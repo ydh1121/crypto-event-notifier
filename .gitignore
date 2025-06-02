@@ -1,0 +1,9 @@
+# Windows 시스템 관련 폴더 무시
+AppData/
+Application Data/
+Local Settings/
+My Documents/
+Cookies/
+Documents/My Music/
+Documents/My Pictures/
+Documents/My Videos/
