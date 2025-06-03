@@ -8,9 +8,9 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 
 # === 텔레그램 설정 ===
-TOKEN = 'YOUR_TOKEN'
-CHANNEL_ID = '@YOUR_CHANNEL_ID'
-bot = telegram.Bot(token=TOKEN)
+import os
+TOKEN = os.environ.get("TELEGRAM_TOKEN")
+CHANNEL_ID = os.environ.get("CHANNEL_ID")
 
 # === 마지막 제목 저장 ===
 last_upbit_title = ''
