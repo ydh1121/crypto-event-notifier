@@ -6,11 +6,12 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
+import os
 
 # === 텔레그램 설정 ===
-import os
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHANNEL_ID = os.environ.get("CHANNEL_ID")
+bot = telegram.Bot(token=TOKEN)  # ← 반드시 먼저 정의되어야 함
 
 # === 마지막 제목 저장 ===
 last_upbit_title = ''
@@ -74,8 +75,11 @@ def check_bithumb_event():
     except Exception as e:
         print(f"빗썸 크롤링 오류: {e}")
 
-# === 테스트 메시지 ===
-bot.send_message(chat_id=CHANNEL_ID, text="✅ 텔레그램 연동 테스트 메시지입니다.")
+# === 텔레그램 연동 테스트 메시지 ===
+try:
+    bot.send_message(chat_id=CHANNEL_ID, text="✅ 텔레그램 연동 테스트 메시지입니다.")
+except Exception as e:
+    print(f"텔레그램 메시지 전송 실패: {e}")
 
 # === 1분마다 반복 실행 ===
 while True:
