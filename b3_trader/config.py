@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 def _bool(name: str, default: bool = False) -> bool:
@@ -16,27 +16,52 @@ def _float(name: str, default: float) -> float:
     return float(value) if value is not None else default
 
 
+def _int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    return int(value) if value is not None else default
+
+
+def _str(name: str, default: str) -> str:
+    return os.getenv(name, default)
+
+
 @dataclass(frozen=True)
 class Settings:
-    market: str = os.getenv("B3_MARKET", "KRW-B3")
-    btc_market: str = os.getenv("BTC_MARKET", "KRW-BTC")
-    eth_market: str = os.getenv("ETH_MARKET", "KRW-ETH")
-    poll_seconds: float = _float("POLL_SECONDS", 10.0)
+    # default_factory is intentional: .env is loaded before Settings() is created.
+    market: str = field(default_factory=lambda: _str("B3_MARKET", "KRW-B3"))
+    btc_market: str = field(default_factory=lambda: _str("BTC_MARKET", "KRW-BTC"))
+    eth_market: str = field(default_factory=lambda: _str("ETH_MARKET", "KRW-ETH"))
 
-    paper_start_krw: float = _float("PAPER_START_KRW", 1_000_000.0)
-    paper_max_position_krw: float = _float("PAPER_MAX_POSITION_KRW", 300_000.0)
-    order_krw: float = _float("ORDER_KRW", 50_000.0)
+    poll_seconds: float = field(default_factory=lambda: _float("POLL_SECONDS", 5.0))
+    candle_refresh_seconds: float = field(default_factory=lambda: _float("CANDLE_REFRESH_SECONDS", 60.0))
+    external_refresh_seconds: float = field(default_factory=lambda: _float("EXTERNAL_REFRESH_SECONDS", 60.0))
+    candle_unit_minutes: int = field(default_factory=lambda: _int("CANDLE_UNIT_MINUTES", 5))
+    candle_count: int = field(default_factory=lambda: _int("CANDLE_COUNT", 48))
 
-    min_regime_score: float = _float("MIN_REGIME_SCORE", 65.0)
-    min_entry_score: float = _float("MIN_ENTRY_SCORE", 68.0)
-    max_daily_loss_pct: float = _float("MAX_DAILY_LOSS_PCT", 3.0)
-    max_slippage_bps: float = _float("MAX_SLIPPAGE_BPS", 35.0)
+    websocket_enabled: bool = field(default_factory=lambda: _bool("WEBSOCKET_ENABLED", True))
+    private_websocket_enabled: bool = field(default_factory=lambda: _bool("PRIVATE_WEBSOCKET_ENABLED", False))
+    okx_derivatives_enabled: bool = field(default_factory=lambda: _bool("OKX_DERIVATIVES_ENABLED", True))
 
-    live_trading_enabled: bool = _bool("LIVE_TRADING_ENABLED", False)
-    live_trading_ack: str = os.getenv("LIVE_TRADING_ACK", "")
+    paper_start_krw: float = field(default_factory=lambda: _float("PAPER_START_KRW", 1_000_000.0))
+    paper_max_position_krw: float = field(default_factory=lambda: _float("PAPER_MAX_POSITION_KRW", 300_000.0))
+    order_krw: float = field(default_factory=lambda: _float("ORDER_KRW", 50_000.0))
+    buy_cooldown_seconds: float = field(default_factory=lambda: _float("BUY_COOLDOWN_SECONDS", 1800.0))
 
-    bithumb_access_key: str = os.getenv("BITHUMB_ACCESS_KEY", "")
-    bithumb_secret_key: str = os.getenv("BITHUMB_SECRET_KEY", "")
+    min_regime_score: float = field(default_factory=lambda: _float("MIN_REGIME_SCORE", 65.0))
+    min_entry_score: float = field(default_factory=lambda: _float("MIN_ENTRY_SCORE", 68.0))
+    max_daily_loss_pct: float = field(default_factory=lambda: _float("MAX_DAILY_LOSS_PCT", 3.0))
+    max_slippage_bps: float = field(default_factory=lambda: _float("MAX_SLIPPAGE_BPS", 35.0))
+
+    journal_db: str = field(
+        default_factory=lambda: _str("B3_JOURNAL_DB", "b3_trader/data/b3_trader.sqlite3")
+    )
+    news_modifier: float = field(default_factory=lambda: _float("NEWS_MODIFIER", 0.0))
+
+    live_trading_enabled: bool = field(default_factory=lambda: _bool("LIVE_TRADING_ENABLED", False))
+    live_trading_ack: str = field(default_factory=lambda: _str("LIVE_TRADING_ACK", ""))
+
+    bithumb_access_key: str = field(default_factory=lambda: _str("BITHUMB_ACCESS_KEY", ""))
+    bithumb_secret_key: str = field(default_factory=lambda: _str("BITHUMB_SECRET_KEY", ""))
 
     @property
     def live_trading_armed(self) -> bool:

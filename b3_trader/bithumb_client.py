@@ -19,7 +19,7 @@ class BithumbClient:
         self.timeout = timeout
         self.session = requests.Session()
 
-    def _jwt_headers(self, params: dict[str, Any] | None = None) -> dict[str, str]:
+    def _jwt_token(self, params: dict[str, Any] | None = None) -> str:
         if not self.access_key or not self.secret_key:
             raise RuntimeError("Bithumb private API credentials are not configured")
 
@@ -34,9 +34,14 @@ class BithumbClient:
             payload["query_hash"] = hashlib.sha512(query.encode("utf-8")).hexdigest()
             payload["query_hash_alg"] = "SHA512"
 
-        token = jwt.encode(payload, self.secret_key, algorithm="HS256")
+        return jwt.encode(payload, self.secret_key, algorithm="HS256")
+
+    def authorization_header(self, params: dict[str, Any] | None = None) -> str:
+        return f"Bearer {self._jwt_token(params)}"
+
+    def _jwt_headers(self, params: dict[str, Any] | None = None) -> dict[str, str]:
         return {
-            "Authorization": f"Bearer {token}",
+            "Authorization": self.authorization_header(params),
             "Content-Type": "application/json; charset=utf-8",
         }
 
@@ -51,11 +56,19 @@ class BithumbClient:
         response.raise_for_status()
         return response.json()
 
+    def market_all(self) -> list[dict[str, Any]]:
+        return self._get("/v1/market/all")
+
     def ticker(self, market: str) -> dict[str, Any]:
-        data = self._get("/v1/ticker", {"markets": market})
+        data = self.tickers([market])
         if not data:
             raise RuntimeError(f"No ticker data for {market}")
         return data[0]
+
+    def tickers(self, markets: list[str]) -> list[dict[str, Any]]:
+        if not markets:
+            return []
+        return self._get("/v1/ticker", {"markets": ",".join(markets)})
 
     def orderbook(self, market: str) -> dict[str, Any]:
         data = self._get("/v1/orderbook", {"markets": market})
@@ -63,11 +76,17 @@ class BithumbClient:
             raise RuntimeError(f"No orderbook data for {market}")
         return data[0]
 
-    def candles_minutes(self, market: str, unit: int = 5, count: int = 120) -> list[dict[str, Any]]:
-        return self._get(
-            f"/v1/candles/minutes/{unit}",
-            {"market": market, "count": count},
-        )
+    def candles_minutes(
+        self,
+        market: str,
+        unit: int = 5,
+        count: int = 120,
+        to: str | None = None,
+    ) -> list[dict[str, Any]]:
+        params: dict[str, Any] = {"market": market, "count": count}
+        if to:
+            params["to"] = to
+        return self._get(f"/v1/candles/minutes/{unit}", params)
 
     def order_chance(self, market: str) -> dict[str, Any]:
         return self._get("/v1/orders/chance", {"market": market}, private=True)
