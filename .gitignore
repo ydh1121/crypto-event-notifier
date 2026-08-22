@@ -1,4 +1,4 @@
-# Windows 시스템 관련 폴더 무시
+# Windows system folders
 AppData/
 Application Data/
 Local Settings/
@@ -14,6 +14,12 @@ Documents/My Videos/
 __pycache__/
 .pytest_cache/
 b3_trader/data/
+*.py[cod]
+*.sqlite
 *.sqlite3
 *.sqlite3-shm
 *.sqlite3-wal
+
+# Cloudflare
+cloudflare/node_modules/
+cloudflare/.wrangler/
