@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import asdict
+from math import isfinite
 from typing import Any
 
 from dotenv import load_dotenv
@@ -16,6 +17,12 @@ from .realtime import (
     RealtimeMarketCache,
     private_account_stream,
     public_market_stream,
+)
+from .risk import (
+    ExecutionGuard,
+    OrderRateLimiter,
+    adaptive_order_krw,
+    estimate_sell,
 )
 from .strategy import B3Strategy, ExternalFactors
 
@@ -35,6 +42,17 @@ def run() -> None:
         client,
         okx_enabled=settings.okx_derivatives_enabled,
         news_modifier=settings.news_modifier,
+    )
+    rate_limiter = OrderRateLimiter(
+        settings.max_orders_per_minute,
+        settings.max_orders_per_hour,
+    )
+    execution_guard = ExecutionGuard(
+        max_spread_bps=settings.max_spread_bps,
+        max_slippage_bps=settings.max_slippage_bps,
+        btc_flash_crash_pct=settings.btc_flash_crash_pct,
+        btc_flash_window_candles=settings.btc_flash_window_candles,
+        rate_limiter=rate_limiter,
     )
 
     realtime_cache = RealtimeMarketCache()
@@ -61,18 +79,25 @@ def run() -> None:
         private_stream.start()
 
     if settings.live_trading_armed:
-        print("WARNING: live credentials are armed, but Phase 2 runner remains PAPER-ONLY.")
+        print("WARNING: live credentials are armed, but Phase 3 runner remains PAPER-ONLY.")
 
     print(
         json.dumps(
             {
                 "mode": "PAPER",
-                "phase": 2,
+                "phase": 3,
                 "market": settings.market,
                 "websocket": bool(public_stream),
                 "private_websocket": bool(private_stream),
                 "okx_derivatives": settings.okx_derivatives_enabled,
                 "journal_db": settings.journal_db,
+                "execution_guard": {
+                    "max_spread_bps": settings.max_spread_bps,
+                    "max_slippage_bps": settings.max_slippage_bps,
+                    "btc_flash_crash_pct": settings.btc_flash_crash_pct,
+                    "max_orders_per_minute": settings.max_orders_per_minute,
+                    "max_orders_per_hour": settings.max_orders_per_hour,
+                },
             },
             ensure_ascii=False,
         )
@@ -154,6 +179,7 @@ def run() -> None:
                     "paper_cash_krw": round(account.cash_krw, 2),
                     "paper_b3": round(account.b3_volume, 8),
                     "paper_avg_price": round(account.avg_price, 6),
+                    "daily_drawdown_pct": round(account.daily_drawdown_pct(price), 4),
                 }
                 print(json.dumps(output, ensure_ascii=False))
                 journal.record_snapshot(
@@ -172,35 +198,97 @@ def run() -> None:
                     and signal.entry_score >= settings.min_entry_score
                     and now - last_buy_at >= settings.buy_cooldown_seconds
                 ):
-                    allowed, reason = account.can_buy(price, settings.order_krw)
-                    if allowed:
-                        fill = account.buy(
-                            price,
-                            settings.order_krw,
-                            f"regime={signal.regime_score}, entry={signal.entry_score}",
-                        )
-                        last_buy_at = now
-                        journal.record_fill(
-                            mode="paper",
-                            market=settings.market,
-                            fill=fill,
-                            ts=now,
-                        )
-                        print(json.dumps({"paper_fill": asdict(fill)}, ensure_ascii=False))
-                    else:
-                        journal.record_event(
-                            "paper_buy_blocked",
-                            {"reason": reason, "price": price},
-                            ts=now,
-                        )
-                        print(json.dumps({"paper_buy_blocked": reason}, ensure_ascii=False))
+                    sized_order_krw = adaptive_order_krw(
+                        settings.order_krw,
+                        regime_score=signal.regime_score,
+                        entry_score=signal.entry_score,
+                        min_multiplier=settings.adaptive_size_min_multiplier,
+                        max_multiplier=settings.adaptive_size_max_multiplier,
+                    )
 
+                    risk = execution_guard.evaluate_buy(
+                        orderbook=orderbook,
+                        btc_candles=btc,
+                        order_krw=sized_order_krw,
+                        now=now,
+                    )
+                    if not risk.allowed:
+                        journal.record_event(
+                            "execution_risk_blocked",
+                            risk.to_dict(),
+                            ts=now,
+                        )
+                        print(
+                            json.dumps(
+                                {"paper_buy_blocked": "execution_risk", "risk": risk.to_dict()},
+                                ensure_ascii=False,
+                            )
+                        )
+                    else:
+                        fill_price = (
+                            risk.estimated_fill_price
+                            if isfinite(risk.estimated_fill_price)
+                            else price
+                        )
+                        allowed, reason = account.can_buy(fill_price, sized_order_krw)
+                        if allowed:
+                            fill = account.buy(
+                                fill_price,
+                                sized_order_krw,
+                                (
+                                    f"regime={signal.regime_score}, "
+                                    f"entry={signal.entry_score}, "
+                                    f"spread_bps={risk.spread_bps}, "
+                                    f"slippage_bps={risk.estimated_slippage_bps}"
+                                ),
+                            )
+                            rate_limiter.record(now)
+                            last_buy_at = now
+                            journal.record_fill(
+                                mode="paper",
+                                market=settings.market,
+                                fill=fill,
+                                ts=now,
+                            )
+                            print(
+                                json.dumps(
+                                    {"paper_fill": asdict(fill), "risk": risk.to_dict()},
+                                    ensure_ascii=False,
+                                )
+                            )
+                        else:
+                            journal.record_event(
+                                "paper_buy_blocked",
+                                {
+                                    "reason": reason,
+                                    "price": fill_price,
+                                    "order_krw": sized_order_krw,
+                                    "risk": risk.to_dict(),
+                                },
+                                ts=now,
+                            )
+                            print(
+                                json.dumps(
+                                    {"paper_buy_blocked": reason, "risk": risk.to_dict()},
+                                    ensure_ascii=False,
+                                )
+                            )
+
+                # Emergency risk-off exits are never blocked by spread/rate guards.
                 if signal.regime_score < 45.0 and account.b3_volume > 0:
+                    sell_price, sell_slippage = estimate_sell(orderbook, account.b3_volume)
+                    if not isfinite(sell_price):
+                        sell_price = price
                     fill = account.sell_all(
-                        price,
-                        f"risk_off regime={signal.regime_score}",
+                        sell_price,
+                        (
+                            f"risk_off regime={signal.regime_score}, "
+                            f"estimated_sell_slippage_bps="
+                            f"{sell_slippage if isfinite(sell_slippage) else 'unknown'}"
+                        ),
                     )
                     if fill:
+                        rate_limiter.record(now)
                         journal.record_fill(
                             mode="paper",
                             market=settings.market,
