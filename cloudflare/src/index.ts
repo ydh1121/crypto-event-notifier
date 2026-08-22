@@ -27,10 +27,8 @@ export class B3TraderContainer extends Container<Env> {
     `);
   }
 
-  async captureCheckpoint(): Promise<Checkpoint> {
-    if (!this.ctx.container.running) {
-      await this.startAndWaitForPorts();
-    }
+  async captureCheckpoint(): Promise<string> {
+    await this.startAndWaitForPorts();
 
     const response = await this.containerFetch("/checkpoint");
     if (!response.ok) {
@@ -49,12 +47,13 @@ export class B3TraderContainer extends Container<Env> {
 
     this.ensureSchema();
     const capturedAt = Date.now();
+    const encoded = JSON.stringify(checkpoint);
     this.ctx.storage.sql.exec(
       `INSERT INTO checkpoints(captured_at, snapshot_ts, payload_json)
        VALUES (?, ?, ?)`,
       capturedAt,
       snapshotTs,
-      JSON.stringify(checkpoint),
+      encoded,
     );
 
     const cutoff = capturedAt - 7 * 24 * 60 * 60 * 1000;
@@ -63,10 +62,10 @@ export class B3TraderContainer extends Container<Env> {
       cutoff,
     );
 
-    return checkpoint;
+    return encoded;
   }
 
-  async latestCheckpoint(): Promise<Checkpoint | null> {
+  async latestCheckpoint(): Promise<string | null> {
     this.ensureSchema();
     const rows = [
       ...this.ctx.storage.sql.exec(
@@ -83,14 +82,14 @@ export class B3TraderContainer extends Container<Env> {
       snapshot_ts: number | null;
       payload_json: string;
     };
-    return {
+    return JSON.stringify({
       captured_at: row.captured_at,
       snapshot_ts: row.snapshot_ts,
       checkpoint: JSON.parse(row.payload_json),
-    };
+    });
   }
 
-  async checkpointHistory(limit = 60): Promise<Checkpoint[]> {
+  async checkpointHistory(limit = 60): Promise<string> {
     this.ensureSchema();
     const safeLimit = Math.max(1, Math.min(1440, Math.floor(limit)));
     const rows = [
@@ -103,18 +102,20 @@ export class B3TraderContainer extends Container<Env> {
       ),
     ];
 
-    return rows.map((raw) => {
-      const row = raw as {
-        captured_at: number;
-        snapshot_ts: number | null;
-        payload_json: string;
-      };
-      return {
-        captured_at: row.captured_at,
-        snapshot_ts: row.snapshot_ts,
-        checkpoint: JSON.parse(row.payload_json),
-      };
-    });
+    return JSON.stringify(
+      rows.map((raw) => {
+        const row = raw as {
+          captured_at: number;
+          snapshot_ts: number | null;
+          payload_json: string;
+        };
+        return {
+          captured_at: row.captured_at,
+          snapshot_ts: row.snapshot_ts,
+          checkpoint: JSON.parse(row.payload_json),
+        };
+      }),
+    );
   }
 }
 
@@ -126,6 +127,16 @@ function authorized(request: Request, env: Env): boolean {
 
 function json(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+    },
+  });
+}
+
+function rawJson(payload: string | null, status = 200): Response {
+  return new Response(payload ?? "null", {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
@@ -152,16 +163,16 @@ export default {
     }
 
     if (url.pathname === "/status") {
-      return json(await instance.latestCheckpoint());
+      return rawJson(await instance.latestCheckpoint());
     }
 
     if (url.pathname === "/history") {
       const limit = Number(url.searchParams.get("limit") ?? "60");
-      return json(await instance.checkpointHistory(limit));
+      return rawJson(await instance.checkpointHistory(limit));
     }
 
     if (url.pathname === "/capture" && request.method === "POST") {
-      return json(await instance.captureCheckpoint());
+      return rawJson(await instance.captureCheckpoint());
     }
 
     return json({ ok: false, error: "not_found" }, 404);
@@ -173,9 +184,13 @@ export default {
     ctx: ExecutionContext,
   ): Promise<void> {
     ctx.waitUntil(
-      trader(env)
-        .captureCheckpoint()
-        .catch((error) => console.error("checkpoint capture failed", error)),
+      (async () => {
+        try {
+          await trader(env).captureCheckpoint();
+        } catch (error: unknown) {
+          console.error("checkpoint capture failed", error);
+        }
+      })(),
     );
   },
 } satisfies ExportedHandler<Env>;
