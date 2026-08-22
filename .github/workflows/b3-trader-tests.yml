@@ -1,0 +1,23 @@
+name: B3 Trader Tests
+
+on:
+  pull_request:
+    paths:
+      - 'b3_trader/**'
+      - '.github/workflows/b3-trader-tests.yml'
+  push:
+    branches:
+      - b3-auto-trader-phase1
+    paths:
+      - 'b3_trader/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r b3_trader/requirements.txt
+      - run: python -m unittest discover -s b3_trader/tests -v
