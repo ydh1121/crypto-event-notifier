@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "assets": [
+    {
+      "market": "KRW-B3",
+      "symbol": "B3",
+      "enabled": true,
+      "context_mode": "base_gaming",
+      "related_markets": ["KRW-AERO", "KRW-VIRTUAL", "KRW-DEGEN", "KRW-IMX", "KRW-AXS", "KRW-GALA", "KRW-BEAM"],
+      "order_krw": 50000,
+      "max_position_krw": 300000,
+      "min_regime_score": 65,
+      "min_entry_score": 68,
+      "news_modifier": 0,
+      "notes": "B3 Base + gaming profile. GPT can update this file when strategy context changes."
+    }
+  ]
+}
