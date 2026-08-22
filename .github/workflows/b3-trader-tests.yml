@@ -4,16 +4,22 @@ on:
   pull_request:
     paths:
       - "b3_trader/**"
+      - "cloudflare/**"
+      - "Dockerfile"
+      - ".dockerignore"
       - ".github/workflows/b3-trader-tests.yml"
   push:
     branches:
       - b3-auto-trader-phase1
     paths:
       - "b3_trader/**"
+      - "cloudflare/**"
+      - "Dockerfile"
+      - ".dockerignore"
       - ".github/workflows/b3-trader-tests.yml"
 
 jobs:
-  test:
+  python-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,6 +27,18 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r b3_trader/requirements.txt pytest
-      - run: pytest -q b3_trader/tests
-        env:
-          PYTHONPATH: .
+      - run: python -m pytest -q b3_trader/tests
+      - run: python -m py_compile b3_trader/*.py
+
+  cloudflare-typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install
+      - run: npm run typecheck
