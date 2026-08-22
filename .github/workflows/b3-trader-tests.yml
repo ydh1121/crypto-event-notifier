@@ -22,3 +22,5 @@ jobs:
           python-version: "3.12"
       - run: pip install -r b3_trader/requirements.txt pytest
       - run: pytest -q b3_trader/tests
+        env:
+          PYTHONPATH: .
