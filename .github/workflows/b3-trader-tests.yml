@@ -8,6 +8,7 @@ on:
       - "Dockerfile"
       - ".dockerignore"
       - ".github/workflows/b3-trader-tests.yml"
+      - ".github/workflows/deploy-b3-cloudflare.yml"
   push:
     branches:
       - b3-auto-trader-phase1
@@ -17,6 +18,7 @@ on:
       - "Dockerfile"
       - ".dockerignore"
       - ".github/workflows/b3-trader-tests.yml"
+      - ".github/workflows/deploy-b3-cloudflare.yml"
 
 jobs:
   python-test:
