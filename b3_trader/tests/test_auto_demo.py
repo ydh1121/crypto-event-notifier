@@ -154,3 +154,64 @@ def test_leaderboard_can_return_more_than_old_top_60_limit(tmp_path: Path):
     store.close()
 
     assert len(rows) == 75
+
+
+def test_market_memory_accumulates_scan_features_for_ai_analysis(tmp_path: Path):
+    store = DemoStore(tmp_path / "demo.sqlite3")
+    store.ensure_market("KRW-AAA", "AAA", "Alpha")
+
+    def save(ts: float, price: float, opportunity: float) -> None:
+        store.save_signal(
+            {
+                "market": "KRW-AAA",
+                "symbol": "AAA",
+                "ts": ts,
+                "price": price,
+                "turnover_24h": 1_000_000_000.0,
+                "change_24h_pct": 3.2,
+                "liquidity_score": 70.0,
+                "regime_score": 62.0,
+                "entry_score": 58.0,
+                "opportunity_score": opportunity,
+                "strategy_action": "WATCH",
+                "trade_intent": "wait",
+                "suggested_weight_pct": 7.5,
+                "reason": "test",
+                "signal": {
+                    "asset_return_pct": 2.5,
+                    "pullback_pct": 4.2,
+                    "volatility_pct": 1.8,
+                    "orderbook_imbalance": 0.12,
+                    "fib_retrace": 0.5,
+                    "btc_return_pct": 0.8,
+                    "eth_return_pct": 1.0,
+                    "asset_vs_majors_pct": 1.6,
+                    "trade_plan": {"target_price": 120.0},
+                },
+            }
+        )
+
+    save(1000.0, 100.0, 60.0)
+    save(1010.0, 102.0, 64.0)
+    detail = store.market_detail("KRW-AAA")
+    store.close()
+
+    assert detail["market_memory_count"] == 2
+    assert len(detail["market_memory"]) == 2
+    assert detail["market_memory"][-1]["price"] == 102.0
+    assert detail["market_memory"][-1]["price_delta_pct"] > 1.9
+    assert detail["market_memory"][-1]["opportunity_delta"] == 4.0
+    assert detail["market_memory"][-1]["features"]["trade_plan"]["target_price"] == 120.0
+
+
+def test_completed_trade_without_position_is_classified_as_waiting(tmp_path: Path):
+    store = DemoStore(tmp_path / "demo.sqlite3")
+    store.ensure_market("KRW-AAA", "AAA", "Alpha")
+    store.conn.execute("UPDATE research_profiles SET closed_trades=2,wins=1 WHERE market='KRW-AAA'")
+    store.conn.commit()
+    row = store.leaderboard(10)[0]
+    store.close()
+
+    assert row["has_position"] is False
+    assert row["state_class"] == "completed_waiting"
+    assert row["state_label"] == "매매 완료 · 대기"
