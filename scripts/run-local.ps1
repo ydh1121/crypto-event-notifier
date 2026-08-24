@@ -5,8 +5,7 @@ $targetBranch = "b3-auto-trader-phase1"
 
 # Windows PowerShell 5.1 can surface stderr from a successful native command
 # (for example Git's normal "From https://..." fetch progress) as an ErrorRecord.
-# With ErrorActionPreference=Stop that incorrectly aborts startup. Capture native
-# Git output under Continue semantics and decide success only from the exit code.
+# Capture native Git output and decide success from the exit code.
 function Invoke-GitCapture {
   param([Parameter(Mandatory = $true)][string[]]$GitArgs)
 
@@ -117,17 +116,42 @@ if (-not (Test-Path ".env")) {
   Write-Host ".env created. PAPER mode needs no Bithumb API key."
 }
 
+$demo = $null
+$demoEnabled = $env:AUTO_DEMO_ENABLED -ne "false"
+if ($demoEnabled) {
+  $demoOut = Join-Path $repo "b3_trader\data\auto-demo-out.log"
+  $demoErr = Join-Path $repo "b3_trader\data\auto-demo-err.log"
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $demoOut) | Out-Null
+  Remove-Item $demoOut,$demoErr -Force -ErrorAction SilentlyContinue
+  Write-Host "Starting isolated 10,000,000 KRW Bithumb-wide PAPER demo scanner..."
+  $demo = Start-Process -FilePath $python -ArgumentList @("-m", "b3_trader.auto_demo") -WorkingDirectory $repo -RedirectStandardOutput $demoOut -RedirectStandardError $demoErr -PassThru -WindowStyle Hidden
+  Write-Host "Demo account is PAPER-only and uses no Bithumb private API credentials."
+}
+
 Write-Host "Starting Crypto Auto Trader..."
 Write-Host "Dashboard will be available at http://127.0.0.1:8765"
-while ($true) {
-  & $python -m b3_trader.local_app
-  $code = $LASTEXITCODE
-  if ($code -eq 0) { break }
-  if ($code -eq 75) {
-    Write-Host "GitHub update applied. Restarting trader..."
-    Start-Sleep -Seconds 2
-    continue
+try {
+  while ($true) {
+    if ($demoEnabled -and ($null -eq $demo -or $demo.HasExited)) {
+      Write-Warning "PAPER demo process stopped. Restarting it."
+      $demoOut = Join-Path $repo "b3_trader\data\auto-demo-out.log"
+      $demoErr = Join-Path $repo "b3_trader\data\auto-demo-err.log"
+      $demo = Start-Process -FilePath $python -ArgumentList @("-m", "b3_trader.auto_demo") -WorkingDirectory $repo -RedirectStandardOutput $demoOut -RedirectStandardError $demoErr -PassThru -WindowStyle Hidden
+    }
+
+    & $python -m b3_trader.local_app
+    $code = $LASTEXITCODE
+    if ($code -eq 0) { break }
+    if ($code -eq 75) {
+      Write-Host "GitHub update applied. Restarting trader..."
+      Start-Sleep -Seconds 2
+      continue
+    }
+    Write-Host "Trader stopped with exit code $code. Restarting in 5 seconds..."
+    Start-Sleep -Seconds 5
   }
-  Write-Host "Trader stopped with exit code $code. Restarting in 5 seconds..."
-  Start-Sleep -Seconds 5
+} finally {
+  if ($demo -and -not $demo.HasExited) {
+    Stop-Process -Id $demo.Id -Force -ErrorAction SilentlyContinue
+  }
 }
