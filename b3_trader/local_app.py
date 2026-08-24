@@ -21,6 +21,7 @@ from .runtime_config import RuntimeConfigStore
 from .runtime_state import RuntimeState
 from .sync_manager import BackupManager, GitAutoSync
 from .telegram_notify import TelegramNotifier
+from .telegram_settings import TelegramSettingsStore
 
 RESTART_EXIT_CODE = 75
 LOOPBACK_HOSTS = {"127.0.0.1", "::1", "::ffff:127.0.0.1"}
@@ -47,11 +48,19 @@ def create_app() -> FastAPI:
     registry = AssetRegistry(settings.asset_registry_path)
     runtime_config = RuntimeConfigStore(settings.runtime_config_path)
     journal = TradeJournal(settings.journal_db)
-    notifier = TelegramNotifier(
-        settings.telegram_token,
-        settings.telegram_chat_id,
-        enabled=settings.telegram_enabled,
+
+    telegram_store = TelegramSettingsStore(
+        default_enabled=settings.telegram_enabled,
+        default_token=settings.telegram_token,
+        default_chat_id=settings.telegram_chat_id,
     )
+    telegram_settings = telegram_store.load()
+    notifier = TelegramNotifier(
+        telegram_settings.token,
+        telegram_settings.chat_id,
+        enabled=telegram_settings.enabled,
+    )
+
     token = _dashboard_token(settings)
     engine = MultiAssetEngine(
         settings=settings,
@@ -113,15 +122,12 @@ def create_app() -> FastAPI:
             engine.stop()
             journal.close()
 
-    app = FastAPI(title="Crypto Auto Trader", version="0.4.1", lifespan=lifespan)
+    app = FastAPI(title="Crypto Auto Trader", version="0.4.2", lifespan=lifespan)
 
     def auth(
         request: Request,
         authorization: str | None = Header(default=None),
     ) -> None:
-        # The dashboard is served by this same process. Loopback requests are allowed
-        # without a token so stale browser localStorage cannot lock out the desktop UI.
-        # LAN/Tailscale/other remote clients still require the bearer token.
         client_host = request.client.host if request.client else ""
         if client_host in LOOPBACK_HOSTS:
             return
@@ -244,11 +250,57 @@ def create_app() -> FastAPI:
     def events(limit: int = Query(default=100, ge=1, le=1000)) -> list[dict[str, Any]]:
         return journal.recent_events(limit)
 
+    @app.get("/api/telegram/status", dependencies=[Depends(auth)])
+    def telegram_status() -> dict[str, Any]:
+        return notifier.status()
+
+    @app.put("/api/telegram/config", dependencies=[Depends(auth)])
+    def telegram_config(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
+        current = telegram_store.load()
+        enabled = bool(payload.get("enabled", current.enabled))
+        supplied_token = str(payload.get("token") or "").strip()
+        supplied_chat_id = str(payload.get("chat_id") or "").strip()
+        next_token = supplied_token or current.token
+        next_chat_id = supplied_chat_id or current.chat_id
+
+        if enabled and (not next_token or not next_chat_id):
+            raise HTTPException(
+                status_code=422,
+                detail="Telegram bot token and chat ID are required",
+            )
+
+        updated = telegram_store.patch(
+            enabled=enabled,
+            token=supplied_token if supplied_token else None,
+            chat_id=supplied_chat_id if supplied_chat_id else None,
+        )
+        notifier.configure(
+            token=updated.token,
+            chat_id=updated.chat_id,
+            enabled=updated.enabled,
+        )
+        journal.record_event(
+            "telegram_config_updated",
+            {
+                "enabled": notifier.enabled,
+                "configured": bool(updated.token and updated.chat_id),
+                "chat_id": updated.chat_id,
+            },
+        )
+        return notifier.status()
+
     @app.post("/api/telegram/test", dependencies=[Depends(auth)])
     def telegram_test() -> dict[str, Any]:
         if not notifier.enabled:
-            raise HTTPException(status_code=409, detail="Telegram is not configured")
-        return {"ok": notifier.safe_send("Crypto Auto Trader 텔레그램 연결 테스트")}
+            raise HTTPException(
+                status_code=409,
+                detail="Telegram is not configured or enabled",
+            )
+        try:
+            ok = notifier.send("Crypto Auto Trader 텔레그램 연결 테스트")
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        return {"ok": ok}
 
     @app.post("/api/backup", dependencies=[Depends(auth)])
     def backup_now() -> dict[str, Any]:
@@ -269,6 +321,7 @@ def create_app() -> FastAPI:
     app.state.engine = engine
     app.state.git_sync = git_sync
     app.state.backup = backup
+    app.state.telegram_store = telegram_store
     app.state.dashboard_token = token
     return app
 
