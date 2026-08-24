@@ -65,35 +65,30 @@ Final fix:
 
 ### 3. Liquid Glass selector now floats outside the rail
 
-User explicitly requested that the active Liquid pill not be trapped inside the rail.
-
-Current `dashboard/navigation-v3.js` architecture:
-- the scrollable rail remains the native iOS scrollport
-- the moving indicator is mounted in an **outer overlay host** (`.view-rail` for primary tabs and `.asset-chip-shell` for coin chips)
-- item geometry is translated from `getBoundingClientRect()` into host coordinates
+- scrollable rail remains the native iOS scrollport
+- moving indicator is mounted in an **outer overlay host** (`.view-rail` for primary tabs and `.asset-chip-shell` for coin chips)
+- geometry is translated from `getBoundingClientRect()` into host coordinates
 - primary tab indicator uses a small outer bleed
-- coin-chip indicator uses an 11 px bleed, large enough to cross the inner rail padding/border and visibly float outside it
-- horizontal scroll updates the overlay position while leaving Safari momentum native
+- coin-chip indicator uses an 11 px bleed, enough to cross the inner rail padding/border and visibly float outside it
+- horizontal scroll updates overlay position while Safari momentum remains native
 - motion is stretch -> overshoot -> snap-back with the approved spring family
 - press interaction compresses the liquid skin slightly
 - `prefers-reduced-motion` remains supported
 
-This keeps Photo-eBook's rule: no JS replacement for iOS rail momentum; the rubber/taffy behavior belongs to the selected Liquid surface.
-
 ### 4. GitHub -> local automatic synchronization
 
-The architecture is now explicit:
 - default remote polling interval is 15 seconds
-- static `dashboard/*.js|css|html` commits are fast-forwarded locally **without restarting Uvicorn** because StaticFiles serves them directly from disk
-- the dashboard watches sync state and reloads itself when dashboard files changed, including `updated`, `published`, and `reconciled` sync paths
-- `b3_trader/*.py` runtime changes still require a Python-process reload; GitAutoSync requests exit code 75 and the existing PowerShell supervisor restarts the app automatically
-- therefore the user should not normally have to stop/re-run `start-trader-secure.bat` for GitHub commits
-- control-only local state remains preserved/reconciled; unexpected non-control local code changes still block auto-update rather than being destroyed
-- `dashboard/index.html` now uses explicit v5/v2 cache-busts for the final navigation/calculator files and `_headers` requests no-store/no-cache
+- static `dashboard/*.js|css|html` commits fast-forward locally without restarting Uvicorn
+- dashboard watcher reloads for `updated`, `published`, and `reconciled` sync paths
+- `b3_trader/*.py` runtime changes request exit code 75 and the already-running PowerShell supervisor restarts the Python app automatically
+- user should not normally stop/re-run `start-trader-secure.bat` for GitHub commits
+- control-only local state remains preserved/reconciled
+- unexpected non-control local code changes block auto-update instead of being destroyed
+- `index.html` uses v5/v2 cache-busts for final navigation/calculator files; static headers request no-store/no-cache
 
 ### 5. Existing stability fixes retained
 
-- `판단 근거 자세히 보기` open state survives polling rerenders
+- `판단 근거 자세히 보기` state survives polling rerenders
 - mobile inputs avoid Safari focus zoom
 - routine button labels stay one line
 - ETH/BTC remains a built-in market reference, not a fake KRW asset
@@ -101,50 +96,46 @@ The architecture is now explicit:
 
 ## Isolated 10,000,000 KRW automatic PAPER demo
 
-The demo is now owned by the **FastAPI app lifecycle**, not by a one-time child process created only when the shell launcher starts. This fixes the problem where code could sync but the newly added demo would not appear until a manual launcher restart.
-
-Implemented in `b3_trader/auto_demo.py` + `b3_trader/local_app.py`.
+The demo is owned by the **FastAPI app lifecycle**, not by a one-time child process created only when the shell launcher starts.
 
 Core rules:
 - start capital: 10,000,000 KRW
 - public Bithumb endpoints only; no private/order endpoints and no API key required
-- scans the current Bithumb KRW market list roughly every 3 minutes
+- scans Bithumb KRW markets roughly every 3 minutes
 - excludes BTC, ETH and major stablecoins from candidate trading
 - filters low turnover and extreme 24h moves
-- ranks liquid universe using liquidity + momentum, then applies existing `AssetStrategy`
+- ranks liquidity + momentum, then applies existing `AssetStrategy`
 - entry still requires existing `BUY_CANDIDATE`
 - adaptive entry sizing from 500,000 KRW base
 - max per asset 3,000,000 KRW
 - max total exposure 6,000,000 KRW
 - max simultaneous positions 4
 - reuses spread/slippage/BTC flash-crash/order-rate guards
-- additional PAPER buys allowed only after cooldown while BUY_CANDIDATE persists and caps permit
+- additional PAPER buys only after cooldown while BUY_CANDIDATE persists and caps permit
 - exit on -8% hard PAPER stop or regime score below 45
-- sell fill uses order-book-estimated executable price when available
+- sell uses order-book-estimated executable price when available
 
 Lifecycle/persistence/UI:
-- separate SQLite: ignored `b3_trader/data/auto_demo.sqlite3`
-- generated runtime status remains ignored `dashboard/runtime-demo.json`
-- local app starts/supervises the demo in a daemon thread when `AUTO_DEMO_ENABLED` is not false
-- the status includes PID so an older external demo process can be observed rather than duplicated during migration
-- `/api/demo` exposes authenticated demo status to the dashboard
-- Home always mounts a `1,000만원 자동매매 데모` card; it shows virtual equity, cash, held symbols and current candidates
-- no demo state contaminates the main PAPER portfolio or manually entered real holdings
+- separate ignored SQLite: `b3_trader/data/auto_demo.sqlite3`
+- generated ignored runtime status: `dashboard/runtime-demo.json`
+- local app starts/supervises the demo thread when `AUTO_DEMO_ENABLED` is not false
+- `/api/demo` exposes authenticated demo status
+- Home always mounts `1,000만원 자동매매 데모`, showing virtual equity, cash, held symbols and current candidates
+- demo never contaminates the main PAPER portfolio or manually entered real holdings
 
 ## Current phone-access decision
 
 - User does not want a phone VPN dependency and removed Tailscale.
 - Primary path: Cloudflare HTTPS Tunnel.
 - Best long-term workflow: one-time named Tunnel + fixed custom hostname, then always launch `start-trader-secure.bat`.
-- Quick Tunnel remains the fallback.
+- Quick Tunnel remains fallback.
 - Do not reintroduce public port forwarding.
 
 ## Git/CI state
 
 - Work continues on `b3-auto-trader-phase1`, Draft PR #1; do not merge without explicit request.
-- Latest fully validated functional UI/runtime head before final cosmetic/cache-bust follow-ups: `b433747f4c6db916d869b08de849a3250e1663a4`.
-- GitHub Actions on that head passed dashboard smoke, Python tests/compile and Cloudflare typecheck.
-- Follow-up commits remove conflicting calculator CSS, increase coin Liquid bleed, and bump static asset versions; validate latest head before declaring QA complete.
+- `b433747f4c6db916d869b08de849a3250e1663a4` passed dashboard smoke, Python tests/compile and Cloudflare typecheck.
+- Later functional QA commits remove conflicting calculator CSS, increase Liquid bleed and bump cache versions; re-check latest head CI before declaring the visual fix complete.
 - Local `control/assets.json` may remain modified because the user added assets locally.
 - Runtime data under `b3_trader/data/` and generated `dashboard/runtime-demo.json` remain ignored by Git.
 
@@ -154,25 +145,21 @@ Lifecycle/persistence/UI:
 
 ## Exact next action
 
-1. Allow the currently running local app up to about one old-sync interval to receive this bootstrap update. Because this update changes Python, the process should auto-exit with code 75 and be restarted by the already-running supervisor; the user should not manually restart the launcher unless that bootstrap fails.
-2. After the automatic runtime restart, refresh the browser once if it was already open on the pre-hot-reload JavaScript. From then on dashboard-only commits should self-reload.
-3. Verify on Home that `1,000만원 자동매매 데모` is visible and `/api/demo` is updating.
-4. Verify on Coin:
-   - averaging inputs are full-width stacked rows
-   - average price is visibly larger
-   - P/L amount and percentage are both visible
-   - coin Liquid selector visibly crosses the inner rail boundary and springs when changed
-5. Leave the demo running to collect trade count, realized P/L, drawdown, concentration and candidate-quality evidence before changing live-trading scope.
-6. Finish rclone Google Drive backup verification after UI/demo validation.
-7. Leave real-money trading deferred to the separate future Work/workstream.
+1. Let the running local app receive the bootstrap update. Python changes should auto-exit with code 75 and be restarted by the already-running supervisor; do not manually restart the launcher unless this fails.
+2. Refresh an already-open browser once after that bootstrap runtime restart. Future dashboard-only commits should self-reload.
+3. Verify Home shows `1,000만원 자동매매 데모` and `/api/demo` updates.
+4. Verify Coin: full-width stacked averaging inputs, larger avg price, visible P/L, coin Liquid selector crossing the rail and springing.
+5. Leave the demo running to collect trade count, P/L, drawdown, concentration and candidate-quality evidence.
+6. Finish Google Drive/rclone backup after UI/demo validation.
+7. Keep real-money trading deferred.
 
 ## Safety constraints
 
 - Keep all exchange execution PAPER-only.
-- Keep `LIVE_TRADING_ENABLED=false`; do not add live order execution here.
-- The isolated auto demo uses only public Bithumb market endpoints.
+- Keep `LIVE_TRADING_ENABLED=false`.
+- Auto demo uses only public Bithumb market endpoints.
 - Never commit local tokens/secrets, Cloudflare credentials, public IPs or runtime SQLite files.
-- Do not expose port 8765 directly to the public internet.
+- Do not expose port 8765 publicly.
 - Preserve remote bearer-token authentication.
-- Local phone-code reveal/rotate/onboarding generation stays loopback-only.
-- Manual real holdings are display/calculator inputs only; they must not trigger exchange orders in this workstream.
+- Local phone-code reveal/rotate/onboarding stays loopback-only.
+- Manual real holdings are display/calculator inputs only.
