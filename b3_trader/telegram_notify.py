@@ -40,6 +40,7 @@ class TelegramNotifier:
                 "configured": bool(self.token and self.chat_id),
                 "token_configured": bool(self.token),
                 "chat_id": self.chat_id,
+                "automatic_alerts": "buy_candidate_only",
             }
 
     def send(
@@ -92,6 +93,15 @@ class TelegramNotifier:
         return True
 
     def safe_send(self, text: str, **kwargs: Any) -> bool:
+        """Send automatic alerts only when a fresh BUY_CANDIDATE appears.
+
+        Manual `/api/telegram/test` uses `send()` directly and therefore still works.
+        All routine engine/risk/fill/error summaries keep being journaled in the dashboard,
+        but they no longer create Telegram noise.
+        """
+        event_key = str(kwargs.get("event_key") or "")
+        if not (event_key.startswith("action-") and event_key.endswith("-BUY_CANDIDATE")):
+            return False
         try:
             return self.send(text, **kwargs)
         except Exception:
