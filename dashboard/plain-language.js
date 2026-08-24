@@ -214,9 +214,27 @@ function addMobileNavLabels(){
   tabs.forEach((tab,i)=>{if(!tab.querySelector('.nav-icon'))tab.innerHTML=`<span class="nav-icon">${icons[i]}</span><span>${tab.textContent}</span>`});
 }
 
+function loadLiquidNavigationEnhancements(){
+  if(!document.querySelector('link[data-crypto-liquid-nav]')){
+    const link=document.createElement('link');
+    link.rel='stylesheet';
+    link.href='./liquid-navigation.css?v=1';
+    link.dataset.cryptoLiquidNav='true';
+    document.head.appendChild(link);
+  }
+  if(!document.querySelector('script[data-crypto-liquid-nav]')){
+    const script=document.createElement('script');
+    script.src='./liquid-navigation.js?v=1';
+    script.dataset.cryptoLiquidNav='true';
+    document.body.appendChild(script);
+  }
+}
+
 applyPlainStaticCopy();
 addMobileNavLabels();
 loadSimpleHoldings();
 loadLocalPhoneCode();
 setInterval(loadSimpleHoldings,15000);
 setTimeout(()=>{applyPlainStaticCopy();addMobileNavLabels();loadSimpleHoldings();loadLocalPhoneCode()},500);
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',loadLiquidNavigationEnhancements,{once:true});
+else setTimeout(loadLiquidNavigationEnhancements,0);
