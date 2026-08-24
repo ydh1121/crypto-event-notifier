@@ -11,9 +11,9 @@
   const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
   const reduced=()=>window.matchMedia?.('(prefers-reduced-motion: reduce)').matches===true;
 
-  function ensureIndicator(root,className){
-    if(!root)return null;
-    const existing=$$(`:scope > .${className}`,root);
+  function ensureIndicator(host,className){
+    if(!host)return null;
+    const existing=$$(`:scope > .${className}`,host);
     existing.slice(1).forEach(node=>node.remove());
     let indicator=existing[0];
     if(!indicator){
@@ -21,7 +21,7 @@
       indicator.className=className;
       indicator.setAttribute('aria-hidden','true');
       indicator.innerHTML='<span class="dashboard-liquid-skin" aria-hidden="true"></span>';
-      root.prepend(indicator);
+      host.prepend(indicator);
     }
     if(!indicator.querySelector(':scope > .dashboard-liquid-skin')){
       indicator.innerHTML='<span class="dashboard-liquid-skin" aria-hidden="true"></span>';
@@ -29,17 +29,25 @@
     return indicator;
   }
 
-  function geometry(item){
-    if(!item)return null;
-    const x=item.offsetLeft,y=item.offsetTop,w=item.offsetWidth,h=item.offsetHeight;
+  function geometry(item,host,bleed){
+    if(!item||!host)return null;
+    const itemRect=item.getBoundingClientRect();
+    const hostRect=host.getBoundingClientRect();
+    const b=Number(bleed||0);
+    const x=itemRect.left-hostRect.left-b;
+    const y=itemRect.top-hostRect.top-b;
+    const w=itemRect.width+b*2;
+    const h=itemRect.height+b*2;
     return w&&h?{x,y,w,h}:null;
   }
 
-  function makeLiquidController(root,{itemSelector,indicatorClass}){
-    if(!root)return null;
+  function makeLiquidController(root,{itemSelector,indicatorClass,host=root,bleed=0}){
+    if(!root||!host)return null;
     const old=controllers.get(root);
     if(old){old.repair();return old;}
-    let indicator=ensureIndicator(root,indicatorClass);
+
+    root.querySelectorAll(`:scope > .${indicatorClass}`).forEach(node=>node.remove());
+    let indicator=ensureIndicator(host,indicatorClass);
     const state={ready:false,x:0,y:0,w:0,h:0,animation:null};
 
     function activeItem(){return $(`${itemSelector}.is-active`,root)||$(itemSelector,root);}
@@ -53,11 +61,12 @@
     }
     function animateTaffy(next){
       const dx=next.x-state.x;
-      const distance=Math.max(Math.abs(dx),Math.abs(next.w-state.w));
+      const dy=next.y-state.y;
+      const distance=Math.max(Math.abs(dx),Math.abs(dy),Math.abs(next.w-state.w));
       const direction=Math.sign(dx)||1;
-      const duration=Math.round(clamp(270+distance*.22,300,480));
-      const stretch=clamp(distance*.14,7,26);
-      const overshoot=clamp(distance*.045,3,9)*direction;
+      const duration=Math.round(clamp(300+distance*.24,330,520));
+      const stretch=clamp(distance*.16,9,32);
+      const overshoot=clamp(distance*.055,4,11)*direction;
       const old={x:state.x,y:state.y,w:state.w||next.w,h:state.h||next.h};
       state.animation?.cancel?.();
       indicator.style.transition='none';
@@ -68,13 +77,13 @@
         indicator.style.transform=`translate3d(${next.x}px,${next.y}px,0)`;
         return;
       }
-      const stretchX=next.x-direction*stretch*.44;
+      const stretchX=next.x-direction*stretch*.48;
       const stretchW=next.w+stretch;
       state.animation=indicator.animate([
-        {transform:`translate3d(${old.x}px,${old.y}px,0)`,width:`${old.w}px`,height:`${old.h}px`,offset:0},
-        {transform:`translate3d(${stretchX}px,${next.y}px,0)`,width:`${stretchW}px`,height:`${next.h}px`,offset:.46,easing:SOFT},
-        {transform:`translate3d(${next.x+overshoot}px,${next.y}px,0)`,width:`${Math.max(1,next.w-stretch*.10)}px`,height:`${next.h}px`,offset:.76,easing:BREEZE},
-        {transform:`translate3d(${next.x}px,${next.y}px,0)`,width:`${next.w}px`,height:`${next.h}px`,offset:1,easing:BREEZE}
+        {transform:`translate3d(${old.x}px,${old.y}px,0) scale(1)`,width:`${old.w}px`,height:`${old.h}px`,offset:0},
+        {transform:`translate3d(${stretchX}px,${next.y}px,0) scale(1.015,.985)`,width:`${stretchW}px`,height:`${next.h}px`,offset:.42,easing:SOFT},
+        {transform:`translate3d(${next.x+overshoot}px,${next.y}px,0) scale(.985,1.015)`,width:`${Math.max(1,next.w-stretch*.08)}px`,height:`${next.h}px`,offset:.76,easing:BREEZE},
+        {transform:`translate3d(${next.x}px,${next.y}px,0) scale(1)`,width:`${next.w}px`,height:`${next.h}px`,offset:1,easing:BREEZE}
       ],{duration,fill:'forwards'});
       state.animation.onfinish=()=>{
         if(!indicator?.isConnected)return;
@@ -84,9 +93,9 @@
     }
     function update({instant=false}={}){
       const item=activeItem();
-      const next=geometry(item);
-      if(!next||!root.isConnected)return;
-      indicator=ensureIndicator(root,indicatorClass);
+      const next=geometry(item,host,bleed);
+      if(!next||!root.isConnected||!host.isConnected)return;
+      indicator=ensureIndicator(host,indicatorClass);
       const first=!state.ready;
       if(instant||first||reduced())settle(next);
       else animateTaffy(next);
@@ -94,7 +103,7 @@
       $$(itemSelector,root).forEach(button=>button.setAttribute('aria-selected',button===item?'true':'false'));
     }
     function repair(){
-      indicator=ensureIndicator(root,indicatorClass);
+      indicator=ensureIndicator(host,indicatorClass);
       update({instant:!state.ready});
     }
 
@@ -102,13 +111,17 @@
       if(records.some(record=>record.type==='attributes'&&record.attributeName==='class'))requestAnimationFrame(()=>update());
     });
     observer.observe(root,{subtree:true,attributes:true,attributeFilter:['class']});
-    if('ResizeObserver'in window)new ResizeObserver(()=>update({instant:true})).observe(root);
+    if('ResizeObserver'in window){
+      const ro=new ResizeObserver(()=>update({instant:true}));
+      ro.observe(root);if(host!==root)ro.observe(host);
+    }
+    root.addEventListener('scroll',()=>requestAnimationFrame(()=>update({instant:true})),{passive:true});
     window.addEventListener('orientationchange',()=>setTimeout(()=>update({instant:true}),80),{passive:true});
     root.addEventListener('pointerdown',event=>{
       const item=event.target.closest?.(itemSelector);
-      if(item)root.classList.add('is-liquid-pressing');
+      if(item)host.classList.add('is-liquid-pressing');
     },{passive:true});
-    ['pointerup','pointercancel','pointerleave'].forEach(type=>root.addEventListener(type,()=>root.classList.remove('is-liquid-pressing'),{passive:true}));
+    ['pointerup','pointercancel','pointerleave'].forEach(type=>root.addEventListener(type,()=>host.classList.remove('is-liquid-pressing'),{passive:true}));
     const controller={update,repair};controllers.set(root,controller);
     requestAnimationFrame(()=>update({instant:true}));
     return controller;
@@ -116,9 +129,11 @@
 
   function installMainRail(){
     const root=$('.view-rail-inner');
-    if(!root)return;
+    const host=$('.view-rail')||root?.parentElement;
+    if(!root||!host)return;
     root.dataset.liquidOwner='navigation-v3';
-    makeLiquidController(root,{itemSelector:'.view-tab',indicatorClass:'dashboard-liquid-indicator'});
+    host.classList.add('liquid-overlay-host');
+    makeLiquidController(root,{itemSelector:'.view-tab',indicatorClass:'dashboard-liquid-indicator',host,bleed:3});
   }
 
   function appState(){return typeof ui==='undefined'?null:ui;}
@@ -131,25 +146,24 @@
     if(!shell){
       shell=document.createElement('div');
       shell.id='assetChipShell';
-      shell.className='asset-chip-shell';
+      shell.className='asset-chip-shell liquid-overlay-host';
       shell.innerHTML='<div id="assetChipRail" class="asset-chip-rail" role="tablist" aria-label="코인 선택"></div>';
       head.insertAdjacentElement('afterend',shell);
     }
     const rail=$('#assetChipRail');
     if(!rail)return;
+    rail.querySelectorAll(':scope > .asset-chip-indicator').forEach(node=>node.remove());
     const markets=assetMarkets();
     if(!markets.length){shell.hidden=true;return;}
     shell.hidden=false;
     const signature=markets.map(m=>`${m}:${appState()?.snapshot?.assets?.[m]?.symbol||''}`).join('|');
     if(rail.dataset.signature!==signature){
       rail.dataset.signature=signature;
-      const indicator=rail.querySelector(':scope > .asset-chip-indicator');
       rail.innerHTML=markets.map(m=>{
         const item=appState().snapshot.assets[m]||{};
         const label=item.symbol||m.replace('KRW-','');
         return `<button type="button" class="asset-chip" data-market="${String(m).replace(/[&<>\"']/g,'')}" role="tab">${String(label).replace(/[&<>]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch]))}</button>`;
       }).join('');
-      if(indicator)rail.prepend(indicator);
       rail.querySelectorAll('.asset-chip').forEach(button=>button.addEventListener('click',()=>{
         if(typeof window.selectMarket==='function')window.selectMarket(button.dataset.market,false);
         requestAnimationFrame(renderAssetChipRail);
@@ -157,7 +171,7 @@
     }
     const selected=appState()?.selectedMarket||markets[0];
     rail.querySelectorAll('.asset-chip').forEach(button=>button.classList.toggle('is-active',button.dataset.market===selected));
-    const controller=makeLiquidController(rail,{itemSelector:'.asset-chip',indicatorClass:'asset-chip-indicator'});
+    const controller=makeLiquidController(rail,{itemSelector:'.asset-chip',indicatorClass:'asset-chip-indicator',host:shell,bleed:3});
     controller?.repair();
     if(rail.dataset.selectedMarket!==selected){
       rail.dataset.selectedMarket=selected;
@@ -266,7 +280,7 @@
     if(!overview||$('#autoDemoCard'))return;
     const card=document.createElement('section');
     card.id='autoDemoCard';card.className='panel auto-demo-card';
-    card.innerHTML='<div class="panel-head"><div><h3>1,000만원 자동매매 데모</h3><p class="panel-copy">빗썸 원화마켓을 훑고 조건이 좋은 코인만 가상으로 매매합니다.</p></div><span class="status-pill neutral" id="autoDemoPill">준비 중</span></div><div id="autoDemoBody" class="auto-demo-body"><p class="muted">데모 상태를 불러오는 중입니다.</p></div>';
+    card.innerHTML='<div class="panel-head"><div><h3>1,000만원 자동매매 데모</h3><p class="panel-copy">빗썸 원화마켓을 자동으로 훑고 조건이 좋은 코인만 가상매매합니다.</p></div><span class="status-pill neutral" id="autoDemoPill">준비 중</span></div><div id="autoDemoBody" class="auto-demo-body"><p class="muted">데모 상태를 불러오는 중입니다.</p></div>';
     (holdings||overview.querySelector('.kpi-grid'))?.insertAdjacentElement('afterend',card);
   }
 
@@ -275,17 +289,16 @@
     demoCardShell();
     const body=$('#autoDemoBody'),pill=$('#autoDemoPill');if(!body)return;
     try{
-      const response=await fetch(`./runtime-demo.json?t=${Date.now()}`,{cache:'no-store'});
-      if(!response.ok)throw new Error('not ready');
-      const data=await response.json();
+      const data=await api('/api/demo');
       const positions=Array.isArray(data.positions)?data.positions:[];
       const candidates=Array.isArray(data.candidates)?data.candidates:[];
       const pnl=Number(data.equity_krw||data.start_krw||0)-Number(data.start_krw||0);
-      if(pill){pill.textContent=data.running?'가상매매 중':'대기';pill.className=`status-pill ${data.running?'good':'neutral'}`;}
-      body.innerHTML=`<div class="auto-demo-metrics"><div><span>가상 자산</span><strong>${won(data.equity_krw)}</strong><small class="${pnl>=0?'positive':'negative'}">${pnl>=0?'+':''}${won(pnl)}</small></div><div><span>남은 현금</span><strong>${won(data.cash_krw)}</strong><small>실제 주문 없음</small></div></div><div class="auto-demo-row"><span>보유 중</span><b>${positions.length?positions.map(p=>p.symbol||String(p.market||'').replace('KRW-','')).join(', '):'없음'}</b></div><div class="auto-demo-row"><span>현재 후보</span><b>${candidates.length?candidates.slice(0,5).map(c=>c.symbol||String(c.market||'').replace('KRW-','')).join(', '):'탐색 중'}</b></div><p class="auto-demo-note">별도 가상계좌입니다. 내 실제 보유량과 기존 PAPER 기록에는 영향을 주지 않습니다.</p>`;
-    }catch{
-      if(pill){pill.textContent='준비 중';pill.className='status-pill neutral';}
-      body.innerHTML='<p class="muted">자동 데모 프로세스가 시작되면 여기에 결과가 표시됩니다.</p>';
+      const running=Boolean(data.running);
+      if(pill){pill.textContent=running?'가상매매 중':data.enabled===false?'꺼짐':'탐색 준비';pill.className=`status-pill ${running?'good':'neutral'}`;}
+      body.innerHTML=`<div class="auto-demo-metrics"><div><span>가상 자산</span><strong>${won(data.equity_krw)}</strong><small class="${pnl>=0?'positive':'negative'}">${pnl>=0?'+':''}${won(pnl)}</small></div><div><span>남은 현금</span><strong>${won(data.cash_krw)}</strong><small>실제 주문 없음</small></div></div><div class="auto-demo-row"><span>보유 중</span><b>${positions.length?positions.map(p=>p.symbol||String(p.market||'').replace('KRW-','')).join(', '):'없음'}</b></div><div class="auto-demo-row"><span>현재 후보</span><b>${candidates.length?candidates.slice(0,5).map(c=>c.symbol||String(c.market||'').replace('KRW-','')).join(', '):'탐색 중'}</b></div><p class="auto-demo-note">별도 1,000만원 가상계좌입니다. 실제 주문과 내 보유분에는 영향을 주지 않습니다.</p>`;
+    }catch(err){
+      if(pill){pill.textContent='연결 대기';pill.className='status-pill neutral';}
+      body.innerHTML=`<p class="muted">자동매매 데모 상태를 아직 받지 못했습니다.${err?.message?` ${esc(err.message)}`:''}</p>`;
     }
   }
 
@@ -293,16 +306,16 @@
     let lastReload='';
     setInterval(()=>{
       const sync=appState()?.snapshot?.sync||{};
-      const changed=Array.isArray(sync.changed)?sync.changed:[];
-      if(sync.status!=='updated'||!changed.some(path=>String(path).startsWith('dashboard/')))return;
-      const marker=String(sync.to||sync.commit||changed.join('|'));
+      const changed=[...(Array.isArray(sync.changed)?sync.changed:[]),...(Array.isArray(sync.remote_changed)?sync.remote_changed:[])];
+      if(!['updated','published','reconciled'].includes(sync.status)||!changed.some(path=>String(path).startsWith('dashboard/')))return;
+      const marker=String(sync.to||sync.commit||sync.remote||changed.join('|'));
       if(!marker||marker===lastReload)return;
       lastReload=marker;
       const key=`cryptoDashboardReload:${marker}`;
       if(sessionStorage.getItem(key)==='1')return;
       sessionStorage.setItem(key,'1');
-      setTimeout(()=>location.reload(),180);
-    },1800);
+      setTimeout(()=>location.reload(),220);
+    },1200);
   }
 
   function install(){
