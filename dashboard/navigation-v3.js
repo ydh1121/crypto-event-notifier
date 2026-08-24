@@ -75,7 +75,8 @@
     makeLiquidController(root,{itemSelector:'.view-tab',indicatorClass:'dashboard-liquid-indicator'});
   }
 
-  function assetMarkets(){return Object.keys(window.ui?.snapshot?.assets||{});}
+  function appState(){return typeof ui==='undefined'?null:ui;}
+  function assetMarkets(){return Object.keys(appState()?.snapshot?.assets||{});}
 
   function renderAssetChipRail(){
     const head=$('[data-view-panel="assets"] .asset-head');
@@ -93,11 +94,11 @@
     const markets=assetMarkets();
     if(!markets.length){shell.hidden=true;return;}
     shell.hidden=false;
-    const signature=markets.map(m=>`${m}:${window.ui?.snapshot?.assets?.[m]?.symbol||''}`).join('|');
+    const signature=markets.map(m=>`${m}:${appState()?.snapshot?.assets?.[m]?.symbol||''}`).join('|');
     if(rail.dataset.signature!==signature){
       rail.dataset.signature=signature;
       rail.innerHTML=markets.map(m=>{
-        const item=window.ui.snapshot.assets[m]||{};
+        const item=appState().snapshot.assets[m]||{};
         const label=item.symbol||m.replace('KRW-','');
         return `<button type="button" class="asset-chip" data-market="${String(m).replace(/[&<>\"']/g,'')}" role="tab">${String(label).replace(/[&<>]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch]))}</button>`;
       }).join('');
@@ -107,7 +108,7 @@
       }));
       controllers.delete(rail);
     }
-    const selected=window.ui?.selectedMarket||markets[0];
+    const selected=appState()?.selectedMarket||markets[0];
     rail.querySelectorAll('.asset-chip').forEach(button=>button.classList.toggle('is-active',button.dataset.market===selected));
     const controller=makeLiquidController(rail,{itemSelector:'.asset-chip',indicatorClass:'asset-chip-indicator'});
     controller?.update();
@@ -147,7 +148,7 @@
   }
 
   function switchAdjacentView(direction){
-    const current=VIEW_ORDER.indexOf(window.ui?.view||'overview');
+    const current=VIEW_ORDER.indexOf(appState()?.view||'overview');
     const next=current+direction;
     if(next<0||next>=VIEW_ORDER.length||typeof window.switchView!=='function')return false;
     window.switchView(VIEW_ORDER[next]);
@@ -158,7 +159,7 @@
   function switchAdjacentAsset(direction){
     const markets=assetMarkets();
     if(!markets.length||typeof window.selectMarket!=='function')return false;
-    const current=Math.max(0,markets.indexOf(window.ui?.selectedMarket));
+    const current=Math.max(0,markets.indexOf(appState()?.selectedMarket));
     const next=current+direction;
     if(next<0||next>=markets.length)return false;
     window.selectMarket(markets[next],false);
@@ -173,7 +174,7 @@
     document.addEventListener('touchstart',event=>{
       if(event.touches.length!==1||interactiveSwipeTarget(event.target)){gesture=null;return;}
       const touch=event.touches[0];
-      gesture={x:touch.clientX,y:touch.clientY,t:performance.now(),view:window.ui?.view||'overview'};
+      gesture={x:touch.clientX,y:touch.clientY,t:performance.now(),view:appState()?.view||'overview'};
     },{passive:true});
     document.addEventListener('touchend',event=>{
       if(!gesture||event.changedTouches.length!==1){gesture=null;return;}
@@ -193,7 +194,7 @@
   function watchForDashboardSync(){
     let lastReload='';
     setInterval(()=>{
-      const sync=window.ui?.snapshot?.sync||{};
+      const sync=appState()?.snapshot?.sync||{};
       const changed=Array.isArray(sync.changed)?sync.changed:[];
       if(sync.status!=='updated'||!changed.some(path=>String(path).startsWith('dashboard/')))return;
       const marker=String(sync.to||sync.commit||changed.join('|'));
