@@ -1,0 +1,107 @@
+from __future__ import annotations
+
+import json
+import shutil
+import socket
+import subprocess
+from pathlib import Path
+from typing import Any
+
+
+def _lan_ipv4() -> str | None:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # No packet is sent; connect only asks the OS which interface would be used.
+        sock.connect(("8.8.8.8", 80))
+        value = sock.getsockname()[0]
+        return value if value and not value.startswith("127.") else None
+    except OSError:
+        try:
+            value = socket.gethostbyname(socket.gethostname())
+            return value if value and not value.startswith("127.") else None
+        except OSError:
+            return None
+    finally:
+        sock.close()
+
+
+def _tailscale_binary() -> str | None:
+    found = shutil.which("tailscale")
+    if found:
+        return found
+    candidates = (
+        Path(r"C:\Program Files\Tailscale\tailscale.exe"),
+        Path(r"C:\Program Files (x86)\Tailscale\tailscale.exe"),
+    )
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+    return None
+
+
+def _tailscale_status() -> dict[str, Any]:
+    binary = _tailscale_binary()
+    if not binary:
+        return {
+            "installed": False,
+            "connected": False,
+            "ipv4": None,
+            "dns_name": None,
+        }
+    try:
+        completed = subprocess.run(
+            [binary, "status", "--json"],
+            text=True,
+            capture_output=True,
+            timeout=5,
+            check=False,
+        )
+        if completed.returncode != 0:
+            return {
+                "installed": True,
+                "connected": False,
+                "ipv4": None,
+                "dns_name": None,
+                "message": (completed.stderr or completed.stdout).strip()[:240],
+            }
+        payload = json.loads(completed.stdout or "{}")
+        self_node = payload.get("Self") or {}
+        ips = list(self_node.get("TailscaleIPs") or [])
+        ipv4 = next((value for value in ips if ":" not in str(value)), None)
+        backend_state = str(payload.get("BackendState") or "")
+        online = bool(self_node.get("Online")) or backend_state.lower() == "running"
+        dns_name = str(self_node.get("DNSName") or "").rstrip(".") or None
+        return {
+            "installed": True,
+            "connected": bool(online and ipv4),
+            "ipv4": ipv4,
+            "dns_name": dns_name,
+            "backend_state": backend_state or None,
+        }
+    except (OSError, ValueError, json.JSONDecodeError, subprocess.SubprocessError) as exc:
+        return {
+            "installed": True,
+            "connected": False,
+            "ipv4": None,
+            "dns_name": None,
+            "message": f"{type(exc).__name__}: {exc}",
+        }
+
+
+def network_status(port: int) -> dict[str, Any]:
+    lan_ip = _lan_ipv4()
+    tailscale = _tailscale_status()
+    tailscale_host = tailscale.get("dns_name") or tailscale.get("ipv4")
+    return {
+        "port": int(port),
+        "lan": {
+            "ipv4": lan_ip,
+            "url": f"http://{lan_ip}:{port}" if lan_ip else None,
+        },
+        "tailscale": {
+            **tailscale,
+            "url": f"http://{tailscale_host}:{port}" if tailscale_host else None,
+        },
+        "public_port_forwarding_recommended": False,
+        "remote_auth_required": True,
+    }
