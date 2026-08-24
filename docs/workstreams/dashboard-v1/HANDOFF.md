@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Phase 4 continuation: local multi-asset PAPER engine + beginner-friendly operational dashboard + secure phone access.
+Phase 4 continuation: local multi-asset PAPER engine + very simple beginner-facing dashboard + VPN-free secure phone access.
 
 ## User-approved scope
 
@@ -15,26 +15,26 @@ Do **not** build real-money execution in this workstream. Live execution is a fu
 - Local FastAPI/Uvicorn server on port 8765
 - secure launcher binds Uvicorn to `127.0.0.1`
 - VPN-free Cloudflare Quick Tunnel HTTPS phone access works over mobile 5G
+- old direct public-IP HTTP access was verified blocked while secure mode is active
 - loopback dashboard authentication without stale-token lockout
 - remote clients require Dashboard token internally
 - user-facing name for that secret is `휴대폰 연결 코드`
-- local-PC-only `/api/local/phone-code` can reveal/copy the code; remote clients receive 403
-- local-PC-only phone-code rotation endpoint can replace an exposed/old code without deleting other local data
-- B3 live market analysis in PAPER mode
-- Regime/Entry/context scoring internally
+- local-PC-only phone-code reveal/rotate endpoints
+- B3-style live analysis generalized to multiple Bithumb KRW tickers
+- Regime/Entry/context scoring remains internal
 - Bithumb/OKX public market inputs
 - PAPER buy/risk-off paths and execution guards
 - SQLite journal + portfolio restoration
 - local SQLite stores manually entered real holding quantity/average price and per-ticker averaging plans
+- user has already added multiple assets and entered average prices locally; do not overwrite local control/runtime/SQLite state
 - GitHub auto-sync on branch `b3-auto-trader-phase1`
 - Telegram local configuration + successful alerts
-- ticker-based multi-asset registry
 
 ## User-facing language rule
 
-Primary UI and Telegram messages must make sense to a Korean non-trader in their 60s.
+The primary UI and Telegram messages must make sense to a Korean non-trader in their 60s.
 
-Internal vocabulary remains valid in code/logs, but the primary mapping is:
+Internal vocabulary remains valid in code/logs, but primary surfaces use:
 
 - Regime → `전체 시장 분위기`
 - Entry → `지금 매수 타이밍`
@@ -54,42 +54,55 @@ Scores include both number and meaning: 0–39 매우 나쁨, 40–54 좋지 않
 - User does not want a phone VPN dependency and uninstalled Tailscale.
 - Primary external phone path is Cloudflare Tunnel over HTTPS.
 - `start-trader-secure.bat` launches the local trader on loopback and creates a temporary `https://*.trycloudflare.com` URL.
-- User confirmed that the Cloudflare URL opens successfully on mobile 5G without VPN.
-- Quick Tunnel URLs can change on restart. Stable named Cloudflare Tunnel is an optional later improvement, not required for current PAPER testing.
-- Direct public-IP HTTP access is not approved and must be removed/disabled after verification.
+- User confirmed the Cloudflare URL opens successfully on mobile 5G without VPN.
+- User confirmed the old public-IP HTTP path is blocked in secure mode.
+- Quick Tunnel URLs can change on restart. Stable named Cloudflare Tunnel is an optional later improvement.
 
-## Current dashboard/tooling status
+## Latest dashboard simplification pass
 
-- Photo-eBook-inspired responsive shell: 개요 / 자산 / 성과 / 활동 / 설정
-- price, score and portfolio charts
-- beginner-facing plain-language decision copy
-- Telegram important-event alerts, with GitHub sync/startup noise removed
-- per-ticker manually entered holding quantity + average price
-- per-ticker averaging-down calculator up to 20 rounds
-- suggested entry amount + account percentage on BUY_CANDIDATE
-- local SQLite runtime persistence
-- GitHub desired-state sync and restart-safe workstream docs
+`dashboard/plain-language.js` and `dashboard/plain-language.css` were rewritten to make the product decision-first and much less technical.
+
+Key changes:
+
+- top-level tabs shown as `홈 / 코인 / 결과 / 기록 / 설정`
+- mobile uses a fixed five-item bottom navigation
+- product title simplified to `코인 상태판`
+- home hero explains only the core question: buy now or wait
+- engine pause/resume/emergency controls moved out of Home and into Settings → safety controls
+- strategy/risk numeric settings collapsed behind `고급 설정 보기`
+- actual saved holdings are summarized on Home using the local `/api/holdings` data
+- each holding row shows ticker, average price, value and current return, and opens that coin directly
+- watchlist cards are decision-first: `매수 후보 / 기다림 / 지켜보기 / 지금은 매수하지 않음`
+- saved average price and unrealized PnL appear directly on asset cards when present
+- score detail is reduced to compact market/timing summaries on cards
+- asset detail shows current price, saved average price, actual unrealized PnL, decision sentence, then three plain-language score blocks
+- technical factors remain under `왜 이렇게 판단했는지 자세히 보기`
+- cards/shadows/spacing were reduced for a calmer Photo-eBook-like grouped layout
+- mobile KPI cards are compact 2x2 instead of tall full-width cards
+- charts remain available but no longer dominate the first screen
 
 ## Git state
 
-- The user's diverged local branch was successfully repaired against `origin/b3-auto-trader-phase1` while preserving local control/runtime data.
+- The user's diverged local branch was repaired against `origin/b3-auto-trader-phase1` while preserving local data.
 - `control/assets.json` may remain locally modified by design.
-- Latest Cloudflare launcher fixes passed CI.
+- Latest secure-launcher baseline passed CI.
+- Latest simplified-dashboard commit is waiting for/under CI at the time of this handoff.
 
 ## Active task
 
-`B. mobile/desktop visual QA + G. Google Drive backup + H. public exposure cleanup`
+`B. screenshot-based simplified UI QA + G. Google Drive backup + F. multi-asset validation`
 
 ## Exact next action
 
-1. While `start-trader-secure.bat` is running, verify the old public-IP `http://...:8765` address no longer opens from 5G.
-2. If the public path still opens, inspect `Get-NetTCPConnection -LocalPort 8765 -State Listen` and remove any leftover old trader process; then disable any router port-forwarding/DMZ/UPnP exposure for TCP 8765.
-3. Rotate the phone connection code from the local PC dashboard because an earlier code appeared in console/chat logs.
-4. Continue screenshot-based mobile dashboard QA, prioritizing ordinary Korean copy and removing remaining technical labels from primary surfaces.
-5. Verify the new `내 실제 보유분`, `물타기 계산기`, and recommended entry-size UI on phone and desktop.
-6. Finish one-time rclone Google Drive setup and verify SQLite snapshot upload to `Crypto Auto Trader/backups`.
-7. Add one or more additional tickers and validate multi-asset simultaneous limits/context behavior.
-8. Leave real-money trading deferred to the separate future Work/workstream.
+1. Let the local secure launcher auto-sync or pull the latest branch, then restart if required.
+2. Open PC and phone dashboards and verify the new `홈 / 코인 / 결과 / 기록 / 설정` UI.
+3. On Home, verify `내 코인 현황` correctly reflects all locally saved holdings/average prices and current PnL without mixing tickers.
+4. On Coin, verify each selected ticker loads its own saved holding and averaging-down plan.
+5. Send screenshots of Home, Coin detail, and the averaging calculator; tune geometry/copy only from those screenshots.
+6. Rotate the phone connection code because an earlier code appeared in console/chat logs.
+7. Finish one-time rclone Google Drive setup and verify SQLite snapshot upload to `Crypto Auto Trader/backups`.
+8. Validate simultaneous multi-asset limits/context behavior using the already-added local assets.
+9. Leave real-money trading deferred to the separate future Work/workstream.
 
 ## Safety constraints
 
@@ -99,7 +112,7 @@ Scores include both number and meaning: 0–39 매우 나쁨, 40–54 좋지 않
 - Do not expose port 8765 directly to the public internet.
 - Prefer VPN-free HTTPS Cloudflare Tunnel for phone access.
 - Preserve remote bearer-token authentication.
-- The local phone-code reveal/rotate endpoints must stay loopback-only.
+- Local phone-code reveal/rotate endpoints must stay loopback-only.
 - Manual real holdings are display/calculator inputs only; they must not trigger exchange orders in this workstream.
 
 ## Branch / PR
