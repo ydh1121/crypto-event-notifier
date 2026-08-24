@@ -23,6 +23,7 @@ from .runtime_state import RuntimeState
 from .sync_manager import BackupManager, GitAutoSync
 from .telegram_notify import TelegramNotifier
 from .telegram_settings import TelegramSettingsStore
+from .user_tools import UserToolsStore, calculate_averaging
 
 RESTART_EXIT_CODE = 75
 LOOPBACK_HOSTS = {"127.0.0.1", "::1", "::ffff:127.0.0.1"}
@@ -72,6 +73,7 @@ def create_app() -> FastAPI:
     registry = AssetRegistry(settings.asset_registry_path)
     runtime_config = RuntimeConfigStore(settings.runtime_config_path)
     journal = TradeJournal(settings.journal_db)
+    user_tools = UserToolsStore(settings.journal_db)
 
     telegram_store = TelegramSettingsStore(
         default_enabled=settings.telegram_enabled,
@@ -144,9 +146,10 @@ def create_app() -> FastAPI:
             git_sync.stop()
             backup.stop()
             engine.stop()
+            user_tools.close()
             journal.close()
 
-    app = FastAPI(title="Crypto Auto Trader", version="0.5.1", lifespan=lifespan)
+    app = FastAPI(title="Crypto Auto Trader", version="0.6.0", lifespan=lifespan)
 
     def auth(
         request: Request,
@@ -158,11 +161,35 @@ def create_app() -> FastAPI:
         if authorization != f"Bearer {token}":
             raise HTTPException(status_code=401, detail="invalid dashboard token")
 
+    def require_loopback(request: Request) -> None:
+        client_host = request.client.host if request.client else ""
+        if client_host not in LOOPBACK_HOSTS:
+            raise HTTPException(status_code=403, detail="available only on the local PC")
+
     def publish_control(message: str) -> None:
         try:
             git_sync.publish_control(message)
         except Exception as exc:
             state.set_error(exc, scope="git_publish")
+
+    def holding_with_market_value(market: str) -> dict[str, Any]:
+        holding = user_tools.get_holding(market)
+        asset = (state.snapshot().get("assets") or {}).get(market) or {}
+        price = float(asset.get("price") or 0.0)
+        volume = float(holding.get("volume") or 0.0)
+        avg_price = float(holding.get("avg_price") or 0.0)
+        invested = volume * avg_price
+        value = volume * price
+        pnl = value - invested
+        pnl_pct = pnl / invested * 100.0 if invested > 0 else 0.0
+        return {
+            **holding,
+            "current_price": round(price, 12),
+            "invested_krw": round(invested, 2),
+            "value_krw": round(value, 2),
+            "unrealized_pnl_krw": round(pnl, 2),
+            "unrealized_pnl_pct": round(pnl_pct, 4),
+        }
 
     @app.get("/api/health")
     def health() -> dict[str, Any]:
@@ -245,13 +272,104 @@ def create_app() -> FastAPI:
 
     @app.get("/api/local/phone-code")
     def local_phone_code(request: Request) -> dict[str, str]:
-        client_host = request.client.host if request.client else ""
-        if client_host not in LOOPBACK_HOSTS:
-            raise HTTPException(status_code=403, detail="available only on the local PC")
+        require_loopback(request)
         return {
             "code": token,
             "file": "b3_trader/data/dashboard-token.txt",
         }
+
+    @app.post("/api/local/phone-code/rotate")
+    def rotate_phone_code(request: Request) -> dict[str, str]:
+        nonlocal token
+        require_loopback(request)
+        if settings.dashboard_token:
+            raise HTTPException(
+                status_code=409,
+                detail="DASHBOARD_TOKEN is fixed in .env; change it there and restart instead",
+            )
+        token = secrets.token_urlsafe(32)
+        token_file = Path("b3_trader/data/dashboard-token.txt")
+        token_file.parent.mkdir(parents=True, exist_ok=True)
+        token_file.write_text(token + "\n", encoding="utf-8")
+        app.state.dashboard_token = token
+        journal.record_event("dashboard_token_rotated", {"local_only": True})
+        return {"code": token}
+
+    @app.get("/api/holdings", dependencies=[Depends(auth)])
+    def list_manual_holdings() -> list[dict[str, Any]]:
+        return [holding_with_market_value(row["market"]) for row in user_tools.list_holdings()]
+
+    @app.get("/api/holdings/{market:path}", dependencies=[Depends(auth)])
+    def get_manual_holding(market: str) -> dict[str, Any]:
+        return holding_with_market_value(normalize_market(market))
+
+    @app.put("/api/holdings/{market:path}", dependencies=[Depends(auth)])
+    def save_manual_holding(
+        market: str,
+        payload: dict[str, Any] = Body(...),
+    ) -> dict[str, Any]:
+        normalized = normalize_market(market)
+        try:
+            volume = float(payload.get("volume") or 0.0)
+            avg_price = float(payload.get("avg_price") or 0.0)
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail="volume and avg_price must be numbers") from exc
+        if volume < 0 or avg_price < 0:
+            raise HTTPException(status_code=422, detail="volume and avg_price must be zero or greater")
+        user_tools.set_holding(normalized, volume=volume, avg_price=avg_price)
+        journal.record_event(
+            "manual_holding_updated",
+            {"market": normalized, "volume": volume, "avg_price": avg_price},
+        )
+        return holding_with_market_value(normalized)
+
+    @app.delete("/api/holdings/{market:path}", dependencies=[Depends(auth)])
+    def delete_manual_holding(market: str) -> dict[str, Any]:
+        normalized = normalize_market(market)
+        removed = user_tools.delete_holding(normalized)
+        journal.record_event("manual_holding_deleted", {"market": normalized})
+        return {"ok": True, "removed": removed, "market": normalized}
+
+    @app.get("/api/averaging/{market:path}", dependencies=[Depends(auth)])
+    def get_averaging_plan(market: str) -> dict[str, Any]:
+        normalized = normalize_market(market)
+        holding = user_tools.get_holding(normalized)
+        plan = user_tools.get_plan(normalized)
+        calculation = calculate_averaging(
+            volume=float(holding.get("volume") or 0.0),
+            avg_price=float(holding.get("avg_price") or 0.0),
+            rows=list(plan.get("rows") or []),
+        )
+        return {"market": normalized, "holding": holding, "plan": plan, "calculation": calculation}
+
+    @app.put("/api/averaging/{market:path}", dependencies=[Depends(auth)])
+    def save_averaging_plan(
+        market: str,
+        payload: dict[str, Any] = Body(...),
+    ) -> dict[str, Any]:
+        normalized = normalize_market(market)
+        rows = payload.get("rows") or []
+        if not isinstance(rows, list):
+            raise HTTPException(status_code=422, detail="rows must be a list")
+        plan = user_tools.set_plan(normalized, rows)
+        holding = user_tools.get_holding(normalized)
+        calculation = calculate_averaging(
+            volume=float(holding.get("volume") or 0.0),
+            avg_price=float(holding.get("avg_price") or 0.0),
+            rows=list(plan.get("rows") or []),
+        )
+        journal.record_event(
+            "averaging_plan_updated",
+            {"market": normalized, "rows": len(plan.get("rows") or [])},
+        )
+        return {"market": normalized, "holding": holding, "plan": plan, "calculation": calculation}
+
+    @app.delete("/api/averaging/{market:path}", dependencies=[Depends(auth)])
+    def delete_averaging_plan(market: str) -> dict[str, Any]:
+        normalized = normalize_market(market)
+        removed = user_tools.delete_plan(normalized)
+        journal.record_event("averaging_plan_deleted", {"market": normalized})
+        return {"ok": True, "removed": removed, "market": normalized}
 
     @app.get("/api/assets", dependencies=[Depends(auth)])
     def api_assets() -> list[dict[str, Any]]:
@@ -265,10 +383,6 @@ def create_app() -> FastAPI:
             profile = AssetProfile.from_dict({**profile.to_dict(), **payload})
         registry.upsert(profile)
         journal.record_event("asset_added", profile.to_dict())
-        notifier.safe_send(
-            f"[{profile.symbol}] 감시 자산 추가\n컨텍스트: {profile.context_mode}",
-            event_key=f"asset-added-{profile.market}",
-        )
         publish_control(f"Add {profile.market} trader profile")
         return profile.to_dict()
 
@@ -311,7 +425,7 @@ def create_app() -> FastAPI:
     def pause() -> dict[str, Any]:
         state.paused = True
         journal.record_event("manual_pause", {})
-        notifier.safe_send("Crypto Auto Trader: 신규 진입 일시정지")
+        notifier.safe_send("자동매매 모니터: 새 매수를 잠시 멈췄습니다")
         return {"ok": True, "paused": True}
 
     @app.post("/api/control/resume", dependencies=[Depends(auth)])
@@ -320,7 +434,7 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=409, detail="reset kill switch first")
         state.paused = False
         journal.record_event("manual_resume", {})
-        notifier.safe_send("Crypto Auto Trader: 신규 진입 재개")
+        notifier.safe_send("자동매매 모니터: 새 매수 감시를 다시 시작했습니다")
         return {"ok": True, "paused": False}
 
     @app.post("/api/control/kill", dependencies=[Depends(auth)])
@@ -328,7 +442,7 @@ def create_app() -> FastAPI:
         state.kill_switch = True
         state.paused = True
         journal.record_event("manual_kill_switch", {})
-        notifier.safe_send("Crypto Auto Trader: KILL SWITCH 활성")
+        notifier.safe_send("자동매매 모니터: 긴급 정지를 켰습니다")
         return {"ok": True, "kill_switch": True}
 
     @app.post("/api/control/reset-kill", dependencies=[Depends(auth)])
@@ -336,7 +450,7 @@ def create_app() -> FastAPI:
         state.kill_switch = False
         state.paused = True
         journal.record_event("manual_kill_switch_reset", {})
-        notifier.safe_send("Crypto Auto Trader: KILL SWITCH 해제 (진입은 아직 일시정지)")
+        notifier.safe_send("자동매매 모니터: 긴급 정지를 해제했습니다. 새 매수는 아직 멈춘 상태입니다")
         return {"ok": True, "kill_switch": False, "paused": True}
 
     @app.get("/api/fills", dependencies=[Depends(auth)])
@@ -394,7 +508,7 @@ def create_app() -> FastAPI:
                 detail="Telegram is not configured or enabled",
             )
         try:
-            ok = notifier.send("Crypto Auto Trader 텔레그램 연결 테스트")
+            ok = notifier.send("코인 자동매매 모니터 텔레그램 연결 테스트")
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         return {"ok": ok}
@@ -415,6 +529,7 @@ def create_app() -> FastAPI:
     app.state.registry = registry
     app.state.runtime_config = runtime_config
     app.state.journal = journal
+    app.state.user_tools = user_tools
     app.state.engine = engine
     app.state.git_sync = git_sync
     app.state.backup = backup
