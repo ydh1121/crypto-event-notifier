@@ -118,8 +118,9 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 - [x] Holdings/calculator/sync baseline CI green
 - [x] VPN-free Cloudflare tunnel changes CI green
-- [-] Latest simplified-dashboard JavaScript/CSS change CI pending
-- [x] Python module compile check passes on previous baseline
+- [x] Latest simplified-dashboard JavaScript/CSS CI green
+- [x] Python module compile check passes
+- [x] Dashboard JavaScript checks pass
 - [x] Existing Cloudflare TypeScript check remains green
 
 ## Completion condition for this workstream
