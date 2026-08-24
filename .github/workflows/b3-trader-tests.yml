@@ -3,6 +3,9 @@ name: B3 trader tests
 on:
   pull_request:
     paths:
+      - "AGENTS.md"
+      - "DESIGN.md"
+      - "docs/workstreams/**"
       - "b3_trader/**"
       - "control/**"
       - "dashboard/**"
@@ -18,6 +21,9 @@ on:
     branches:
       - b3-auto-trader-phase1
     paths:
+      - "AGENTS.md"
+      - "DESIGN.md"
+      - "docs/workstreams/**"
       - "b3_trader/**"
       - "control/**"
       - "dashboard/**"
@@ -46,9 +52,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - run: test -s dashboard/index.html
       - run: test -s dashboard/app.js
       - run: test -s dashboard/styles.css
+      - run: node --check dashboard/app.js
+      - run: grep -q 'data-view-panel="overview"' dashboard/index.html
+      - run: grep -q 'data-view-panel="performance"' dashboard/index.html
+      - run: grep -q 'Phone access' dashboard/index.html
 
   cloudflare-typecheck:
     runs-on: ubuntu-latest
