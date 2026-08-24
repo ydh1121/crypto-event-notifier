@@ -58,13 +58,17 @@ jobs:
       - run: test -s dashboard/index.html
       - run: test -s dashboard/app.js
       - run: test -s dashboard/plain-language.js
+      - run: test -s dashboard/portfolio-tools.js
       - run: test -s dashboard/styles.css
       - run: test -s dashboard/plain-language.css
+      - run: test -s dashboard/portfolio-tools.css
       - run: node --check dashboard/app.js
       - run: node --check dashboard/plain-language.js
+      - run: node --check dashboard/portfolio-tools.js
       - run: grep -q 'data-view-panel="overview"' dashboard/index.html
       - run: grep -q 'data-view-panel="performance"' dashboard/index.html
       - run: grep -q 'plain-language.js' dashboard/index.html
+      - run: grep -q 'portfolio-tools.js' dashboard/index.html
       - run: grep -q 'Phone access' dashboard/index.html
 
   cloudflare-typecheck:
