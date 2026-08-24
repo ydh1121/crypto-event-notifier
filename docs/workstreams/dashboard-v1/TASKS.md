@@ -96,11 +96,10 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 ## Validation status
 
-- [-] Latest plain-language change CI pending
-- [x] Previous Python tests pass in GitHub Actions
-- [x] Previous Python module compile check passes
-- [x] Previous Dashboard JS `node --check` passes
-- [x] Previous Dashboard structural smoke checks pass
+- [x] Plain-language Python tests pass in GitHub Actions
+- [x] Python module compile check passes
+- [x] Dashboard `app.js` and `plain-language.js` pass `node --check`
+- [x] Dashboard structural/plain-language smoke checks pass
 - [x] Existing Cloudflare TypeScript check remains green
 
 ## Completion condition for this workstream
