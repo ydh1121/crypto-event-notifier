@@ -20,6 +20,10 @@ b3_trader/data/
 *.sqlite3-shm
 *.sqlite3-wal
 
+# Generated dashboard runtime state
+dashboard/runtime-demo.json
+dashboard/runtime-demo.tmp
+
 # Cloudflare
 cloudflare/node_modules/
 cloudflare/.wrangler/
