@@ -116,6 +116,16 @@ if ($isGitRepo) {
       $dirtyPaths | Sort-Object -Unique | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
     }
   }
+
+  $localHead = Invoke-GitCapture -GitArgs @("rev-parse", "--short", "HEAD")
+  $remoteHead = Invoke-GitCapture -GitArgs @("rev-parse", "--short", "origin/$targetBranch")
+  if ($localHead.ExitCode -eq 0 -and $remoteHead.ExitCode -eq 0) {
+    if ($localHead.Output.Trim() -eq $remoteHead.Output.Trim()) {
+      Write-Host "GitHub sync: latest ($($localHead.Output.Trim()))" -ForegroundColor Green
+    } else {
+      Write-Warning "GitHub sync: local $($localHead.Output.Trim()) / remote $($remoteHead.Output.Trim()). Runtime auto-sync will keep retrying."
+    }
+  }
 } else {
   Write-Warning "This folder is a GitHub ZIP/export (no .git metadata). The trader will still run locally, but GPT/GitHub automatic sync is disabled for this copy."
   Write-Host "For automatic GPT/GitHub sync later, use 'git clone' instead of Download ZIP."
