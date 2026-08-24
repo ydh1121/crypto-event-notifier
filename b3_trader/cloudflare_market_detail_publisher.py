@@ -16,7 +16,8 @@ STATE_PATH = REPO_ROOT / "b3_trader/data/research-platform/cloudflare-market-det
 MAX_BATCH = 40
 PRIORITY_COUNT = 8
 ROTATING_COUNT = 32
-MAX_BODY_BYTES = 1_800_000
+MAX_BODY_BYTES = 1_500_000
+MAX_SINGLE_DETAIL_BYTES = 170_000
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -154,6 +155,36 @@ def _compact_detail(source: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _encode_batch(details: list[dict[str, Any]]) -> bytes:
+    return json.dumps({"details": details}, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
+def _split_batches(details: list[dict[str, Any]]) -> list[tuple[list[dict[str, Any]], bytes]]:
+    batches: list[tuple[list[dict[str, Any]], bytes]] = []
+    current: list[dict[str, Any]] = []
+    current_body = b""
+
+    for detail in details:
+        single_body = _encode_batch([detail])
+        if len(single_body) > MAX_SINGLE_DETAIL_BYTES:
+            market = str(detail.get("market") or "unknown")
+            raise RuntimeError(f"single market detail is too large: {market} {len(single_body)} bytes")
+
+        candidate = [*current, detail]
+        candidate_body = _encode_batch(candidate)
+        if current and len(candidate_body) > MAX_BODY_BYTES:
+            batches.append((current, current_body))
+            current = [detail]
+            current_body = single_body
+        else:
+            current = candidate
+            current_body = candidate_body
+
+    if current:
+        batches.append((current, current_body))
+    return batches
+
+
 class CloudflareMarketDetailPublisher:
     """Publishes bounded per-market PAPER detail without bloating the global snapshot."""
 
@@ -238,45 +269,59 @@ class CloudflareMarketDetailPublisher:
         if not details:
             return {"status": "waiting_for_detail_files", "configured": True, "published": 0, "cursor": cursor}
 
-        body = json.dumps({"details": details}, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-        if len(body) > MAX_BODY_BYTES:
-            raise RuntimeError(f"market detail batch is too large: {len(body)} bytes")
+        batches = _split_batches(details)
+        total_bytes = 0
+        total_stored = 0
+        remote_results: list[dict[str, Any]] = []
+        batch_sizes: list[int] = []
 
-        response = requests.post(
-            url,
-            data=body,
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json",
-                "User-Agent": "crypto-auto-trader-market-detail-publisher/1.0",
-            },
-            timeout=30,
-        )
-        response.raise_for_status()
-        try:
-            remote = response.json()
-        except ValueError:
-            remote = {"ok": True}
+        for batch_details, body in batches:
+            response = requests.post(
+                url,
+                data=body,
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                    "User-Agent": "crypto-auto-trader-market-detail-publisher/1.0",
+                },
+                timeout=30,
+            )
+            response.raise_for_status()
+            try:
+                remote = response.json()
+            except ValueError:
+                remote = {"ok": True}
+            remote_payload = remote if isinstance(remote, dict) else {}
+            remote_results.append(remote_payload)
+            total_stored += int(remote_payload.get("stored") or len(batch_details))
+            total_bytes += len(body)
+            batch_sizes.append(len(body))
 
         now = time.time()
         _write_json(
             STATE_PATH,
             {
-                "version": 1,
+                "version": 2,
                 "cursor": next_cursor,
                 "published_at": now,
                 "published_markets": [row["market"] for row in details],
-                "bytes": len(body),
-                "remote": remote if isinstance(remote, dict) else {},
+                "published": len(details),
+                "stored": total_stored,
+                "requests": len(batches),
+                "bytes": total_bytes,
+                "batch_bytes": batch_sizes,
+                "remote": remote_results,
             },
         )
         return {
             "status": "published",
             "configured": True,
             "published": len(details),
-            "bytes": len(body),
+            "stored": total_stored,
+            "requests": len(batches),
+            "bytes": total_bytes,
+            "max_request_bytes": max(batch_sizes, default=0),
             "cursor": next_cursor,
-            "remote": remote if isinstance(remote, dict) else {},
         }
 
 
