@@ -4,13 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#f5f5f7" />
-  <meta name="crypto-dashboard-build" content="2026.08.24-4" />
+  <meta name="crypto-dashboard-build" content="2026.08.24-5" />
   <title>Crypto Auto Trader</title>
   <link rel="stylesheet" href="./styles.css?v=2" />
   <link rel="stylesheet" href="./plain-language.css?v=1" />
   <link rel="stylesheet" href="./portfolio-tools.css?v=2" />
   <link rel="stylesheet" href="./ux-polish.css?v=1" />
-  <link rel="stylesheet" href="./navigation-v3.css?v=6" />
+  <link rel="stylesheet" href="./navigation-v3.css?v=8" />
 </head>
 <body>
   <header class="app-header">
@@ -156,22 +156,22 @@
           </form>
         </article>
 
-        <article class="panel"><div class="panel-head"><div><p class="panel-kicker">Telegram</p><h3>알림</h3></div><span id="telegramStatePill" class="status-pill neutral">확인 중</span></div><p class="panel-copy">매수 후보, PAPER 체결, 리스크오프, 중요한 차단·오류와 일일 요약을 보냅니다.</p><div class="button-row"><button id="telegramSettings" class="button secondary">설정</button><button id="telegramTest" class="button secondary">테스트</button></div></article>
+        <article class="panel"><div class="panel-head"><div><p class="panel-kicker">Telegram</p><h3>알림</h3></div><span id="telegramStatePill" class="status-pill neutral">확인 중</span></div><p class="panel-copy">매수하기 좋은 조건이 처음 충족될 때만 자동으로 알려드립니다.</p><div class="button-row"><button id="telegramSettings" class="button secondary">설정</button><button id="telegramTest" class="button secondary">테스트</button></div></article>
 
         <article class="panel"><div class="panel-head"><div><p class="panel-kicker">Backup & sync</p><h3>데이터 보존</h3></div></div><div id="backupSyncStatus" class="list"></div><div class="button-row"><button id="backupNow" class="button secondary">백업 실행</button><button id="syncNow" class="button secondary">GitHub 동기화</button></div></article>
 
-        <article class="panel phone-panel"><div class="panel-head"><div><p class="panel-kicker">Phone access</p><h3>폰 외부 접속</h3></div><span id="tailscalePill" class="status-pill neutral">확인 중</span></div><div id="phoneAccessBody" class="phone-access-body empty-state">네트워크 상태를 확인하는 중입니다.</div><div class="phone-warning">포트 8765를 공유기에서 인터넷에 직접 개방하지 않습니다. 외부 접속은 Tailscale을 사용합니다.</div></article>
+        <article class="panel phone-panel"><div class="panel-head"><div><p class="panel-kicker">Phone access</p><h3>폰 외부 접속</h3></div><span id="tailscalePill" class="status-pill neutral">확인 중</span></div><div id="phoneAccessBody" class="phone-access-body empty-state">네트워크 상태를 확인하는 중입니다.</div><div class="phone-warning">포트 8765를 인터넷에 직접 개방하지 않습니다. 외부에서는 Cloudflare HTTPS 연결을 사용합니다.</div></article>
 
         <article class="panel"><div class="panel-head"><div><p class="panel-kicker">System</p><h3>로컬 엔진</h3></div></div><div id="systemDetail" class="list"></div></article>
 
-        <article class="panel" id="staticUiBuild"><div class="panel-head"><div><p class="panel-kicker">UI BUILD</p><h3>화면 버전</h3></div><span class="status-pill good">UI 2026.08.24-4</span></div><p class="panel-copy">이 표시가 보이면 최신 index.html이 로컬 브라우저에 적용된 상태입니다.</p></article>
+        <article class="panel" id="staticUiBuild"><div class="panel-head"><div><p class="panel-kicker">UI BUILD</p><h3>화면 버전</h3></div><span class="status-pill good">UI 2026.08.24-5</span></div><p class="panel-copy">이 표시가 보이면 최신 index.html이 로컬 브라우저에 적용된 상태입니다.</p></article>
 
         <article class="panel deferred-panel"><div class="panel-head"><div><p class="panel-kicker">Deferred</p><h3>실거래 엔진</h3></div></div><p class="panel-copy">실제 주문, 잔고 정합성, 부분체결, 중복 주문 방지는 별도 Work에서 구축합니다. 현재 앱은 PAPER 전용입니다.</p><span class="status-pill neutral">나중 작업</span></article>
       </section>
     </section>
   </main>
 
-  <dialog id="settingsDialog"><form method="dialog" class="dialog-body"><h2>대시보드 연결</h2><label>API 주소<input id="apiBaseInput" placeholder="http://100.x.x.x:8765" /></label><label>Dashboard token<input id="tokenInput" type="password" placeholder="폰/LAN/Tailscale 접속에서 사용" /></label><p id="connectionHint" class="hint">이 PC의 127.0.0.1 접속은 자동 인증됩니다. 다른 기기에서는 Dashboard token이 필요합니다.</p><div class="dialog-actions"><button value="cancel" class="button secondary">취소</button><button id="saveSettings" value="default" class="button">저장</button></div></form></dialog>
+  <dialog id="settingsDialog"><form method="dialog" class="dialog-body"><h2>대시보드 연결</h2><label>API 주소<input id="apiBaseInput" placeholder="현재 Cloudflare HTTPS 주소" /></label><label>Dashboard token<input id="tokenInput" type="password" placeholder="휴대폰 연결 코드" /></label><p id="connectionHint" class="hint">이 PC의 127.0.0.1 접속은 자동 인증됩니다. 휴대폰에서는 Cloudflare HTTPS 주소와 연결 코드를 사용합니다.</p><div class="dialog-actions"><button value="cancel" class="button secondary">취소</button><button id="saveSettings" value="default" class="button">저장</button></div></form></dialog>
 
   <dialog id="telegramDialog"><form method="dialog" class="dialog-body"><h2>텔레그램 알림</h2><label>Bot token<input id="telegramTokenInput" type="password" autocomplete="off" placeholder="BotFather에서 발급한 토큰" /></label><label>Chat ID<input id="telegramChatIdInput" autocomplete="off" /></label><label class="check-row"><input id="telegramEnabledInput" type="checkbox" /> 알림 활성화</label><p id="telegramStatusHint" class="hint">토큰은 이 PC 로컬 데이터에만 저장합니다.</p><div class="dialog-actions"><button value="cancel" class="button secondary">취소</button><button id="saveTelegram" value="default" class="button">저장</button></div></form></dialog>
 
@@ -179,6 +179,6 @@
   <script src="./plain-language.js?v=1"></script>
   <script src="./portfolio-tools.js?v=2"></script>
   <script src="./ux-stability.js?v=1"></script>
-  <script src="./navigation-v3.js?v=7"></script>
+  <script src="./navigation-v3.js?v=8"></script>
 </body>
 </html>
