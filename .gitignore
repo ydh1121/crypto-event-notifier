@@ -32,5 +32,6 @@ cloudflare/node_modules/
 cloudflare/.wrangler/
 cloudflare-pages/node_modules/
 cloudflare-pages/.wrangler/
+cloudflare-pages/package-lock.json
 cloudflare-pages/wrangler.local.jsonc
 cloudflare-pages/wrangler.jsonc
