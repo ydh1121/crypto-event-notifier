@@ -10,7 +10,7 @@
   const $$=(selector,root=document)=>[...root.querySelectorAll(selector)];
   const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
   const reduced=()=>window.matchMedia?.('(prefers-reduced-motion: reduce)').matches===true;
-  const UI_BUILD='2026.08.24-5';
+  const UI_BUILD='2026.08.24-6';
 
   function indicatorMarkup(){
     return '<span class="dashboard-liquid-skin" aria-hidden="true"></span><span class="dashboard-liquid-content" aria-hidden="true"></span>';
@@ -199,10 +199,20 @@
     },1200);
   }
 
+  function appendStyleOnce(selector,href,datasetKey){
+    if(document.querySelector(selector))return;
+    const link=document.createElement('link');link.rel='stylesheet';link.href=href;link.dataset[datasetKey]='1';document.head.appendChild(link);
+  }
+  function appendScriptOnce(flag,src){
+    if(window[flag]||document.querySelector(`script[src^="${src.split('?')[0]}"]`))return;
+    const script=document.createElement('script');script.src=src;document.body.appendChild(script);
+  }
   function loadResearchUi(){
     const version=encodeURIComponent(UI_BUILD);
-    if(!document.querySelector('link[data-demo-research]')){const link=document.createElement('link');link.rel='stylesheet';link.href=`./demo-research.css?v=${version}`;link.dataset.demoResearch='1';document.head.appendChild(link)}
+    appendStyleOnce('link[data-demo-research]',`./demo-research.css?v=${version}`,'demoResearch');
+    appendStyleOnce('link[data-research-capital]',`./research-capital.css?v=${version}`,'researchCapital');
     if(!window.__demoResearchLoading&&!window.__demoResearchLoaded){window.__demoResearchLoading=true;const script=document.createElement('script');script.src=`./demo-research.js?v=${version}`;script.onload=()=>{window.__demoResearchLoading=false};script.onerror=()=>{window.__demoResearchLoading=false};document.body.appendChild(script)}
+    appendScriptOnce('__researchCapitalLoaded',`./research-capital.js?v=${version}`);
   }
 
   function installBuildMarker(){
