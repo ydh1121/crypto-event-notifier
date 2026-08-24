@@ -33,6 +33,13 @@ COMPONENT_DEFINITIONS: dict[str, dict[str, Any]] = {
         "default_interval_seconds": 20,
         "min_interval_seconds": 10,
     },
+    "cloudflare-market-detail-publish": {
+        "label": "웹 코인 상세 데이터 보내기",
+        "description": "코인별 체결·매매계획·학습·자산곡선을 작게 나눠 Cloudflare 조회판으로 보냅니다.",
+        "default_enabled": True,
+        "default_interval_seconds": 30,
+        "min_interval_seconds": 20,
+    },
     "cloudflare-pages-deploy": {
         "label": "웹 화면 자동 배포",
         "description": "GitHub에서 새 웹 화면을 받은 뒤 Pages 코드가 바뀐 경우에만 pages.dev로 자동 배포합니다.",
