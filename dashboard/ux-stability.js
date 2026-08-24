@@ -182,3 +182,152 @@ if(typeof renderVpnFreePhoneAccess==='function'){
 polishStaticCopy();
 restoreTechnicalDetail();
 setTimeout(()=>{polishStaticCopy();addOneTapPhoneLink()},700);
+
+/* --------------------------------------------------------------------------
+   Dashboard UX v2 — compact navigation, price-first asset presentation,
+   beginner-friendly settings status. UI only: no trading logic changes.
+   -------------------------------------------------------------------------- */
+
+const V2_NAV=[
+  ['overview','홈','<path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V21h13V9.5"/><path d="M9.5 21v-7h5v7"/>'],
+  ['assets','코인','<circle cx="12" cy="12" r="8.5"/><path d="M9 9.2h4.1a2.1 2.1 0 0 1 0 4.2H9z"/><path d="M9 13.4h4.8a2.2 2.2 0 0 1 0 4.4H9z"/><path d="M11 7v2.2M14 7v2.2M11 17.8V20M14 17.8V20"/>'],
+  ['performance','결과','<path d="M4 18V10"/><path d="M10 18V6"/><path d="M16 18v-5"/><path d="M3 21h18"/><path d="m15.5 7.5 2-2 2 2"/>'],
+  ['activity','기록','<path d="M6 4h12a2 2 0 0 1 2 2v14H4V6a2 2 0 0 1 2-2Z"/><path d="M8 9h8M8 13h8M8 17h5"/>'],
+  ['settings','설정','<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 9 19.36a1.7 1.7 0 0 0-1.87.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.64 15 1.7 1.7 0 0 0 3.08 14H3v-4h.08A1.7 1.7 0 0 0 4.64 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.64 1.7 1.7 0 0 0 10.03 3.08V3h4v.08A1.7 1.7 0 0 0 15 4.64a1.7 1.7 0 0 0 1.87-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.36 9 1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/>'],
+];
+
+function installV2Navigation(){
+  document.querySelectorAll('.view-tab').forEach(tab=>{
+    const row=V2_NAV.find(([view])=>view===tab.dataset.view);
+    if(!row)return;
+    tab.innerHTML=`<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">${row[2]}</svg><span>${row[1]}</span>`;
+    tab.setAttribute('aria-label',row[1]);
+  });
+}
+
+function enhanceV2AssetHero(){
+  const item=ui.snapshot?.assets?.[ui.selectedMarket];
+  const target=document.getElementById('assetDetailHeader');
+  if(!item||!target)return;
+  const holding=typeof holdingFor==='function'?holdingFor(ui.selectedMarket):null;
+  const hasHolding=!!(holding&&Number(holding.volume)>0);
+  const price=Number(item.price||0);
+  const pnl=hasHolding?Number(holding.unrealized_pnl_krw||0):0;
+  const pnlPct=hasHolding?Number(holding.unrealized_pnl_pct||0):0;
+  const tone=actionTone(item.action);
+  target.className='asset-detail-header v2-asset-hero';
+  target.innerHTML=`
+    <div class="v2-asset-top">
+      <span class="v2-asset-symbol">${esc(item.symbol||ui.selectedMarket.replace('KRW-',''))}</span>
+      <span class="v2-decision-badge ${tone}">${esc(actionLabel(item.action))}</span>
+    </div>
+    <div class="v2-current-price">
+      <span>현재 가격</span>
+      <strong>${num(price,8)}원</strong>
+      <small class="${clsSign(item.asset_return_pct)}">24시간 ${signedPct(item.asset_return_pct)}</small>
+    </div>
+    <div class="v2-holding-line">
+      <div class="v2-holding-chip"><span>내 평단</span><b>${hasHolding?`${num(holding.avg_price,8)}원`:'입력 안 함'}</b></div>
+      <div class="v2-holding-chip"><span>현재 손익</span><b class="${hasHolding?clsSign(pnl):''}">${hasHolding?`${money(pnl)} · ${signedPct(pnlPct)}`:'-'}</b></div>
+    </div>`;
+}
+
+if(typeof renderSelectedAsset==='function'){
+  const renderSelectedAssetBeforeV2=renderSelectedAsset;
+  renderSelectedAsset=function(){
+    renderSelectedAssetBeforeV2();
+    enhanceV2AssetHero();
+  };
+}
+
+assetCard=function(market,item){
+  const holding=typeof holdingFor==='function'?holdingFor(market):null;
+  const selected=market===ui.selectedMarket;
+  const decision=decisionCopy(item);
+  const hasHolding=!!(holding&&Number(holding.volume)>0);
+  const pnl=hasHolding?Number(holding.unrealized_pnl_krw||0):0;
+  const pnlPct=hasHolding?Number(holding.unrealized_pnl_pct||0):0;
+  const holdingHtml=hasHolding
+    ?`<div class="holding-strip"><span>내 평단 <b>${num(holding.avg_price,8)}원</b></span><span>현재 손익 <b class="${clsSign(pnl)}">${money(pnl)} · ${signedPct(pnlPct)}</b></span></div>`
+    :'<div class="holding-strip is-empty"><span>내 보유 정보 <b>입력 안 함</b></span><span class="holding-empty-note">코인 화면에서 입력</span></div>';
+  return `<article class="asset-card simple-asset-card ${selected?'is-selected':''}" data-market="${esc(market)}">
+    <div class="asset-card-top">
+      <div class="asset-title"><h3>${esc(item.symbol||market.replace('KRW-',''))}</h3></div>
+      <div class="asset-actions"><span class="asset-action ${esc(item.action||'')}">${esc(actionLabel(item.action))}</span><button class="icon-button remove-asset" data-market="${esc(market)}" title="감시 제거" aria-label="감시 제거">×</button></div>
+    </div>
+    <div class="v2-card-price"><div><span>현재 가격</span><strong>${num(item.price,8)}원</strong></div><b class="v2-card-change ${clsSign(item.asset_return_pct)}">${signedPct(item.asset_return_pct)}</b></div>
+    <div class="simple-decision ${actionTone(item.action)}"><strong>${esc(decision[0])}</strong><small>${esc(decision[1])}</small></div>
+    ${holdingHtml}
+    <div class="simple-score-row"><span>시장 <b>${esc(easyScoreMeaning(item.regime_score))}</b></span><span>타이밍 <b>${esc(easyScoreMeaning(item.entry_score))}</b></span></div>
+  </article>`;
+};
+
+function friendlySyncStatus(value){
+  const raw=String(value||'').toLowerCase();
+  if(['up_to_date','published','success','done'].includes(raw))return '최신 상태';
+  if(raw==='blocked_dirty_worktree')return '내 변경사항 보존 중';
+  if(raw==='idle'||!raw)return '대기';
+  if(raw.includes('error')||raw.includes('fail'))return '확인 필요';
+  if(raw.includes('sync'))return '동기화 중';
+  return String(value||'대기').replaceAll('_',' ');
+}
+
+function friendlyBackupStatus(value){
+  const raw=String(value||'').toLowerCase();
+  if(['success','done','completed'].includes(raw))return '백업 완료';
+  if(raw==='idle'||!raw)return '대기';
+  if(raw.includes('error')||raw.includes('fail'))return '확인 필요';
+  if(raw.includes('run')||raw.includes('progress'))return '백업 중';
+  return String(value||'대기').replaceAll('_',' ');
+}
+
+if(typeof renderSettingsStatus==='function'){
+  const renderSettingsBeforeV2=renderSettingsStatus;
+  renderSettingsStatus=function(){
+    renderSettingsBeforeV2();
+    const statusBox=document.getElementById('backupSyncStatus');
+    const s=ui.snapshot||{},sync=s.sync||{},backup=s.backup||{};
+    if(statusBox){
+      statusBox.innerHTML=`
+        <div class="list-item"><div class="list-item-head"><b>코드 동기화</b><span class="v2-status-text">${esc(friendlySyncStatus(sync.status))}</span></div><small>설정과 대시보드 변경사항을 안전하게 보존합니다.</small></div>
+        <div class="list-item"><div class="list-item-head"><b>Google Drive 백업</b><span class="v2-status-text">${esc(friendlyBackupStatus(backup.status))}</span></div><small>${backup.drive?esc(backup.drive):'연결 전에는 이 PC에만 백업합니다.'}</small></div>`;
+    }
+    const system=document.getElementById('systemDetail');
+    if(system){
+      const up=Math.floor((s.uptime_seconds||0)/60);
+      system.innerHTML=`<div class="list-item"><div class="list-item-head"><b>운영 방식</b><span>가상매매</span></div><small>실제 주문은 하지 않습니다.</small></div><div class="list-item"><div class="list-item-head"><b>실행 시간</b><span>${up}분</span></div></div>${s.last_error?`<div class="list-item"><div class="list-item-head"><b>최근 문제</b><span>확인 필요</span></div><small>${esc(s.last_error.message||'기록 화면에서 확인하세요.')}</small></div>`:''}`;
+    }
+  };
+}
+
+function simplifyRemotePhonePanel(){
+  if(isLoopback())return;
+  const cf=ui.network?.cloudflare||{};
+  const body=document.getElementById('phoneAccessBody');
+  if(!body||!cf.active)return;
+  body.innerHTML=`<div class="access-card"><div class="access-card-top"><h4>외부 연결</h4><span class="status-pill good">정상</span></div><p>현재 휴대폰에서 안전한 HTTPS 연결로 접속 중입니다.</p></div>`;
+  const warning=document.querySelector('.phone-warning');if(warning)warning.style.display='none';
+}
+
+if(typeof renderVpnFreePhoneAccess==='function'){
+  const renderPhoneBeforeV2=renderVpnFreePhoneAccess;
+  renderVpnFreePhoneAccess=function(){
+    renderPhoneBeforeV2();
+    simplifyRemotePhonePanel();
+  };
+}
+
+function v2PolishStaticCopy(){
+  const brand=document.querySelector('.brand-row h1');if(brand)brand.textContent='코인 상태판';
+  const phoneTitle=document.querySelector('.phone-panel h3');if(phoneTitle)phoneTitle.textContent='휴대폰 연결';
+  const backupPanel=document.getElementById('backupSyncStatus')?.closest('.panel');
+  const backupTitle=backupPanel?.querySelector('h3');if(backupTitle)backupTitle.textContent='백업과 동기화';
+  const systemTitle=document.getElementById('systemDetail')?.closest('.panel')?.querySelector('h3');if(systemTitle)systemTitle.textContent='프로그램 상태';
+  const telegramTitle=document.getElementById('telegramStatePill')?.closest('.panel')?.querySelector('h3');if(telegramTitle)telegramTitle.textContent='매수 알림';
+}
+
+installV2Navigation();
+v2PolishStaticCopy();
+enhanceV2AssetHero();
+simplifyRemotePhonePanel();
+setTimeout(()=>{installV2Navigation();v2PolishStaticCopy();enhanceV2AssetHero();simplifyRemotePhonePanel()},900);
