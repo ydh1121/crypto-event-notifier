@@ -8,9 +8,21 @@ Write-Host "This preserves control/assets.json and control/runtime.json, then re
 
 if (-not (Test-Path ".git")) { throw "This folder is not a Git clone." }
 
+$controlFiles = @("control/assets.json", "control/runtime.json")
+$dirtyLines = @(& git status --porcelain) | Where-Object { $_ }
+$dirtyPaths = @($dirtyLines | ForEach-Object {
+  if ($_.Length -ge 4) { $_.Substring(3).Trim() }
+}) | Where-Object { $_ }
+$unsafeDirty = @($dirtyPaths | Where-Object { $_ -notin $controlFiles })
+if ($unsafeDirty.Count -gt 0) {
+  Write-Host "Repair stopped because non-control local changes exist:" -ForegroundColor Yellow
+  $unsafeDirty | Sort-Object -Unique | ForEach-Object { Write-Host "  $_" }
+  Write-Host "No reset was performed. Ask GPT to review these files before continuing."
+  exit 2
+}
+
 $temp = Join-Path $env:TEMP ("crypto-trader-control-" + [guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $temp | Out-Null
-$controlFiles = @("control/assets.json", "control/runtime.json")
 foreach ($relative in $controlFiles) {
   if (Test-Path $relative) {
     $dest = Join-Path $temp ([IO.Path]::GetFileName($relative))
@@ -18,35 +30,38 @@ foreach ($relative in $controlFiles) {
   }
 }
 
-& git fetch origin $branch
-if ($LASTEXITCODE -ne 0) { throw "GitHub fetch failed." }
+try {
+  & git fetch origin $branch
+  if ($LASTEXITCODE -ne 0) { throw "GitHub fetch failed." }
 
-$remote = "origin/$branch"
-$base = (& git merge-base HEAD $remote).Trim()
-if (-not $base) { throw "Could not find a common Git ancestor." }
-$localOnly = @(& git diff --name-only "$base..HEAD") | Where-Object { $_ }
-$unsafe = @($localOnly | Where-Object { $_ -notin $controlFiles })
-if ($unsafe.Count -gt 0) {
-  Write-Host "Repair stopped because local-only code/files exist:" -ForegroundColor Yellow
-  $unsafe | ForEach-Object { Write-Host "  $_" }
-  Write-Host "No reset was performed. Ask GPT to review these files before continuing."
-  exit 2
-}
-
-& git reset --hard $remote
-if ($LASTEXITCODE -ne 0) { throw "Git reset failed." }
-
-foreach ($relative in $controlFiles) {
-  $source = Join-Path $temp ([IO.Path]::GetFileName($relative))
-  if (Test-Path $source) {
-    $parent = Split-Path -Parent $relative
-    if ($parent -and -not (Test-Path $parent)) { New-Item -ItemType Directory -Path $parent | Out-Null }
-    Copy-Item $source $relative -Force
+  $remote = "origin/$branch"
+  $base = (& git merge-base HEAD $remote).Trim()
+  if (-not $base) { throw "Could not find a common Git ancestor." }
+  $localOnly = @(& git diff --name-only "$base..HEAD") | Where-Object { $_ }
+  $unsafe = @($localOnly | Where-Object { $_ -notin $controlFiles })
+  if ($unsafe.Count -gt 0) {
+    Write-Host "Repair stopped because local-only code/files exist:" -ForegroundColor Yellow
+    $unsafe | ForEach-Object { Write-Host "  $_" }
+    Write-Host "No reset was performed. Ask GPT to review these files before continuing."
+    exit 2
   }
-}
-Remove-Item $temp -Recurse -Force -ErrorAction SilentlyContinue
 
-Write-Host "Repair complete. Local code now matches $remote."
-Write-Host "Your local .env, dashboard token, Telegram settings, SQLite data, holdings, and backups were not deleted."
-Write-Host "Next: .\start-trader.bat"
+  & git reset --hard $remote
+  if ($LASTEXITCODE -ne 0) { throw "Git reset failed." }
+
+  foreach ($relative in $controlFiles) {
+    $source = Join-Path $temp ([IO.Path]::GetFileName($relative))
+    if (Test-Path $source) {
+      $parent = Split-Path -Parent $relative
+      if ($parent -and -not (Test-Path $parent)) { New-Item -ItemType Directory -Path $parent | Out-Null }
+      Copy-Item $source $relative -Force
+    }
+  }
+} finally {
+  Remove-Item $temp -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host "Repair complete. Local code now matches origin/$branch."
+Write-Host "Your local .env, dashboard token, Telegram settings, SQLite data, holdings, averaging plans, and backups were not deleted."
+Write-Host "Next: .\start-trader-secure.bat"
 & git status --short
