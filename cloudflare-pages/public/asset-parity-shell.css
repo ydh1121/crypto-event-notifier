@@ -1,0 +1,31 @@
+/* Asset view layout ported from the local dashboard. The remote viewer stays read-only. */
+[data-view-panel="coin"].asset-local-ready>.coin-detail-card,[data-view-panel="coin"].asset-local-ready>#marketResearchDetail{display:none}
+.asset-local-layout{display:grid;grid-template-columns:minmax(0,1.52fr) minmax(300px,.62fr);gap:14px;align-items:start}
+.asset-local-primary{display:grid;gap:12px;min-width:0}
+.asset-local-aside{position:sticky;top:118px;display:grid;gap:10px;min-width:0;padding:12px;border-radius:20px;background:var(--grouped)}
+.asset-local-aside-head{padding:5px 5px 1px}
+.asset-local-aside-head h3{margin:3px 0 0;font-size:18px;letter-spacing:-.025em}
+.asset-local-aside-head>p:last-child{margin:6px 0 0;color:var(--secondary);font-size:10.5px;line-height:1.45}
+.asset-local-aside #holdingsCard{margin:0!important;padding:13px!important;border:0!important;border-radius:16px!important;box-shadow:none!important;background:rgba(255,255,255,.9)!important}
+.asset-local-aside #holdingsCard .section-head{margin-bottom:9px}.asset-local-aside #holdingsCard .section-head .kicker,.asset-local-aside #holdingsCard .section-head h3{display:none}
+.asset-local-aside #holdingsCard .holding-summary{grid-template-columns:1fr!important;gap:6px!important}.asset-local-aside #holdingsCard .holding-summary>div{padding:10px!important;border-radius:12px!important}
+.asset-local-aside #holdingsCard .holding-list{gap:5px!important}.asset-local-aside #holdingsCard .holding-row{grid-template-columns:1fr 1fr!important;gap:7px!important;padding:10px!important;border-radius:12px!important}.asset-local-aside #holdingsCard .holding-row>div:nth-child(3),.asset-local-aside #holdingsCard .holding-row>div:nth-child(4){text-align:left!important}
+
+.asset-local-primary>#coinDetailCard{margin:0!important;padding:16px!important;border-radius:20px!important;box-shadow:none!important;border:1px solid var(--border)!important;background:rgba(255,255,255,.97)!important}
+.asset-local-primary>#coinDetailCard .coin-hero{padding-bottom:14px!important}.asset-local-primary>#coinDetailCard .coin-hero h3{font-size:31px!important;letter-spacing:-.05em!important}.asset-local-primary>#coinDetailCard .coin-price strong{font-size:26px!important}
+.asset-local-primary>#coinDetailCard .coin-stat-grid{gap:7px!important}.asset-local-primary>#coinDetailCard .coin-stat-grid>div{padding:11px!important;border-radius:13px!important;background:var(--grouped)!important}
+.asset-local-primary>#coinDetailCard .score-grid{gap:7px!important}.asset-local-primary>#coinDetailCard .score-box{padding:12px!important;border-radius:14px!important;background:var(--grouped)!important}
+.asset-local-primary>#coinDetailCard .coin-status-line{margin-top:9px!important;border-radius:13px!important}
+
+.asset-local-primary>#marketResearchDetail{display:grid!important;gap:12px!important;margin:0!important}
+.asset-local-primary .research-detail-card{padding:15px!important;border-radius:19px!important;box-shadow:none!important;background:rgba(255,255,255,.97)!important}
+.asset-local-primary .research-detail-card:first-child{background:linear-gradient(180deg,rgba(65,110,225,.055),rgba(255,255,255,.98))!important}
+.asset-local-primary .trade-plan-grid{gap:7px!important}.asset-local-primary .trade-plan-grid>div{padding:11px!important;border-radius:13px!important;background:rgba(255,255,255,.78)!important}
+.asset-local-primary .diagnostic-grid{gap:7px!important}.asset-local-primary .diagnostic-grid>div{padding:10px!important}
+.asset-local-primary .detail-chart-grid{gap:8px!important}.asset-local-primary .mini-chart{min-height:177px!important;border-radius:14px!important;background:#fff!important}
+.asset-local-primary .detail-columns{gap:8px!important}.asset-local-primary .detail-columns .research-detail-card{background:#fff!important}
+
+@media(max-width:1040px){.asset-local-layout{grid-template-columns:minmax(0,1fr) 280px}.asset-local-aside #holdingsCard .holding-row{grid-template-columns:1fr!important}}
+@media(max-width:880px){.asset-local-layout{grid-template-columns:1fr}.asset-local-aside{position:static;order:-1}.asset-local-aside #holdingsCard .holding-summary{grid-template-columns:repeat(3,1fr)!important}.asset-local-aside #holdingsCard .holding-row{grid-template-columns:repeat(2,1fr)!important}}
+@media(max-width:620px){.asset-local-layout{gap:10px}.asset-local-aside{padding:9px;border-radius:17px}.asset-local-primary>#coinDetailCard{padding:13px!important;border-radius:17px!important}.asset-local-primary>#coinDetailCard .coin-stat-grid,.asset-local-primary>#coinDetailCard .score-grid{grid-template-columns:1fr 1fr!important}.asset-local-primary .trade-plan-grid,.asset-local-primary .diagnostic-grid{grid-template-columns:1fr 1fr!important}.asset-local-primary .detail-chart-grid,.asset-local-primary .detail-columns{grid-template-columns:1fr!important}}
+@media(max-width:430px){.asset-local-aside #holdingsCard .holding-summary,.asset-local-aside #holdingsCard .holding-row,.asset-local-primary>#coinDetailCard .coin-stat-grid,.asset-local-primary>#coinDetailCard .score-grid,.asset-local-primary .trade-plan-grid,.asset-local-primary .diagnostic-grid{grid-template-columns:1fr!important}}
