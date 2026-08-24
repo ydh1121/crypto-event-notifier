@@ -14,6 +14,7 @@ from .telegram_notify import TelegramNotifier
 
 CODE_SUFFIXES = (".py", ".toml", ".yml", ".yaml", ".txt")
 CODE_PREFIXES = ("b3_trader/", "scripts/", ".github/", "Dockerfile", "cloudflare/")
+CONTROL_PATHS = ("control/assets.json", "control/runtime.json")
 
 
 class GitAutoSync:
@@ -59,22 +60,113 @@ class GitAutoSync:
             raise RuntimeError(completed.stderr.strip() or completed.stdout.strip())
         return completed.stdout.strip()
 
+    def _is_ancestor(self, older: str, newer: str) -> bool:
+        completed = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", older, newer],
+            cwd=self.repo_dir,
+            text=True,
+            capture_output=True,
+            timeout=30,
+            check=False,
+        )
+        if completed.returncode == 0:
+            return True
+        if completed.returncode == 1:
+            return False
+        raise RuntimeError(completed.stderr.strip() or "git merge-base failed")
+
+    def _merge_base(self, left: str, right: str) -> str:
+        return self._git("merge-base", left, right)
+
+    @staticmethod
+    def _control_only(paths: list[str]) -> bool:
+        return bool(paths) and all(path in CONTROL_PATHS for path in paths)
+
+    def _changed_from_base(self, base: str, ref: str) -> list[str]:
+        return [line for line in self._git("diff", "--name-only", f"{base}..{ref}").splitlines() if line]
+
+    def _preserve_control(self) -> dict[str, bytes]:
+        preserved: dict[str, bytes] = {}
+        for relative in CONTROL_PATHS:
+            path = self.repo_dir / relative
+            if path.exists():
+                preserved[relative] = path.read_bytes()
+        return preserved
+
+    def _restore_control(self, preserved: dict[str, bytes]) -> None:
+        for relative, content in preserved.items():
+            path = self.repo_dir / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+
+    def _restart_if_needed(self, code_changed: bool) -> None:
+        if not code_changed:
+            return
+        self.state.restart_required = True
+        if self.on_restart_required:
+            self.on_restart_required()
+
     def publish_control(self, message: str = "Update local trader control state") -> dict:
         if not self.push_control_changes:
             return {"status": "push_disabled"}
         available, reason = self._git_available()
         if not available:
             return self._disabled_payload(reason)
+
         with self._lock:
-            self._git("add", "control/assets.json", "control/runtime.json")
+            preserved = self._preserve_control()
+            self._git("fetch", "origin", self.branch)
+            local = self._git("rev-parse", "HEAD")
+            remote = self._git("rev-parse", f"origin/{self.branch}")
+            remote_changed: list[str] = []
+
+            if local != remote:
+                if self._is_ancestor(local, remote):
+                    remote_changed = [line for line in self._git("diff", "--name-only", f"{local}..{remote}").splitlines() if line]
+                    self._git("reset", "--hard", f"origin/{self.branch}")
+                    self._restore_control(preserved)
+                elif self._is_ancestor(remote, local):
+                    base = remote
+                    local_only = self._changed_from_base(base, local)
+                    if not self._control_only(local_only):
+                        payload = {"status": "blocked_local_commits", "ts": time.time(), "changed": local_only}
+                        self.state.set_sync(payload)
+                        return payload
+                else:
+                    base = self._merge_base(local, remote)
+                    local_only = self._changed_from_base(base, local)
+                    remote_changed = self._changed_from_base(base, remote)
+                    if not self._control_only(local_only):
+                        payload = {
+                            "status": "blocked_diverged_local_commits",
+                            "ts": time.time(),
+                            "local_changed": local_only,
+                            "remote_changed": remote_changed,
+                        }
+                        self.state.set_sync(payload)
+                        return payload
+                    # Local-only commits are dashboard control state. Keep their current
+                    # file contents, move code to the remote head, then republish control.
+                    self._git("reset", "--hard", f"origin/{self.branch}")
+                    self._restore_control(preserved)
+
+            self._git("add", *CONTROL_PATHS)
             staged = self._git("diff", "--cached", "--name-only")
-            if not staged:
-                return {"status": "nothing_to_publish"}
-            self._git("commit", "-m", message)
+            if staged:
+                self._git("commit", "-m", message)
             self._git("push", "origin", f"HEAD:{self.branch}")
             commit = self._git("rev-parse", "HEAD")
-            payload = {"status": "published", "commit": commit, "files": staged.splitlines()}
-            self.state.set_sync({**payload, "ts": time.time()})
+            code_changed = any(path.startswith(CODE_PREFIXES) or path.endswith(CODE_SUFFIXES) for path in remote_changed)
+            payload = {
+                "status": "published" if staged else "up_to_date",
+                "commit": commit,
+                "files": staged.splitlines() if staged else [],
+                "remote_changed": remote_changed,
+                "restart_required": code_changed,
+                "ts": time.time(),
+            }
+            self.state.set_sync(payload)
+            self._restart_if_needed(code_changed)
             return payload
 
     def check_once(self) -> dict:
@@ -83,16 +175,17 @@ class GitAutoSync:
         available, reason = self._git_available()
         if not available:
             return self._disabled_payload(reason)
+
         with self._lock:
             dirty = self._git("status", "--porcelain")
             if dirty:
-                only_control = all(line[3:].startswith("control/") for line in dirty.splitlines() if len(line) >= 4)
-                if only_control and self.push_control_changes:
-                    self.publish_control()
-                else:
-                    payload = {"status": "blocked_dirty_worktree", "ts": time.time(), "detail": dirty.splitlines()[:10]}
-                    self.state.set_sync(payload)
-                    return payload
+                dirty_paths = [line[3:] for line in dirty.splitlines() if len(line) >= 4]
+                if self._control_only(dirty_paths) and self.push_control_changes:
+                    return self.publish_control()
+                payload = {"status": "blocked_dirty_worktree", "ts": time.time(), "detail": dirty.splitlines()[:10]}
+                self.state.set_sync(payload)
+                return payload
+
             self._git("fetch", "origin", self.branch)
             local = self._git("rev-parse", "HEAD")
             remote = self._git("rev-parse", f"origin/{self.branch}")
@@ -100,22 +193,59 @@ class GitAutoSync:
                 payload = {"status": "up_to_date", "ts": time.time(), "commit": local}
                 self.state.set_sync(payload)
                 return payload
-            changed = [line for line in self._git("diff", "--name-only", f"{local}..{remote}").splitlines() if line]
-            code_changed = any(path.startswith(CODE_PREFIXES) or path.endswith(CODE_SUFFIXES) for path in changed)
-            if code_changed and self.block_code_updates:
-                payload = {"status": "blocked_live_code_update", "ts": time.time(), "local": local, "remote": remote, "changed": changed}
+
+            if self._is_ancestor(local, remote):
+                changed = [line for line in self._git("diff", "--name-only", f"{local}..{remote}").splitlines() if line]
+                code_changed = any(path.startswith(CODE_PREFIXES) or path.endswith(CODE_SUFFIXES) for path in changed)
+                if code_changed and self.block_code_updates:
+                    payload = {"status": "blocked_live_code_update", "ts": time.time(), "local": local, "remote": remote, "changed": changed}
+                    self.state.set_sync(payload)
+                    return payload
+                self._git("merge", "--ff-only", f"origin/{self.branch}")
+                payload = {"status": "updated", "ts": time.time(), "from": local, "to": remote, "changed": changed, "restart_required": code_changed}
+                self.state.set_sync(payload)
+                self._restart_if_needed(code_changed)
+                return payload
+
+            if self._is_ancestor(remote, local):
+                local_only = self._changed_from_base(remote, local)
+                if self._control_only(local_only) and self.push_control_changes:
+                    self._git("push", "origin", f"HEAD:{self.branch}")
+                    payload = {"status": "published", "ts": time.time(), "commit": local, "files": local_only}
+                    self.state.set_sync(payload)
+                    return payload
+                payload = {"status": "blocked_local_commits", "ts": time.time(), "changed": local_only}
                 self.state.set_sync(payload)
                 return payload
-            self._git("merge", "--ff-only", f"origin/{self.branch}")
-            payload = {"status": "updated", "ts": time.time(), "from": local, "to": remote, "changed": changed, "restart_required": code_changed}
-            self.state.set_sync(payload)
-            if self.notifier:
-                self.notifier.safe_send("GitHub 동기화 완료\n" + f"{local[:7]} → {remote[:7]}\n변경 {len(changed)}개" + ("\n프로그램 재시작 예정" if code_changed else ""), event_key=f"git-sync-{remote}")
-            if code_changed:
-                self.state.restart_required = True
-                if self.on_restart_required:
-                    self.on_restart_required()
-            return payload
+
+            base = self._merge_base(local, remote)
+            local_only = self._changed_from_base(base, local)
+            remote_changed = self._changed_from_base(base, remote)
+            if not self._control_only(local_only):
+                payload = {
+                    "status": "blocked_diverged_local_commits",
+                    "ts": time.time(),
+                    "local_changed": local_only,
+                    "remote_changed": remote_changed,
+                }
+                self.state.set_sync(payload)
+                return payload
+
+            if self.block_code_updates and any(path.startswith(CODE_PREFIXES) or path.endswith(CODE_SUFFIXES) for path in remote_changed):
+                payload = {"status": "blocked_live_code_update", "ts": time.time(), "local": local, "remote": remote, "changed": remote_changed}
+                self.state.set_sync(payload)
+                return payload
+
+            preserved = self._preserve_control()
+            self._git("reset", "--hard", f"origin/{self.branch}")
+            self._restore_control(preserved)
+            result = self.publish_control("Reconcile local trader control state")
+            result["status"] = "reconciled"
+            result["remote_changed"] = remote_changed
+            result["restart_required"] = any(path.startswith(CODE_PREFIXES) or path.endswith(CODE_SUFFIXES) for path in remote_changed)
+            self.state.set_sync(result)
+            self._restart_if_needed(bool(result["restart_required"]))
+            return result
 
     def _loop(self) -> None:
         while not self._stop.wait(self.interval_seconds):
@@ -126,7 +256,8 @@ class GitAutoSync:
                 self.state.set_sync({"status": "error", "ts": time.time(), "message": str(exc)})
 
     def start(self) -> None:
-        if not self.enabled or (self._thread and self._thread.is_alive()): return
+        if not self.enabled or (self._thread and self._thread.is_alive()):
+            return
         available, reason = self._git_available()
         if not available:
             self._disabled_payload(reason)
@@ -168,9 +299,11 @@ class BackupManager:
         try:
             source.backup(target)
         finally:
-            target.close(); source.close()
+            target.close()
+            source.close()
         backups = sorted(self.local_dir.glob("crypto-trader-*.sqlite3"), reverse=True)
-        for old in backups[48:]: old.unlink(missing_ok=True)
+        for old in backups[48:]:
+            old.unlink(missing_ok=True)
         drive_status = "disabled"
         if self.rclone_remote:
             if shutil.which("rclone") is None:
@@ -180,8 +313,10 @@ class BackupManager:
                 base = self.rclone_remote.rsplit("/", 1)[0] if "/" in self.rclone_remote else self.rclone_remote
                 control_dir = self.repo_dir / "control"
                 dashboard_dir = self.repo_dir / "dashboard"
-                if control_dir.exists(): self._rclone("sync", str(control_dir), f"{base}/control")
-                if dashboard_dir.exists(): self._rclone("sync", str(dashboard_dir), f"{base}/dashboard")
+                if control_dir.exists():
+                    self._rclone("sync", str(control_dir), f"{base}/control")
+                if dashboard_dir.exists():
+                    self._rclone("sync", str(dashboard_dir), f"{base}/dashboard")
                 drive_status = "uploaded_and_mirrored"
         payload = {"status": "ok", "ts": time.time(), "local": str(destination), "drive": drive_status}
         self.state.set_backup(payload)
@@ -196,7 +331,8 @@ class BackupManager:
                 self.state.set_backup({"status": "error", "ts": time.time(), "message": str(exc)})
 
     def start(self) -> None:
-        if self._thread and self._thread.is_alive(): return
+        if self._thread and self._thread.is_alive():
+            return
         self._thread = threading.Thread(target=self._loop, name="backup-manager", daemon=True)
         self._thread.start()
 
