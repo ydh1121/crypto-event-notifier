@@ -33,6 +33,8 @@ Verified in the real Cloudflare account on 2026-08-24:
 - 20-second PAPER snapshot delivery
 - owner-only manual holdings display
 - Windows Wrangler/Python UTF-8 and Pages config-path deployment issues fixed
+- local Git auto-sync recovered and verified after the generated npm lockfile blocker was removed
+- Pages auto-deploy verified `healthy` and `up_to_date` against the current branch head
 
 ## Research supervisor
 
@@ -41,6 +43,7 @@ Managed periodic components:
 - `warehouse-export` — 5 minutes
 - `reference-version-watch` — 6 hours
 - `cloudflare-snapshot-publish` — 20 seconds
+- `cloudflare-market-detail-publish` — 30 seconds
 - `cloudflare-pages-deploy` — 30-second viewer-code change check
 
 Component failure remains isolated from the PAPER engine. Remote Pages users cannot change component state.
@@ -57,11 +60,27 @@ The global snapshot currently contains:
 - Research Supervisor summary
 - optional authenticated manual holdings
 
+A separate per-market detail path now stores bounded detailed PAPER research by `exchange + market + strategy` without bloating the 20-second global snapshot.
+
+Current detail payload contains:
+
+- current PAPER position/account state
+- next entry/add plan, target, hard stop and trailing state
+- recent PAPER fills
+- completed-trade feedback and profile-learning changes
+- bounded equity history
+- bounded market-memory / regime / entry / opportunity history
+- selected signal diagnostics such as pullback, volatility, orderbook imbalance and BTC/ETH context
+
+Current implementation uses `bithumb|KRW-XXX|adaptive`; the key shape is ready for Phase 3 Upbit and Phase 4 strategy variants.
+
+The Windows detail publisher rotates through the market universe while prioritizing active/high-opportunity markets. Payloads are size-aware and automatically split into <=1.5 MB requests. Real runtime verification stored 40 markets in two requests (22 + 18) with no lost rows.
+
 Raw SQLite is never uploaded.
 
-## Phase 2.5 implementation started
+## Phase 2.5 status
 
-The Pages viewer now has the same top-level information architecture as the local dashboard:
+The Pages viewer has the same top-level information architecture as the local dashboard:
 
 - `홈`
 - `코인`
@@ -69,10 +88,11 @@ The Pages viewer now has the same top-level information architecture as the loca
 - `기록`
 - `설정`
 
-First slice added:
+Implemented viewer slices:
 
 - Home: aggregate PAPER state, permitted manual holdings, leader, research-node summary
-- Coin: current per-market account state and plain-Korean regime/entry/opportunity scores from the compact snapshot
+- Coin: current per-market account state and plain-Korean regime/entry/opportunity scores
+- Coin detail: next trade plan, bounded charts, recent fills and learning history from the authenticated per-market detail API
 - Results: all-market search/filter/sort; rows open Coin detail
 - Records: current snapshot/trade-count summary
 - Settings: read-only account/research-node state plus owner invite management
@@ -81,22 +101,20 @@ Remote contract remains read-only. There are no Pages endpoints for pause/resume
 
 ## Current next action
 
-Proceed with **Phase 2.5B — detailed research data bridge**.
+Proceed with **Phase 2.5C — browser/UI verification and parity polish**.
 
-Do not put all historical data into the 20-second global snapshot. Design a separate bounded per-market detail path so 477 markets do not resend full history continuously.
+Immediate order:
 
-Next implementation order:
+1. verify a known published market such as BTC/XRP/ETH renders the detailed Coin cards in the authenticated Pages viewer,
+2. fix any client-side/API rendering issue found by that real browser check,
+3. improve chart ranges/labels and plain-Korean trade-decision hierarchy,
+4. expand Records into a useful cross-market fill/learning view instead of only a summary,
+5. verify polling preserves selected tab/coin/filter/scroll state,
+6. mobile Safari QA at 360–430 px,
+7. desktop QA at 1280–1920 px,
+8. verify 477-market rendering remains responsive.
 
-1. define compact per-market detail payload from the existing local PAPER detail data,
-2. add D1 storage/API for latest per-market detail,
-3. publish only changed/recent selected detail slices on a slower cadence,
-4. expose current trade plan / next add / target / stop / trailing state,
-5. expose recent fills and completed-trade feedback,
-6. expose bounded equity + market-memory history for charts,
-7. build the Pages Coin/Records detailed views on that API,
-8. mobile/desktop QA and polling-state preservation.
-
-After the Phase 2.5 data contract is stable, Phase 3 Upbit adapter work can begin while UI polish continues.
+After the Phase 2.5 data contract and browser rendering are stable, Phase 3 Upbit adapter work can begin while UI polish continues.
 
 ## Parallel observations
 
