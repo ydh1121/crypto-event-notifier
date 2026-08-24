@@ -94,6 +94,7 @@ Initial catalog:
 
 ## Phase 1 validation gate
 
+- [x] CI: Python tests + compile, dashboard smoke and Cloudflare typecheck passed for the Phase 1 foundation commit set
 - [ ] One continuous 24-hour local run
 - [ ] Parquet files continue growing without duplicate checkpoints after restart
 - [ ] DuckDB can query several days of accumulated market-memory Parquet
