@@ -146,7 +146,7 @@ def create_app() -> FastAPI:
             engine.stop()
             journal.close()
 
-    app = FastAPI(title="Crypto Auto Trader", version="0.5.0", lifespan=lifespan)
+    app = FastAPI(title="Crypto Auto Trader", version="0.5.1", lifespan=lifespan)
 
     def auth(
         request: Request,
@@ -242,6 +242,16 @@ def create_app() -> FastAPI:
     @app.get("/api/network", dependencies=[Depends(auth)])
     def network() -> dict[str, Any]:
         return network_status(settings.service_port)
+
+    @app.get("/api/local/phone-code")
+    def local_phone_code(request: Request) -> dict[str, str]:
+        client_host = request.client.host if request.client else ""
+        if client_host not in LOOPBACK_HOSTS:
+            raise HTTPException(status_code=403, detail="available only on the local PC")
+        return {
+            "code": token,
+            "file": "b3_trader/data/dashboard-token.txt",
+        }
 
     @app.get("/api/assets", dependencies=[Depends(auth)])
     def api_assets() -> list[dict[str, Any]]:
