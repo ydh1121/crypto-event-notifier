@@ -108,11 +108,10 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 ## Validation status
 
-- [-] Latest holdings/calculator/sync/Tailscale change CI pending
-- [x] Previous plain-language Python tests pass in GitHub Actions
-- [x] Previous Python module compile check passes
-- [x] Previous Dashboard JS checks pass
-- [x] Previous Dashboard structural/plain-language smoke checks pass
+- [x] Latest holdings/calculator/sync/Tailscale Python tests pass in GitHub Actions
+- [x] Latest Python module compile check passes
+- [x] Latest Dashboard `app.js`, `plain-language.js`, and `portfolio-tools.js` pass `node --check`
+- [x] Latest Dashboard structural smoke checks pass
 - [x] Existing Cloudflare TypeScript check remains green
 
 ## Completion condition for this workstream
