@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VIEWER_DIR = REPO_ROOT / "cloudflare-pages"
-LOCAL_CONFIG_PATH = VIEWER_DIR / "wrangler.local.jsonc"
+LOCAL_CONFIG_PATH = VIEWER_DIR / "wrangler.jsonc"
 STATE_PATH = REPO_ROOT / "b3_trader/data/research-platform/cloudflare-pages-deploy-state.json"
 DEFAULT_PROJECT = "crypto-paper-viewer-ydh1121"
 DEFAULT_DATABASE = "crypto-paper-viewer"
@@ -44,6 +44,14 @@ def _tool(name: str) -> str:
     return resolved
 
 
+def _local_wrangler() -> str:
+    filename = "wrangler.cmd" if os.name == "nt" else "wrangler"
+    path = VIEWER_DIR / "node_modules" / ".bin" / filename
+    if not path.exists():
+        raise RuntimeError("local Wrangler is missing; run npm install in cloudflare-pages")
+    return str(path)
+
+
 def _run(
     args: list[str],
     *,
@@ -56,6 +64,8 @@ def _run(
         args,
         cwd=str(cwd),
         text=True,
+        encoding="utf-8",
+        errors="replace",
         input=input_text,
         capture_output=True,
         timeout=timeout,
@@ -151,25 +161,24 @@ class CloudflarePagesDeployer:
             }
 
         npm = _tool("npm")
-        npx = _tool("npx")
         node = _tool("node")
         child_env = dict(os.environ)
         child_env["CI"] = "true"
+        child_env["PYTHONUTF8"] = "1"
+        child_env["PYTHONIOENCODING"] = "utf-8"
         _run([npm, "install", "--no-audit", "--no-fund"], cwd=VIEWER_DIR, timeout=300.0, env=child_env)
+        wrangler = _local_wrangler()
         _run([npm, "run", "typecheck"], cwd=VIEWER_DIR, timeout=180.0, env=child_env)
         _run([node, "--check", "public/app.js"], cwd=VIEWER_DIR, timeout=60.0, env=child_env)
 
         _run(
             [
-                npx,
-                "wrangler",
+                wrangler,
                 "d1",
                 "migrations",
                 "apply",
                 self.database,
                 "--remote",
-                "--config",
-                str(LOCAL_CONFIG_PATH),
             ],
             cwd=VIEWER_DIR,
             timeout=180.0,
@@ -178,8 +187,7 @@ class CloudflarePagesDeployer:
         )
         _run(
             [
-                npx,
-                "wrangler",
+                wrangler,
                 "pages",
                 "deploy",
                 "public",
@@ -189,8 +197,7 @@ class CloudflarePagesDeployer:
                 self.branch,
                 "--commit-hash",
                 head,
-                "--config",
-                str(LOCAL_CONFIG_PATH),
+                "--commit-dirty=true",
             ],
             cwd=VIEWER_DIR,
             timeout=300.0,
