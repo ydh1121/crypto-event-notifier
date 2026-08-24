@@ -1,5 +1,5 @@
 const encoder = new TextEncoder();
-const PBKDF2_ITERATIONS = 160_000;
+const PBKDF2_ITERATIONS = 100_000;
 
 function base64Url(bytes: Uint8Array): string {
   let binary = '';
