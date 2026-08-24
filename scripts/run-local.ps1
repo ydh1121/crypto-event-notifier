@@ -48,6 +48,13 @@ if ($isGitRepo) {
         if ($checkout.ExitCode -ne 0) {
           Write-Warning "Could not switch to $targetBranch. Starting with the current local branch. $($checkout.Output)"
         }
+      } elseif ($branch.ExitCode -eq 0 -and $current -eq $targetBranch) {
+        $update = Invoke-GitCapture -GitArgs @("merge", "--ff-only", "origin/$targetBranch")
+        if ($update.ExitCode -ne 0) {
+          Write-Warning "Could not fast-forward $targetBranch before startup. Starting with the current local copy; runtime auto-sync will retry. $($update.Output)"
+        } elseif ($update.Output) {
+          Write-Host $update.Output
+        }
       }
     } else {
       Write-Warning "GitHub fetch failed. Starting with the local copy; automatic Git sync may also be unavailable until Git authentication/network is fixed. $($fetch.Output)"
