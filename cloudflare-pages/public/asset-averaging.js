@@ -88,6 +88,17 @@
     return p;
   }
 
+  function refreshUntouchedBaseline(market){
+    const p=planFor(market);if(p.baselineTouched)return false;
+    const holding=privateHolding(market),volume=n(holding?.volume),avg=n(holding?.avg_price);
+    if(p.volume===volume&&p.avg===avg)return false;
+    p.volume=volume;p.avg=avg;
+    const volumeInput=$('#assetCalcVolume'),avgInput=$('#assetCalcAvg');
+    if(volumeInput)volumeInput.value=volume||'';
+    if(avgInput)avgInput.value=avg||'';
+    return true;
+  }
+
   function renderRows(rows){
     const list=$('#assetCalcRows');if(!list)return;
     const data=(Array.isArray(rows)&&rows.length?rows:[{price:0,amount_krw:0}]).slice(0,20);
@@ -189,7 +200,11 @@
   function sync(){
     const root=ensureTool();if(!root)return;
     const market=currentMarket();if(!market)return;
-    if(market!==activeMarket)switchMarket(market);else{renderSource();renderGuide();calculate()}
+    if(market!==activeMarket)switchMarket(market);
+    else{
+      refreshUntouchedBaseline(market);
+      renderSource();renderGuide();calculate();
+    }
   }
 
   function install(){
