@@ -2,13 +2,13 @@
 
 ## Current phase
 
-Phase 4 continuation: local multi-asset PAPER engine + very simple beginner-facing dashboard + VPN-free secure phone access.
+Phase 4 continuation: local multi-asset PAPER engine + beginner-facing dashboard + secure Cloudflare phone access + isolated Bithumb-wide auto PAPER demo.
 
 ## User-approved scope
 
-Proceed through dashboard redesign, charts/analytics, forward-test persistence, quiet Telegram buy alerts, multi-asset context UI, Git/Drive backup flow, manually entered holdings/averaging tools, and phone external access.
+Proceed through dashboard redesign, charts/analytics, forward-test persistence, quiet Telegram buy alerts, multi-asset context UI, Git/Drive backup flow, manually entered holdings/averaging tools, secure phone access, and a **real-market-data / fake-money** automatic trading demo before any real-order work.
 
-Do **not** build real-money execution in this workstream. Live execution is a future separate Work/workstream.
+Do **not** build real-money execution in this workstream. Live execution remains a future separate Work/workstream.
 
 ## Runtime that already works
 
@@ -26,13 +26,14 @@ Do **not** build real-money execution in this workstream. Live execution is a fu
 - local SQLite stores manually entered real holding quantity/average price and per-ticker averaging plans
 - user has already added multiple assets and entered average prices locally; do not overwrite local control/runtime/SQLite state
 - GitHub auto-sync on branch `b3-auto-trader-phase1`
-- Telegram is configured and test messages work
+- Telegram is configured; automatic delivery is intentionally BUY_CANDIDATE-only
 
 ## Permanent UI/copy baseline
 
 - Read repo `AGENTS.md` and `DESIGN.md` first.
 - For Korean UI copy, apply the current Photo-eBook `docs/spec-v1/20-korean-copywriting-skill.md`.
 - For mobile Safari/interaction regression work, apply the current Photo-eBook `UI_REGRESSION_SPEC.md`.
+- For Liquid Glass selector work, use Photo-eBook `docs/spec-v1/06-liquid-navigation.md` plus the approved `interaction-liquid-taffy` reference.
 - Primary comprehension target: Korean non-trader in their 60s.
 - Put the user decision/action first; technical reasons stay behind `판단 근거 자세히 보기`.
 - iOS focusable form controls must be >=16 px.
@@ -40,93 +41,124 @@ Do **not** build real-money execution in this workstream. Live execution is a fu
 - repeated cards/panels keep stable geometry.
 - 5-second polling must not reset deliberate UI state.
 
-## Latest UX fixes — 2026-08-24
+## Latest screenshot QA fixes — 2026-08-24
 
-1. Live-refresh disclosure stability
-   - problem: `판단 근거 자세히 보기` collapsed every 5 seconds because `refreshState()` rebuilt `renderSelectedAsset()`.
-   - `dashboard/ux-stability.js` remembers disclosure state per selected market in localStorage and restores it after rerender.
+### 1. Averaging calculator layout
 
-2. iPhone input zoom + button geometry
-   - `dashboard/ux-polish.css` is loaded last.
-   - mobile focusable inputs/selects/textareas are >=16 px to prevent Safari focus zoom.
-   - routine button/copy/tab labels are nowrap with consistent 46 px control height.
-   - calculator/action button groups reflow as grids instead of wrapping text.
-   - asset cards reserve consistent rows when holding data is absent.
+Observed on iPhone: the first averaging row collapsed into a narrow two-column shape, labels/inputs were vertically misaligned, and the remove control competed with the amount input.
 
-3. ETH/BTC
-   - do not register ETH/BTC as a KRW asset.
-   - `b3_trader/factors.py` derives ETH/BTC ratio from ETH-KRW / BTC-KRW prices and derives 24h relative change from ETH/BTC returns.
-   - Home market summary shows ETH/BTC in plain language (`ETH가 더 강함`, `BTC가 더 강함`, `비슷한 흐름`).
-   - entering ETH/BTC in the ticker box explains that it is already monitored as a market reference.
+Current fix in `dashboard/navigation-v3.css`:
+- mobile `.avg-row` has one explicit geometry owner
+- grid areas are `round/remove`, then full-width `price`, full-width `amount`, then `after`
+- inputs are full-width, 50 px high, 16 px text
+- action buttons and summary are separated by explicit spacing
+- existing 20-round persistence/calculation behavior is unchanged
 
-4. Telegram policy
-   - automatic Telegram delivery is BUY_CANDIDATE-only.
-   - WAIT/RISK_OFF/fills/risk blocks/errors/daily summaries remain in journal/dashboard and do not generate Telegram noise.
-   - manual Telegram test still calls direct `send()` and remains available.
+### 2. Average price and P/L readability
 
-5. Phone restart convenience
-   - Quick Tunnel still works as fallback but changes URL on restart.
-   - one-time `scripts/setup-stable-cloudflare.ps1` configures a persistent named Cloudflare Tunnel using a hostname on a domain already managed by the user's Cloudflare account.
-   - `start-trader-secure.bat` / `run-local-cloudflare.ps1` automatically use the stable named Tunnel when local stable config exists; otherwise Quick Tunnel is used.
-   - stable config/credentials live under ignored `b3_trader/data/` paths only.
-   - stable hostname keeps the same browser origin, so the saved phone connection code remains in localStorage across server restarts.
-   - for Quick Tunnel fallback, loopback PC UI can generate a one-tap phone link with `#connect=<code>`; the remote page imports it then immediately removes the URL fragment.
+Observed on iPhone: saved average-price text was too small and current P/L was ellipsized, hiding the percentage/value.
 
-6. Dashboard UX v2 — current visual baseline
-   - user rejected the previous large-card/mobile-tab presentation as too bulky and generic.
-   - mobile navigation is now a floating bottom dock, not the large icon row at the top.
-   - navigation uses one consistent inline-SVG line icon family; emoji/glyph-style icons are removed.
-   - mobile header is reduced to a small `코인 상태판` row plus connection state.
-   - desktop navigation is a compact segmented control rather than a full-width heavy rail.
-   - asset detail is price-first: `현재 가격` is the dominant number (roughly 41–44 px mobile, larger desktop), followed by 24h change, saved average price and current P/L.
-   - watch cards also promote current price to a primary 24–26 px number rather than small metadata.
-   - Telegram/backup/phone/system English micro-kickers are hidden on mobile; developer status strings such as `blocked_dirty_worktree`, `idle`, and `PAPER` are translated to ordinary Korean.
-   - remote phone settings no longer show the long active Cloudflare URL as a large block; a connected phone sees a compact `외부 연결 정상` summary.
-   - calculator summary values are nowrap/ellipsis-protected to avoid splitting long numbers across multiple lines.
-   - chart range buttons use one quiet segmented-control style; cards use softer borders/shadows and less redundant decoration.
-   - this v2 pass is implemented in the final-loaded `dashboard/ux-polish.css` and `dashboard/ux-stability.js`, so trading-engine behavior is unchanged.
+Current fix:
+- average-price value is roughly 24–25 px on phone
+- current P/L gets more horizontal share at wider phone widths
+- P/L amount and percentage are rendered as separate inline pieces and may wrap instead of disappearing
+- <=430 px switches the two metrics to one column so neither value is sacrificed
+
+### 3. Liquid Glass motion
+
+The previous implementation mostly looked like a blue selected pill; it did not reproduce the approved spring/taffy feel.
+
+Current implementation in `dashboard/navigation-v3.js` + `.css` follows the Photo-eBook contract:
+- one rail = one moving indicator = one geometry/motion owner
+- geometry comes from the active item's real `offsetLeft/Top/Width/Height`
+- active button itself does not paint a second blue plate after indicator mount
+- move animation uses stretch -> overshoot -> snap-back keyframes
+- approved spring family includes `cubic-bezier(0.34, 1.56, 0.64, 1)`
+- press interaction compresses the surface slightly
+- native iOS horizontal scrolling remains native; no custom touch momentum is installed
+- `prefers-reduced-motion` falls back to static/quiet motion
+
+Photo-eBook's current contract explicitly says horizontal rails should keep native iOS scrolling and **must not** add custom touch/pointer momentum; the "rubber" character belongs to the moving Liquid indicator, not a JavaScript replacement for Safari scrolling.
+
+### 4. Existing stability fixes retained
+
+- `판단 근거 자세히 보기` open state survives 5-second rerenders
+- mobile inputs avoid Safari focus zoom
+- routine button labels stay one line
+- ETH/BTC remains a built-in market reference, not a fake KRW asset
+- Telegram remains BUY_CANDIDATE-only
+
+## New isolated 10,000,000 KRW automatic PAPER demo
+
+User requested a demo before real execution that automatically searches the full Bithumb KRW market and trades suitable coins with a 10,000,000 KRW virtual seed.
+
+Implemented as `b3_trader/auto_demo.py` and intentionally isolated from the existing manual/watchlist PAPER portfolio.
+
+Core rules:
+- start capital: 10,000,000 KRW
+- public Bithumb endpoints only; **no API key and no private/order endpoint calls**
+- scans the current Bithumb KRW market list every ~3 minutes
+- excludes BTC, ETH and major stablecoins from candidate trading
+- filters out low-turnover assets and extreme 24h moves
+- ranks the liquid universe using liquidity + momentum, then applies the existing `AssetStrategy` to top candidates
+- entry requires existing `BUY_CANDIDATE` logic rather than a new unrelated signal model
+- adaptive base order starts from 500,000 KRW and uses the existing regime/entry confidence sizing function
+- max per-asset virtual position: 3,000,000 KRW
+- max total virtual exposure: 6,000,000 KRW
+- max simultaneous positions: 4
+- existing execution-risk logic is reused for spread, estimated slippage, BTC flash-crash and order-rate limits
+- the same asset can receive an additional PAPER buy only after cooldown while BUY_CANDIDATE still holds and caps permit it
+- exit on hard PAPER stop at -8% or broad-regime score below 45
+- sell fill uses order-book-estimated executable price when available
+
+Persistence/UI:
+- separate SQLite: `b3_trader/data/auto_demo.sqlite3`
+- generated dashboard state: ignored `dashboard/runtime-demo.json`
+- `scripts/run-local.ps1` starts the demo automatically unless local environment sets `AUTO_DEMO_ENABLED=false`
+- if the demo process dies while the main launcher is alive, the launcher restarts it
+- Home dashboard gets a `1,000만원 자동매매 데모` card showing virtual equity, cash, held symbols and current candidates
+- this experiment never changes manually entered real holdings and never places real orders
 
 ## Current phone-access decision
 
-- User does not want a phone VPN dependency and uninstalled Tailscale.
+- User does not want a phone VPN dependency and removed Tailscale.
 - Primary path: Cloudflare HTTPS Tunnel.
-- Best long-term local-PC workflow: one-time named Tunnel + fixed custom hostname, then always launch `start-trader-secure.bat`.
-- If no Cloudflare-managed domain is available, continue Quick Tunnel and use the PC-generated one-tap link to avoid manually typing the connection code.
+- Best long-term workflow: one-time named Tunnel + fixed custom hostname, then always launch `start-trader-secure.bat`.
+- Quick Tunnel remains the fallback.
 - Do not reintroduce public port forwarding.
 
 ## Git/CI state
 
 - Work continues on `b3-auto-trader-phase1`, Draft PR #1; do not merge without explicit request.
+- Latest functional head before this handoff update: `6e1791ef0af1e80d8e7440babde760e7d415ead1`.
+- GitHub Actions run for that functional head completed successfully: dashboard smoke, Python tests/compile, and Cloudflare typecheck all passed.
 - Local `control/assets.json` may remain modified because the user added assets locally.
-- Current change set includes the dashboard UX v2 in `ux-stability.js` + `ux-polish.css`, BUY-only Telegram policy, ETH/BTC factor details, stable Cloudflare setup/launcher/status, tests, CI checks, and permanent repo rules.
-- Check the workflow for the latest branch head before calling the unit complete.
+- Runtime data under `b3_trader/data/` and generated `dashboard/runtime-demo.json` remain ignored by Git.
 
 ## Active task
 
-`B. screenshot-based UX v2 QA + F. multi-asset validation + G. Google Drive backup`
+`B. iPhone screenshot QA + F. Bithumb-wide 10M PAPER forward test + G. Google Drive backup`
 
 ## Exact next action
 
-1. Check latest GitHub Actions for the current branch and fix any failures.
-2. User updates local code safely while preserving locally added assets/holdings and restarts `start-trader-secure.bat`.
-3. On iPhone verify the UX v2 specifically:
-   - navigation appears as the floating bottom dock, not a large row at the top
-   - `코인` detail shows a much larger current price
-   - current price on watch cards is clearly readable
-   - settings no longer exposes `blocked_dirty_worktree`, `idle`, `PAPER`, or long Cloudflare URL blocks
-   - calculator numbers/buttons do not wrap awkwardly and form focus does not zoom
-   - disclosure stays open across 5-second refreshes
-4. Capture Home, Coin, and Settings screenshots and tune only observed spacing/geometry issues.
-5. If the user has a Cloudflare-managed domain, run `scripts/setup-stable-cloudflare.ps1` once and verify the same HTTPS URL survives restart.
-6. Rotate the phone connection code after access is stable because an older code appeared in console/chat logs.
-7. Finish rclone Google Drive backup and validate simultaneous multi-asset portfolio/context behavior.
-8. Leave real-money trading deferred to the separate future Work/workstream.
+1. Let the user's local auto-sync receive the new branch head, or restart `start-trader-secure.bat` once if the new demo process is not running yet.
+2. On iPhone reload the current Cloudflare HTTPS page and verify:
+   - averaging rows are stacked cleanly and no input/removal button overlaps
+   - `내 평단` is clearly larger
+   - `현재 손익` amount and percentage are both visible
+   - moving blue Liquid selector visibly stretches/overshoots/springs when changing top navigation or coin chips
+3. On Home verify `1,000만원 자동매매 데모` appears and updates independently of the main PAPER account.
+4. Leave the demo running. Evaluate candidate quality, trade count, realized P/L, total return, drawdown and concentration before changing thresholds or discussing live execution.
+5. Capture new Home/Coin screenshots after the branch is active; tune only observed regressions.
+6. Finish rclone Google Drive backup verification after UI/demo validation.
+7. Leave real-money trading deferred to the separate future Work/workstream.
 
 ## Safety constraints
 
-- Keep PAPER-only behavior.
-- Keep `LIVE_TRADING_ENABLED=false` and do not add live order execution.
-- Never commit local tokens/secrets, Cloudflare credentials, or public IP addresses.
+- Keep all exchange execution PAPER-only.
+- Keep `LIVE_TRADING_ENABLED=false`; do not add live order execution here.
+- The isolated auto demo must use only public Bithumb market endpoints.
+- Never commit local tokens/secrets, Cloudflare credentials, public IPs or runtime SQLite files.
 - Do not expose port 8765 directly to the public internet.
 - Preserve remote bearer-token authentication.
 - Local phone-code reveal/rotate/onboarding generation stays loopback-only.
