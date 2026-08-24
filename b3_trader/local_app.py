@@ -22,6 +22,7 @@ from .config import Settings
 from .journal import TradeJournal
 from .local_engine import MultiAssetEngine
 from .network_access import network_status
+from .research_routes import install_research_routes
 from .runtime_config import RuntimeConfigStore
 from .runtime_state import RuntimeState
 from .sync_manager import BackupManager, GitAutoSync
@@ -302,6 +303,8 @@ def create_app() -> FastAPI:
             "unrealized_pnl_krw": round(pnl, 2),
             "unrealized_pnl_pct": round(pnl_pct, 4),
         }
+
+    install_research_routes(app, auth=auth, require_loopback=require_loopback, journal=journal)
 
     @app.get("/api/health")
     def health() -> dict[str, Any]:
