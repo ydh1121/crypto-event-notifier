@@ -140,8 +140,9 @@ Lifecycle/persistence/UI:
 ## Git/CI state
 
 - Work continues on `b3-auto-trader-phase1`, Draft PR #1; do not merge without explicit request.
-- Latest code head before this handoff update: `bdc65f4b19fb82935f8c23e539c495072873ff65`.
-- GitHub Actions on that head completed successfully.
+- Latest validated functional UI/runtime head: `b433747f4c6db916d869b08de849a3250e1663a4`.
+- GitHub Actions on that head passed dashboard smoke, Python tests/compile and Cloudflare typecheck.
+- Later commits after that head only update workstream documentation/status unless otherwise noted.
 - Local `control/assets.json` may remain modified because the user added assets locally.
 - Runtime data under `b3_trader/data/` and generated `dashboard/runtime-demo.json` remain ignored by Git.
 
@@ -158,7 +159,7 @@ Lifecycle/persistence/UI:
    - averaging inputs are full-width stacked rows
    - average price is visibly larger
    - P/L amount and percentage are both visible
-   - primary and coin Liquid selectors visually bleed outside the inner rail and spring when changed
+   - primary and coin Liquid selectors visibly bleed outside the inner rail and spring when changed
 5. Leave the demo running to collect trade count, realized P/L, drawdown, concentration and candidate-quality evidence before changing live-trading scope.
 6. Finish rclone Google Drive backup verification after UI/demo validation.
 7. Leave real-money trading deferred to the separate future Work/workstream.
