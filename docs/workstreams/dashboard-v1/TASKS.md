@@ -123,7 +123,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Python module compile check passes, including `b3_trader.auto_demo`
 - [x] Dashboard JS syntax/smoke checks pass, including final `navigation-v3.js` Liquid overlay layer
 - [x] Existing Cloudflare TypeScript check passes
-- [x] GitHub Actions passed on the latest code head before documentation-only updates
+- [x] GitHub Actions passed on latest functional UI/runtime head `b433747f4c6db916d869b08de849a3250e1663a4`
 
 ## Completion condition for this workstream
 
