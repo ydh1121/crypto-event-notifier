@@ -11,6 +11,7 @@ on:
       - "dashboard/**"
       - "scripts/**"
       - "start-trader.bat"
+      - "start-trader-secure.bat"
       - "LOCAL_MULTI_ASSET.md"
       - "cloudflare/**"
       - "Dockerfile"
@@ -29,6 +30,7 @@ on:
       - "dashboard/**"
       - "scripts/**"
       - "start-trader.bat"
+      - "start-trader-secure.bat"
       - "LOCAL_MULTI_ASSET.md"
       - "cloudflare/**"
       - "Dockerfile"
@@ -59,16 +61,21 @@ jobs:
       - run: test -s dashboard/app.js
       - run: test -s dashboard/plain-language.js
       - run: test -s dashboard/portfolio-tools.js
+      - run: test -s dashboard/ux-stability.js
       - run: test -s dashboard/styles.css
       - run: test -s dashboard/plain-language.css
       - run: test -s dashboard/portfolio-tools.css
+      - run: test -s dashboard/ux-polish.css
       - run: node --check dashboard/app.js
       - run: node --check dashboard/plain-language.js
       - run: node --check dashboard/portfolio-tools.js
+      - run: node --check dashboard/ux-stability.js
       - run: grep -q 'data-view-panel="overview"' dashboard/index.html
       - run: grep -q 'data-view-panel="performance"' dashboard/index.html
       - run: grep -q 'plain-language.js' dashboard/index.html
       - run: grep -q 'portfolio-tools.js' dashboard/index.html
+      - run: grep -q 'ux-stability.js' dashboard/index.html
+      - run: grep -q 'ux-polish.css' dashboard/index.html
       - run: grep -q 'Phone access' dashboard/index.html
 
   cloudflare-typecheck:
