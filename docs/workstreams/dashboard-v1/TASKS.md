@@ -52,6 +52,8 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Alert on engine/asset errors with anti-spam cooldown
 - [x] Add daily PAPER performance summary
 - [x] Translate outgoing trading jargon into ordinary Korean before delivery
+- [x] Include suggested entry amount and account percentage on BUY_CANDIDATE alerts
+- [x] Remove GitHub-sync and routine engine start/stop Telegram noise
 - [x] Add tests for score meaning and Telegram jargon translation
 
 ## F. Multi-asset workflow
@@ -59,6 +61,10 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Ticker-only asset addition starts generic analysis
 - [x] Asset profiles support context mode + related markets
 - [x] Improve asset detail UI to expose context basket and factor contribution
+- [x] Add manually entered real holding quantity/average-price records per ticker in local SQLite
+- [x] Add per-ticker averaging-down calculator with up to 20 saved rounds
+- [x] Show current-value/unrealized-PnL summary for manually entered holdings
+- [x] Show suggested entry sizing on the asset screen when a BUY_CANDIDATE appears
 - [ ] Add per-asset analysis/profile notes for GPT-managed refinements
 - [ ] Validate multi-asset portfolio limits with several simultaneous assets
 
@@ -67,6 +73,8 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] GitHub code/control desired-state sync exists
 - [x] Local SQLite is the authoritative runtime DB
 - [x] Surface backup/sync status in the redesigned dashboard
+- [x] Add control-only divergence reconciliation so dashboard-generated Git commits do not permanently break auto-sync
+- [x] Add `scripts/repair-local-sync.ps1` for safe one-time branch repair while preserving control files
 - [ ] Finish one-time rclone Google Drive setup flow/documentation
 - [ ] Verify consistent SQLite snapshot upload to `Crypto Auto Trader/backups`
 - [ ] Mirror `control/` and `dashboard/` to Drive without secrets
@@ -77,9 +85,13 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Add phone-access panel in settings with copyable safe URL and token guidance
 - [x] Rename Dashboard token to user-facing `휴대폰 연결 코드`
 - [x] Add a loopback-only API so the PC dashboard can reveal/copy the connection code without exposing it remotely
+- [x] Add loopback-only phone-code rotation endpoint/button
 - [x] Add `scripts/setup-phone-access.ps1` to install/open Tailscale with user approval
-- [ ] Verify same-Wi-Fi phone access on the user's device
-- [ ] Verify Tailscale external phone access on the user's device
+- [x] Prefer direct Tailscale 100.x IPv4 URL instead of depending on MagicDNS/ts.net
+- [x] Add optional Windows Firewall rule scoped only to Tailscale `100.64.0.0/10`
+- [x] Add a visible warning when the dashboard is opened over a public HTTP/WAN address
+- [ ] Verify direct `http://100.x.x.x:8765` access from the user's phone on 5G with Tailscale VPN enabled
+- [ ] Confirm any public-IP/port-forwarding path is disabled after Tailscale works
 - [x] Keep remote clients behind Dashboard token authentication
 - [x] Explicitly warn against public port-forwarding of 8765
 
@@ -96,12 +108,13 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 ## Validation status
 
-- [x] Plain-language Python tests pass in GitHub Actions
-- [x] Python module compile check passes
-- [x] Dashboard `app.js` and `plain-language.js` pass `node --check`
-- [x] Dashboard structural/plain-language smoke checks pass
+- [-] Latest holdings/calculator/sync/Tailscale change CI pending
+- [x] Previous plain-language Python tests pass in GitHub Actions
+- [x] Previous Python module compile check passes
+- [x] Previous Dashboard JS checks pass
+- [x] Previous Dashboard structural/plain-language smoke checks pass
 - [x] Existing Cloudflare TypeScript check remains green
 
 ## Completion condition for this workstream
 
-This workstream stops when the redesigned dashboard, analytics/graphs, durable PAPER forward test, Telegram operations, Git/Drive backup path, multi-asset views, and secure phone external access are usable and verified. Real-money trading remains deferred.
+This workstream stops when the redesigned dashboard, analytics/graphs, durable PAPER forward test, Telegram operations, Git/Drive backup path, multi-asset views, secure phone external access, and user-facing holdings/averaging tools are usable and verified. Real-money trading remains deferred.
