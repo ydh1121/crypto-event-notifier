@@ -23,6 +23,7 @@ b3_trader/data/
 # Generated dashboard runtime state
 dashboard/runtime-demo.json
 dashboard/runtime-demo.tmp
+dashboard/demo-runtime/
 
 # Cloudflare
 cloudflare/node_modules/
