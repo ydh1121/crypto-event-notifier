@@ -21,11 +21,11 @@ LOG_PATH = Path("b3_trader/data/research-platform/supervisor.log")
 
 
 def _log(message: str) -> None:
-    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    line = f"{time.strftime('%Y-%m-%d %H:%M:%S')} {message}\n"
-    with LOG_PATH.open("a", encoding="utf-8") as handle:
-        handle.write(line)
     try:
+        LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        line = f"{time.strftime('%Y-%m-%d %H:%M:%S')} {message}\n"
+        with LOG_PATH.open("a", encoding="utf-8") as handle:
+            handle.write(line)
         if LOG_PATH.stat().st_size > 2_000_000:
             text = LOG_PATH.read_text(encoding="utf-8", errors="replace")
             LOG_PATH.write_text(text[-1_000_000:], encoding="utf-8")
@@ -136,6 +136,12 @@ class ResearchSupervisor:
             }
         atomic_json(STATUS_PATH, payload)
 
+    def _safe_write_status(self) -> None:
+        try:
+            self._write_status()
+        except Exception as exc:
+            _log(f"status write retryable error: {type(exc).__name__}: {exc}")
+
     def _apply_control(self) -> None:
         next_control = load_control()
         current_revision = int(self.control.get("revision") or 0)
@@ -187,7 +193,7 @@ class ResearchSupervisor:
             self.force_run[name] = False
             state.status = "running"
             state.last_started_at = time.time()
-            self._write_status()
+            self._safe_write_status()
             try:
                 result = runner()
                 state.last_result = result if isinstance(result, dict) else {"result": str(result)}
@@ -206,21 +212,24 @@ class ResearchSupervisor:
                 next_due = state.last_finished_at + state.interval_seconds
                 if not state.enabled:
                     state.status = "stopped"
-                self._write_status()
+                self._safe_write_status()
 
     def run(self) -> None:
         _log("research supervisor starting")
-        self._write_status()
+        self._safe_write_status()
         for thread in self.threads.values():
             thread.start()
         while not self.stop_event.wait(2.0):
-            self._apply_control()
-            self._write_status()
+            try:
+                self._apply_control()
+            except Exception as exc:
+                _log(f"control loop retryable error: {type(exc).__name__}: {exc}")
+            self._safe_write_status()
         for event in self.wake_events.values():
             event.set()
         for thread in self.threads.values():
             thread.join(timeout=5.0)
-        self._write_status()
+        self._safe_write_status()
         _log("research supervisor stopped")
 
     def stop(self) -> None:
@@ -230,17 +239,36 @@ class ResearchSupervisor:
 
 
 def main() -> None:
-    supervisor = ResearchSupervisor()
+    stop_requested = threading.Event()
+    holder: dict[str, ResearchSupervisor | None] = {"supervisor": None}
 
     def _signal_handler(_signum, _frame) -> None:
-        supervisor.stop()
+        stop_requested.set()
+        supervisor = holder.get("supervisor")
+        if supervisor is not None:
+            supervisor.stop()
 
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
             signal.signal(sig, _signal_handler)
         except (ValueError, OSError):
             pass
-    supervisor.run()
+
+    while not stop_requested.is_set():
+        supervisor: ResearchSupervisor | None = None
+        try:
+            supervisor = ResearchSupervisor()
+            holder["supervisor"] = supervisor
+            supervisor.run()
+            if stop_requested.is_set():
+                break
+            _log("research supervisor exited unexpectedly; restarting in 3 seconds")
+        except Exception as exc:
+            _log(f"research supervisor crashed: {type(exc).__name__}: {exc}; restarting in 3 seconds")
+        finally:
+            holder["supervisor"] = None
+        if stop_requested.wait(3.0):
+            break
 
 
 if __name__ == "__main__":
