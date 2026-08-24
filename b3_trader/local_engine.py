@@ -22,6 +22,32 @@ from .strategy import ExternalFactors
 from .telegram_notify import TelegramNotifier
 
 
+def _score_word(value: float) -> str:
+    value = float(value)
+    if value < 40:
+        return "매우 나쁨"
+    if value < 55:
+        return "좋지 않음"
+    if value < 65:
+        return "보통"
+    if value < 75:
+        return "좋음"
+    return "매우 좋음"
+
+
+def _risk_reason_text(reason: str) -> str:
+    text = reason.lower()
+    if "spread" in text:
+        return "매수·매도 가격 차이가 너무 벌어져 있어 이번 매수는 건너뜁니다."
+    if "slippage" in text:
+        return "지금 주문하면 예상보다 비싸게 살 가능성이 커서 이번 매수는 건너뜁니다."
+    if "btc" in text or "flash" in text:
+        return "비트코인이 갑자기 크게 내려가고 있어 새 매수를 잠시 막았습니다."
+    if "rate" in text or "order" in text:
+        return "짧은 시간에 주문이 너무 많아질 수 있어 잠시 기다립니다."
+    return "안전 조건을 통과하지 못해 이번 매수는 건너뜁니다."
+
+
 @dataclass
 class AssetRuntime:
     candles: list[dict[str, Any]] | None = None
@@ -282,16 +308,43 @@ class MultiAssetEngine:
             "WAIT_PULLBACK",
         }:
             return
-        labels = {
-            "BUY_CANDIDATE": "매수 후보",
-            "RISK_OFF": "시장 위험 확대",
-            "WAIT_PULLBACK": "시장 강세 · 눌림 대기",
-        }
+
+        market_score = float(payload.get("regime_score") or 0.0)
+        entry_score = float(payload.get("entry_score") or 0.0)
+        context_score = float(payload.get("context_score") or 0.0)
+        suggested = payload.get("suggested_entry") or {}
+
+        if action == "BUY_CANDIDATE":
+            amount = float(suggested.get("amount_krw") or 0.0)
+            account_pct = float(suggested.get("account_pct") or 0.0)
+            message = (
+                f"[{profile.symbol}] 매수 후보\n"
+                f"현재가 {payload['price']}원\n"
+                f"추천 진입 비중: 약 {account_pct:.1f}% ({amount:,.0f}원)\n\n"
+                f"전체 시장 분위기: {_score_word(market_score)} ({market_score:.0f}/100)\n"
+                f"지금 매수 타이밍: {_score_word(entry_score)} ({entry_score:.0f}/100)\n"
+                f"비슷한 코인 흐름: {_score_word(context_score)} ({context_score:.0f}/100)"
+            )
+        elif action == "WAIT_PULLBACK":
+            message = (
+                f"[{profile.symbol}] 가격이 조금 내려오길 기다리는 중\n"
+                f"현재가 {payload['price']}원\n"
+                f"시장 분위기는 {_score_word(market_score)} ({market_score:.0f}/100)이지만 "
+                f"매수 타이밍은 {_score_word(entry_score)} ({entry_score:.0f}/100)입니다.\n"
+                "지금 따라 사기보다 더 좋은 가격을 기다립니다."
+            )
+        else:
+            message = (
+                f"[{profile.symbol}] 지금은 새로 사지 않는 구간\n"
+                f"현재가 {payload['price']}원\n"
+                f"전체 시장 분위기: {_score_word(market_score)} ({market_score:.0f}/100)\n"
+                f"지금 매수 타이밍: {_score_word(entry_score)} ({entry_score:.0f}/100)\n"
+                f"비슷한 코인 흐름: {_score_word(context_score)} ({context_score:.0f}/100)\n"
+                "시장이 좋아질 때까지 지켜봅니다."
+            )
+
         self.notifier.safe_send(
-            f"[{profile.symbol}] {labels.get(action, action)}\n"
-            f"가격 {payload['price']}\n"
-            f"Regime {payload['regime_score']} / Entry {payload['entry_score']}\n"
-            f"Context {payload['context_score']}",
+            message,
             event_key=f"action-{profile.market}-{action}",
             min_interval_seconds=600,
         )
@@ -407,6 +460,33 @@ class MultiAssetEngine:
             else cfg.default_max_position_krw
         )
 
+        suggested_raw = adaptive_order_krw(
+            base_order,
+            regime_score=signal.regime_score,
+            entry_score=signal.entry_score,
+            min_multiplier=cfg.adaptive_size_min_multiplier,
+            max_multiplier=cfg.adaptive_size_max_multiplier,
+        )
+        current_position_value = max(0.0, position.volume * price)
+        remaining_position_room = max(0.0, float(max_position) - current_position_value)
+        suggested_order = min(
+            float(suggested_raw),
+            remaining_position_room,
+            max(0.0, float(self.portfolio.cash_krw)),
+        )
+        account_equity = max(0.0, float(self.portfolio.equity(self._prices)))
+        suggested_account_pct = (
+            suggested_order / account_equity * 100.0 if account_equity > 0 else 0.0
+        )
+        suggested_position_pct = (
+            suggested_order / float(max_position) * 100.0 if float(max_position) > 0 else 0.0
+        )
+        projected_position_pct = (
+            (current_position_value + suggested_order) / float(max_position) * 100.0
+            if float(max_position) > 0
+            else 0.0
+        )
+
         payload = {
             "ts": now,
             "market": profile.market,
@@ -416,6 +496,13 @@ class MultiAssetEngine:
             "context_score": round(context_score, 2),
             "context_details": context_details,
             **asdict(signal),
+            "suggested_entry": {
+                "amount_krw": round(suggested_order, 2),
+                "account_pct": round(suggested_account_pct, 2),
+                "asset_limit_pct": round(suggested_position_pct, 2),
+                "projected_asset_limit_pct": round(projected_position_pct, 2),
+                "max_position_krw": round(float(max_position), 2),
+            },
             "diagnostics": self._diagnostics(
                 signal,
                 external,
@@ -465,8 +552,8 @@ class MultiAssetEngine:
                     ts=now,
                 )
                 self.notifier.safe_send(
-                    f"[{profile.symbol}] PAPER 강제청산\n"
-                    f"{fill.krw:,.0f}원 @ {fill.price}",
+                    f"[{profile.symbol}] 가상 보유분을 긴급 정리했습니다\n"
+                    f"약 {fill.krw:,.0f}원 · 체결가 {fill.price}원",
                     event_key=f"kill-fill-{profile.market}-{int(now)}",
                 )
             return
@@ -501,7 +588,8 @@ class MultiAssetEngine:
                 )
                 reason = risk.reasons[0] if risk.reasons else "risk guard"
                 self.notifier.safe_send(
-                    f"[{profile.symbol}] PAPER 진입 차단\n{reason}",
+                    f"[{profile.symbol}] 매수 후보였지만 이번에는 건너뜁니다\n"
+                    f"{_risk_reason_text(reason)}",
                     event_key=f"risk-block-{profile.market}-{reason}",
                     min_interval_seconds=1800,
                     disable_notification=True,
@@ -542,10 +630,15 @@ class MultiAssetEngine:
                         fill=fill,
                         ts=now,
                     )
+                    actual_account_pct = (
+                        fill.krw / account_equity * 100.0 if account_equity > 0 else 0.0
+                    )
                     self.notifier.safe_send(
-                        f"[{profile.symbol}] PAPER 매수\n"
-                        f"{fill.krw:,.0f}원 @ {fill.price}\n"
-                        f"Regime {signal.regime_score} / Entry {signal.entry_score}",
+                        f"[{profile.symbol}] 가상 매수했습니다\n"
+                        f"{fill.krw:,.0f}원 · 체결가 {fill.price}원\n"
+                        f"이번 진입 비중 약 {actual_account_pct:.1f}%\n"
+                        f"시장 분위기 {_score_word(signal.regime_score)} ({signal.regime_score:.0f}/100) · "
+                        f"매수 타이밍 {_score_word(signal.entry_score)} ({signal.entry_score:.0f}/100)",
                         event_key=f"fill-{profile.market}-{int(now)}",
                     )
                 else:
@@ -581,8 +674,9 @@ class MultiAssetEngine:
                     ts=now,
                 )
                 self.notifier.safe_send(
-                    f"[{profile.symbol}] PAPER 리스크오프 청산\n"
-                    f"{fill.krw:,.0f}원 @ {fill.price}",
+                    f"[{profile.symbol}] 시장이 많이 약해져 가상 보유분을 정리했습니다\n"
+                    f"약 {fill.krw:,.0f}원 · 체결가 {fill.price}원\n"
+                    f"시장 분위기 {signal.regime_score:.0f}/100",
                     event_key=f"riskoff-fill-{profile.market}-{int(now)}",
                 )
 
@@ -621,17 +715,16 @@ class MultiAssetEngine:
         equity = float(portfolio.get("equity_krw") or start)
         return_pct = (equity / start - 1.0) * 100.0 if start > 0 else 0.0
         self.notifier.safe_send(
-            "PAPER 일일 요약\n"
-            f"평가금액 {equity:,.0f}원 ({return_pct:+.2f}%)\n"
-            f"실현손익 {stats['realized_pnl_krw']:+,.0f}원\n"
-            f"완료 거래 {stats['closed_trades']}회 · 승률 {stats['win_rate_pct']:.1f}%\n"
-            f"현재 노출 {float(portfolio.get('exposure_krw') or 0):,.0f}원",
+            "오늘 가상매매 결과\n"
+            f"가상 계좌 총액 {equity:,.0f}원 ({return_pct:+.2f}%)\n"
+            f"확정 손익 {stats['realized_pnl_krw']:+,.0f}원\n"
+            f"끝난 거래 {stats['closed_trades']}회 · 이긴 비율 {stats['win_rate_pct']:.1f}%\n"
+            f"현재 코인에 들어간 금액 {float(portfolio.get('exposure_krw') or 0):,.0f}원",
             event_key=f"daily-summary-{today.isoformat()}",
         )
         self._last_daily_summary = today
 
     def run(self) -> None:
-        self.notifier.safe_send("Crypto Auto Trader 로컬 엔진 시작 (PAPER)")
         try:
             while not self._stop.is_set():
                 started = time.time()
@@ -673,7 +766,8 @@ class MultiAssetEngine:
                                 },
                             )
                             self.notifier.safe_send(
-                                f"[{profile.symbol}] 분석 오류\n{type(exc).__name__}: {exc}",
+                                f"[{profile.symbol}] 분석에 문제가 생겼습니다\n"
+                                "프로그램은 계속 실행 중이며 잠시 뒤 다시 시도합니다.",
                                 event_key=(
                                     f"asset-error-{profile.market}-{type(exc).__name__}"
                                 ),
@@ -688,7 +782,7 @@ class MultiAssetEngine:
                         {"error": type(exc).__name__, "message": str(exc)},
                     )
                     self.notifier.safe_send(
-                        f"Crypto Auto Trader 엔진 오류\n{type(exc).__name__}: {exc}",
+                        "자동매매 모니터에 문제가 생겼습니다.\n잠시 뒤 자동으로 다시 시도합니다.",
                         event_key=f"engine-error-{type(exc).__name__}",
                         min_interval_seconds=1800,
                     )
@@ -698,7 +792,6 @@ class MultiAssetEngine:
         finally:
             if self._stream is not None:
                 self._stream.stop()
-            self.notifier.safe_send("Crypto Auto Trader 로컬 엔진 종료")
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
