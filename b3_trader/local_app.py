@@ -17,6 +17,7 @@ from .assets import AssetProfile, AssetRegistry, default_profile, normalize_mark
 from .config import Settings
 from .journal import TradeJournal
 from .local_engine import MultiAssetEngine
+from .network_access import network_status
 from .runtime_config import RuntimeConfigStore
 from .runtime_state import RuntimeState
 from .sync_manager import BackupManager, GitAutoSync
@@ -25,6 +26,12 @@ from .telegram_settings import TelegramSettingsStore
 
 RESTART_EXIT_CODE = 75
 LOOPBACK_HOSTS = {"127.0.0.1", "::1", "::ffff:127.0.0.1"}
+RANGE_SECONDS = {
+    "1h": 3_600.0,
+    "6h": 21_600.0,
+    "24h": 86_400.0,
+    "7d": 604_800.0,
+}
 
 
 def _dashboard_token(settings: Settings) -> str:
@@ -39,6 +46,23 @@ def _dashboard_token(settings: Settings) -> str:
     token = secrets.token_urlsafe(32)
     token_file.write_text(token + "\n", encoding="utf-8")
     return token
+
+
+def _range_seconds(value: str) -> float:
+    key = str(value or "24h").strip().lower()
+    if key not in RANGE_SECONDS:
+        raise HTTPException(status_code=422, detail="range must be one of 1h, 6h, 24h, 7d")
+    return RANGE_SECONDS[key]
+
+
+def _downsample(rows: list[dict[str, Any]], target: int = 420) -> list[dict[str, Any]]:
+    if len(rows) <= target:
+        return rows
+    step = max(1, len(rows) // target)
+    sampled = rows[::step]
+    if sampled[-1] is not rows[-1]:
+        sampled.append(rows[-1])
+    return sampled[: target + 1]
 
 
 def create_app() -> FastAPI:
@@ -122,7 +146,7 @@ def create_app() -> FastAPI:
             engine.stop()
             journal.close()
 
-    app = FastAPI(title="Crypto Auto Trader", version="0.4.2", lifespan=lifespan)
+    app = FastAPI(title="Crypto Auto Trader", version="0.5.0", lifespan=lifespan)
 
     def auth(
         request: Request,
@@ -155,6 +179,69 @@ def create_app() -> FastAPI:
     @app.get("/api/state", dependencies=[Depends(auth)])
     def api_state() -> dict[str, Any]:
         return {"mode": "PAPER", **state.snapshot()}
+
+    @app.get("/api/analytics", dependencies=[Depends(auth)])
+    def analytics() -> dict[str, Any]:
+        snapshot = state.snapshot()
+        portfolio = snapshot.get("portfolio") or {}
+        stats = journal.paper_trade_stats()
+        start_krw = float(portfolio.get("start_krw") or settings.paper_start_krw)
+        equity = float(portfolio.get("equity_krw") or start_krw)
+        positions = portfolio.get("positions") or {}
+        unrealized = 0.0
+        for item in positions.values():
+            volume = float(item.get("volume") or 0.0)
+            avg_price = float(item.get("avg_price") or 0.0)
+            value = float(item.get("value_krw") or 0.0)
+            unrealized += value - volume * avg_price
+        total_pnl = equity - start_krw
+        return {
+            **stats,
+            "start_krw": round(start_krw, 2),
+            "equity_krw": round(equity, 2),
+            "total_pnl_krw": round(total_pnl, 2),
+            "unrealized_pnl_krw": round(unrealized, 2),
+            "return_pct": round(total_pnl / start_krw * 100.0, 4) if start_krw > 0 else 0.0,
+            "exposure_krw": float(portfolio.get("exposure_krw") or 0.0),
+            "current_daily_drawdown_pct": float(portfolio.get("daily_drawdown_pct") or 0.0),
+        }
+
+    @app.get("/api/history", dependencies=[Depends(auth)])
+    def history(
+        market: str = Query(...),
+        range: str = Query(default="24h"),
+    ) -> dict[str, Any]:
+        normalized = normalize_market(market)
+        seconds = _range_seconds(range)
+        rows = journal.snapshot_history(
+            normalized,
+            since_seconds=seconds,
+            limit=20_000,
+        )
+        fills = journal.fills_for_market(
+            normalized,
+            since_seconds=seconds,
+            limit=2_000,
+        )
+        return {
+            "market": normalized,
+            "range": range,
+            "points": _downsample(rows),
+            "fills": fills,
+        }
+
+    @app.get("/api/portfolio/history", dependencies=[Depends(auth)])
+    def portfolio_history(range: str = Query(default="7d")) -> dict[str, Any]:
+        seconds = _range_seconds(range)
+        rows = journal.portfolio_history(
+            since_seconds=seconds,
+            limit=20_000,
+        )
+        return {"range": range, "points": _downsample(rows)}
+
+    @app.get("/api/network", dependencies=[Depends(auth)])
+    def network() -> dict[str, Any]:
+        return network_status(settings.service_port)
 
     @app.get("/api/assets", dependencies=[Depends(auth)])
     def api_assets() -> list[dict[str, Any]]:
