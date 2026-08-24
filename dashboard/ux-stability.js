@@ -144,6 +144,23 @@ function polishStaticCopy(){
   if(stableHint&&ui.network?.cloudflare?.mode==='named_tunnel')stableHint.textContent='고정 HTTPS 주소를 사용 중입니다. 서버를 다시 켜도 주소와 휴대폰 로그인이 유지됩니다.';
 }
 
+function addOneTapPhoneLink(){
+  if(!isLoopback()||!localPhoneCode)return;
+  const panel=document.querySelector('.phone-panel');
+  const cf=ui.network?.cloudflare||{};
+  if(!panel||!cf.active||!cf.url)return;
+  let card=document.getElementById('oneTapPhoneLink');
+  if(!card){
+    card=document.createElement('div');
+    card.id='oneTapPhoneLink';
+    card.className='access-card one-tap-phone-link';
+    panel.appendChild(card);
+  }
+  const link=`${String(cf.url).replace(/\/$/,'')}/#connect=${encodeURIComponent(localPhoneCode)}`;
+  card.innerHTML=`<div class="access-card-top"><h4>휴대폰용 바로가기</h4><span class="status-pill good">PC에서만 생성</span></div><p>${cf.mode==='named_tunnel'?'이 링크를 휴대폰에서 한 번 열면 이후에는 같은 주소로 바로 접속합니다.':'현재 임시 주소와 연결 코드를 한 링크에 넣습니다. 서버를 다시 켜 주소가 바뀌면 PC에서 새 링크만 다시 복사하면 됩니다.'}</p><button id="copyOneTapPhoneLink" class="button secondary">휴대폰용 링크 복사</button><p class="plain-help">연결 코드는 주소의 # 뒤에만 들어가며 서버 요청에는 포함되지 않습니다. 링크를 다른 사람에게 보내지 마세요.</p>`;
+  card.querySelector('#copyOneTapPhoneLink').onclick=()=>copyText(link,card.querySelector('#copyOneTapPhoneLink'));
+}
+
 if(typeof renderVpnFreePhoneAccess==='function'){
   const renderPhoneBeforeUx=renderVpnFreePhoneAccess;
   renderVpnFreePhoneAccess=function(){
@@ -158,9 +175,10 @@ if(typeof renderVpnFreePhoneAccess==='function'){
         ?'고정 HTTPS 주소입니다. 서버를 다시 켜도 같은 주소를 사용합니다.'
         :'현재는 임시 HTTPS 주소입니다. 고정 주소 설정을 완료하면 재시작 때 주소를 다시 찾을 필요가 없습니다.';
     }
+    addOneTapPhoneLink();
   };
 }
 
 polishStaticCopy();
 restoreTechnicalDetail();
-setTimeout(polishStaticCopy,700);
+setTimeout(()=>{polishStaticCopy();addOneTapPhoneLink()},700);
