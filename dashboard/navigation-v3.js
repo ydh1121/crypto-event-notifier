@@ -133,7 +133,7 @@
     if(!root||!host)return;
     root.dataset.liquidOwner='navigation-v3';
     host.classList.add('liquid-overlay-host');
-    makeLiquidController(root,{itemSelector:'.view-tab',indicatorClass:'dashboard-liquid-indicator',host,bleed:3});
+    makeLiquidController(root,{itemSelector:'.view-tab',indicatorClass:'dashboard-liquid-indicator',host,bleed:4});
   }
 
   function appState(){return typeof ui==='undefined'?null:ui;}
@@ -171,7 +171,7 @@
     }
     const selected=appState()?.selectedMarket||markets[0];
     rail.querySelectorAll('.asset-chip').forEach(button=>button.classList.toggle('is-active',button.dataset.market===selected));
-    const controller=makeLiquidController(rail,{itemSelector:'.asset-chip',indicatorClass:'asset-chip-indicator',host:shell,bleed:3});
+    const controller=makeLiquidController(rail,{itemSelector:'.asset-chip',indicatorClass:'asset-chip-indicator',host:shell,bleed:11});
     controller?.repair();
     if(rail.dataset.selectedMarket!==selected){
       rail.dataset.selectedMarket=selected;
