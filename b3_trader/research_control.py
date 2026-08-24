@@ -15,14 +15,23 @@ COMPONENT_DEFINITIONS: dict[str, dict[str, Any]] = {
     "warehouse-export": {
         "label": "AI 분석 데이터 저장",
         "description": "가상매매·시장 기억 데이터를 Parquet 분석 창고에 추가 저장합니다.",
+        "default_enabled": True,
         "default_interval_seconds": 300,
         "min_interval_seconds": 60,
     },
     "reference-version-watch": {
         "label": "외부 레포 버전 확인",
         "description": "참고 GitHub 프로젝트의 새 버전만 확인합니다. 코드는 자동 적용하지 않습니다.",
+        "default_enabled": True,
         "default_interval_seconds": 21600,
         "min_interval_seconds": 300,
+    },
+    "cloudflare-snapshot-publish": {
+        "label": "웹 상태판 데이터 보내기",
+        "description": "24시간 PC의 가상매매 결과를 Cloudflare Pages 조회용 스냅샷으로 보냅니다.",
+        "default_enabled": False,
+        "default_interval_seconds": 20,
+        "min_interval_seconds": 10,
     },
 }
 
@@ -54,8 +63,8 @@ def default_control() -> dict[str, Any]:
         "updated_at": time.time(),
         "components": {
             name: {
-                "enabled": True,
-                "interval_seconds": int(definition["default_interval_seconds"]),
+                "enabled": bool(definition.get("default_enabled", True)),
+                "interval_seconds": float(definition["default_interval_seconds"]),
                 "run_nonce": 0,
             }
             for name, definition in COMPONENT_DEFINITIONS.items()
@@ -77,8 +86,9 @@ def load_control(path: Path = CONTROL_PATH) -> dict[str, Any]:
                 source = source_components.get(name) if isinstance(source_components.get(name), dict) else {}
                 minimum = float(definition["min_interval_seconds"])
                 interval = max(minimum, float(source.get("interval_seconds") or definition["default_interval_seconds"]))
+                default_enabled = bool(definition.get("default_enabled", True))
                 value["components"][name] = {
-                    "enabled": bool(source.get("enabled", True)),
+                    "enabled": bool(source.get("enabled", default_enabled)),
                     "interval_seconds": interval,
                     "run_nonce": max(0, int(source.get("run_nonce") or 0)),
                 }
@@ -140,12 +150,13 @@ def platform_snapshot(
     for name, definition in COMPONENT_DEFINITIONS.items():
         desired = control["components"].get(name) or {}
         runtime = status_components.get(name) if isinstance(status_components.get(name), dict) else {}
+        default_enabled = bool(definition.get("default_enabled", True))
         components.append(
             {
                 "name": name,
                 "label": definition["label"],
                 "description": definition["description"],
-                "enabled": bool(desired.get("enabled", True)) and bool(control.get("enabled", True)),
+                "enabled": bool(desired.get("enabled", default_enabled)) and bool(control.get("enabled", True)),
                 "interval_seconds": float(desired.get("interval_seconds") or definition["default_interval_seconds"]),
                 "run_nonce": int(desired.get("run_nonce") or 0),
                 "status": runtime.get("status") or ("starting" if supervisor_fresh else "offline"),
