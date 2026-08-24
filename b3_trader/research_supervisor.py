@@ -10,6 +10,7 @@ from typing import Any, Callable
 
 from dotenv import load_dotenv
 
+from .cloudflare_snapshot_publisher import CloudflareSnapshotPublisher
 from .reference_components import ReferenceComponentWatcher
 from .research_control import COMPONENT_DEFINITIONS, STATUS_PATH, atomic_json, load_control
 from .research_warehouse import ResearchWarehouse
@@ -61,12 +62,7 @@ class ComponentState:
 
 
 class ResearchSupervisor:
-    """Non-trading sidecar for research storage and external-version observation.
-
-    It cannot place orders, alter PAPER strategy profiles or auto-promote external code.
-    Component enable/disable/run-now commands are applied from a local control file
-    without restarting the trading process.
-    """
+    """Non-trading sidecar for storage, web snapshots and external-version observation."""
 
     def __init__(self) -> None:
         load_dotenv()
@@ -75,10 +71,12 @@ class ResearchSupervisor:
         self.control = load_control()
         self.warehouse = ResearchWarehouse()
         self.reference_watcher = ReferenceComponentWatcher()
+        self.cloudflare_publisher = CloudflareSnapshotPublisher()
         self.states: dict[str, ComponentState] = {}
         self.runners: dict[str, Callable[[], dict[str, Any]]] = {
             "warehouse-export": self.warehouse.export_once,
             "reference-version-watch": self.reference_watcher.check_once,
+            "cloudflare-snapshot-publish": self.cloudflare_publisher.publish_once,
         }
         self.threads: dict[str, threading.Thread] = {}
         self.wake_events: dict[str, threading.Event] = {}
@@ -90,11 +88,12 @@ class ResearchSupervisor:
     def _install_components(self) -> None:
         components = self.control.get("components") or {}
         global_enabled = bool(self.control.get("enabled", True))
-        for name in COMPONENT_DEFINITIONS:
+        for name, definition in COMPONENT_DEFINITIONS.items():
             cfg = components.get(name) or {}
-            enabled = bool(cfg.get("enabled", True)) and global_enabled
-            minimum = float(COMPONENT_DEFINITIONS[name]["min_interval_seconds"])
-            interval = max(minimum, float(cfg.get("interval_seconds") or COMPONENT_DEFINITIONS[name]["default_interval_seconds"]))
+            default_enabled = bool(definition.get("default_enabled", True))
+            enabled = bool(cfg.get("enabled", default_enabled)) and global_enabled
+            minimum = float(definition["min_interval_seconds"])
+            interval = max(minimum, float(cfg.get("interval_seconds") or definition["default_interval_seconds"]))
             self.states[name] = ComponentState(
                 name=name,
                 enabled=enabled,
@@ -141,12 +140,14 @@ class ResearchSupervisor:
         with self._lock:
             self.control = next_control
             for name, state in self.states.items():
+                definition = COMPONENT_DEFINITIONS[name]
                 cfg = components.get(name) or {}
-                minimum = float(COMPONENT_DEFINITIONS[name]["min_interval_seconds"])
-                state.enabled = bool(cfg.get("enabled", True)) and global_enabled
+                default_enabled = bool(definition.get("default_enabled", True))
+                minimum = float(definition["min_interval_seconds"])
+                state.enabled = bool(cfg.get("enabled", default_enabled)) and global_enabled
                 state.interval_seconds = max(
                     minimum,
-                    float(cfg.get("interval_seconds") or COMPONENT_DEFINITIONS[name]["default_interval_seconds"]),
+                    float(cfg.get("interval_seconds") or definition["default_interval_seconds"]),
                 )
                 nonce = int(cfg.get("run_nonce") or 0)
                 if nonce != self.last_run_nonce.get(name, 0):
