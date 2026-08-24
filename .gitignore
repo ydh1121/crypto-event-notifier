@@ -30,3 +30,5 @@ dashboard/runtime-build.json.tmp
 # Cloudflare
 cloudflare/node_modules/
 cloudflare/.wrangler/
+cloudflare-pages/node_modules/
+cloudflare-pages/.wrangler/
