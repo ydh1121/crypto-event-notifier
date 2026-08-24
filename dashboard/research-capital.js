@@ -23,6 +23,15 @@
     return response.json();
   }
 
+  function loadComponentManager(){
+    if(!document.querySelector('link[data-research-components]')){
+      const link=document.createElement('link');link.rel='stylesheet';link.href='./research-components.css?v=1';link.dataset.researchComponents='1';document.head.appendChild(link);
+    }
+    if(!window.__researchComponentsLoaded&&!document.querySelector('script[data-research-components]')){
+      const script=document.createElement('script');script.src='./research-components.js?v=1';script.dataset.researchComponents='1';document.body.appendChild(script);
+    }
+  }
+
   function aggregateNumbers(data){
     const count=Math.max(0,n(data?.market_count));
     const start=n(data?.aggregate_virtual_capital_krw)||(n(data?.per_market_start_krw)||10_000_000)*count;
@@ -132,6 +141,7 @@
   }
 
   function install(){
+    loadComponentManager();
     sync({forceDetail:true});
     timer=window.setInterval(()=>sync({forceDetail:false}),15000);
     document.addEventListener('click',event=>{
