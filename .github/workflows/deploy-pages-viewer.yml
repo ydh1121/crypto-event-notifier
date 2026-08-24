@@ -7,6 +7,12 @@ on:
     paths:
       - "cloudflare-pages/**"
       - ".github/workflows/deploy-pages-viewer.yml"
+  pull_request:
+    branches:
+      - master
+    paths:
+      - "cloudflare-pages/**"
+      - ".github/workflows/deploy-pages-viewer.yml"
   workflow_dispatch:
 
 concurrency:
@@ -20,11 +26,14 @@ env:
 
 jobs:
   deploy:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: b3-auto-trader-phase1
 
       - uses: actions/setup-node@v4
         with:
@@ -147,7 +156,7 @@ jobs:
           npx wrangler pages deploy public \
             --project-name "$PAGES_PROJECT" \
             --branch "$PRODUCTION_BRANCH" \
-            --commit-hash "$GITHUB_SHA" \
+            --commit-hash "$(git rev-parse HEAD)" \
             --config wrangler.generated.jsonc
 
       - name: Verify deployed health endpoint
