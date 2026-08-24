@@ -31,6 +31,28 @@ class GitAutoSync:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
+    def _git_available(self) -> tuple[bool, str]:
+        if shutil.which("git") is None:
+            return False, "git_not_installed"
+        if not (self.repo_dir / ".git").exists():
+            return False, "not_a_git_clone"
+        completed = subprocess.run(
+            ["git", "rev-parse", "--is-inside-work-tree"],
+            cwd=self.repo_dir,
+            text=True,
+            capture_output=True,
+            timeout=15,
+            check=False,
+        )
+        if completed.returncode != 0 or completed.stdout.strip().lower() != "true":
+            return False, "not_a_git_clone"
+        return True, "ok"
+
+    def _disabled_payload(self, reason: str) -> dict:
+        payload = {"status": "disabled", "reason": reason, "ts": time.time()}
+        self.state.set_sync(payload)
+        return payload
+
     def _git(self, *args: str, check: bool = True) -> str:
         completed = subprocess.run(["git", *args], cwd=self.repo_dir, text=True, capture_output=True, timeout=60, check=False)
         if check and completed.returncode != 0:
@@ -40,6 +62,9 @@ class GitAutoSync:
     def publish_control(self, message: str = "Update local trader control state") -> dict:
         if not self.push_control_changes:
             return {"status": "push_disabled"}
+        available, reason = self._git_available()
+        if not available:
+            return self._disabled_payload(reason)
         with self._lock:
             self._git("add", "control/assets.json", "control/runtime.json")
             staged = self._git("diff", "--cached", "--name-only")
@@ -54,9 +79,10 @@ class GitAutoSync:
 
     def check_once(self) -> dict:
         if not self.enabled:
-            payload = {"status": "disabled", "ts": time.time()}
-            self.state.set_sync(payload)
-            return payload
+            return self._disabled_payload("config_disabled")
+        available, reason = self._git_available()
+        if not available:
+            return self._disabled_payload(reason)
         with self._lock:
             dirty = self._git("status", "--porcelain")
             if dirty:
@@ -101,6 +127,10 @@ class GitAutoSync:
 
     def start(self) -> None:
         if not self.enabled or (self._thread and self._thread.is_alive()): return
+        available, reason = self._git_available()
+        if not available:
+            self._disabled_payload(reason)
+            return
         self._thread = threading.Thread(target=self._loop, name="git-auto-sync", daemon=True)
         self._thread.start()
 
