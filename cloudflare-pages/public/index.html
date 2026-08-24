@@ -4,14 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f5f5f7">
-  <meta name="crypto-viewer-build" content="2026.08.25-4">
+  <meta name="crypto-viewer-build" content="2026.08.25-5">
   <title>Crypto Research</title>
   <link rel="stylesheet" href="/styles.css?v=3">
   <link rel="stylesheet" href="/workspaces.css?v=1">
-  <link rel="stylesheet" href="/market-detail.css?v=2">
   <link rel="stylesheet" href="/local-parity.css?v=1">
-  <link rel="stylesheet" href="/asset-parity-shell.css?v=1">
-  <link rel="stylesheet" href="/asset-averaging.css?v=2">
+  <link rel="stylesheet" href="/asset-local-port.css?v=1">
 </head>
 <body>
   <header class="top-shell">
@@ -21,10 +19,10 @@
     </div>
     <nav id="viewerNav" class="viewer-nav hidden" aria-label="조회 화면">
       <div class="viewer-nav-inner">
-        <button class="active" data-view="home">개요</button>
-        <button data-view="coin">자산</button>
-        <button data-view="results">성과</button>
-        <button data-view="records">활동</button>
+        <button class="active" data-view="home">홈</button>
+        <button data-view="coin">코인</button>
+        <button data-view="results">결과</button>
+        <button data-view="records">기록</button>
         <button data-view="settings">설정</button>
       </div>
     </nav>
@@ -67,7 +65,7 @@
     <section id="viewerView" class="hidden">
       <section class="viewer-page active" data-view-panel="home">
         <div class="viewer-intro">
-          <div><p class="kicker">READ ONLY</p><h2>가상매매 연구 현황</h2><p id="viewerSub">PC에서 받은 마지막 데이터를 보여줍니다.</p></div>
+          <div><p class="kicker">한눈에 보기</p><h2>지금 살지, 기다릴지만 먼저 봅니다.</h2><p id="viewerSub">PC에서 받은 마지막 데이터를 보여줍니다.</p></div>
           <div class="user-chip"><span id="userName">-</span><small id="userRole">-</small></div>
         </div>
 
@@ -94,17 +92,15 @@
 
       <section class="viewer-page" data-view-panel="coin">
         <div class="section-head page-head">
-          <div><p class="kicker">ASSET WORKSPACE</p><h2>자산 분석</h2><p>선택한 자산의 현재 판단, 가상계좌, 매매 계획과 실제 보유분을 한 화면에서 봅니다.</p></div>
-          <label class="coin-picker">자산<select id="coinSelect"></select></label>
+          <div><p class="kicker">코인별 보기</p><h2>내 코인 상태</h2><p>가격, 내 평단, 손익, 현재 판단을 한 화면에서 확인합니다.</p></div>
+          <label class="coin-picker">코인<select id="coinSelect"></select></label>
         </div>
-        <section id="coinDetailCard" class="coin-detail-card">
-          <div class="empty">자산을 선택하면 상세 상태가 표시됩니다.</div>
-        </section>
+        <section id="coinDetailCard" class="coin-detail-card"><div class="empty">코인을 선택하면 상세 상태가 표시됩니다.</div></section>
       </section>
 
       <section class="viewer-page" data-view-panel="results">
         <div class="section-head page-head">
-          <div><p class="kicker">RESULTS</p><h2>전체 코인 연구 결과</h2><p>전체 KRW 시장의 가상계좌 성과를 검색하고 비교합니다.</p></div>
+          <div><p class="kicker">가상매매 결과</p><h2>이 판단이 실제로 잘 맞았는지</h2><p>가상으로 사고판 결과를 누적해서 확인합니다.</p></div>
           <span id="leaderText" class="leader-text">-</span>
         </div>
         <section class="market-card results-card">
@@ -119,24 +115,22 @@
               <option value="opportunity_desc">기회점수 높은 순</option>
             </select>
           </div>
-          <div class="filter-row" id="filterRow">
-            <button class="active" data-filter="all">전체</button><button data-filter="holding">보유 중</button><button data-filter="completed">매매 완료</button><button data-filter="profit">수익</button><button data-filter="loss">손실</button>
-          </div>
+          <div class="filter-row" id="filterRow"><button class="active" data-filter="all">전체</button><button data-filter="holding">보유 중</button><button data-filter="completed">매매 완료</button><button data-filter="profit">수익</button><button data-filter="loss">손실</button></div>
           <div id="marketList" class="market-list"><div class="empty">데이터를 기다리는 중입니다.</div></div>
         </section>
       </section>
 
       <section class="viewer-page" data-view-panel="records">
-        <div class="section-head page-head"><div><p class="kicker">RECORDS</p><h2>연구 기록</h2><p>현재 외부 조회판에 전달된 최근 연구 상태를 확인합니다.</p></div></div>
+        <div class="section-head page-head"><div><p class="kicker">기록</p><h2>최근에 무슨 일이 있었나요?</h2><p>가상매매 체결과 학습, 데이터 갱신 상태를 시간순으로 확인합니다.</p></div></div>
         <section class="records-grid">
           <article class="summary-card"><p class="kicker">LATEST</p><h3>최근 스냅샷</h3><div id="recordSnapshot" class="summary-body empty">데이터를 기다리는 중입니다.</div></article>
           <article class="summary-card"><p class="kicker">TRADES</p><h3>완료 거래 요약</h3><div id="recordTrades" class="summary-body empty">데이터를 기다리는 중입니다.</div></article>
         </section>
-        <article class="summary-card roadmap-card"><p class="kicker">DETAIL DATA</p><h3>상세 체결 · 학습 이력</h3><p>코인 화면에서 매매 계획, 최근 체결, 학습 변화, 자산곡선과 판단 점수 이력을 별도 상세 데이터로 조회합니다. 원본 SQLite는 계속 PC에만 보관됩니다.</p></article>
+        <article class="summary-card roadmap-card"><p class="kicker">DETAIL DATA</p><h3>상세 체결 · 학습 이력</h3><p>코인 화면과 결과 화면에서 매매 계획, 최근 체결, 학습 변화와 판단 점수 이력을 조회합니다. 원본 SQLite는 계속 PC에만 보관됩니다.</p></article>
       </section>
 
       <section class="viewer-page" data-view-panel="settings">
-        <div class="section-head page-head"><div><p class="kicker">SETTINGS</p><h2>조회 설정</h2><p>이 웹은 조회 전용입니다. 매매 중지·재개·전략 변경은 원격에서 실행하지 않습니다.</p></div></div>
+        <div class="section-head page-head"><div><p class="kicker">설정</p><h2>필요할 때만 바꾸세요.</h2><p>외부 웹은 조회 전용입니다. 실제 PAPER 엔진 제어와 전략 변경은 이 화면에서 하지 않습니다.</p></div></div>
         <section class="settings-grid">
           <article class="summary-card"><p class="kicker">SYSTEM</p><h3>연구 서버 상태</h3><div id="settingsNode" class="summary-body empty">데이터를 기다리는 중입니다.</div></article>
           <article class="summary-card"><p class="kicker">ACCESS</p><h3>내 계정</h3><div id="settingsAccount" class="summary-body"></div></article>
@@ -155,9 +149,7 @@
   </main>
 
   <script src="/app.js?v=3"></script>
-  <script src="/market-detail.js?v=2"></script>
   <script src="/local-parity.js?v=1"></script>
-  <script src="/asset-parity-shell.js?v=1"></script>
-  <script src="/asset-averaging.js?v=2"></script>
+  <script src="/asset-local-port.js?v=1"></script>
 </body>
 </html>
