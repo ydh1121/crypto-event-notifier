@@ -111,6 +111,42 @@ class GitAutoSync:
         if self.on_restart_required:
             self.on_restart_required()
 
+    def _apply_remote_preserving_control(self, *, local: str, remote: str, changed: list[str]) -> dict:
+        """Update application code first while preserving local dashboard-managed control files.
+
+        Control publishing is deliberately decoupled from code delivery. A missing Git identity,
+        push rejection, or other control-publish problem must never leave the running application
+        stuck on an old GitHub revision.
+        """
+        code_changed = self._restart_required(changed)
+        if code_changed and self.block_code_updates:
+            payload = {
+                "status": "blocked_live_code_update",
+                "ts": time.time(),
+                "local": local,
+                "remote": remote,
+                "changed": changed,
+            }
+            self.state.set_sync(payload)
+            return payload
+
+        preserved = self._preserve_control()
+        self._git("reset", "--hard", f"origin/{self.branch}")
+        self._restore_control(preserved)
+        payload = {
+            "status": "updated",
+            "ts": time.time(),
+            "from": local,
+            "to": remote,
+            "changed": changed,
+            "remote_changed": changed,
+            "restart_required": code_changed,
+            "local_control_preserved": True,
+        }
+        self.state.set_sync(payload)
+        self._restart_if_needed(code_changed)
+        return payload
+
     def publish_control(self, message: str = "Update local trader control state") -> dict:
         if not self.push_control_changes:
             return {"status": "push_disabled"}
@@ -125,12 +161,15 @@ class GitAutoSync:
             remote = self._git("rev-parse", f"origin/{self.branch}")
             remote_changed: list[str] = []
 
+            # Always deliver remote application changes before attempting to commit/push
+            # local control state. This keeps local runtime code current even if the later
+            # control publish fails for an unrelated Git configuration/authentication reason.
+            if local != remote and self._is_ancestor(local, remote):
+                remote_changed = [line for line in self._git("diff", "--name-only", f"{local}..{remote}").splitlines() if line]
+                return self._apply_remote_preserving_control(local=local, remote=remote, changed=remote_changed)
+
             if local != remote:
-                if self._is_ancestor(local, remote):
-                    remote_changed = [line for line in self._git("diff", "--name-only", f"{local}..{remote}").splitlines() if line]
-                    self._git("reset", "--hard", f"origin/{self.branch}")
-                    self._restore_control(preserved)
-                elif self._is_ancestor(remote, local):
+                if self._is_ancestor(remote, local):
                     base = remote
                     local_only = self._changed_from_base(base, local)
                     if not self._control_only(local_only):
@@ -150,8 +189,7 @@ class GitAutoSync:
                         }
                         self.state.set_sync(payload)
                         return payload
-                    self._git("reset", "--hard", f"origin/{self.branch}")
-                    self._restore_control(preserved)
+                    return self._apply_remote_preserving_control(local=local, remote=remote, changed=remote_changed)
 
             self._git("add", *CONTROL_PATHS)
             staged = self._git("diff", "--cached", "--name-only")
@@ -159,18 +197,16 @@ class GitAutoSync:
                 self._git("commit", "-m", message)
             self._git("push", "origin", f"HEAD:{self.branch}")
             commit = self._git("rev-parse", "HEAD")
-            code_changed = self._restart_required(remote_changed)
             payload = {
                 "status": "published" if staged else "up_to_date",
                 "commit": commit,
                 "files": staged.splitlines() if staged else [],
-                "changed": remote_changed,
-                "remote_changed": remote_changed,
-                "restart_required": code_changed,
+                "changed": [],
+                "remote_changed": [],
+                "restart_required": False,
                 "ts": time.time(),
             }
             self.state.set_sync(payload)
-            self._restart_if_needed(code_changed)
             return payload
 
     def check_once(self) -> dict:
@@ -182,24 +218,42 @@ class GitAutoSync:
 
         with self._lock:
             dirty = self._git("status", "--porcelain")
-            if dirty:
-                dirty_paths = [line[3:] for line in dirty.splitlines() if len(line) >= 4]
-                if self._control_only(dirty_paths) and self.push_control_changes:
-                    return self.publish_control()
+            dirty_paths = [line[3:] for line in dirty.splitlines() if len(line) >= 4] if dirty else []
+            control_dirty = self._control_only(dirty_paths)
+            if dirty and not control_dirty:
                 payload = {"status": "blocked_dirty_worktree", "ts": time.time(), "detail": dirty.splitlines()[:10]}
                 self.state.set_sync(payload)
                 return payload
 
+            # Fetch and compare even when control files are dirty. Local dashboard edits to
+            # assets/runtime settings must never block receiving newer application code.
             self._git("fetch", "origin", self.branch)
             local = self._git("rev-parse", "HEAD")
             remote = self._git("rev-parse", f"origin/{self.branch}")
+
             if local == remote:
+                if control_dirty and self.push_control_changes:
+                    try:
+                        return self.publish_control()
+                    except Exception as exc:
+                        payload = {
+                            "status": "control_publish_error",
+                            "ts": time.time(),
+                            "message": str(exc),
+                            "commit": local,
+                            "code_up_to_date": True,
+                        }
+                        self.state.set_error(exc, scope="git_control_publish")
+                        self.state.set_sync(payload)
+                        return payload
                 payload = {"status": "up_to_date", "ts": time.time(), "commit": local}
                 self.state.set_sync(payload)
                 return payload
 
             if self._is_ancestor(local, remote):
                 changed = [line for line in self._git("diff", "--name-only", f"{local}..{remote}").splitlines() if line]
+                if control_dirty:
+                    return self._apply_remote_preserving_control(local=local, remote=remote, changed=changed)
                 code_changed = self._restart_required(changed)
                 if code_changed and self.block_code_updates:
                     payload = {"status": "blocked_live_code_update", "ts": time.time(), "local": local, "remote": remote, "changed": changed}
@@ -240,17 +294,7 @@ class GitAutoSync:
                 self.state.set_sync(payload)
                 return payload
 
-            preserved = self._preserve_control()
-            self._git("reset", "--hard", f"origin/{self.branch}")
-            self._restore_control(preserved)
-            result = self.publish_control("Reconcile local trader control state")
-            result["status"] = "reconciled"
-            result["changed"] = remote_changed
-            result["remote_changed"] = remote_changed
-            result["restart_required"] = self._restart_required(remote_changed)
-            self.state.set_sync(result)
-            self._restart_if_needed(bool(result["restart_required"]))
-            return result
+            return self._apply_remote_preserving_control(local=local, remote=remote, changed=remote_changed)
 
     def _loop(self) -> None:
         while not self._stop.wait(self.interval_seconds):
