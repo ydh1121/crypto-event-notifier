@@ -17,6 +17,12 @@ function Resolve-Tailscale {
   return $null
 }
 
+function Test-IsAdmin {
+  $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+  $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+  return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
 $tailscale = Resolve-Tailscale
 if (-not $tailscale) {
   $winget = Get-Command winget -ErrorAction SilentlyContinue
@@ -38,14 +44,31 @@ if ($LASTEXITCODE -ne 0) {
   Write-Warning "'tailscale up' did not finish successfully. Open the Tailscale app from the Start menu and sign in, then continue."
 }
 
+$tailIp = (& $tailscale ip -4 | Select-Object -First 1).Trim()
 Write-Host ""
-Write-Host "Current Tailscale IPv4:"
-& $tailscale ip -4
+Write-Host "Current Tailscale IPv4: $tailIp"
+if ($tailIp) {
+  Write-Host "Direct dashboard URL: http://$tailIp`:8765"
+}
+
+$ruleName = "Crypto Auto Trader - Tailscale 8765"
+if (Get-Command Get-NetFirewallRule -ErrorAction SilentlyContinue) {
+  $rule = Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue
+  if (-not $rule) {
+    if (Test-IsAdmin) {
+      New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8765 -RemoteAddress "100.64.0.0/10" -Profile Any | Out-Null
+      Write-Host "Added a Windows Firewall rule limited to Tailscale addresses (100.64.0.0/10)."
+    } else {
+      Write-Warning "Windows Firewall rule was not added because PowerShell is not running as Administrator. If the 100.x address does not open on the phone, run this script once from an Administrator PowerShell."
+    }
+  }
+}
+
 Write-Host ""
 Write-Host "Next:"
-Write-Host "1. Install Tailscale on the phone and sign in to the same tailnet."
-Write-Host "2. Open the Crypto Auto Trader dashboard on this PC."
-Write-Host "3. In Settings > Phone access, copy the Tailscale URL."
-Write-Host "4. On the phone, enter the Dashboard token shown by the local PC console."
+Write-Host "1. Install/open Tailscale on the phone and sign in to the SAME account/tailnet."
+Write-Host "2. Make sure the Tailscale VPN switch on the phone is ON."
+Write-Host "3. Use the direct 100.x address shown above, including :8765. Do not rely on the ts.net name first."
+Write-Host "4. Enter the phone connection code shown in the local PC dashboard."
 Write-Host ""
-Write-Host "Do not configure public router port-forwarding for port 8765."
+Write-Host "Do NOT use your public/WAN IP and do NOT configure router port-forwarding/DMZ/UPnP for port 8765."
