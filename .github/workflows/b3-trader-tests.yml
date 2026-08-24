@@ -14,6 +14,7 @@ on:
       - "start-trader-secure.bat"
       - "LOCAL_MULTI_ASSET.md"
       - "cloudflare/**"
+      - "cloudflare-pages/**"
       - "Dockerfile"
       - ".dockerignore"
       - ".github/workflows/b3-trader-tests.yml"
@@ -33,6 +34,7 @@ on:
       - "start-trader-secure.bat"
       - "LOCAL_MULTI_ASSET.md"
       - "cloudflare/**"
+      - "cloudflare-pages/**"
       - "Dockerfile"
       - ".dockerignore"
       - ".github/workflows/b3-trader-tests.yml"
@@ -105,3 +107,22 @@ jobs:
           node-version: "22"
       - run: npm install
       - run: npm run typecheck
+
+  cloudflare-pages-viewer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare-pages
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install
+      - run: npm run typecheck
+      - run: node --check public/app.js
+      - run: test -s public/index.html
+      - run: test -s public/styles.css
+      - run: test -s migrations/0001_init.sql
+      - run: grep -q 'READ ONLY' public/index.html
+      - run: grep -q 'functions/api/ingest' README.md
