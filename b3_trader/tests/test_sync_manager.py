@@ -36,3 +36,20 @@ def test_publish_control_disables_cleanly_without_git_metadata(tmp_path: Path):
 
     assert result["status"] == "disabled"
     assert result["reason"] in {"not_a_git_clone", "git_not_installed"}
+
+
+def test_dashboard_and_launcher_changes_require_restart(tmp_path: Path):
+    sync = GitAutoSync(
+        repo_dir=str(tmp_path),
+        branch="b3-auto-trader-phase1",
+        enabled=False,
+        interval_seconds=60,
+        state=RuntimeState(),
+    )
+
+    assert sync._restart_required(["dashboard/navigation-v3.js"])
+    assert sync._restart_required(["dashboard/navigation-v3.css"])
+    assert sync._restart_required(["dashboard/index.html"])
+    assert sync._restart_required(["scripts/run-local.ps1"])
+    assert sync._restart_required(["start-trader-secure.bat"])
+    assert not sync._restart_required(["control/assets.json"])
