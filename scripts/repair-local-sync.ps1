@@ -9,11 +9,18 @@ Write-Host "This preserves control/assets.json and control/runtime.json, then re
 if (-not (Test-Path ".git")) { throw "This folder is not a Git clone." }
 
 $controlFiles = @("control/assets.json", "control/runtime.json")
+$selfPath = "scripts/repair-local-sync.ps1"
+$safeDirtyPaths = @($controlFiles + $selfPath)
+
+# The normal recovery command deliberately checks out the newest copy of this
+# script before running it. That makes this file appear dirty against the old
+# local HEAD. Treat only this script itself as a safe transient change; every
+# other non-control local change still blocks the reset.
 $dirtyLines = @(& git status --porcelain) | Where-Object { $_ }
 $dirtyPaths = @($dirtyLines | ForEach-Object {
   if ($_.Length -ge 4) { $_.Substring(3).Trim() }
 }) | Where-Object { $_ }
-$unsafeDirty = @($dirtyPaths | Where-Object { $_ -notin $controlFiles })
+$unsafeDirty = @($dirtyPaths | Where-Object { $_ -notin $safeDirtyPaths })
 if ($unsafeDirty.Count -gt 0) {
   Write-Host "Repair stopped because non-control local changes exist:" -ForegroundColor Yellow
   $unsafeDirty | Sort-Object -Unique | ForEach-Object { Write-Host "  $_" }
@@ -46,6 +53,10 @@ try {
     exit 2
   }
 
+  $before = (& git rev-parse --short HEAD).Trim()
+  $remoteShort = (& git rev-parse --short $remote).Trim()
+  Write-Host "Updating local code: $before -> $remoteShort"
+
   & git reset --hard $remote
   if ($LASTEXITCODE -ne 0) { throw "Git reset failed." }
 
@@ -61,7 +72,13 @@ try {
   Remove-Item $temp -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host "Repair complete. Local code now matches origin/$branch."
+$after = (& git rev-parse --short HEAD).Trim()
+Write-Host "Repair complete. Local code now matches origin/$branch at $after." -ForegroundColor Green
 Write-Host "Your local .env, dashboard token, Telegram settings, SQLite data, holdings, averaging plans, and backups were not deleted."
+if (Test-Path "dashboard/navigation-v3.js") {
+  Write-Host "Dashboard navigation v3 files are present."
+} else {
+  Write-Warning "dashboard/navigation-v3.js is missing after repair."
+}
 Write-Host "Next: .\start-trader-secure.bat"
 & git status --short
