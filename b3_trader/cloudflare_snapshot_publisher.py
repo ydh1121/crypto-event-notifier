@@ -15,8 +15,11 @@ from .research_control import platform_snapshot
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEMO_STATUS_PATH = REPO_ROOT / "dashboard/runtime-demo.json"
+DEMO_DB_PATH = REPO_ROOT / "b3_trader/data/auto_demo.sqlite3"
 MAX_RANKING_ROWS = 5000
 MAX_BODY_BYTES = 1_800_000
+RECENT_FILL_LIMIT = 80
+RECENT_FEEDBACK_LIMIT = 60
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -27,6 +30,16 @@ def _read_json(path: Path) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError):
         return {}
     return value if isinstance(value, dict) else {}
+
+
+def _json_object(value: Any) -> dict[str, Any]:
+    if not value:
+        return {}
+    try:
+        parsed = json.loads(str(value))
+    except (TypeError, json.JSONDecodeError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
 
 
 def _number(value: Any, default: float = 0.0) -> float:
@@ -109,6 +122,96 @@ def _manual_holdings(journal_db: str, price_by_market: dict[str, float]) -> dict
     }
 
 
+def _recent_research_records(path: Path = DEMO_DB_PATH) -> dict[str, Any]:
+    """Return a bounded cross-market PAPER activity index for the read-only viewer."""
+    empty = {
+        "fills": [],
+        "feedback": [],
+        "fill_count": 0,
+        "feedback_count": 0,
+        "updated_at": 0.0,
+    }
+    if not path.exists():
+        return empty
+    conn = sqlite3.connect(str(path), timeout=10)
+    conn.row_factory = sqlite3.Row
+    try:
+        tables = {
+            str(row["name"])
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('research_fills','research_feedback')"
+            ).fetchall()
+        }
+        if "research_fills" not in tables or "research_feedback" not in tables:
+            return empty
+        fill_rows = conn.execute(
+            """SELECT ts,market,symbol,side,price,krw,realized_pnl,return_pct,reason
+               FROM research_fills ORDER BY id DESC LIMIT ?""",
+            (RECENT_FILL_LIMIT,),
+        ).fetchall()
+        feedback_rows = conn.execute(
+            """SELECT ts,market,outcome_return_pct,realized_pnl,holding_seconds,
+                      profile_before_json,profile_after_json,note
+               FROM research_feedback ORDER BY id DESC LIMIT ?""",
+            (RECENT_FEEDBACK_LIMIT,),
+        ).fetchall()
+        fill_count = int(conn.execute("SELECT COUNT(*) AS count FROM research_fills").fetchone()["count"])
+        feedback_count = int(conn.execute("SELECT COUNT(*) AS count FROM research_feedback").fetchone()["count"])
+    except sqlite3.Error:
+        return empty
+    finally:
+        conn.close()
+
+    fills = [
+        {
+            "ts": _number(row["ts"]),
+            "market": row["market"],
+            "symbol": row["symbol"],
+            "side": row["side"],
+            "price": round(_number(row["price"]), 12),
+            "krw": round(_number(row["krw"]), 2),
+            "realized_pnl": round(_number(row["realized_pnl"]), 2),
+            "return_pct": round(_number(row["return_pct"]), 4),
+            "reason": str(row["reason"] or "")[:220],
+        }
+        for row in fill_rows
+    ]
+    feedback: list[dict[str, Any]] = []
+    for row in feedback_rows:
+        before = _json_object(row["profile_before_json"])
+        after = _json_object(row["profile_after_json"])
+        feedback.append(
+            {
+                "ts": _number(row["ts"]),
+                "market": row["market"],
+                "outcome_return_pct": round(_number(row["outcome_return_pct"]), 4),
+                "realized_pnl": round(_number(row["realized_pnl"]), 2),
+                "holding_seconds": round(_number(row["holding_seconds"]), 1),
+                "note": str(row["note"] or "")[:260],
+                "profile_change": {
+                    "regime_before": round(_number(before.get("regime_floor")), 3),
+                    "regime_after": round(_number(after.get("regime_floor")), 3),
+                    "entry_before": round(_number(before.get("entry_floor")), 3),
+                    "entry_after": round(_number(after.get("entry_floor")), 3),
+                    "weight_before": round(_number(before.get("base_weight_pct")), 3),
+                    "weight_after": round(_number(after.get("base_weight_pct")), 3),
+                },
+            }
+        )
+    latest = max(
+        [0.0]
+        + [_number(row.get("ts")) for row in fills]
+        + [_number(row.get("ts")) for row in feedback]
+    )
+    return {
+        "fills": fills,
+        "feedback": feedback,
+        "fill_count": fill_count,
+        "feedback_count": feedback_count,
+        "updated_at": latest,
+    }
+
+
 class CloudflareSnapshotPublisher:
     """Outbound-only publisher for the read-only Cloudflare Pages viewer."""
 
@@ -150,6 +253,7 @@ class CloudflareSnapshotPublisher:
             "best_market": _compact_market(demo.get("best_market") or {}) if isinstance(demo.get("best_market"), dict) else None,
             "leaderboard": leaderboard,
             "research_node": platform_snapshot(),
+            "recent_records": _recent_research_records(),
         }
         private_payload: dict[str, Any] = {}
         if _bool_env("CLOUDFLARE_PUBLISH_PRIVATE_HOLDINGS", False):
