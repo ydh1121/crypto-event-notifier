@@ -53,10 +53,35 @@ _LOCK = threading.RLock()
 
 
 def atomic_json(path: Path, payload: dict[str, Any]) -> None:
+    """Atomically replace a JSON file without sharing one fixed Windows temp path.
+
+    Supervisor component threads can write status at nearly the same time, and a
+    process restart can briefly overlap the old and new supervisor. A fixed
+    `status.json.tmp` therefore races on Windows. Give every writer its own temp
+    file and retry only the final replace when Windows reports a transient lock.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_suffix(path.suffix + ".tmp")
-    temp.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    os.replace(temp, path)
+    temp = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    text = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    temp.write_text(text, encoding="utf-8")
+    try:
+        last_error: OSError | None = None
+        for attempt in range(6):
+            try:
+                os.replace(temp, path)
+                return
+            except OSError as exc:
+                last_error = exc
+                if attempt >= 5:
+                    raise
+                time.sleep(0.05 * (attempt + 1))
+        if last_error is not None:
+            raise last_error
+    finally:
+        try:
+            temp.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def _read_json(path: Path) -> dict[str, Any]:
