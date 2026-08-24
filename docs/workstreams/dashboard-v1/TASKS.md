@@ -13,14 +13,20 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 ## B. Dashboard information architecture and visual redesign
 
-- [x] Replace the single long page with responsive view navigation: 개요 / 자산 / 성과 / 활동 / 설정
+- [x] Replace the single long page with responsive view navigation
 - [x] Rebuild top shell, KPI hierarchy, cards, spacing, status chips, mobile safe-area behavior
-- [x] Remove the current narrow-left-content / empty-right-space desktop feel
+- [x] Remove narrow-left-content / empty-right-space desktop feel
 - [x] Group strategy settings by purpose instead of one dense matrix
 - [x] Keep existing controls wired through the redesign
-- [x] Add a beginner-facing copy layer that replaces Regime/Entry/Context/RISK_OFF/PAPER/DD/Profit Factor on primary surfaces
-- [x] Add plain-language 0–100 score meanings: 매우 나쁨 / 좋지 않음 / 보통 / 좋음 / 매우 좋음
-- [-] User visual QA on the live local dashboard; tune spacing/geometry/copy only from actual screenshots
+- [x] Add beginner-facing copy that replaces Regime/Entry/Context/RISK_OFF/PAPER/DD/Profit Factor on primary surfaces
+- [x] Add plain-language 0–100 score meanings
+- [x] Add second simplification pass: `홈 / 코인 / 결과 / 기록 / 설정`
+- [x] Move routine engine controls out of the home hero into Settings safety controls
+- [x] Collapse advanced strategy values behind `고급 설정 보기`
+- [x] Add mobile bottom navigation and reduce mobile card density
+- [x] Add home-level actual-holdings summary using saved local quantity/average-price records
+- [x] Make asset cards decision-first: current action, my average/PnL when present, then compact score summary
+- [-] User visual QA on the updated live dashboard; tune geometry/copy from screenshots only
 
 ## C. Charts and analytics
 
@@ -31,7 +37,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Add range selection (1H / 6H / 24H / 7D)
 - [x] Add performance summary: total return, realized/unrealized PnL, closed trades, win rate, profit factor, MDD/current DD
 - [x] Add condition diagnostics showing why an asset is WATCH / WAIT_PULLBACK / BUY_CANDIDATE / RISK_OFF
-- [x] Hide technical factor detail behind `왜 이렇게 판단했는지 자세히 보기` while keeping the primary decision plain
+- [x] Hide technical factor detail behind `왜 이렇게 판단했는지 자세히 보기`
 - [ ] Add condition-performance breakdown after enough completed fills exist to make it meaningful
 
 ## D. Forward-test durability
@@ -48,7 +54,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Test message works
 - [x] Alert on important action changes with cooldown
 - [x] Alert on PAPER fills and risk-off exits
-- [x] Alert on risk blocks (spread/slippage/BTC flash) with anti-spam cooldown
+- [x] Alert on risk blocks with anti-spam cooldown
 - [x] Alert on engine/asset errors with anti-spam cooldown
 - [x] Add daily PAPER performance summary
 - [x] Translate outgoing trading jargon into ordinary Korean before delivery
@@ -65,6 +71,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Add per-ticker averaging-down calculator with up to 20 saved rounds
 - [x] Show current-value/unrealized-PnL summary for manually entered holdings
 - [x] Show suggested entry sizing on the asset screen when a BUY_CANDIDATE appears
+- [x] User has added multiple assets and entered average prices locally; preserve this local state
 - [ ] Add per-asset analysis/profile notes for GPT-managed refinements
 - [ ] Validate multi-asset portfolio limits with several simultaneous assets
 
@@ -79,27 +86,22 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [ ] Verify consistent SQLite snapshot upload to `Crypto Auto Trader/backups`
 - [ ] Mirror `control/` and `dashboard/` to Drive without secrets
 
-## H. Phone / external access — current stopping point
+## H. Phone / external access
 
 - [x] Add network-access status API
 - [x] Add phone-access panel with connection-code guidance
 - [x] Rename Dashboard token to user-facing `휴대폰 연결 코드`
 - [x] Add loopback-only reveal/rotate endpoints for the phone connection code
-- [x] Add Tailscale setup as an optional path
-- [x] Confirm Tailscale 100.x requires the phone VPN switch to be ON
-- [x] User declined VPN-dependent phone access as the primary path and uninstalled Tailscale
+- [x] User declined VPN-dependent access and uninstalled Tailscale
 - [x] Add VPN-free Cloudflare Quick Tunnel launcher: `start-trader-secure.bat`
-- [x] Bind the trader to 127.0.0.1 in secure launcher mode so router forwarding cannot directly reach the app
+- [x] Bind the trader to 127.0.0.1 in secure launcher mode
 - [x] Surface current `https://*.trycloudflare.com` URL through `/api/network`
 - [x] Make VPN-free HTTPS Cloudflare access the primary phone-access UI
-- [x] Keep public HTTP/WAN access warning visible
 - [x] Repair the user's diverged local branch and pull the secure launcher
-- [x] Verify `start-trader-secure.bat` generates an HTTPS Quick Tunnel URL
-- [x] Verify iPhone/phone 5G access to the Cloudflare HTTPS URL with no VPN
-- [ ] Verify old public-IP `http://...:8765` access stops while secure launcher is active
-- [ ] Remove router port-forwarding/DMZ/UPnP exposure after the HTTPS path works
-- [ ] Rotate the phone connection code after public exposure is removed
-- [ ] Decide whether to keep temporary Quick Tunnel URLs or configure a stable named Cloudflare Tunnel later
+- [x] Verify Quick Tunnel HTTPS opens on phone 5G with no VPN
+- [x] Verify old public-IP `http://...:8765` access no longer works in secure mode
+- [ ] Rotate the phone connection code after the previously exposed code
+- [ ] Decide whether temporary Quick Tunnel URLs are sufficient or configure a stable named Cloudflare Tunnel later
 
 ## I. Real-money execution
 
@@ -116,10 +118,10 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 - [x] Holdings/calculator/sync baseline CI green
 - [x] VPN-free Cloudflare tunnel changes CI green
-- [x] Python module compile check passes
-- [x] Dashboard JavaScript checks pass
+- [-] Latest simplified-dashboard JavaScript/CSS change CI pending
+- [x] Python module compile check passes on previous baseline
 - [x] Existing Cloudflare TypeScript check remains green
 
 ## Completion condition for this workstream
 
-This workstream stops when the redesigned dashboard, analytics/graphs, durable PAPER forward test, Telegram operations, Git/Drive backup path, multi-asset views, VPN-free secure phone external access, and user-facing holdings/averaging tools are usable and verified. Real-money trading remains deferred.
+This workstream stops when the simplified dashboard, analytics/graphs, durable PAPER forward test, Telegram operations, Git/Drive backup path, multi-asset views, VPN-free secure phone external access, and user-facing holdings/averaging tools are usable and verified. Real-money trading remains deferred.
