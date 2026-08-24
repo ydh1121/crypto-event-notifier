@@ -4,6 +4,7 @@ import json
 import math
 import os
 import sqlite3
+import threading
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -358,6 +359,7 @@ class AutoPaperDemo:
         payload = {
             "running": not bool(error),
             "paper_only": True,
+            "pid": os.getpid(),
             "start_krw": START_KRW,
             "cash_krw": round(self.cash_krw, 2),
             "equity_krw": round(self.equity(), 2),
@@ -369,6 +371,7 @@ class AutoPaperDemo:
             "updated_at": time.time(),
             "error": error,
             "rules": {
+                "scan_interval_seconds": SCAN_INTERVAL_SECONDS,
                 "max_open_positions": MAX_OPEN_POSITIONS,
                 "base_order_krw": BASE_ORDER_KRW,
                 "adaptive_min_multiplier": ADAPTIVE_MIN_MULTIPLIER,
@@ -441,17 +444,20 @@ class AutoPaperDemo:
         )
         self._write_status(candidates=scored)
 
-    def run(self) -> None:
+    def run(self, stop_event: threading.Event | None = None) -> None:
+        stop_event = stop_event or threading.Event()
         self._write_status(candidates=[])
         try:
-            while True:
+            while not stop_event.is_set():
                 started = time.time()
                 try:
                     self.scan_once()
                 except Exception as exc:
                     self._write_status(candidates=[], error=f"{type(exc).__name__}: {exc}")
                 elapsed = time.time() - started
-                time.sleep(max(15.0, SCAN_INTERVAL_SECONDS - elapsed))
+                wait_seconds = max(15.0, SCAN_INTERVAL_SECONDS - elapsed)
+                if stop_event.wait(wait_seconds):
+                    break
         finally:
             self.store.close()
 
