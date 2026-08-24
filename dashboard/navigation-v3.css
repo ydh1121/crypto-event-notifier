@@ -53,6 +53,10 @@
 .personal-tools .holding-summary{margin-top:16px!important;gap:10px!important}
 .personal-tools .form-note{margin-top:14px!important;margin-bottom:0!important}
 .personal-tools .avg-row{padding:12px!important}
+/* Calculator action rail must not visually stick to either the last round or the summary. */
+.personal-tools>.panel:last-child #averagingRows{margin-bottom:0!important}
+.personal-tools>.panel:last-child #averagingRows + .tool-actions{margin:20px 0!important;padding:2px 0!important}
+.personal-tools>.panel:last-child .avg-summary{margin-top:0!important}
 
 @media(max-width:760px){
   body{padding-bottom:calc(28px + env(safe-area-inset-bottom,0px))!important}
@@ -104,6 +108,7 @@
   .personal-tools .entry-guide{margin-bottom:14px!important}
   .personal-tools .avg-list{margin-bottom:16px!important}
   .personal-tools .avg-row{padding:11px!important}
+  .personal-tools>.panel:last-child #averagingRows + .tool-actions{margin:22px 0!important;padding:3px 0!important}
 }
 
 @media(max-width:430px){
@@ -113,6 +118,7 @@
   .asset-chip{padding-inline:14px}
   .personal-tools{gap:15px!important}
   .personal-tools .avg-row{padding:10px!important}
+  .personal-tools>.panel:last-child #averagingRows + .tool-actions{margin:24px 0!important}
 }
 
 @media(prefers-reduced-motion:reduce){
