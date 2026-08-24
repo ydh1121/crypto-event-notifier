@@ -40,10 +40,11 @@
     </section>
     <section class="two-col">
       <article class="panel"><div class="panel-head"><h2>최근 체결</h2><button id="refreshFills" class="text-btn">새로고침</button></div><div id="fillsList" class="list"></div></article>
-      <article class="panel"><div class="panel-head"><h2>시스템</h2></div><div id="systemList" class="list"></div><div class="panel-actions"><button id="telegramTest" class="secondary">텔레그램 테스트</button><button id="backupNow" class="secondary">백업 실행</button><button id="syncNow" class="secondary">GitHub 동기화</button></div></article>
+      <article class="panel"><div class="panel-head"><h2>시스템</h2></div><div id="systemList" class="list"></div><div class="panel-actions"><button id="telegramSettings" class="secondary">텔레그램 설정</button><button id="telegramTest" class="secondary">텔레그램 테스트</button><button id="backupNow" class="secondary">백업 실행</button><button id="syncNow" class="secondary">GitHub 동기화</button></div></article>
     </section>
   </main>
   <dialog id="settingsDialog"><form method="dialog" class="dialog-body"><h2>대시보드 연결</h2><label>API 주소<input id="apiBaseInput" placeholder="http://192.168.0.10:8765" /></label><label>Dashboard token<input id="tokenInput" type="password" placeholder="폰/LAN/Tailscale 접속에서 사용" /></label><p id="connectionHint" class="hint">이 PC에서 127.0.0.1로 접속하면 토큰 없이 자동 인증됩니다. 폰이나 다른 기기에서는 PC 콘솔에 표시된 Dashboard token을 사용하세요.</p><div class="dialog-actions"><button value="cancel" class="secondary">취소</button><button id="saveSettings" value="default">저장</button></div></form></dialog>
+  <dialog id="telegramDialog"><form method="dialog" class="dialog-body"><h2>텔레그램 알림</h2><label>Bot token<input id="telegramTokenInput" type="password" autocomplete="off" placeholder="BotFather에서 발급한 토큰" /></label><label>Chat ID<input id="telegramChatIdInput" autocomplete="off" placeholder="예: 123456789" /></label><label class="check-row"><input id="telegramEnabledInput" type="checkbox" /> 알림 활성화</label><p id="telegramStatusHint" class="hint">토큰은 이 PC의 로컬 데이터 폴더에만 저장되며 GitHub·Google Drive에는 올리지 않습니다.</p><div class="dialog-actions"><button value="cancel" class="secondary">취소</button><button id="saveTelegram" value="default">저장</button></div></form></dialog>
   <script src="./app.js"></script>
 </body>
 </html>
