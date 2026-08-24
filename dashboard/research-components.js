@@ -21,6 +21,10 @@
     return response.json();
   }
 
+  function markBuild(){
+    const pill=q('#staticUiBuild .status-pill');if(pill)pill.textContent='UI 2026.08.24-9';
+    const copy=q('#staticUiBuild .panel-copy');if(copy)copy.textContent='Photo-eBook 내비게이션 + 24시간 연구 구성요소 관리 화면이 적용된 버전입니다.';
+  }
   function ageText(ts){
     const value=Number(ts||0);if(!value)return'아직 없음';
     const sec=Math.max(0,Math.floor(Date.now()/1000-value));
@@ -139,7 +143,7 @@
   }
 
   function install(){
-    ensurePanel();sync();
+    markBuild();ensurePanel();sync();
     document.addEventListener('click',event=>{
       const button=event.target.closest?.('#researchComponentPanel [data-action]');if(button)act(button);
     });
