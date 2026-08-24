@@ -34,6 +34,19 @@
       "min_entry_score": null,
       "news_modifier": 0.0,
       "notes": "Generic profile. Ask GPT to refine sector/ecosystem context."
+    },
+    {
+      "market": "KRW-UP",
+      "symbol": "UP",
+      "enabled": true,
+      "context_mode": "generic_alt",
+      "related_markets": [],
+      "order_krw": null,
+      "max_position_krw": null,
+      "min_regime_score": null,
+      "min_entry_score": null,
+      "news_modifier": 0.0,
+      "notes": "Generic profile. Ask GPT to refine sector/ecosystem context."
     }
   ]
 }
