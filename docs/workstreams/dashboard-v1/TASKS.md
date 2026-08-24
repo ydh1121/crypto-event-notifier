@@ -102,8 +102,11 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 ## Validation status
 
-- [-] Latest UI/Telegram/ETH-BTC/stable-tunnel CI is running/pending final verification
-- [x] Previous baseline Python tests/module compile/dashboard checks/cloudflare typecheck were green
+- [x] Latest Python tests pass, including ETH/BTC relative-strength and BUY-candidate-only Telegram policy tests
+- [x] Python module compile check passes
+- [x] Dashboard JS syntax/smoke checks pass, including final `ux-stability.js` and `ux-polish.css` wiring
+- [x] Existing Cloudflare TypeScript check passes
+- [x] Latest GitHub Actions run is green
 
 ## Completion condition for this workstream
 
