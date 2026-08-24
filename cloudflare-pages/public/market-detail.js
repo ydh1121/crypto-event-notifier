@@ -9,7 +9,8 @@
   const price=v=>{const x=n(v);if(!x)return'-';return `${x.toLocaleString('ko-KR',{maximumFractionDigits:x<1?8:x<100?4:2})}원`};
   const dt=ts=>n(ts)?new Date(n(ts)*1000).toLocaleString('ko-KR'):'-';
   const tone=v=>n(v)>0?'positive':n(v)<0?'negative':'';
-  let lastMarket='';
+  let renderedMarket='';
+  let inFlightMarket='';
   let requestSeq=0;
   let timer=0;
 
@@ -85,26 +86,59 @@
     }).join('')}</div>`;
   }
 
-  function render(detail){
+  function render(detail,market){
     const shell=ensureShell();if(!shell)return;
-    if(!detail){shell.innerHTML='<article class="research-detail-card"><div class="detail-empty">이 코인의 상세 데이터가 아직 Cloudflare 순회에 도착하지 않았습니다. 기본 가상계좌 정보는 위에서 계속 실시간으로 갱신됩니다.</div></article>';return}
+    if(!detail){shell.innerHTML='<article class="research-detail-card"><div class="detail-empty">이 코인의 상세 데이터가 아직 Cloudflare 순회에 도착하지 않았습니다. 기본 가상계좌 정보는 위에서 계속 실시간으로 갱신됩니다.</div></article>';shell.dataset.loaded='1';shell.dataset.market=market;renderedMarket=market;return}
     const data=detail.data||{},plan=data.trade_plan||{},signal=data.signal||{},fills=Array.isArray(data.fills)?data.fills:[],feedback=Array.isArray(data.feedback)?data.feedback:[],equity=Array.isArray(data.equity_history)?data.equity_history:[],memory=Array.isArray(data.market_memory)?data.market_memory:[];
     shell.innerHTML=`
       <article class="research-detail-card"><div class="research-detail-head"><div><p class="kicker">TRADE PLAN</p><h3>다음 매매 계획</h3></div><span class="detail-age">${esc(ageText(detail.source_ts||detail.received_at))}</span></div>${planGrid(plan)}${diagnostics(signal)}</article>
       <div class="detail-chart-grid">${equityChart(equity)}${scoreChart(memory)}</div>
       <div class="detail-columns"><article class="research-detail-card"><div class="research-detail-head"><div><p class="kicker">FILLS</p><h3>최근 가상매매 체결</h3></div><span class="detail-age">최대 12건 표시</span></div>${fillsList(fills)}</article><article class="research-detail-card"><div class="research-detail-head"><div><p class="kicker">LEARNING</p><h3>최근 학습 변화</h3></div><span class="detail-age">완료 거래 기준</span></div>${feedbackList(feedback)}</article></div>`;
+    shell.dataset.loaded='1';
+    shell.dataset.market=market;
+    delete shell.dataset.refreshing;
+    renderedMarket=market;
   }
 
   async function load(force=false){
     if(document.hidden||!coinViewActive())return;
     const market=currentMarket();if(!market)return;
-    if(!force&&market===lastMarket&&document.getElementById('marketResearchDetail')?.dataset.loaded==='1')return;
-    lastMarket=market;const seq=++requestSeq;const shell=ensureShell();if(shell){shell.dataset.loaded='0';shell.innerHTML='<article class="research-detail-card"><div class="detail-empty">상세 연구 데이터를 불러오는 중입니다.</div></article>'}
+    const shell=ensureShell();if(!shell)return;
+    const hasRendered=shell.dataset.loaded==='1'&&renderedMarket===market&&shell.dataset.market===market;
+    if(!force&&hasRendered)return;
+    if(inFlightMarket===market)return;
+
+    const foreground=!hasRendered;
+    const seq=++requestSeq;
+    inFlightMarket=market;
+    if(foreground){
+      shell.dataset.loaded='0';
+      shell.dataset.market=market;
+      shell.innerHTML='<article class="research-detail-card"><div class="detail-empty">상세 연구 데이터를 불러오는 중입니다.</div></article>';
+    }else{
+      shell.dataset.refreshing='1';
+    }
+
     try{
       const response=await fetch(`/api/market-detail?exchange=bithumb&strategy=adaptive&market=${encodeURIComponent(market)}`,{credentials:'same-origin',cache:'no-store'});
       if(!response.ok)throw new Error(`요청 실패 ${response.status}`);
-      const body=await response.json();if(seq!==requestSeq)return;render(body.detail||null);const current=ensureShell();if(current)current.dataset.loaded='1';
-    }catch(err){if(seq!==requestSeq)return;const current=ensureShell();if(current)current.innerHTML=`<article class="research-detail-card"><div class="detail-error">${esc(err?.message||'상세 데이터를 불러오지 못했습니다.')}</div></article>`}
+      const body=await response.json();
+      if(seq!==requestSeq||currentMarket()!==market)return;
+      render(body.detail||null,market);
+    }catch(err){
+      if(seq!==requestSeq)return;
+      const current=ensureShell();
+      if(!current)return;
+      delete current.dataset.refreshing;
+      if(foreground){
+        current.dataset.loaded='0';
+        current.innerHTML=`<article class="research-detail-card"><div class="detail-error">${esc(err?.message||'상세 데이터를 불러오지 못했습니다.')}</div></article>`;
+      }else{
+        console.warn('market detail background refresh failed',err);
+      }
+    }finally{
+      if(inFlightMarket===market)inFlightMarket='';
+    }
   }
 
   function install(){
