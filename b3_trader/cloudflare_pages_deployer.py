@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VIEWER_DIR = REPO_ROOT / "cloudflare-pages"
 LOCAL_CONFIG_PATH = VIEWER_DIR / "wrangler.jsonc"
+GENERATED_PACKAGE_LOCK = VIEWER_DIR / "package-lock.json"
 STATE_PATH = REPO_ROOT / "b3_trader/data/research-platform/cloudflare-pages-deploy-state.json"
 DEFAULT_PROJECT = "crypto-paper-viewer-ydh1121"
 DEFAULT_DATABASE = "crypto-paper-viewer"
@@ -50,6 +51,13 @@ def _local_wrangler() -> str:
     if not path.exists():
         raise RuntimeError("local Wrangler is missing; run npm install in cloudflare-pages")
     return str(path)
+
+
+def _remove_generated_package_lock() -> None:
+    try:
+        GENERATED_PACKAGE_LOCK.unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def _run(
@@ -166,7 +174,14 @@ class CloudflarePagesDeployer:
         child_env["CI"] = "true"
         child_env["PYTHONUTF8"] = "1"
         child_env["PYTHONIOENCODING"] = "utf-8"
-        _run([npm, "install", "--no-audit", "--no-fund"], cwd=VIEWER_DIR, timeout=300.0, env=child_env)
+        _remove_generated_package_lock()
+        _run(
+            [npm, "install", "--no-audit", "--no-fund", "--package-lock=false"],
+            cwd=VIEWER_DIR,
+            timeout=300.0,
+            env=child_env,
+        )
+        _remove_generated_package_lock()
         wrangler = _local_wrangler()
         _run([npm, "run", "typecheck"], cwd=VIEWER_DIR, timeout=180.0, env=child_env)
         _run([node, "--check", "public/app.js"], cwd=VIEWER_DIR, timeout=60.0, env=child_env)
