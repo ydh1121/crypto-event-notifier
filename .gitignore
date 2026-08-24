@@ -32,3 +32,4 @@ cloudflare/node_modules/
 cloudflare/.wrangler/
 cloudflare-pages/node_modules/
 cloudflare-pages/.wrangler/
+cloudflare-pages/wrangler.local.jsonc
