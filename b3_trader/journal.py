@@ -231,7 +231,7 @@ class TradeJournal:
         since_seconds: float = 86_400.0,
         limit: int = 900,
     ) -> list[dict[str, Any]]:
-        safe_limit = max(20, min(5000, int(limit)))
+        safe_limit = max(20, min(20000, int(limit)))
         cutoff = time.time() - max(60.0, float(since_seconds))
         with self._lock:
             rows = self._conn.execute(
@@ -281,7 +281,7 @@ class TradeJournal:
         since_seconds: float = 604_800.0,
         limit: int = 2000,
     ) -> list[dict[str, Any]]:
-        safe_limit = max(20, min(5000, int(limit)))
+        safe_limit = max(20, min(20000, int(limit)))
         cutoff = time.time() - max(60.0, float(since_seconds))
         with self._lock:
             rows = self._conn.execute(
@@ -360,7 +360,7 @@ class TradeJournal:
             else (float("inf") if winning_pnl > 0 else 0.0)
         )
 
-        history = self.portfolio_history(since_seconds=365 * 86_400.0, limit=5000)
+        history = self.portfolio_history(since_seconds=365 * 86_400.0, limit=20000)
         peak: float | None = None
         max_drawdown_pct = 0.0
         for point in history:
