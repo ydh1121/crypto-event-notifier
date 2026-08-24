@@ -182,17 +182,38 @@ if (-not (Test-Path ".env")) {
   Write-Host ".env created. PAPER mode needs no Bithumb API key."
 }
 
-Write-Host "Starting Crypto Auto Trader..."
-Write-Host "Dashboard will be available at http://127.0.0.1:8765"
-while ($true) {
-  & $python -m b3_trader.local_app
-  $code = $LASTEXITCODE
-  if ($code -eq 0) { break }
-  if ($code -eq 75) {
-    Write-Host "GitHub runtime update applied. Restarting trader automatically..."
-    Start-Sleep -Seconds 2
-    continue
+function Start-ResearchSupervisor {
+  param([string]$PythonPath)
+  $statusPath = Join-Path $repo "b3_trader\data\research-platform\status.json"
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $statusPath) | Out-Null
+  $process = Start-Process -FilePath $PythonPath -ArgumentList @("-m", "b3_trader.research_supervisor") -PassThru -WindowStyle Hidden
+  Write-Host "Research supervisor: ON (warehouse export + external repo version watch, PAPER-only)" -ForegroundColor Green
+  return $process
+}
+
+$researchSupervisor = $null
+try {
+  $researchSupervisor = Start-ResearchSupervisor -PythonPath $python
+  Write-Host "Starting Crypto Auto Trader..."
+  Write-Host "Dashboard will be available at http://127.0.0.1:8765"
+  while ($true) {
+    & $python -m b3_trader.local_app
+    $code = $LASTEXITCODE
+    if ($code -eq 0) { break }
+    if ($code -eq 75) {
+      Write-Host "GitHub runtime update applied. Restarting trader and research supervisor automatically..."
+      if ($researchSupervisor -and -not $researchSupervisor.HasExited) {
+        Stop-Process -Id $researchSupervisor.Id -Force -ErrorAction SilentlyContinue
+      }
+      Start-Sleep -Seconds 2
+      $researchSupervisor = Start-ResearchSupervisor -PythonPath $python
+      continue
+    }
+    Write-Host "Trader stopped with exit code $code. Restarting in 5 seconds..."
+    Start-Sleep -Seconds 5
   }
-  Write-Host "Trader stopped with exit code $code. Restarting in 5 seconds..."
-  Start-Sleep -Seconds 5
+} finally {
+  if ($researchSupervisor -and -not $researchSupervisor.HasExited) {
+    Stop-Process -Id $researchSupervisor.Id -Force -ErrorAction SilentlyContinue
+  }
 }
