@@ -6,13 +6,34 @@
       "symbol": "B3",
       "enabled": true,
       "context_mode": "base_gaming",
-      "related_markets": ["KRW-AERO", "KRW-VIRTUAL", "KRW-DEGEN", "KRW-IMX", "KRW-AXS", "KRW-GALA", "KRW-BEAM"],
-      "order_krw": 50000,
-      "max_position_krw": 300000,
-      "min_regime_score": 65,
-      "min_entry_score": 68,
-      "news_modifier": 0,
+      "related_markets": [
+        "KRW-AERO",
+        "KRW-VIRTUAL",
+        "KRW-DEGEN",
+        "KRW-IMX",
+        "KRW-AXS",
+        "KRW-GALA",
+        "KRW-BEAM"
+      ],
+      "order_krw": 50000.0,
+      "max_position_krw": 300000.0,
+      "min_regime_score": 65.0,
+      "min_entry_score": 68.0,
+      "news_modifier": 0.0,
       "notes": "B3 Base + gaming profile. GPT can update this file when strategy context changes."
+    },
+    {
+      "market": "KRW-SLX",
+      "symbol": "SLX",
+      "enabled": true,
+      "context_mode": "generic_alt",
+      "related_markets": [],
+      "order_krw": null,
+      "max_position_krw": null,
+      "min_regime_score": null,
+      "min_entry_score": null,
+      "news_modifier": 0.0,
+      "notes": "Generic profile. Ask GPT to refine sector/ecosystem context."
     }
   ]
 }
