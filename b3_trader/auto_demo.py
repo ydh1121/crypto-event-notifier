@@ -11,10 +11,11 @@ from typing import Any
 
 from .asset_strategy import AssetExternalFactors, AssetSignal, AssetStrategy
 from .bithumb_client import BithumbClient
+from .risk import ExecutionGuard, OrderRateLimiter, adaptive_order_krw, estimate_sell
 
 START_KRW = 10_000_000.0
-ORDER_KRW = 1_000_000.0
-MAX_POSITION_KRW = 1_500_000.0
+BASE_ORDER_KRW = 500_000.0
+MAX_POSITION_KRW = 3_000_000.0
 MAX_EXPOSURE_KRW = 6_000_000.0
 MAX_OPEN_POSITIONS = 4
 MIN_TURNOVER_24H = 3_000_000_000.0
@@ -22,6 +23,12 @@ SCAN_INTERVAL_SECONDS = 180.0
 BUY_COOLDOWN_SECONDS = 30 * 60.0
 HARD_STOP_PCT = -8.0
 CANDIDATE_LIMIT = 12
+ADAPTIVE_MIN_MULTIPLIER = 0.60
+ADAPTIVE_MAX_MULTIPLIER = 1.25
+MAX_SPREAD_BPS = 45.0
+MAX_SLIPPAGE_BPS = 35.0
+BTC_FLASH_CRASH_PCT = -3.0
+BTC_FLASH_WINDOW_CANDLES = 3
 STATUS_PATH = Path("dashboard/runtime-demo.json")
 DB_PATH = Path("b3_trader/data/auto_demo.sqlite3")
 EXCLUDED_SYMBOLS = {
@@ -106,8 +113,9 @@ class DemoStore:
 class AutoPaperDemo:
     """Isolated PAPER-only portfolio that scans Bithumb KRW markets.
 
-    This process never calls Bithumb private endpoints and never shares fills with the
-    main PAPER portfolio. It reuses the existing AssetStrategy for entry/regime scoring.
+    It never calls Bithumb private endpoints and never shares fills with the main
+    PAPER portfolio. Entry scoring, adaptive sizing and execution-risk checks reuse
+    the same building blocks as the existing local engine.
     """
 
     def __init__(self) -> None:
@@ -120,6 +128,14 @@ class AutoPaperDemo:
         self.last_buy_at: dict[str, float] = {}
         self.prices: dict[str, float] = {}
         self.realized_pnl = 0.0
+        self.rate_limiter = OrderRateLimiter(2, 8)
+        self.execution_guard = ExecutionGuard(
+            max_spread_bps=MAX_SPREAD_BPS,
+            max_slippage_bps=MAX_SLIPPAGE_BPS,
+            btc_flash_crash_pct=BTC_FLASH_CRASH_PCT,
+            btc_flash_window_candles=BTC_FLASH_WINDOW_CANDLES,
+            rate_limiter=self.rate_limiter,
+        )
         self._restore()
 
     def _restore(self) -> None:
@@ -127,7 +143,6 @@ class AutoPaperDemo:
             market = str(row["market"])
             symbol = str(row["symbol"])
             side = str(row["side"])
-            price = _num(row["price"])
             volume = _num(row["volume"])
             krw = _num(row["krw"])
             self.symbols[market] = symbol
@@ -200,7 +215,7 @@ class AutoPaperDemo:
         btc_candles: list[dict[str, Any]],
         eth_candles: list[dict[str, Any]],
         breadth: float,
-    ) -> AssetSignal:
+    ) -> tuple[AssetSignal, dict[str, Any]]:
         market = str(row["market"])
         candles = self.client.candles_minutes(market, unit=5, count=48)
         orderbook = self.client.orderbook(market)
@@ -210,7 +225,8 @@ class AutoPaperDemo:
             derivatives_risk_on=50.0,
             news_modifier=0.0,
         )
-        return self.strategy.score(btc_candles, eth_candles, candles, orderbook, external)
+        signal = self.strategy.score(btc_candles, eth_candles, candles, orderbook, external)
+        return signal, orderbook
 
     def _position_value(self, market: str) -> float:
         p = self.positions.get(market)
@@ -222,40 +238,88 @@ class AutoPaperDemo:
     def equity(self) -> float:
         return self.cash_krw + self.exposure()
 
-    def _buy(self, row: dict[str, Any], signal: AssetSignal) -> None:
+    def _buy(
+        self,
+        row: dict[str, Any],
+        signal: AssetSignal,
+        orderbook: dict[str, Any],
+        btc_candles: list[dict[str, Any]],
+    ) -> None:
         market = str(row["market"])
-        if market in self.positions or len(self.positions) >= MAX_OPEN_POSITIONS:
+        existing = self.positions.get(market)
+        if existing is None and len(self.positions) >= MAX_OPEN_POSITIONS:
             return
         now = time.time()
         if now - self.last_buy_at.get(market, 0.0) < BUY_COOLDOWN_SECONDS:
             return
-        if self.exposure() + ORDER_KRW > MAX_EXPOSURE_KRW or self.cash_krw < ORDER_KRW:
-            return
+
         price = _num(row["price"])
-        order = min(ORDER_KRW, MAX_POSITION_KRW, self.cash_krw)
+        current_value = existing.volume * price if existing else 0.0
+        remaining_position_room = max(0.0, MAX_POSITION_KRW - current_value)
+        remaining_exposure_room = max(0.0, MAX_EXPOSURE_KRW - self.exposure())
+        adaptive = adaptive_order_krw(
+            BASE_ORDER_KRW,
+            regime_score=signal.regime_score,
+            entry_score=signal.entry_score,
+            min_multiplier=ADAPTIVE_MIN_MULTIPLIER,
+            max_multiplier=ADAPTIVE_MAX_MULTIPLIER,
+        )
+        order = min(adaptive, remaining_position_room, remaining_exposure_room, self.cash_krw)
         if price <= 0 or order < 100_000:
             return
-        volume = order / price
-        self.positions[market] = DemoPosition(volume=volume, avg_price=price)
+
+        risk = self.execution_guard.evaluate_buy(
+            orderbook=orderbook,
+            btc_candles=btc_candles,
+            order_krw=order,
+            now=now,
+        )
+        if not risk.allowed:
+            return
+        fill_price = risk.estimated_fill_price if math.isfinite(risk.estimated_fill_price) else price
+        volume = order / fill_price
+        position = existing or DemoPosition()
+        old_cost = position.avg_price * position.volume
+        position.volume += volume
+        position.avg_price = (old_cost + order) / position.volume if position.volume else 0.0
+        self.positions[market] = position
         self.symbols[market] = str(row["symbol"])
         self.cash_krw -= order
         self.last_buy_at[market] = now
+        self.rate_limiter.record(now)
         self.store.add_fill(
             market=market,
             symbol=str(row["symbol"]),
             side="buy",
-            price=price,
+            price=fill_price,
             volume=volume,
             krw=order,
             realized_pnl=0.0,
-            reason=f"BUY_CANDIDATE regime={signal.regime_score} entry={signal.entry_score}",
+            reason=(
+                f"BUY_CANDIDATE regime={signal.regime_score} entry={signal.entry_score} "
+                f"spread_bps={risk.spread_bps} slippage_bps={risk.estimated_slippage_bps}"
+            ),
         )
 
-    def _sell(self, market: str, price: float, reason: str) -> None:
+    def _sell(
+        self,
+        market: str,
+        price: float,
+        reason: str,
+        orderbook: dict[str, Any] | None = None,
+    ) -> None:
         position = self.positions.get(market)
         if not position or position.volume <= 0 or price <= 0:
             return
-        proceeds = position.volume * price
+        fill_price = price
+        slip = None
+        if orderbook:
+            estimated, estimated_slip = estimate_sell(orderbook, position.volume)
+            if math.isfinite(estimated):
+                fill_price = estimated
+            if math.isfinite(estimated_slip):
+                slip = estimated_slip
+        proceeds = position.volume * fill_price
         cost = position.volume * position.avg_price
         realized = proceeds - cost
         self.cash_krw += proceeds
@@ -263,14 +327,15 @@ class AutoPaperDemo:
             market=market,
             symbol=self.symbols.get(market, market.replace("KRW-", "")),
             side="sell",
-            price=price,
+            price=fill_price,
             volume=position.volume,
             krw=proceeds,
             realized_pnl=realized,
-            reason=reason,
+            reason=f"{reason}; sell_slippage_bps={slip if slip is not None else 'unknown'}",
         )
         self.positions.pop(market, None)
         self.realized_pnl += realized
+        self.rate_limiter.record()
 
     def _write_status(self, *, candidates: list[dict[str, Any]], error: str = "") -> None:
         STATUS_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -305,8 +370,13 @@ class AutoPaperDemo:
             "error": error,
             "rules": {
                 "max_open_positions": MAX_OPEN_POSITIONS,
-                "order_krw": ORDER_KRW,
+                "base_order_krw": BASE_ORDER_KRW,
+                "adaptive_min_multiplier": ADAPTIVE_MIN_MULTIPLIER,
+                "adaptive_max_multiplier": ADAPTIVE_MAX_MULTIPLIER,
+                "max_position_krw": MAX_POSITION_KRW,
                 "max_exposure_krw": MAX_EXPOSURE_KRW,
+                "max_spread_bps": MAX_SPREAD_BPS,
+                "max_slippage_bps": MAX_SLIPPAGE_BPS,
                 "min_turnover_24h": MIN_TURNOVER_24H,
             },
         }
@@ -321,7 +391,6 @@ class AutoPaperDemo:
         eth_candles = self.client.candles_minutes("KRW-ETH", unit=5, count=48)
 
         by_market = {row["market"]: row for row in ranked}
-        # Open positions must stay in the scoring set even if they fall out of the top liquidity/momentum list.
         for market in list(self.positions):
             if market not in by_market:
                 price = self.prices.get(market, 0.0)
@@ -336,35 +405,40 @@ class AutoPaperDemo:
 
         scored: list[dict[str, Any]] = []
         signals: dict[str, AssetSignal] = {}
+        orderbooks: dict[str, dict[str, Any]] = {}
         for row in list(by_market.values())[: CANDIDATE_LIMIT + MAX_OPEN_POSITIONS]:
             market = str(row["market"])
             try:
-                signal = self._score_market(row, btc_candles, eth_candles, breadth)
+                signal, orderbook = self._score_market(row, btc_candles, eth_candles, breadth)
             except Exception:
                 continue
             signals[market] = signal
+            orderbooks[market] = orderbook
             scored.append({**row, **asdict(signal)})
             time.sleep(0.10)
 
-        # Exit first. The core engine already treats a deeply weak regime as an emergency exit;
-        # the demo also has a hard PAPER stop so an unattended experiment cannot snowball.
         for market, position in list(self.positions.items()):
             price = self.prices.get(market, position.avg_price)
             pnl_pct = (price / position.avg_price - 1.0) * 100.0 if position.avg_price else 0.0
             signal = signals.get(market)
             if pnl_pct <= HARD_STOP_PCT:
-                self._sell(market, price, f"hard PAPER stop {pnl_pct:.2f}%")
+                self._sell(market, price, f"hard PAPER stop {pnl_pct:.2f}%", orderbooks.get(market))
             elif signal and signal.regime_score < 45.0:
-                self._sell(market, price, f"market weakness regime={signal.regime_score}")
+                self._sell(market, price, f"market weakness regime={signal.regime_score}", orderbooks.get(market))
 
-        buyable = [row for row in scored if row.get("action") == "BUY_CANDIDATE" and row["market"] not in self.positions]
-        buyable.sort(key=lambda row: (float(row.get("entry_score", 0.0)) + float(row.get("regime_score", 0.0))), reverse=True)
+        buyable = [row for row in scored if row.get("action") == "BUY_CANDIDATE"]
+        buyable.sort(
+            key=lambda row: float(row.get("entry_score", 0.0)) + float(row.get("regime_score", 0.0)),
+            reverse=True,
+        )
         for row in buyable:
-            if len(self.positions) >= MAX_OPEN_POSITIONS:
-                break
-            self._buy(row, signals[str(row["market"])])
+            market = str(row["market"])
+            self._buy(row, signals[market], orderbooks[market], btc_candles)
 
-        scored.sort(key=lambda row: (row.get("action") == "BUY_CANDIDATE", float(row.get("entry_score", 0.0))), reverse=True)
+        scored.sort(
+            key=lambda row: (row.get("action") == "BUY_CANDIDATE", float(row.get("entry_score", 0.0))),
+            reverse=True,
+        )
         self._write_status(candidates=scored)
 
     def run(self) -> None:
