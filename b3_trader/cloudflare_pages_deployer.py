@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -36,6 +37,13 @@ def _read_json(path: Path) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _tool(name: str) -> str:
+    resolved = shutil.which(name)
+    if not resolved:
+        raise RuntimeError(f"required command not found: {name}")
+    return resolved
+
+
 def _run(
     args: list[str],
     *,
@@ -55,13 +63,13 @@ def _run(
         env=env,
     )
     if completed.returncode != 0:
-        label = " ".join(args[:4])
+        label = " ".join(Path(args[0]).name if index == 0 else part for index, part in enumerate(args[:4]))
         raise RuntimeError(f"{label} failed with exit code {completed.returncode}")
     return completed
 
 
 def _git(*args: str) -> str:
-    completed = _run(["git", *args], cwd=REPO_ROOT, timeout=30.0)
+    completed = _run([_tool("git"), *args], cwd=REPO_ROOT, timeout=30.0)
     return completed.stdout.strip()
 
 
@@ -103,6 +111,8 @@ class CloudflarePagesDeployer:
 
     def deploy_once(self, *, force: bool = False) -> dict[str, Any]:
         load_dotenv(REPO_ROOT / ".env", override=True)
+        self.project = os.getenv("CLOUDFLARE_VIEWER_PROJECT", self.project).strip() or self.project
+        self.database = os.getenv("CLOUDFLARE_VIEWER_D1", self.database).strip() or self.database
         started = time.time()
         if not VIEWER_DIR.exists() or not LOCAL_CONFIG_PATH.exists():
             return {
@@ -140,15 +150,18 @@ class CloudflarePagesDeployer:
                 "elapsed_seconds": round(time.time() - started, 3),
             }
 
+        npm = _tool("npm")
+        npx = _tool("npx")
+        node = _tool("node")
         child_env = dict(os.environ)
         child_env["CI"] = "true"
-        _run(["npm", "install", "--no-audit", "--no-fund"], cwd=VIEWER_DIR, timeout=300.0, env=child_env)
-        _run(["npm", "run", "typecheck"], cwd=VIEWER_DIR, timeout=180.0, env=child_env)
-        _run(["node", "--check", "public/app.js"], cwd=VIEWER_DIR, timeout=60.0, env=child_env)
+        _run([npm, "install", "--no-audit", "--no-fund"], cwd=VIEWER_DIR, timeout=300.0, env=child_env)
+        _run([npm, "run", "typecheck"], cwd=VIEWER_DIR, timeout=180.0, env=child_env)
+        _run([node, "--check", "public/app.js"], cwd=VIEWER_DIR, timeout=60.0, env=child_env)
 
         _run(
             [
-                "npx",
+                npx,
                 "wrangler",
                 "d1",
                 "migrations",
@@ -165,7 +178,7 @@ class CloudflarePagesDeployer:
         )
         _run(
             [
-                "npx",
+                npx,
                 "wrangler",
                 "pages",
                 "deploy",
