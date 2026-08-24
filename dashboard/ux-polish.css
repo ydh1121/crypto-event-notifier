@@ -1,0 +1,200 @@
+/* Final interaction/geometry polish. Keep this file loaded last. */
+
+:root{
+  --ux-control-h:46px;
+}
+
+button,input,select,textarea{
+  -webkit-tap-highlight-color:transparent;
+}
+
+.button,.copy-button,.view-tab,.range-control button,.avg-remove,.icon-button{
+  white-space:nowrap;
+  line-height:1.2;
+}
+
+.button,.copy-button{
+  min-height:var(--ux-control-h);
+}
+
+.button{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:0;
+}
+
+.simple-asset-card{
+  display:grid;
+  grid-template-rows:auto minmax(78px,auto) minmax(48px,auto) auto;
+  gap:12px;
+  height:100%;
+}
+.simple-asset-card .simple-decision{
+  margin:0;
+  min-height:78px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+.simple-asset-card .holding-strip{
+  min-height:48px;
+  margin:0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.simple-asset-card .holding-strip.is-empty{
+  color:var(--tertiary);
+  background:transparent;
+  border:1px dashed var(--border-strong);
+}
+.holding-empty-note{font-size:11px;color:var(--tertiary)}
+.simple-asset-card .simple-score-row{margin-top:0}
+
+.asset-grid,.overview-grid,.settings-grid,.personal-tools,.performance-columns,.activity-grid{
+  align-items:stretch;
+}
+.asset-grid>.asset-card,
+.overview-grid>.panel,
+.settings-grid>.panel,
+.performance-columns>.panel,
+.activity-grid>.panel{
+  height:100%;
+}
+
+.score-detail-grid{align-items:stretch}
+.score-detail-grid>.easy-score{height:100%}
+
+.technical-details summary{
+  min-height:46px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.technical-details summary::after{float:none;flex:none}
+
+.ux-toast{
+  position:fixed;
+  left:50%;
+  bottom:calc(28px + var(--safe-bottom));
+  z-index:220;
+  max-width:min(90vw,420px);
+  transform:translate(-50%,14px);
+  opacity:0;
+  pointer-events:none;
+  padding:12px 16px;
+  border-radius:14px;
+  background:rgba(29,29,31,.94);
+  color:#fff;
+  font-size:14px;
+  line-height:1.45;
+  text-align:center;
+  box-shadow:0 12px 30px rgba(0,0,0,.18);
+  backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);
+  transition:opacity .18s ease,transform .18s ease;
+}
+.ux-toast.is-visible{opacity:1;transform:translate(-50%,0)}
+
+.eth-btc-pulse small{line-height:1.4}
+
+@media(max-width:760px){
+  /* iOS Safari zooms focused controls below 16px. */
+  input,select,textarea,
+  .holding-form input,.avg-row input,.dialog-body input,.settings-form input{
+    font-size:16px!important;
+  }
+
+  input,select,textarea{
+    min-height:48px;
+  }
+
+  .button,.copy-button{
+    min-height:46px;
+    font-size:14px;
+  }
+
+  .panel{
+    border-radius:18px;
+  }
+
+  .section-intro,.section-head,.panel-head,.chart-head{
+    gap:12px;
+  }
+
+  .tool-actions,.button-row,.dialog-actions{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+    width:100%;
+  }
+  .tool-actions .button,.button-row .button,.dialog-actions .button{
+    width:100%;
+    min-width:0;
+    padding-inline:10px;
+  }
+
+  .engine-controls{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    width:100%;
+  }
+  .engine-controls .button{width:100%;padding-inline:8px;font-size:13px}
+
+  .simple-asset-card{
+    grid-template-rows:auto auto auto auto;
+    gap:10px;
+  }
+  .simple-asset-card .simple-decision{min-height:0}
+
+  .avg-row{
+    align-items:end;
+  }
+  .avg-row input{
+    min-height:46px;
+    padding:0 10px!important;
+  }
+  .avg-remove{
+    height:46px;
+    min-height:46px;
+  }
+
+  .holding-summary,.avg-summary{
+    align-items:stretch;
+  }
+  .mini-stat{min-height:74px}
+
+  .ux-toast{
+    bottom:calc(88px + var(--safe-bottom));
+    font-size:13px;
+  }
+}
+
+@media(max-width:430px){
+  .tool-actions,.button-row,.dialog-actions{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+
+  .tool-actions .button,.button-row .button,.dialog-actions .button{
+    font-size:13px;
+  }
+
+  .avg-row{
+    grid-template-columns:28px minmax(0,1fr) minmax(0,1fr) 34px;
+    gap:6px;
+    padding:9px;
+  }
+  .avg-row label{font-size:11px}
+  .avg-round{font-size:11px}
+
+  .holding-strip{
+    font-size:12px;
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  .ux-toast{transition:none}
+}
