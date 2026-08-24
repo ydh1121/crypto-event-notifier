@@ -7,31 +7,45 @@ Write-Host "No VPN app is required on the phone. The trader will listen only on 
 Write-Host ""
 
 function Resolve-Cloudflared {
-  $command = Get-Command cloudflared -ErrorAction SilentlyContinue
-  if ($command) { return $command.Source }
+  $command = Get-Command cloudflared.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($command -and $command.Source) { return [string]$command.Source }
+
   $candidates = @(
+    (Join-Path $env:LOCALAPPDATA "Microsoft\WinGet\Links\cloudflared.exe"),
     "C:\Program Files\cloudflared\cloudflared.exe",
     "C:\Program Files (x86)\cloudflared\cloudflared.exe",
     (Join-Path $repo "b3_trader\data\tools\cloudflared.exe")
-  )
+  ) | Where-Object { $_ }
+
   foreach ($candidate in $candidates) {
-    if (Test-Path $candidate) { return $candidate }
+    if (Test-Path $candidate) { return [string]$candidate }
   }
   return $null
 }
 
 function Install-Cloudflared {
   $binary = Resolve-Cloudflared
-  if ($binary) { return $binary }
+  if ($binary) { return [string]$binary }
 
-  $winget = Get-Command winget -ErrorAction SilentlyContinue
-  if ($winget) {
+  $winget = Get-Command winget.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($winget -and $winget.Source) {
     Write-Host "cloudflared is not installed. Trying winget..."
-    & winget install --id Cloudflare.cloudflared --exact --accept-package-agreements --accept-source-agreements
-    if ($LASTEXITCODE -eq 0) {
+    $wingetArgs = @(
+      "install",
+      "--id", "Cloudflare.cloudflared",
+      "--exact",
+      "--accept-package-agreements",
+      "--accept-source-agreements"
+    )
+    # Start-Process avoids Windows PowerShell 5.1 turning native stderr/status text
+    # into pipeline ErrorRecords and also guarantees this function returns only a path.
+    $install = Start-Process -FilePath ([string]$winget.Source) -ArgumentList $wingetArgs -Wait -PassThru
+    if ($install.ExitCode -eq 0) {
       Start-Sleep -Seconds 2
       $binary = Resolve-Cloudflared
-      if ($binary) { return $binary }
+      if ($binary) { return [string]$binary }
+    } else {
+      Write-Warning "winget cloudflared install returned exit code $($install.ExitCode). Falling back to the official binary download."
     }
   }
 
@@ -39,8 +53,9 @@ function Install-Cloudflared {
   $toolDir = Join-Path $repo "b3_trader\data\tools"
   New-Item -ItemType Directory -Force -Path $toolDir | Out-Null
   $binary = Join-Path $toolDir "cloudflared.exe"
-  Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" -OutFile $binary
-  return $binary
+  Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" -OutFile $binary
+  if (-not (Test-Path $binary)) { throw "cloudflared download did not create the expected executable." }
+  return [string]$binary
 }
 
 function Test-PortInUse {
@@ -55,11 +70,17 @@ function Test-PortInUse {
 
 if (Test-PortInUse -Port 8765) {
   Write-Host ""
-  Write-Warning "Port 8765 is already in use. Stop the existing start-trader.bat window with Ctrl+C first, then run this script again."
+  Write-Warning "Port 8765 is already in use. Stop the existing trader window with Ctrl+C first, then run start-trader-secure.bat again."
   exit 2
 }
 
-$cloudflared = Install-Cloudflared
+# Force a scalar string even if an older PowerShell/native command unexpectedly emits extra output.
+$cloudflared = [string](@(Install-Cloudflared) | Select-Object -Last 1)
+if (-not $cloudflared -or -not (Test-Path $cloudflared)) {
+  throw "cloudflared executable could not be resolved. Resolved value: '$cloudflared'"
+}
+Write-Host "Using cloudflared: $cloudflared"
+
 $dataDir = Join-Path $repo "b3_trader\data"
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 $urlFile = Join-Path $dataDir "cloudflare-tunnel-url.txt"
@@ -68,7 +89,7 @@ $errLog = Join-Path $dataDir "cloudflare-tunnel-err.log"
 Remove-Item $urlFile,$outLog,$errLog -Force -ErrorAction SilentlyContinue
 
 # Override .env for this process tree only. This makes router port-forwarding ineffective
-# because Uvicorn no longer listens on the LAN/WAN interfaces.
+# because Uvicorn no longer listens on LAN/WAN interfaces.
 $env:DASHBOARD_HOST = "127.0.0.1"
 
 $traderArgs = @(
@@ -105,7 +126,7 @@ try {
       if ($match.Success) { $url = $match.Value; break }
       Start-Sleep -Seconds 1
     }
-    if (-not $url) { throw "Could not find the trycloudflare.com URL in cloudflared output." }
+    if (-not $url) { throw "Could not find the trycloudflare.com URL in cloudflared output. Check $errLog" }
 
     Set-Content -Path $urlFile -Value $url -Encoding UTF8
     Write-Host ""
@@ -114,7 +135,7 @@ try {
     Write-Host "Enter the phone connection code when asked."
     Write-Host ""
     Write-Host "While this mode is running, the trader listens only on 127.0.0.1."
-    Write-Host "Your old public-IP :8765 address should stop working after the previous trader process is fully stopped."
+    Write-Host "Your old public-IP :8765 address should not reach this process."
     Write-Host "Quick Tunnel URLs change when this script is restarted."
     Write-Host "Press Ctrl+C here to stop both the trader and tunnel."
 
