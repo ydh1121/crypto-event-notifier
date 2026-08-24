@@ -63,16 +63,19 @@ jobs:
       - run: test -s dashboard/portfolio-tools.js
       - run: test -s dashboard/ux-stability.js
       - run: test -s dashboard/navigation-v3.js
+      - run: test -s dashboard/demo-research.js
       - run: test -s dashboard/styles.css
       - run: test -s dashboard/plain-language.css
       - run: test -s dashboard/portfolio-tools.css
       - run: test -s dashboard/ux-polish.css
       - run: test -s dashboard/navigation-v3.css
+      - run: test -s dashboard/demo-research.css
       - run: node --check dashboard/app.js
       - run: node --check dashboard/plain-language.js
       - run: node --check dashboard/portfolio-tools.js
       - run: node --check dashboard/ux-stability.js
       - run: node --check dashboard/navigation-v3.js
+      - run: node --check dashboard/demo-research.js
       - run: grep -q 'data-view-panel="overview"' dashboard/index.html
       - run: grep -q 'data-view-panel="performance"' dashboard/index.html
       - run: grep -q 'plain-language.js' dashboard/index.html
