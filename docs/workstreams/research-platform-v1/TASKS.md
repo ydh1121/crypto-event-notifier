@@ -97,8 +97,8 @@ Initial catalog:
 
 ## Phase 1 validation gate
 
-- [x] CI: Python tests + compile, dashboard smoke and Cloudflare typecheck passed for the initial Phase 1 foundation commit set
-- [-] CI validation for the component-control slice
+- [x] CI: Python tests + compile, dashboard smoke and Cloudflare typecheck passed for the initial Phase 1 foundation
+- [x] CI: component-control API/supervisor/dashboard slice passed Python tests + compile, dashboard smoke and Cloudflare typecheck
 - [ ] Long-run observation remains useful for retention sizing, but no longer blocks Phase 2 work
 - [ ] Measure storage growth/day before choosing retention and compaction
 
