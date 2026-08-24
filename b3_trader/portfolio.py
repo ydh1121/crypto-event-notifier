@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Mapping
+from typing import Any, Mapping
 
 from .paper import Fill
 
@@ -35,7 +35,11 @@ class MultiPaperPortfolio:
         return self.position(market).volume * price
 
     def total_exposure(self, prices: Mapping[str, float]) -> float:
-        return sum(position.volume * float(prices.get(market, position.avg_price)) for market, position in self.positions.items() if position.volume > 0)
+        return sum(
+            position.volume * float(prices.get(market, position.avg_price))
+            for market, position in self.positions.items()
+            if position.volume > 0
+        )
 
     def equity(self, prices: Mapping[str, float]) -> float:
         return self.cash_krw + self.total_exposure(prices)
@@ -50,9 +54,80 @@ class MultiPaperPortfolio:
         self._roll_day(prices)
         if self.day_start_equity <= 0:
             return 0.0
-        return max(0.0, (self.day_start_equity - self.equity(prices)) / self.day_start_equity * 100.0)
+        return max(
+            0.0,
+            (self.day_start_equity - self.equity(prices))
+            / self.day_start_equity
+            * 100.0,
+        )
 
-    def can_buy(self, *, market: str, price: float, order_krw: float, max_position_krw: float, prices: Mapping[str, float]) -> tuple[bool, str]:
+    def restore_from_fills(
+        self,
+        fills: list[dict[str, Any]],
+        *,
+        day_start_equity: float | None = None,
+    ) -> None:
+        """Rebuild PAPER cash/positions deterministically from persisted fills.
+
+        The journal is the persistence layer for forward testing. This keeps a code/server
+        restart from silently resetting paper capital or open positions.
+        """
+        self.cash_krw = float(self.start_krw)
+        self.positions.clear()
+        self.fills.clear()
+        self.day = date.today()
+
+        for row in fills:
+            market = str(row.get("market") or "")
+            side = str(row.get("side") or "").lower()
+            price = float(row.get("price") or 0.0)
+            volume = float(row.get("volume") or 0.0)
+            krw = float(row.get("krw") or 0.0)
+            reason = str(row.get("reason") or "restored")
+            if not market or price <= 0 or volume <= 0 or krw < 0:
+                continue
+
+            position = self.position(market)
+            if side == "buy":
+                previous_cost = position.avg_price * position.volume
+                position.volume += volume
+                position.avg_price = (
+                    (previous_cost + krw) / position.volume
+                    if position.volume > 0
+                    else 0.0
+                )
+                self.cash_krw -= krw
+                self.fills.append(Fill("buy", price, volume, krw, reason))
+                continue
+
+            if side == "sell":
+                matched = min(volume, position.volume)
+                proceeds = krw
+                self.cash_krw += proceeds
+                if matched >= position.volume - 1e-12:
+                    position.volume = 0.0
+                    position.avg_price = 0.0
+                else:
+                    position.volume -= matched
+                self.fills.append(Fill("sell", price, volume, krw, reason))
+
+        self.day_start_equity = (
+            float(day_start_equity)
+            if day_start_equity is not None and day_start_equity > 0
+            else max(0.0, self.cash_krw + sum(
+                p.volume * p.avg_price for p in self.positions.values()
+            ))
+        )
+
+    def can_buy(
+        self,
+        *,
+        market: str,
+        price: float,
+        order_krw: float,
+        max_position_krw: float,
+        prices: Mapping[str, float],
+    ) -> tuple[bool, str]:
         self._roll_day(prices)
         if self.daily_drawdown_pct(prices) >= self.max_daily_loss_pct:
             return False, "daily loss circuit breaker"
@@ -64,8 +139,23 @@ class MultiPaperPortfolio:
             return False, "max total exposure reached"
         return True, "ok"
 
-    def buy(self, *, market: str, price: float, order_krw: float, reason: str, max_position_krw: float, prices: Mapping[str, float]) -> Fill:
-        allowed, why = self.can_buy(market=market, price=price, order_krw=order_krw, max_position_krw=max_position_krw, prices=prices)
+    def buy(
+        self,
+        *,
+        market: str,
+        price: float,
+        order_krw: float,
+        reason: str,
+        max_position_krw: float,
+        prices: Mapping[str, float],
+    ) -> Fill:
+        allowed, why = self.can_buy(
+            market=market,
+            price=price,
+            order_krw=order_krw,
+            max_position_krw=max_position_krw,
+            prices=prices,
+        )
         if not allowed:
             raise RuntimeError(why)
         position = self.position(market)
@@ -101,8 +191,13 @@ class MultiPaperPortfolio:
                 market: {
                     "volume": round(position.volume, 12),
                     "avg_price": round(position.avg_price, 12),
-                    "value_krw": round(position.volume * float(prices.get(market, position.avg_price)), 2),
+                    "value_krw": round(
+                        position.volume
+                        * float(prices.get(market, position.avg_price)),
+                        2,
+                    ),
                 }
-                for market, position in self.positions.items() if position.volume > 0
+                for market, position in self.positions.items()
+                if position.volume > 0
             },
         }
