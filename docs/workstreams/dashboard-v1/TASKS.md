@@ -121,11 +121,8 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 ## Validation status
 
-- [x] Latest Python tests pass
-- [x] Python module compile check passes, including `b3_trader.auto_demo`
-- [x] Dashboard JS syntax/smoke checks pass, including final `navigation-v3.js` Liquid overlay layer
-- [x] Existing Cloudflare TypeScript check passes
-- [-] Re-check latest post-QA branch head after final calculator/Liquid/cache-bust commits
+- [x] `b433747f4c6db916d869b08de849a3250e1663a4` passed Python tests/compile, dashboard smoke and Cloudflare typecheck
+- [-] Await current branch CI after final calculator single-owner cleanup, Liquid bleed and cache-bust updates
 
 ## Completion condition for this workstream
 
