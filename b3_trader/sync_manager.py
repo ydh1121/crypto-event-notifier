@@ -12,8 +12,9 @@ from typing import Callable
 from .runtime_state import RuntimeState
 from .telegram_notify import TelegramNotifier
 
-CODE_SUFFIXES = (".py", ".toml", ".yml", ".yaml", ".txt", ".js", ".css", ".html", ".ps1", ".bat")
-CODE_PREFIXES = ("b3_trader/", "dashboard/", "scripts/", ".github/", "Dockerfile", "cloudflare/")
+# Static dashboard assets are served directly from disk. Updating them does not need
+# to kill/restart Uvicorn; the browser reload watcher handles those changes. Only
+# Python runtime code needs the supervised exit-code-75 restart path.
 CONTROL_PATHS = ("control/assets.json", "control/runtime.json")
 
 
@@ -84,7 +85,7 @@ class GitAutoSync:
 
     @staticmethod
     def _restart_required(paths: list[str]) -> bool:
-        return any(path.startswith(CODE_PREFIXES) or path.endswith(CODE_SUFFIXES) for path in paths)
+        return any(path.startswith("b3_trader/") and path.endswith(".py") for path in paths)
 
     def _changed_from_base(self, base: str, ref: str) -> list[str]:
         return [line for line in self._git("diff", "--name-only", f"{base}..{ref}").splitlines() if line]
@@ -163,6 +164,7 @@ class GitAutoSync:
                 "status": "published" if staged else "up_to_date",
                 "commit": commit,
                 "files": staged.splitlines() if staged else [],
+                "changed": remote_changed,
                 "remote_changed": remote_changed,
                 "restart_required": code_changed,
                 "ts": time.time(),
@@ -213,7 +215,7 @@ class GitAutoSync:
                 local_only = self._changed_from_base(remote, local)
                 if self._control_only(local_only) and self.push_control_changes:
                     self._git("push", "origin", f"HEAD:{self.branch}")
-                    payload = {"status": "published", "ts": time.time(), "commit": local, "files": local_only}
+                    payload = {"status": "published", "ts": time.time(), "commit": local, "files": local_only, "changed": []}
                     self.state.set_sync(payload)
                     return payload
                 payload = {"status": "blocked_local_commits", "ts": time.time(), "changed": local_only}
@@ -243,6 +245,7 @@ class GitAutoSync:
             self._restore_control(preserved)
             result = self.publish_control("Reconcile local trader control state")
             result["status"] = "reconciled"
+            result["changed"] = remote_changed
             result["remote_changed"] = remote_changed
             result["restart_required"] = self._restart_required(remote_changed)
             self.state.set_sync(result)
