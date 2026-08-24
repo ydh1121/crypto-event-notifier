@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f5f5f7">
-  <meta name="crypto-viewer-build" content="2026.08.24-2">
+  <meta name="crypto-viewer-build" content="2026.08.24-3">
   <title>Crypto Research</title>
-  <link rel="stylesheet" href="/styles.css?v=2">
+  <link rel="stylesheet" href="/styles.css?v=3">
 </head>
 <body>
   <header class="top-shell">
@@ -14,6 +14,15 @@
       <div><small>24/7 PAPER RESEARCH</small><h1>Crypto Research</h1></div>
       <div class="top-actions"><span id="freshnessPill" class="pill neutral">연결 확인 중</span><button id="logoutBtn" class="ghost hidden">로그아웃</button></div>
     </div>
+    <nav id="viewerNav" class="viewer-nav hidden" aria-label="조회 화면">
+      <div class="viewer-nav-inner">
+        <button class="active" data-view="home">홈</button>
+        <button data-view="coin">코인</button>
+        <button data-view="results">결과</button>
+        <button data-view="records">기록</button>
+        <button data-view="settings">설정</button>
+      </div>
+    </nav>
   </header>
 
   <main>
@@ -51,57 +60,95 @@
     </section>
 
     <section id="viewerView" class="hidden">
-      <div class="viewer-intro">
-        <div><p class="kicker">READ ONLY</p><h2>가상매매 연구 현황</h2><p id="viewerSub">PC에서 받은 마지막 데이터를 보여줍니다.</p></div>
-        <div class="user-chip"><span id="userName">-</span><small id="userRole">-</small></div>
-      </div>
-
-      <section class="capital-card">
-        <div class="capital-main"><span>전체 가상 운용자금</span><div><b id="startCapital">-</b><i>→</i><strong id="currentCapital">-</strong></div><small id="marketCount">-</small></div>
-        <div class="capital-stats">
-          <div><span>전체 증감액</span><b id="totalPnl">-</b><small id="totalReturn">-</small></div>
-          <div><span>남아 있는 현금</span><b id="totalCash">-</b><small>가상계좌 합계</small></div>
-          <div><span>현재 보유 중</span><b id="activePositions">-</b><small id="scanProgress">-</small></div>
+      <section class="viewer-page active" data-view-panel="home">
+        <div class="viewer-intro">
+          <div><p class="kicker">READ ONLY</p><h2>가상매매 연구 현황</h2><p id="viewerSub">PC에서 받은 마지막 데이터를 보여줍니다.</p></div>
+          <div class="user-chip"><span id="userName">-</span><small id="userRole">-</small></div>
         </div>
+
+        <section class="capital-card">
+          <div class="capital-main"><span>전체 가상 운용자금</span><div><b id="startCapital">-</b><i>→</i><strong id="currentCapital">-</strong></div><small id="marketCount">-</small></div>
+          <div class="capital-stats">
+            <div><span>전체 증감액</span><b id="totalPnl">-</b><small id="totalReturn">-</small></div>
+            <div><span>남아 있는 현금</span><b id="totalCash">-</b><small>가상계좌 합계</small></div>
+            <div><span>현재 보유 중</span><b id="activePositions">-</b><small id="scanProgress">-</small></div>
+          </div>
+        </section>
+
+        <section id="holdingsCard" class="holdings-card hidden">
+          <div class="section-head"><div><p class="kicker">MY ASSETS</p><h3>내 자산</h3></div><span class="pill neutral">로그인 전용</span></div>
+          <div id="holdingsSummary" class="holding-summary"></div>
+          <div id="holdingsList" class="holding-list"></div>
+        </section>
+
+        <section class="home-grid">
+          <article class="summary-card"><p class="kicker">LEADER</p><h3>현재 상위 코인</h3><div id="homeLeader" class="summary-body empty">데이터를 기다리는 중입니다.</div></article>
+          <article class="summary-card"><p class="kicker">SCAN</p><h3>연구 노드 상태</h3><div id="homeNode" class="summary-body empty">데이터를 기다리는 중입니다.</div></article>
+        </section>
       </section>
 
-      <section id="holdingsCard" class="holdings-card hidden">
-        <div class="section-head"><div><p class="kicker">MY ASSETS</p><h3>내 자산</h3></div><span class="pill neutral">로그인 전용</span></div>
-        <div id="holdingsSummary" class="holding-summary"></div>
-        <div id="holdingsList" class="holding-list"></div>
+      <section class="viewer-page" data-view-panel="coin">
+        <div class="section-head page-head">
+          <div><p class="kicker">COIN</p><h2>코인 상세</h2><p>현재 가상계좌 상태와 매수 판단 점수를 한 화면에서 봅니다.</p></div>
+          <label class="coin-picker">코인<select id="coinSelect"></select></label>
+        </div>
+        <section id="coinDetailCard" class="coin-detail-card">
+          <div class="empty">코인을 선택하면 상세 상태가 표시됩니다.</div>
+        </section>
       </section>
 
-      <section class="market-card">
-        <div class="section-head"><div><p class="kicker">ALL MARKETS</p><h3>전체 코인</h3></div><span id="leaderText" class="leader-text">-</span></div>
-        <div class="market-controls">
-          <input id="searchInput" type="search" placeholder="코인 검색" autocomplete="off">
-          <select id="sortSelect" aria-label="정렬">
-            <option value="return_desc">수익률 높은 순</option>
-            <option value="return_asc">수익률 낮은 순</option>
-            <option value="position_desc">보유금액 큰 순</option>
-            <option value="pnl_desc">미실현손익 큰 순</option>
-            <option value="trades_desc">거래횟수 많은 순</option>
-            <option value="opportunity_desc">기회점수 높은 순</option>
-          </select>
+      <section class="viewer-page" data-view-panel="results">
+        <div class="section-head page-head">
+          <div><p class="kicker">RESULTS</p><h2>전체 코인 연구 결과</h2><p>477개 시장의 가상계좌 성과를 검색하고 비교합니다.</p></div>
+          <span id="leaderText" class="leader-text">-</span>
         </div>
-        <div class="filter-row" id="filterRow">
-          <button class="active" data-filter="all">전체</button><button data-filter="holding">보유 중</button><button data-filter="completed">매매 완료</button><button data-filter="profit">수익</button><button data-filter="loss">손실</button>
-        </div>
-        <div id="marketList" class="market-list"><div class="empty">데이터를 기다리는 중입니다.</div></div>
+        <section class="market-card results-card">
+          <div class="market-controls">
+            <input id="searchInput" type="search" placeholder="코인 검색" autocomplete="off">
+            <select id="sortSelect" aria-label="정렬">
+              <option value="return_desc">수익률 높은 순</option>
+              <option value="return_asc">수익률 낮은 순</option>
+              <option value="position_desc">보유금액 큰 순</option>
+              <option value="pnl_desc">미실현손익 큰 순</option>
+              <option value="trades_desc">거래횟수 많은 순</option>
+              <option value="opportunity_desc">기회점수 높은 순</option>
+            </select>
+          </div>
+          <div class="filter-row" id="filterRow">
+            <button class="active" data-filter="all">전체</button><button data-filter="holding">보유 중</button><button data-filter="completed">매매 완료</button><button data-filter="profit">수익</button><button data-filter="loss">손실</button>
+          </div>
+          <div id="marketList" class="market-list"><div class="empty">데이터를 기다리는 중입니다.</div></div>
+        </section>
       </section>
 
-      <section id="ownerPanel" class="owner-card hidden">
-        <div class="section-head"><div><p class="kicker">OWNER</p><h3>사용자 추가</h3></div><span class="pill neutral">관리자 전용</span></div>
-        <form id="inviteCreateForm" class="invite-create">
-          <label>초대할 이메일<input id="inviteEmail" type="email" required></label>
-          <label class="check"><input id="inviteHoldings" type="checkbox"> 내 자산정보도 보이기</label>
-          <button type="submit" class="primary">초대 링크 만들기</button>
-        </form>
-        <div id="inviteResult" class="invite-result hidden"></div>
+      <section class="viewer-page" data-view-panel="records">
+        <div class="section-head page-head"><div><p class="kicker">RECORDS</p><h2>연구 기록</h2><p>현재 외부 조회판에 전달된 최근 연구 상태를 확인합니다.</p></div></div>
+        <section class="records-grid">
+          <article class="summary-card"><p class="kicker">LATEST</p><h3>최근 스냅샷</h3><div id="recordSnapshot" class="summary-body empty">데이터를 기다리는 중입니다.</div></article>
+          <article class="summary-card"><p class="kicker">TRADES</p><h3>완료 거래 요약</h3><div id="recordTrades" class="summary-body empty">데이터를 기다리는 중입니다.</div></article>
+        </section>
+        <article class="summary-card roadmap-card"><p class="kicker">NEXT DATA SLICE</p><h3>상세 체결 · 학습 이력</h3><p>로컬 SQLite 원본은 PC에 유지하고, 다음 데이터 확장 단계에서 코인별 체결·학습·자산곡선만 별도 조회용 데이터로 전송합니다.</p></article>
+      </section>
+
+      <section class="viewer-page" data-view-panel="settings">
+        <div class="section-head page-head"><div><p class="kicker">SETTINGS</p><h2>조회 설정</h2><p>이 웹은 조회 전용입니다. 매매 중지·재개·전략 변경은 원격에서 실행하지 않습니다.</p></div></div>
+        <section class="settings-grid">
+          <article class="summary-card"><p class="kicker">SYSTEM</p><h3>연구 서버 상태</h3><div id="settingsNode" class="summary-body empty">데이터를 기다리는 중입니다.</div></article>
+          <article class="summary-card"><p class="kicker">ACCESS</p><h3>내 계정</h3><div id="settingsAccount" class="summary-body"></div></article>
+        </section>
+        <section id="ownerPanel" class="owner-card hidden">
+          <div class="section-head"><div><p class="kicker">OWNER</p><h3>사용자 추가</h3></div><span class="pill neutral">관리자 전용</span></div>
+          <form id="inviteCreateForm" class="invite-create">
+            <label>초대할 이메일<input id="inviteEmail" type="email" required></label>
+            <label class="check"><input id="inviteHoldings" type="checkbox"> 내 자산정보도 보이기</label>
+            <button type="submit" class="primary">초대 링크 만들기</button>
+          </form>
+          <div id="inviteResult" class="invite-result hidden"></div>
+        </section>
       </section>
     </section>
   </main>
 
-  <script src="/app.js?v=2"></script>
+  <script src="/app.js?v=3"></script>
 </body>
 </html>
