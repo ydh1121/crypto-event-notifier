@@ -6,190 +6,121 @@ Local multi-asset PAPER monitor + beginner-facing dashboard + secure Cloudflare 
 
 ## Hard boundary
 
-This workstream remains **PAPER-only**. The goal is to use forward-test evidence to find robust candidates before any later live-trading work. Do not add real-money order execution here.
+This workstream remains **PAPER-only**. Use forward-test evidence to find robust candidates before any later live-trading work. Do not add real-money order execution here.
 
 ## Runtime / local state
 
 - Windows local PC, FastAPI/Uvicorn on port 8765
 - secure launcher binds to `127.0.0.1`
-- Cloudflare HTTPS phone access, no phone VPN dependency
+- Cloudflare HTTPS phone access; no phone VPN dependency
 - manual holdings/average prices/averaging plans remain in local SQLite
 - user-added assets in `control/assets.json` must be preserved
 - Telegram automatic delivery remains fresh BUY_CANDIDATE-only
 - PR #1 stays Draft and must not be merged without explicit request
 
-## Permanent UI baseline
+## Permanent UI baseline — Photo-eBook is canonical
 
-Use repo `AGENTS.md`, `DESIGN.md`, current Photo-eBook Korean copy rules, mobile regression rules and Liquid navigation reference.
+Before modifying navigation, read the current Photo-eBook sources:
+- `docs/spec-v1/06-liquid-navigation.md`
+- `UI_REGRESSION_SPEC.md`
+- `public/assets/js/ui/liquid-controller.js`
+- `public/assets/styles/ui/liquid-skin.css`
+- `public/assets/styles/desktop/nav-corrections.css`
 
-Primary requirements:
-- Korean non-trader in their 60s must understand primary surfaces
-- decision/action first; technical detail behind secondary disclosure
-- iOS focusable controls >=16px
-- buttons do not wrap
-- native iOS horizontal momentum stays native
-- polling must not reset deliberate UI state
+Required Liquid contract:
+- **one rail = one moving indicator = one nested skin = one controller**
+- actual glass material belongs to the rail; shell/wrapper stays visually transparent
+- moving indicator is a **direct child of the rail**
+- indicator geometry uses active button `offsetLeft`, `offsetTop`, `offsetWidth`, `offsetHeight`
+- active button/icon/text remains the real clickable element at a higher z-layer; never clone its content into the indicator and never hide the active button with `opacity:0`
+- selected button paints blue only as a first-paint fallback; after controller ready, only the moving indicator paints blue
+- approved Breeze easing: `cubic-bezier(0.34, 1.56, 0.64, 1)`
+- browser owns native horizontal momentum; no JS `scrollLeft`/`scrollIntoView` loop and no custom pointer/touch pan for the nav rail
+- PC top rail is `width:max-content`, centered on the actual chip group; never stretch a grey/glass rail across the viewport
+- mobile rail keeps native Safari scrolling and approved safe-area behavior
+- do not add a second navigation controller or a second moving indicator
 
-## Latest mobile Liquid fix
-
-User screenshot showed two related bugs:
-- active top-navigation glass covered the active icon/label, leaving a blank blue pill
-- coin selector sometimes appeared as a detached blue circle / oversized blob at the left edge
-
-Current fix:
-- visual rail background lives on the outer host/pseudo layer
-- moving Liquid indicator is an outer-host sibling at a lower z-layer
-- tab/chip label and icon content stays above the Liquid layer
-- geometry uses separate horizontal/vertical bleed instead of one oversized 11px value
-- top nav uses small bleed; coin chip uses modest horizontal bleed and slightly larger vertical bleed
-- active indicator still slightly crosses the rail boundary but should remain visually attached to its chip
-- native Safari rail scrolling remains untouched
-
-Files:
+Current implementation files:
 - `dashboard/navigation-v3.js`
 - `dashboard/navigation-v3.css`
+- build marker: `UI 2026.08.24-8`
+
+## Chrome freeze root cause and fix
+
+The experimental `research-capital.js` used a broad `MutationObserver` on `document.body`. A mutation inside `#demoResearch` triggered `renderAggregate()`, which wrote `innerHTML` back inside `#demoResearch`, which could trigger the same observer again. With the full Bithumb universe this could form a high-frequency self-triggering DOM loop and freeze Chrome.
+
+Current rule:
+- no broad body MutationObserver for research decoration
+- `research-capital.js` uses bounded 15-second data polling plus explicit coin-selection refresh only
+- only write aggregate/detail DOM when the rendered value signature changed
+- research assets load directly from `dashboard/index.html`; navigation code does not dynamically own research loading
+
+## Browser / Git synchronization ownership
+
+Do **not** reintroduce multiple sync/reload owners.
+
+Current architecture:
+- **one Git sync owner:** Python `GitAutoSync`
+- `scripts/run-local.ps1` forces `AUTO_GIT_SYNC=true`, `AUTO_GIT_PUSH_CONTROL=true`, 15-second polling
+- local `control/assets.json` and `control/runtime.json` are preserved while remote application code updates
+- unexpected local code edits still fail closed
+- dashboard-only file updates do not require Uvicorn restart
+- `b3_trader/*.py` updates trigger supervised exit code 75 and automatic Python restart
+- secure Cloudflare launcher no longer starts the experimental external `git-sync-watch.ps1`
+- browser no longer force-reloads itself on every Git commit; user refresh is allowed and preferred over reload loops
+- `dashboard/runtime-build.json` remains ignored so a stale experimental file cannot dirty/block the worktree
 
 ## Adaptive all-market PAPER research
 
-The old model used one shared 10M portfolio and only traded a filtered top-candidate basket. That is no longer the target.
-
-Current model:
 - every valid Bithumb KRW market gets its own independent **10,000,000 KRW virtual account**
-- all accounts are isolated from one another
-- public Bithumb market data only; no API key and no private/order endpoint
+- accounts are isolated
+- public Bithumb data only; no private/order endpoint
 - roughly 3-minute full-market sweep
-- `AssetStrategy` scores remain inputs, but PAPER trading no longer freezes until legacy BUY_CANDIDATE appears
-
-### Entry behavior
-
-Per market, the engine computes:
-- regime score
-- entry score
-- liquidity score
-- opportunity score
-- adaptive profile thresholds
-
-Entry intents:
-- `buy`: normal/adaptive threshold pass
-- `explore`: bounded smaller entry when opportunity is constructive but old fixed threshold is not met
-- `idle_explore`: after long inactivity, permit a smaller PAPER probe if risk/opportunity are still acceptable
-- `add`: additional PAPER buy after cooldown when opportunity improves
-
-Exploration is intentionally smaller than normal entries. It does not mean forcing trades into poor conditions; very weak opportunity/risk remains `wait`.
-
-### Exits
-
-- hard PAPER stop
-- take profit
-- trailing giveback after profit is armed
-- market-weakness exit
-- time/opportunity-decay exit
-
-### Position size
-
-- percentage of that coin's own 10M account
-- adaptive base weight, bounded 3–15%
-- max position percentage bounded per market
-- spread, estimated slippage and BTC flash-crash guards remain active
-
-## Feedback DB / bounded automatic improvement
-
-Database: ignored local `b3_trader/data/auto_demo.sqlite3`.
-
-New research tables persist:
-- per-market accounts
-- per-market adaptive profiles
-- signals / current intent
-- fills
-- completed-trade feedback
-- equity history
-
-After a completed trade the engine stores:
-- entry signal snapshot
-- holding duration
-- realized P/L and return
-- profile before update
-- profile after update
-- learning note/version
-
-Bounded learning behavior:
-- winning entry conditions can move that coin's PAPER thresholds toward the successful conditions
-- losing entry conditions make that coin's profile more selective
-- base PAPER position weight can rise/fall within bounds
-- only DB profile parameters change
-- Python source code is **not** self-modified
-- live trading is never enabled by this learning loop
-
-Future promotion to live trading must use enough samples plus holdout/out-of-sample validation so a short lucky streak is not treated as a robust edge.
+- `AssetStrategy` remains an input, but bounded `explore` / `idle_explore` entries prevent waiting forever for one legacy threshold
+- staged additions, adaptive sizing, spread/slippage/BTC flash guards
+- hard stop, dynamic take profit, trailing protection, market weakness and time/opportunity decay exits
+- per-market adaptive profile changes are bounded DB parameters; Python source never self-modifies
 
 ## Research dashboard
-
-Generated market detail files: ignored `dashboard/demo-runtime/KRW-XXX.json`.
 
 Home:
 - coin-by-coin 10M research status
 - current return leader
-- market count
-- sweep progress
-- active PAPER positions
+- market count / scan progress / active positions / freshness
 
 Results:
-- `전체 코인 자동매매 연구`
-- ranking with return / completed trades / win rate / current intent
-- search field
-- visible top ranking for quick comparison
-- direct ticker + Enter lookup for any scanned KRW market outside the visible top ranking
+- full Bithumb KRW universe, scrollable and searchable
+- filters: all / holding / completed-waiting / untraded / profit / loss
+- sorts include return, position value, unrealized P/L, trade count, win rate, drawdown, opportunity and current price
 
-Per-coin detail:
-- current return
-- opportunity / regime / entry
-- suggested weight
-- adaptive profile version and thresholds
-- max drawdown
-- equity curve
-- trade time / side / virtual amount / weight / return / reason
-- learning-feedback records with before → after parameters
+Per-coin detail prioritizes:
+- current price
+- average entry
+- current position value / weight
+- realized and unrealized P/L
+- next planned entry/add
+- expected buy rounds
+- dynamic target / stop / trailing protection
+- market-memory history for later AI analysis
+- fills and bounded learning feedback
 
-Files:
-- `dashboard/demo-research.js`
-- `dashboard/demo-research.css`
-- dynamically loaded by `dashboard/navigation-v3.js`
+Generated data remains local/ignored:
+- `b3_trader/data/auto_demo.sqlite3`
+- `dashboard/demo-runtime/KRW-XXX.json`
 
-## GitHub -> local auto-sync
+## Immediate verification after 2026-08-24-8
 
-The earlier failure mode was: local `control/assets.json` was dirty, so the old startup script skipped all Git updates and the server remained on an old commit.
+Because the previous running launcher may still contain the retired external watchdog and the browser may already be frozen, do one clean bootstrap/restart once:
 
-Current behavior:
-- `scripts/run-local.ps1` forces `AUTO_GIT_SYNC=true`
-- forces `AUTO_GIT_PUSH_CONTROL=true`
-- forces 15-second polling in process environment even if old `.env` has the original value
-- if only `control/assets.json` / `control/runtime.json` are dirty, startup runs safe control-preserving repair instead of skipping the update
-- unexpected local code changes are still protected from destructive overwrite
-- startup prints `GitHub sync: latest (<sha>)` when local and remote match
-- dashboard-only changes do not require Uvicorn restart
-- `b3_trader/*.py` changes trigger supervised exit code 75 and automatic Python restart
-
-## Validation
-
-Current adaptive research + UI branch updates passed:
-- Python tests
-- Python module compile
-- dashboard Node syntax/smoke checks
-- Cloudflare typecheck
-
-## Next verification on the user's machine
-
-1. Wait for running local app to auto-sync current branch; the `auto_demo.py` Python change should trigger the supervised restart automatically.
-2. Confirm console reports latest Git sync rather than `Local Git working tree has changes. Startup update was skipped`.
-3. On iPhone verify:
-   - active top tab shows icon + label over the blue glass
-   - coin chip glass remains attached to the selected chip
-   - no detached blue circle
-4. Home should show `코인별 1,000만원 가상매매`.
-5. Results should show `전체 코인 자동매매 연구`.
-6. Let the engine complete at least one full Bithumb KRW sweep; per-market detail files appear progressively during the sweep.
-7. Leave research running to accumulate trades/profile versions before judging which markets are actually robust.
-8. Finish Google Drive/rclone backup verification afterward.
+1. Close the frozen Chrome tab/window.
+2. Stop the current secure launcher with `Ctrl+C`.
+3. Run safe `repair-local-sync.ps1` from the latest remote branch, preserving control state.
+4. Confirm local HEAD equals `origin/b3-auto-trader-phase1`.
+5. Start `start-trader-secure.bat` once.
+6. Confirm console says `GitHub sync: in-app single owner (15s, local coin settings preserved)`.
+7. Confirm Settings shows only one build card: `UI 2026.08.24-8`.
+8. Verify PC top nav is one compact centered glass capsule and mobile active icon/label remains visible above the moving Liquid skin.
+9. Verify Chrome remains responsive while Results updates.
 
 ## Safety constraints
 
