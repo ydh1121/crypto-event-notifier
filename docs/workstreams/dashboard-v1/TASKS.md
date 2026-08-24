@@ -12,44 +12,47 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 ## B. Dashboard information architecture and visual redesign
 
-- [-] Replace the single long page with responsive view navigation: 개요 / 자산 / 성과 / 활동 / 설정
-- [ ] Rebuild top shell, KPI hierarchy, cards, spacing, status chips, mobile safe-area behavior
-- [ ] Remove the current narrow-left-content / empty-right-space desktop feel
-- [ ] Group strategy settings by purpose instead of one dense matrix
-- [ ] Keep all existing controls functional through the redesign
+- [x] Replace the single long page with responsive view navigation: 개요 / 자산 / 성과 / 활동 / 설정
+- [x] Rebuild top shell, KPI hierarchy, cards, spacing, status chips, mobile safe-area behavior
+- [x] Remove the current narrow-left-content / empty-right-space desktop feel
+- [x] Group strategy settings by purpose instead of one dense matrix
+- [x] Keep existing controls wired through the redesign
+- [-] User visual QA on the live local dashboard; tune spacing/geometry only from actual screenshots
 
 ## C. Charts and analytics
 
-- [ ] Add asset price history API and chart with PAPER buy/sell markers
-- [ ] Add Regime + Entry score history chart
-- [ ] Add portfolio equity/exposure/drawdown time series
-- [ ] Add range selection (1H / 6H / 24H / 7D where enough data exists)
-- [ ] Add performance summary: total return, realized/unrealized PnL, closed trades, win rate, profit factor, MDD/current DD
-- [ ] Add condition diagnostics showing why an asset is WATCH / WAIT_PULLBACK / BUY_CANDIDATE / RISK_OFF
-- [ ] Add condition-performance breakdown once enough fills exist
+- [x] Add asset price history API and chart with PAPER buy/sell markers
+- [x] Add Regime + Entry score history chart
+- [x] Add portfolio equity time series
+- [x] Persist exposure/drawdown in portfolio history payloads
+- [x] Add range selection (1H / 6H / 24H / 7D)
+- [x] Add performance summary: total return, realized/unrealized PnL, closed trades, win rate, profit factor, MDD/current DD
+- [x] Add condition diagnostics showing why an asset is WATCH / WAIT_PULLBACK / BUY_CANDIDATE / RISK_OFF
+- [ ] Add condition-performance breakdown after enough completed fills exist to make it meaningful
 
 ## D. Forward-test durability
 
-- [ ] Persist portfolio snapshots to SQLite
-- [ ] Restore PAPER cash/positions from the journal after app restart
-- [ ] Keep forward-test history across code/server restarts
-- [ ] Add migration-safe tests for journal/restore behavior
+- [x] Persist portfolio snapshots to SQLite
+- [x] Restore PAPER cash/positions from journal fills after app restart
+- [x] Keep forward-test fills/history across code/server restarts
+- [x] Add migration-safe journal/restore tests
+- [ ] Preserve the exact same-day drawdown baseline across a restart instead of recalculating from restored cost basis
 
 ## E. Telegram operations
 
 - [x] Telegram local secret configuration from dashboard
 - [x] Test message works
-- [ ] Alert on important action changes only, with debounce/cooldown
-- [ ] Alert on PAPER fills and risk-off exits
-- [ ] Alert on risk blocks (spread/slippage/BTC flash) only when materially new
-- [ ] Alert on engine/system errors with anti-spam cooldown
-- [ ] Add daily PAPER performance summary
+- [x] Alert on important action changes with cooldown
+- [x] Alert on PAPER fills and risk-off exits
+- [x] Alert on risk blocks (spread/slippage/BTC flash) with anti-spam cooldown
+- [x] Alert on engine/asset errors with anti-spam cooldown
+- [x] Add daily PAPER performance summary
 
 ## F. Multi-asset workflow
 
 - [x] Ticker-only asset addition starts generic analysis
 - [x] Asset profiles support context mode + related markets
-- [ ] Improve asset detail UI to expose context basket and factor contribution
+- [x] Improve asset detail UI to expose context basket and factor contribution
 - [ ] Add per-asset analysis/profile notes for GPT-managed refinements
 - [ ] Validate multi-asset portfolio limits with several simultaneous assets
 
@@ -57,20 +60,20 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 - [x] GitHub code/control desired-state sync exists
 - [x] Local SQLite is the authoritative runtime DB
-- [ ] Surface backup age/status clearly in dashboard
+- [x] Surface backup/sync status in the redesigned dashboard
 - [ ] Finish one-time rclone Google Drive setup flow/documentation
 - [ ] Verify consistent SQLite snapshot upload to `Crypto Auto Trader/backups`
 - [ ] Mirror `control/` and `dashboard/` to Drive without secrets
 
 ## H. Phone / external access — current stopping point
 
-- [ ] Add network-access status API (LAN address + Tailscale installed/connected state)
-- [ ] Add phone-access panel in settings with copyable safe URL and token guidance
-- [ ] Add `scripts/setup-phone-access.ps1` to install/open Tailscale with user approval
-- [ ] Verify same-Wi-Fi phone access
-- [ ] Verify Tailscale external phone access
-- [ ] Confirm remote clients still require Dashboard token
-- [ ] Explicitly warn against public port-forwarding of 8765
+- [x] Add network-access status API (LAN address + Tailscale installed/connected state)
+- [x] Add phone-access panel in settings with copyable safe URL and token guidance
+- [x] Add `scripts/setup-phone-access.ps1` to install/open Tailscale with user approval
+- [ ] Verify same-Wi-Fi phone access on the user's device
+- [ ] Verify Tailscale external phone access on the user's device
+- [x] Keep remote clients behind Dashboard token authentication
+- [x] Explicitly warn against public port-forwarding of 8765
 
 ## I. Real-money execution
 
@@ -82,6 +85,14 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [>] hard daily-loss kill / maximum exposure at exchange balance level
 - [>] tightly capped live pilot
 - [>] live-mode update/change-approval workflow
+
+## Validation status
+
+- [x] Python tests pass in GitHub Actions
+- [x] Python module compile check passes
+- [x] Dashboard JS `node --check` passes
+- [x] Dashboard structural smoke checks pass
+- [x] Existing Cloudflare TypeScript check remains green
 
 ## Completion condition for this workstream
 
