@@ -49,18 +49,22 @@ Desktop improvements must not break mobile. Mobile controls need comfortable tou
 
 ## Korean UI copy contract
 
+The default user-facing dashboard and Telegram alerts must be understandable without trading vocabulary. Treat a Korean non-trader in their 60s as the comprehension baseline.
+
+Primary surfaces must use ordinary Korean first. Internal terms such as `Regime`, `Entry`, `Context`, `RISK_OFF`, `WATCH`, `PAPER`, `DD`, `PnL`, `Profit Factor`, `spread`, `slippage`, and `bps` may remain in code, logs, or an explicit technical-details section, but must not be the only wording shown to the user.
+
+Use the permanent mappings and score-grade bands in `DESIGN.md`. A numeric score must include a plain-language meaning, for example `전체 시장 분위기: 좋지 않음 (50/100)` rather than `Regime 49.62`.
+
 Korean UI copy must be concise, natural, and operational. Preserve technical meaning while avoiding translationese and repetitive AI patterns.
 
 Avoid habitual phrases such as `~에 대해`, `~을 통해`, `~할 수 있습니다`, `결론적으로`, hype wording, abstract noun chains, and unnecessary defensive explanations. Use consistent terms for the same concept.
 
-For market terms that are conventional in trading, English labels such as Regime, Entry, MDD, PnL, WATCH may remain when the surrounding Korean UI explains their meaning once.
-
 ## Trading-analysis contract
 
-Keep two dimensions separate:
+Keep two dimensions separate internally:
 
-- **Regime**: whether the surrounding market is supportive.
-- **Entry**: whether the current asset price/location is attractive.
+- **Regime**: whether the surrounding market is supportive. User-facing name: `전체 시장 분위기`.
+- **Entry**: whether the current asset price/location is attractive. User-facing name: `지금 매수 타이밍`.
 
 Never interpret a high Regime score alone as permission to chase price. Entry/risk guards remain separate.
 
@@ -87,4 +91,5 @@ At minimum:
 - Mobile layout has no obvious horizontal overflow at 360–430 px widths.
 - Desktop layout works at 1280–1920 px widths.
 - Existing Telegram/Git sync/PAPER operation does not regress.
+- Top-level UI and Telegram alerts do not expose unexplained trading jargon.
 - Update the active workstream handoff with completed checks and exact next action.
