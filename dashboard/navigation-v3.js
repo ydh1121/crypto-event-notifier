@@ -10,6 +10,7 @@
   const $$=(selector,root=document)=>[...root.querySelectorAll(selector)];
   const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
   const reduced=()=>window.matchMedia?.('(prefers-reduced-motion: reduce)').matches===true;
+  const UI_BUILD='2026.08.24-3';
 
   function ensureIndicator(host,className){
     if(!host)return null;
@@ -126,10 +127,14 @@
   }
   function watchForDashboardSync(){let lastReload='';setInterval(()=>{const sync=appState()?.snapshot?.sync||{},changed=[...(Array.isArray(sync.changed)?sync.changed:[]),...(Array.isArray(sync.remote_changed)?sync.remote_changed:[])];if(!['updated','published','reconciled'].includes(sync.status)||!changed.some(path=>String(path).startsWith('dashboard/')))return;const marker=String(sync.to||sync.commit||sync.remote||changed.join('|'));if(!marker||marker===lastReload)return;lastReload=marker;const key=`cryptoDashboardReload:${marker}`;if(sessionStorage.getItem(key)==='1')return;sessionStorage.setItem(key,'1');setTimeout(()=>location.reload(),250)},1200)}
   function loadResearchUi(){
-    if(!document.querySelector('link[data-demo-research]')){const link=document.createElement('link');link.rel='stylesheet';link.href='./demo-research.css?v=2';link.dataset.demoResearch='1';document.head.appendChild(link)}
-    if(!window.__demoResearchLoading&&!window.__demoResearchLoaded){window.__demoResearchLoading=true;const script=document.createElement('script');script.src='./demo-research.js?v=2';script.onload=()=>{window.__demoResearchLoading=false};script.onerror=()=>{window.__demoResearchLoading=false};document.body.appendChild(script)}
+    if(!document.querySelector('link[data-demo-research]')){const link=document.createElement('link');link.rel='stylesheet';link.href='./demo-research.css?v=3';link.dataset.demoResearch='1';document.head.appendChild(link)}
+    if(!window.__demoResearchLoading&&!window.__demoResearchLoaded){window.__demoResearchLoading=true;const script=document.createElement('script');script.src='./demo-research.js?v=3';script.onload=()=>{window.__demoResearchLoading=false};script.onerror=()=>{window.__demoResearchLoading=false};document.body.appendChild(script)}
   }
-  function install(){installMainRail();installPatches();renderAssetChipRail();polishAssetHeroMetrics();installSwipePaging();watchForDashboardSync();loadResearchUi()}
+  function installBuildMarker(){
+    const settings=$('[data-view-panel="settings"] .settings-grid');if(!settings||$('#uiBuildMarker'))return;
+    const marker=document.createElement('div');marker.id='uiBuildMarker';marker.className='panel';marker.innerHTML=`<div class="panel-head"><div><p class="panel-kicker">UI BUILD</p><h3>화면 버전</h3></div><span class="status-pill good">UI ${UI_BUILD}</span></div><p class="panel-copy">이 표시가 보이면 최신 대시보드 JavaScript가 로컬 브라우저에 적용된 상태입니다.</p>`;settings.appendChild(marker);
+  }
+  function install(){installMainRail();installPatches();renderAssetChipRail();polishAssetHeroMetrics();installSwipePaging();watchForDashboardSync();loadResearchUi();installBuildMarker()}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
-  [100,420,1000].forEach(delay=>setTimeout(()=>{installMainRail();installPatches();renderAssetChipRail();polishAssetHeroMetrics()},delay));
+  [100,420,1000].forEach(delay=>setTimeout(()=>{installMainRail();installPatches();renderAssetChipRail();polishAssetHeroMetrics();installBuildMarker()},delay));
 })();
