@@ -30,7 +30,6 @@
     return`${Math.round(sec)}초마다`;
   }
   function stateClass(row){return row?.state_class||(row?.has_position?'holding':n(row?.closed_trades)>0?'completed_waiting':'untraded')}
-  function stateLabel(row){return row?.state_label||({holding:'보유 중',completed_waiting:'매매 완료 · 대기',untraded:'미진입'})[stateClass(row)]||'대기'}
   function componentMeta(row){
     if(!row?.enabled)return['꺼짐','neutral'];
     return ({healthy:['정상','good'],running:['실행 중','good'],degraded:['확인 필요','bad'],starting:['시작 중','warn'],offline:['연결 안 됨','bad'],stopped:['꺼짐','neutral']})[row?.status]||['확인 중','warn'];
@@ -77,19 +76,21 @@
     };
   }
 
+  function holdingsAnchors(){return '<div id="holdingsSummary" class="holding-summary best-refresh-anchor"></div><div id="holdingsList" class="holding-list best-refresh-anchor"></div>'}
   function renderHoldings(){
     const card=q('#holdingsCard');if(!card)return;
     const data=snapshot()?.private_visible?snapshot()?.private?.manual_holdings:null;
     const list=Array.isArray(data?.holdings)?data.holdings.filter(row=>n(row.volume)>0):[];
-    if(!list.length)return;
+    if(!list.length){
+      card.classList.remove('best-holdings-card');
+      if(data)card.innerHTML=`<div class="section-head"><div><p class="kicker">내 실제 보유분</p><h3>내 코인 현황</h3></div><span class="pill neutral">로그인 전용</span></div><div class="empty">보유 수량과 평단을 입력한 코인이 없습니다.</div>${holdingsAnchors()}`;
+      return;
+    }
     const pnl=n(data.pnl_krw),value=n(data.value_krw),invested=n(data.invested_krw),pnlPct=invested>0?pnl/invested*100:0;
     card.classList.add('best-holdings-card');
     card.innerHTML=`
       <div class="section-head best-holdings-head"><div><p class="kicker">내 실제 보유분</p><h3>내 코인 현황</h3></div><button type="button" class="best-inline-button" data-best-open-coin="${esc(list[0]?.market||'')}">코인별 보기</button></div>
-      <div class="best-holdings-body">
-        <div class="best-holdings-total"><span>전체 평가금액</span><strong>${won(value)}</strong><small class="${tone(pnl)}">현재 손익 ${pnl>=0?'+':''}${won(pnl)} · ${pct(pnlPct)}</small></div>
-        <div class="best-holdings-list">${list.slice(0,8).map(row=>`<button type="button" class="best-holding-row" data-best-open-coin="${esc(row.market)}"><span><b>${esc(String(row.market||'').replace('KRW-',''))}</b><small>평단 ${n(row.avg_price).toLocaleString('ko-KR',{maximumFractionDigits:8})}원</small></span><span><b>${won(row.value_krw)}</b><small class="${tone(row.unrealized_pnl_krw)}">${pct(row.unrealized_pnl_pct)}</small></span></button>`).join('')}</div>
-      </div>`;
+      <div class="best-holdings-body"><div class="best-holdings-total"><span>전체 평가금액</span><strong>${won(value)}</strong><small class="${tone(pnl)}">현재 손익 ${pnl>=0?'+':''}${won(pnl)} · ${pct(pnlPct)}</small></div><div class="best-holdings-list">${list.slice(0,8).map(row=>`<button type="button" class="best-holding-row" data-best-open-coin="${esc(row.market)}"><span><b>${esc(String(row.market||'').replace('KRW-',''))}</b><small>평단 ${n(row.avg_price).toLocaleString('ko-KR',{maximumFractionDigits:8})}원</small></span><span><b>${won(row.value_krw)}</b><small class="${tone(row.unrealized_pnl_krw)}">${pct(row.unrealized_pnl_pct)}</small></span></button>`).join('')}</div></div>${holdingsAnchors()}`;
   }
 
   function ensureHomeResearch(){
@@ -101,27 +102,14 @@
   }
   function renderHomeResearch(){
     const section=ensureHomeResearch();if(!section)return;
-    const data=pub(),list=rows(),stats=researchStats(),node=researchNode();
-    const best=data.best_market||list[0]||{};
-    const total=n(data.scan_total)||n(data.market_count)||list.length;
-    const scanned=n(data.scanned_count);const progress=total>0?Math.max(0,Math.min(100,scanned/total*100)):0;
-    const components=Array.isArray(node.components)?node.components:[];
-    const enabled=components.filter(row=>row.enabled);const healthy=enabled.filter(row=>row.status==='healthy'||row.status==='running').length;
+    const data=pub(),list=rows(),stats=researchStats(),node=researchNode(),best=data.best_market||list[0]||{};
+    const total=n(data.scan_total)||n(data.market_count)||list.length,scanned=n(data.scanned_count),progress=total>0?Math.max(0,Math.min(100,scanned/total*100)):0;
+    const components=Array.isArray(node.components)?node.components:[],enabled=components.filter(row=>row.enabled),healthy=enabled.filter(row=>row.status==='healthy'||row.status==='running').length;
     section.innerHTML=`
       <div class="best-home-head"><div><p class="kicker">PAPER RESEARCH</p><h3>코인별 1,000만원 가상매매</h3><p>빗썸 원화마켓 전체를 같은 출발선에서 비교합니다. 실제 주문은 없습니다.</p></div><span class="pill ${node.supervisor_running?'good':'bad'}">${node.supervisor_running?'연구 중':'확인 필요'}</span></div>
-      <div class="best-leader-strip">
-        <div><span>현재 수익률 1위</span><strong>${best?.symbol?esc(best.symbol):'집계 중'}</strong><small>${esc(best?.name||best?.market||'')}</small></div>
-        <b class="${tone(best?.return_pct)}">${best?.symbol?pct(best.return_pct):'-'}</b>
-      </div>
-      <div class="best-scan-progress"><i style="width:${progress.toFixed(1)}%"></i></div>
-      <div class="best-scan-meta"><span>전체 스캔 ${scanned.toLocaleString('ko-KR')} / ${total.toLocaleString('ko-KR')}</span><span>갱신 ${ageText(data.source_updated_at)}</span></div>
-      <div class="best-home-metrics">
-        <div><span>전체 연구 대상</span><b>${n(data.market_count||list.length).toLocaleString('ko-KR')}개</b><small>코인별 독립 계좌</small></div>
-        <div><span>보유 중</span><b>${stats.holding.toLocaleString('ko-KR')}개</b><small>현재 포지션 있음</small></div>
-        <div><span>매매 완료 · 대기</span><b>${stats.completed.toLocaleString('ko-KR')}개</b><small>청산 후 다음 기회 대기</small></div>
-        <div><span>아직 미진입</span><b>${stats.untraded.toLocaleString('ko-KR')}개</b><small>탐색/조건 확인 중</small></div>
-        <div><span>전체 평균 수익률</span><b class="${tone(stats.avg)}">${pct(stats.avg)}</b><small>전체 가상계좌 기준</small></div>
-      </div>
+      <div class="best-leader-strip"><div><span>현재 수익률 1위</span><strong>${best?.symbol?esc(best.symbol):'집계 중'}</strong><small>${esc(best?.name||best?.market||'')}</small></div><b class="${tone(best?.return_pct)}">${best?.symbol?pct(best.return_pct):'-'}</b></div>
+      <div class="best-scan-progress"><i style="width:${progress.toFixed(1)}%"></i></div><div class="best-scan-meta"><span>전체 스캔 ${scanned.toLocaleString('ko-KR')} / ${total.toLocaleString('ko-KR')}</span><span>갱신 ${ageText(data.source_updated_at)}</span></div>
+      <div class="best-home-metrics"><div><span>전체 연구 대상</span><b>${n(data.market_count||list.length).toLocaleString('ko-KR')}개</b><small>코인별 독립 계좌</small></div><div><span>보유 중</span><b>${stats.holding.toLocaleString('ko-KR')}개</b><small>현재 포지션 있음</small></div><div><span>매매 완료 · 대기</span><b>${stats.completed.toLocaleString('ko-KR')}개</b><small>청산 후 다음 기회 대기</small></div><div><span>아직 미진입</span><b>${stats.untraded.toLocaleString('ko-KR')}개</b><small>탐색/조건 확인 중</small></div><div><span>전체 평균 수익률</span><b class="${tone(stats.avg)}">${pct(stats.avg)}</b><small>전체 가상계좌 기준</small></div></div>
       <div class="best-home-components"><div class="best-home-components-title"><span>24시간 연구 서비스</span><b>${node.supervisor_running?`정상 ${healthy}/${Math.max(enabled.length,1)}`:'연결 확인 필요'}</b></div><div class="best-home-component-chips">${components.map(row=>{const [label,t]=componentMeta(row);return `<span class="best-component-chip ${t}"><i></i>${esc(row.label)} · ${label}</span>`}).join('')}</div></div>`;
     q('.home-grid',q('[data-view-panel="home"]'))?.classList.add('best-home-old-hidden');
   }
@@ -159,19 +147,12 @@
   }
 
   function openCoin(market){
-    if(!market)return;
-    const s=stateRef();if(!s)return;
-    s.coinMarket=market;
+    if(!market)return;const s=stateRef();if(!s)return;s.coinMarket=market;
     if(typeof switchView==='function')switchView('coin');
     const select=q('#coinSelect');if(select){select.value=market;select.dispatchEvent(new Event('change',{bubbles:true}))}
   }
-  function bind(){
-    document.addEventListener('click',event=>{const button=event.target.closest?.('[data-best-open-coin]');if(button){event.preventDefault();openCoin(button.dataset.bestOpenCoin)}},true);
-  }
-  function renderAll(){
-    if(!stateRef()?.user||!snapshot())return;
-    renderHoldings();renderHomeResearch();renderResultsSummary();renderResearchComponents();
-  }
+  function bind(){document.addEventListener('click',event=>{const button=event.target.closest?.('[data-best-open-coin]');if(button){event.preventDefault();openCoin(button.dataset.bestOpenCoin)}},true)}
+  function renderAll(){if(!stateRef()?.user||!snapshot())return;renderHoldings();renderHomeResearch();renderResultsSummary();renderResearchComponents()}
   function install(){
     bind();renderAll();
     if(typeof renderSnapshot==='function'){
