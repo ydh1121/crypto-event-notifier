@@ -24,6 +24,8 @@ b3_trader/data/
 dashboard/runtime-demo.json
 dashboard/runtime-demo.tmp
 dashboard/demo-runtime/
+dashboard/runtime-build.json
+dashboard/runtime-build.json.tmp
 
 # Cloudflare
 cloudflare/node_modules/
