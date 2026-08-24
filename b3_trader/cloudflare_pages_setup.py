@@ -35,6 +35,14 @@ def _command(name: str) -> str:
     return resolved
 
 
+def _local_wrangler() -> str:
+    filename = "wrangler.cmd" if os.name == "nt" else "wrangler"
+    path = VIEWER_DIR / "node_modules" / ".bin" / filename
+    if not path.exists():
+        raise RuntimeError("local Wrangler is missing; run npm install in cloudflare-pages")
+    return str(path)
+
+
 def _run(
     args: list[str],
     *,
@@ -48,6 +56,8 @@ def _run(
         args,
         cwd=str(cwd),
         text=True,
+        encoding="utf-8",
+        errors="replace",
         input=input_text,
         capture_output=capture,
         timeout=timeout,
@@ -115,37 +125,37 @@ def _copy_to_clipboard(value: str) -> bool:
         return False
 
 
-def _ensure_login(npx: str) -> None:
-    whoami = _run([npx, "wrangler", "whoami"], cwd=VIEWER_DIR, timeout=60.0, capture=True, allow_failure=True)
+def _ensure_login(wrangler: str) -> None:
+    whoami = _run([wrangler, "whoami"], cwd=VIEWER_DIR, timeout=60.0, capture=True, allow_failure=True)
     if whoami.returncode == 0:
         return
     print("Cloudflare 로그인이 필요합니다. 브라우저 인증 창을 엽니다.")
-    login = _run([npx, "wrangler", "login"], cwd=VIEWER_DIR, timeout=600.0, capture=False, allow_failure=True)
+    login = _run([wrangler, "login"], cwd=VIEWER_DIR, timeout=600.0, capture=False, allow_failure=True)
     if login.returncode != 0:
         raise RuntimeError("Cloudflare browser login was not completed")
-    verify = _run([npx, "wrangler", "whoami"], cwd=VIEWER_DIR, timeout=60.0, capture=True, allow_failure=True)
+    verify = _run([wrangler, "whoami"], cwd=VIEWER_DIR, timeout=60.0, capture=True, allow_failure=True)
     if verify.returncode != 0:
         raise RuntimeError("Cloudflare login verification failed")
 
 
-def _pages_projects(npx: str) -> list[dict[str, Any]]:
-    value = _json_output([npx, "wrangler", "pages", "project", "list", "--json"], cwd=VIEWER_DIR)
+def _pages_projects(wrangler: str) -> list[dict[str, Any]]:
+    value = _json_output([wrangler, "pages", "project", "list", "--json"], cwd=VIEWER_DIR)
     return value if isinstance(value, list) else []
 
 
-def _d1_databases(npx: str) -> list[dict[str, Any]]:
-    value = _json_output([npx, "wrangler", "d1", "list", "--json"], cwd=VIEWER_DIR)
+def _d1_databases(wrangler: str) -> list[dict[str, Any]]:
+    value = _json_output([wrangler, "d1", "list", "--json"], cwd=VIEWER_DIR)
     return value if isinstance(value, list) else []
 
 
-def _ensure_project(npx: str, desired: str) -> str:
-    projects = _pages_projects(npx)
-    if any(str(row.get("name") or "") == desired for row in projects):
+def _ensure_project(wrangler: str, desired: str) -> str:
+    projects = _pages_projects(wrangler)
+    if any(str(row.get("name") or row.get("Project Name") or "") == desired for row in projects):
         return desired
     candidates = [desired, f"{desired}-{secrets.token_hex(2)}", f"{desired}-{secrets.token_hex(3)}"]
     for candidate in candidates:
         created = _run(
-            [npx, "wrangler", "pages", "project", "create", candidate, "--production-branch", "b3-auto-trader-phase1"],
+            [wrangler, "pages", "project", "create", candidate, "--production-branch", "b3-auto-trader-phase1"],
             cwd=VIEWER_DIR,
             timeout=120.0,
             capture=True,
@@ -156,15 +166,15 @@ def _ensure_project(npx: str, desired: str) -> str:
     raise RuntimeError("Cloudflare Pages project creation failed")
 
 
-def _ensure_database(npx: str, desired: str) -> tuple[str, str]:
-    databases = _d1_databases(npx)
+def _ensure_database(wrangler: str, desired: str) -> tuple[str, str]:
+    databases = _d1_databases(wrangler)
     for row in databases:
         if str(row.get("name") or "") == desired:
             database_id = str(row.get("uuid") or row.get("id") or "")
             if database_id:
                 return desired, database_id
     created = _run(
-        [npx, "wrangler", "d1", "create", desired, "--location", "apac"],
+        [wrangler, "d1", "create", desired, "--location", "apac"],
         cwd=VIEWER_DIR,
         timeout=120.0,
         capture=True,
@@ -172,7 +182,7 @@ def _ensure_database(npx: str, desired: str) -> tuple[str, str]:
     )
     if created.returncode != 0:
         raise RuntimeError("Cloudflare D1 creation failed")
-    databases = _d1_databases(npx)
+    databases = _d1_databases(wrangler)
     for row in databases:
         if str(row.get("name") or "") == desired:
             database_id = str(row.get("uuid") or row.get("id") or "")
@@ -213,44 +223,44 @@ def _secret_value(path: Path, fallback_bytes: int = 32) -> str:
 
 def setup() -> dict[str, Any]:
     npm = _command("npm")
-    npx = _command("npx")
     _command("node")
     if not VIEWER_DIR.exists():
         raise RuntimeError("cloudflare-pages directory is missing; sync Git first")
 
     print("1/6 Cloudflare Pages viewer 코드를 검사합니다.")
     _run([npm, "install", "--no-audit", "--no-fund"], cwd=VIEWER_DIR, timeout=300.0, capture=False)
+    wrangler = _local_wrangler()
     _run([npm, "run", "typecheck"], cwd=VIEWER_DIR, timeout=180.0, capture=False)
 
     print("2/6 Cloudflare 계정 연결을 확인합니다.")
-    _ensure_login(npx)
+    _ensure_login(wrangler)
 
     desired_project = _existing_local_secret("CLOUDFLARE_VIEWER_PROJECT") or DEFAULT_PROJECT
     desired_database = _existing_local_secret("CLOUDFLARE_VIEWER_D1") or DEFAULT_DATABASE
     print("3/6 무료 pages.dev 프로젝트와 D1을 준비합니다.")
-    project = _ensure_project(npx, desired_project)
-    database, database_id = _ensure_database(npx, desired_database)
+    project = _ensure_project(wrangler, desired_project)
+    database, database_id = _ensure_database(wrangler, desired_database)
     _write_wrangler_config(project, database, database_id)
 
     ingest_token = _existing_local_secret("CLOUDFLARE_VIEWER_INGEST_TOKEN") or secrets.token_urlsafe(36)
     owner_token = _secret_value(BOOTSTRAP_PATH, 36)
     print("4/6 로그인/수집용 보안 키와 D1 스키마를 설정합니다.")
     _run(
-        [npx, "wrangler", "pages", "secret", "put", "INGEST_TOKEN", "--project-name", project],
+        [wrangler, "pages", "secret", "put", "INGEST_TOKEN", "--project-name", project],
         cwd=VIEWER_DIR,
         timeout=120.0,
         capture=True,
         input_text=ingest_token + "\n",
     )
     _run(
-        [npx, "wrangler", "pages", "secret", "put", "OWNER_BOOTSTRAP_TOKEN", "--project-name", project],
+        [wrangler, "pages", "secret", "put", "OWNER_BOOTSTRAP_TOKEN", "--project-name", project],
         cwd=VIEWER_DIR,
         timeout=120.0,
         capture=True,
         input_text=owner_token + "\n",
     )
     _run(
-        [npx, "wrangler", "d1", "migrations", "apply", database, "--remote", "--config", str(LOCAL_CONFIG_PATH)],
+        [wrangler, "d1", "migrations", "apply", database, "--remote"],
         cwd=VIEWER_DIR,
         timeout=180.0,
         capture=True,
