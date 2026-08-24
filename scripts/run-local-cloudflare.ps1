@@ -84,6 +84,8 @@ $urlFile = Join-Path $dataDir "cloudflare-tunnel-url.txt"
 $outLog = Join-Path $dataDir "cloudflare-tunnel-out.log"
 $errLog = Join-Path $dataDir "cloudflare-tunnel-err.log"
 $stableStateFile = Join-Path $dataDir "cloudflare-stable.json"
+$syncOutLog = Join-Path $dataDir "git-sync-watch-out.log"
+$syncErrLog = Join-Path $dataDir "git-sync-watch-err.log"
 Remove-Item $urlFile,$outLog,$errLog -Force -ErrorAction SilentlyContinue
 
 $stable = $null
@@ -99,6 +101,20 @@ if (Test-Path $stableStateFile) {
 }
 
 $env:DASHBOARD_HOST = "127.0.0.1"
+
+# Independent sync watchdog: this is deliberately outside the Python process.
+# If an older in-app updater gets stuck, the watchdog still fetches GitHub, preserves
+# local control/assets.json + control/runtime.json, updates code, and restarts only
+# the local Python listener when runtime files changed.
+$syncWatch = $null
+$syncScript = Join-Path $repo "scripts\git-sync-watch.ps1"
+if (Test-Path $syncScript) {
+  $syncArgs = @("-NoProfile","-ExecutionPolicy","Bypass","-File",$syncScript)
+  $syncWatch = Start-Process -FilePath "powershell.exe" -ArgumentList $syncArgs -RedirectStandardOutput $syncOutLog -RedirectStandardError $syncErrLog -WindowStyle Hidden -PassThru
+  Write-Host "GitHub sync watchdog: ON (20s fallback, local coin settings preserved)" -ForegroundColor Green
+} else {
+  Write-Warning "GitHub sync watchdog script is missing. In-app sync will be used as the fallback."
+}
 
 $traderArgs = @(
   "-NoProfile",
@@ -177,6 +193,7 @@ try {
     while (-not $trader.HasExited -and -not $tunnel.HasExited) {
       Start-Sleep -Seconds 2
       $trader.Refresh(); $tunnel.Refresh()
+      if ($syncWatch) { $syncWatch.Refresh() }
     }
     if ($tunnel.HasExited -and -not $trader.HasExited) {
       throw "Cloudflare Tunnel stopped unexpectedly. Check $errLog"
@@ -187,4 +204,5 @@ try {
   }
 } finally {
   if ($trader -and -not $trader.HasExited) { Stop-Process -Id $trader.Id -Force -ErrorAction SilentlyContinue }
+  if ($syncWatch -and -not $syncWatch.HasExited) { Stop-Process -Id $syncWatch.Id -Force -ErrorAction SilentlyContinue }
 }
