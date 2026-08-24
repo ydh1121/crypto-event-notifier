@@ -10,7 +10,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Preserve local SQLite/control state across restart
 - [x] Keep live exchange execution out of this workstream
 
-Phase 0 remains the release gate. Phase 1 foundation below is deliberately sidecar/read-only so it does not change PAPER execution semantics.
+Phase 0 remains the release gate for calling the current dashboard stable, but it no longer blocks low-risk sidecar/viewer work. PAPER execution semantics remain unchanged.
 
 ## Phase 1 — 24/7 local data foundation
 
@@ -25,7 +25,7 @@ Phase 0 remains the release gate. Phase 1 foundation below is deliberately sidec
 - [x] Partition Parquet by table + UTC date
 - [x] Persist export checkpoints locally so restart does not duplicate old rows
 - [x] Keep SQLite authoritative; Parquet remains secondary analytical history
-- [ ] Add retention/compaction policy after real 24h volume is measured
+- [ ] Add retention/compaction policy after real volume is measured
 - [ ] Add Upbit partitions after Phase 3 adapter exists
 - [ ] Add news/community/on-chain/macro partitions in Phase 5
 
@@ -44,9 +44,11 @@ This path remains ignored by Git.
 - [x] Component failures are isolated and retried instead of stopping the trader
 - [x] Persist component health/status locally
 - [x] Persist bounded local supervisor log
-- [ ] Add dashboard component-health UI after Phase 0 UI is accepted
-- [ ] Add safe per-component on/off controls
-- [ ] Add independent restart control per component
+- [x] Add dashboard component-health UI
+- [x] Add safe per-component on/off controls
+- [x] Add immediate per-component `지금 실행` control without restarting the trader
+- [x] Apply control-file changes live in the research supervisor
+- [x] Restrict component mutations to loopback/local PC; remote clients are read-only
 
 Current managed components:
 
@@ -68,11 +70,12 @@ Safety contract:
 - [x] Persist latest-seen SHA/status locally
 - [x] No cloning/execution/update promotion from watcher
 - [x] Optional local `REFERENCE_GITHUB_TOKEN` support only for API-rate headroom; not required
+- [x] Show external-repo watch count/update/failure summary in the research component UI
 - [ ] Review licenses before adopting code from any reference
 - [ ] Add staged install directory and compatibility-test runner
 - [ ] Add PAPER smoke test before promotion
 - [ ] Add rollback version management
-- [ ] Add `update available` UI and manual promote action
+- [ ] Add manual promote action only after the staging/test/rollback chain exists
 
 Initial catalog:
 
@@ -94,17 +97,14 @@ Initial catalog:
 
 ## Phase 1 validation gate
 
-- [x] CI: Python tests + compile, dashboard smoke and Cloudflare typecheck passed for the Phase 1 foundation commit set
-- [ ] One continuous 24-hour local run
-- [ ] Parquet files continue growing without duplicate checkpoints after restart
-- [ ] DuckDB can query several days of accumulated market-memory Parquet
-- [ ] supervisor status remains healthy/degraded without taking the trader down
-- [ ] external version watcher detects upstream versions but never changes active code
-- [ ] measure storage growth/day before choosing retention and compaction
+- [x] CI: Python tests + compile, dashboard smoke and Cloudflare typecheck passed for the initial Phase 1 foundation commit set
+- [-] CI validation for the component-control slice
+- [ ] Long-run observation remains useful for retention sizing, but no longer blocks Phase 2 work
+- [ ] Measure storage growth/day before choosing retention and compaction
 
 ## Phase 2 — Cloudflare Pages viewer + invite users
 
-- [ ] Stable free `*.pages.dev` viewer
+- [-] Stable free `*.pages.dev` viewer architecture/scaffold
 - [ ] GitHub -> Pages auto deploy
 - [ ] outbound local snapshot publisher
 - [ ] Cloudflare D1 owner/viewer accounts and invites
