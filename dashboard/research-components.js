@@ -22,8 +22,8 @@
   }
 
   function markBuild(){
-    const pill=q('#staticUiBuild .status-pill');if(pill)pill.textContent='UI 2026.08.24-9';
-    const copy=q('#staticUiBuild .panel-copy');if(copy)copy.textContent='Photo-eBook 내비게이션 + 24시간 연구 구성요소 관리 화면이 적용된 버전입니다.';
+    const pill=q('#staticUiBuild .status-pill');if(pill)pill.textContent='UI 2026.08.24-10';
+    const copy=q('#staticUiBuild .panel-copy');if(copy)copy.textContent='Photo-eBook 내비게이션 + 24시간 연구 구성요소 + pages.dev 조회 화면 연동이 적용된 버전입니다.';
   }
   function ageText(ts){
     const value=Number(ts||0);if(!value)return'아직 없음';
@@ -56,6 +56,17 @@
       if(Number(refs.updates)>0)return`${refs.updates}개 새 버전 감지`;
       if(Number(refs.total)>0)return`${refs.total}개 레포 확인 완료`;
       return'첫 확인 대기 중';
+    }
+    if(row.name==='cloudflare-snapshot-publish'){
+      if(result.status==='not_configured')return'pages.dev 초기 연결 필요';
+      if(result.status==='published')return`${Number(result.markets||0).toLocaleString('ko-KR')}개 코인 웹 전송 완료`;
+      return'웹 상태판 연결 대기 중';
+    }
+    if(row.name==='cloudflare-pages-deploy'){
+      if(result.status==='not_configured')return'Cloudflare 1회 설정 필요';
+      if(result.status==='deployed')return`새 화면 배포 완료 · ${esc(String(result.head||'').slice(0,7))}`;
+      if(result.status==='up_to_date'||result.status==='no_viewer_changes')return'웹 화면 최신 상태';
+      return'Git 변경 감시 중';
     }
     return'';
   }
@@ -104,7 +115,7 @@
               <div class="research-component-meta">
                 <span>${esc(intervalText(row.interval_seconds))}</span>
                 <span>최근 성공 ${esc(ageText(row.last_success_at))}</span>
-                <span>${esc(resultText(row))}</span>
+                <span>${resultText(row)}</span>
               </div>
               ${row.last_error?`<div class="research-component-error">${esc(row.last_error)}</div>`:''}
             </div>
@@ -115,7 +126,7 @@
           </section>`;
         }).join('')}
       </div>
-      <p class="research-component-footnote">외부 레포는 새 버전 여부만 확인합니다. 다운로드·실행·자동 교체는 하지 않습니다.</p>`;
+      <p class="research-component-footnote">외부 레포는 새 버전 여부만 확인합니다. 웹 배포는 이 프로젝트의 조회 전용 Pages 코드만 대상으로 하며 실제 주문 기능을 포함하지 않습니다.</p>`;
   }
 
   async function sync(){
