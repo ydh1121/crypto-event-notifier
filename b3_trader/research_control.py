@@ -33,6 +33,13 @@ COMPONENT_DEFINITIONS: dict[str, dict[str, Any]] = {
         "default_interval_seconds": 20,
         "min_interval_seconds": 10,
     },
+    "cloudflare-pages-deploy": {
+        "label": "웹 화면 자동 배포",
+        "description": "GitHub에서 새 웹 화면을 받은 뒤 Pages 코드가 바뀐 경우에만 pages.dev로 자동 배포합니다.",
+        "default_enabled": False,
+        "default_interval_seconds": 30,
+        "min_interval_seconds": 15,
+    },
 }
 
 _LOCK = threading.RLock()
@@ -150,13 +157,12 @@ def platform_snapshot(
     for name, definition in COMPONENT_DEFINITIONS.items():
         desired = control["components"].get(name) or {}
         runtime = status_components.get(name) if isinstance(status_components.get(name), dict) else {}
-        default_enabled = bool(definition.get("default_enabled", True))
         components.append(
             {
                 "name": name,
                 "label": definition["label"],
                 "description": definition["description"],
-                "enabled": bool(desired.get("enabled", default_enabled)) and bool(control.get("enabled", True)),
+                "enabled": bool(desired.get("enabled", definition.get("default_enabled", True))) and bool(control.get("enabled", True)),
                 "interval_seconds": float(desired.get("interval_seconds") or definition["default_interval_seconds"]),
                 "run_nonce": int(desired.get("run_nonce") or 0),
                 "status": runtime.get("status") or ("starting" if supervisor_fresh else "offline"),
