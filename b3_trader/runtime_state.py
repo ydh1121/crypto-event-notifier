@@ -16,6 +16,7 @@ class RuntimeState:
         self.last_error: dict[str, Any] | None = None
         self.assets: dict[str, dict[str, Any]] = {}
         self.portfolio: dict[str, Any] = {}
+        self.market: dict[str, Any] = {}
         self.sync: dict[str, Any] = {"status": "idle"}
         self.backup: dict[str, Any] = {"status": "idle"}
 
@@ -30,6 +31,10 @@ class RuntimeState:
     def set_portfolio(self, payload: dict[str, Any]) -> None:
         with self._lock:
             self.portfolio = copy.deepcopy(payload)
+
+    def set_market(self, payload: dict[str, Any]) -> None:
+        with self._lock:
+            self.market = copy.deepcopy(payload)
 
     def set_error(self, error: Exception | str, *, scope: str = "engine") -> None:
         with self._lock:
@@ -59,6 +64,7 @@ class RuntimeState:
                 "last_error": copy.deepcopy(self.last_error),
                 "assets": copy.deepcopy(self.assets),
                 "portfolio": copy.deepcopy(self.portfolio),
+                "market": copy.deepcopy(self.market),
                 "sync": copy.deepcopy(self.sync),
                 "backup": copy.deepcopy(self.backup),
             }
