@@ -37,8 +37,6 @@ function Install-Cloudflared {
       "--accept-package-agreements",
       "--accept-source-agreements"
     )
-    # Start-Process avoids Windows PowerShell 5.1 turning native stderr/status text
-    # into pipeline ErrorRecords and also guarantees this function returns only a path.
     $install = Start-Process -FilePath ([string]$winget.Source) -ArgumentList $wingetArgs -Wait -PassThru
     if ($install.ExitCode -eq 0) {
       Start-Sleep -Seconds 2
@@ -74,7 +72,6 @@ if (Test-PortInUse -Port 8765) {
   exit 2
 }
 
-# Force a scalar string even if an older PowerShell/native command unexpectedly emits extra output.
 $cloudflared = [string](@(Install-Cloudflared) | Select-Object -Last 1)
 if (-not $cloudflared -or -not (Test-Path $cloudflared)) {
   throw "cloudflared executable could not be resolved. Resolved value: '$cloudflared'"
@@ -86,10 +83,21 @@ New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 $urlFile = Join-Path $dataDir "cloudflare-tunnel-url.txt"
 $outLog = Join-Path $dataDir "cloudflare-tunnel-out.log"
 $errLog = Join-Path $dataDir "cloudflare-tunnel-err.log"
+$stableStateFile = Join-Path $dataDir "cloudflare-stable.json"
 Remove-Item $urlFile,$outLog,$errLog -Force -ErrorAction SilentlyContinue
 
-# Override .env for this process tree only. This makes router port-forwarding ineffective
-# because Uvicorn no longer listens on LAN/WAN interfaces.
+$stable = $null
+if (Test-Path $stableStateFile) {
+  try {
+    $candidate = Get-Content $stableStateFile -Raw | ConvertFrom-Json
+    if ($candidate.hostname -and $candidate.tunnel_id -and $candidate.config_file -and (Test-Path ([string]$candidate.config_file))) {
+      $stable = $candidate
+    }
+  } catch {
+    Write-Warning "고정 Cloudflare 설정 파일을 읽지 못했습니다. 이번 실행은 임시 주소로 계속합니다."
+  }
+}
+
 $env:DASHBOARD_HOST = "127.0.0.1"
 
 $traderArgs = @(
@@ -112,31 +120,58 @@ try {
   }
   if (-not $healthy) { throw "Dashboard did not become ready on 127.0.0.1:8765." }
 
-  $tunnelArgs = @("tunnel", "--url", "http://127.0.0.1:8765", "--no-autoupdate")
+  $url = $null
+  $mode = "quick_tunnel"
+  if ($stable) {
+    $mode = "named_tunnel"
+    $url = "https://$($stable.hostname)"
+    $tunnelArgs = @(
+      "tunnel",
+      "--config", ([string]$stable.config_file),
+      "run", ([string]$stable.tunnel_id)
+    )
+    Write-Host "Starting persistent Cloudflare Tunnel: $url"
+  } else {
+    $tunnelArgs = @("tunnel", "--url", "http://127.0.0.1:8765", "--no-autoupdate")
+    Write-Host "고정 주소 설정이 없습니다. 이번 실행은 임시 HTTPS 주소를 만듭니다."
+    Write-Host "고정 주소가 필요하면 한 번만 .\scripts\setup-stable-cloudflare.ps1 을 실행하세요."
+  }
+
   $tunnel = Start-Process -FilePath $cloudflared -ArgumentList $tunnelArgs -RedirectStandardOutput $outLog -RedirectStandardError $errLog -PassThru
   try {
-    $url = $null
-    for ($i = 0; $i -lt 45; $i++) {
-      if ($tunnel.HasExited) {
-        $detail = ((Get-Content $errLog -Raw -ErrorAction SilentlyContinue) + "`n" + (Get-Content $outLog -Raw -ErrorAction SilentlyContinue)).Trim()
-        throw "Cloudflare Tunnel exited early. $detail"
+    if ($mode -eq "named_tunnel") {
+      for ($i = 0; $i -lt 12; $i++) {
+        if ($tunnel.HasExited) {
+          $detail = ((Get-Content $errLog -Raw -ErrorAction SilentlyContinue) + "`n" + (Get-Content $outLog -Raw -ErrorAction SilentlyContinue)).Trim()
+          throw "Cloudflare Tunnel exited early. $detail"
+        }
+        Start-Sleep -Milliseconds 500
       }
-      $combined = ((Get-Content $errLog -Raw -ErrorAction SilentlyContinue) + "`n" + (Get-Content $outLog -Raw -ErrorAction SilentlyContinue))
-      $match = [regex]::Match($combined, 'https://[a-zA-Z0-9-]+\.trycloudflare\.com')
-      if ($match.Success) { $url = $match.Value; break }
-      Start-Sleep -Seconds 1
+    } else {
+      for ($i = 0; $i -lt 45; $i++) {
+        if ($tunnel.HasExited) {
+          $detail = ((Get-Content $errLog -Raw -ErrorAction SilentlyContinue) + "`n" + (Get-Content $outLog -Raw -ErrorAction SilentlyContinue)).Trim()
+          throw "Cloudflare Tunnel exited early. $detail"
+        }
+        $combined = ((Get-Content $errLog -Raw -ErrorAction SilentlyContinue) + "`n" + (Get-Content $outLog -Raw -ErrorAction SilentlyContinue))
+        $match = [regex]::Match($combined, 'https://[a-zA-Z0-9-]+\.trycloudflare\.com')
+        if ($match.Success) { $url = $match.Value; break }
+        Start-Sleep -Seconds 1
+      }
+      if (-not $url) { throw "Could not find the trycloudflare.com URL in cloudflared output. Check $errLog" }
     }
-    if (-not $url) { throw "Could not find the trycloudflare.com URL in cloudflared output. Check $errLog" }
 
     Set-Content -Path $urlFile -Value $url -Encoding UTF8
     Write-Host ""
-    Write-Host "Secure phone URL: $url" -ForegroundColor Green
-    Write-Host "Open this HTTPS address on the phone. No phone VPN is required."
-    Write-Host "Enter the phone connection code when asked."
+    if ($mode -eq "named_tunnel") {
+      Write-Host "Secure phone URL (fixed): $url" -ForegroundColor Green
+      Write-Host "이 주소는 서버를 다시 켜도 그대로 유지됩니다. 같은 브라우저에서는 휴대폰 연결 코드도 다시 입력할 필요가 없습니다."
+    } else {
+      Write-Host "Secure phone URL (temporary): $url" -ForegroundColor Green
+      Write-Host "이 주소는 재실행할 때 바뀝니다. 고정 주소 설정은 .\scripts\setup-stable-cloudflare.ps1"
+    }
     Write-Host ""
     Write-Host "While this mode is running, the trader listens only on 127.0.0.1."
-    Write-Host "Your old public-IP :8765 address should not reach this process."
-    Write-Host "Quick Tunnel URLs change when this script is restarted."
     Write-Host "Press Ctrl+C here to stop both the trader and tunnel."
 
     while (-not $trader.HasExited -and -not $tunnel.HasExited) {
