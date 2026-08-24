@@ -47,15 +47,15 @@ Do **not** build real-money execution in this workstream. Live execution remains
 
 Observed on iPhone/Chrome device emulation: the first averaging row still collapsed into an awkward multi-column legacy layout.
 
-Final owner is now `dashboard/navigation-v3.css`, loaded after the legacy calculator CSS:
-- mobile `.avg-row` is forced to **flex-column**, not another competing CSS grid
+Final fix:
+- removed the conflicting mobile `.avg-row` grid from `portfolio-tools.css`; that file now explicitly leaves mobile calculator geometry to `navigation-v3.css`
+- mobile `.avg-row` is forced to **flex-column**
 - round number sits at top-left
 - delete button is absolutely positioned top-right
 - `매수가` and `매수금액` each get a full-width 52 px input on their own row
 - input text is 16 px
 - calculated after-average message gets a separate full-width block
 - action buttons use two columns; `계획 비우기` gets its own full row
-- this deliberately overrides old `.avg-row` rules in `portfolio-tools.css`
 
 ### 2. Average price and P/L readability
 
@@ -71,7 +71,8 @@ Current `dashboard/navigation-v3.js` architecture:
 - the scrollable rail remains the native iOS scrollport
 - the moving indicator is mounted in an **outer overlay host** (`.view-rail` for primary tabs and `.asset-chip-shell` for coin chips)
 - item geometry is translated from `getBoundingClientRect()` into host coordinates
-- the indicator uses a 3 px bleed, so it can visibly protrude beyond the inner rail
+- primary tab indicator uses a small outer bleed
+- coin-chip indicator uses an 11 px bleed, large enough to cross the inner rail padding/border and visibly float outside it
 - horizontal scroll updates the overlay position while leaving Safari momentum native
 - motion is stretch -> overshoot -> snap-back with the approved spring family
 - press interaction compresses the liquid skin slightly
@@ -88,7 +89,7 @@ The architecture is now explicit:
 - `b3_trader/*.py` runtime changes still require a Python-process reload; GitAutoSync requests exit code 75 and the existing PowerShell supervisor restarts the app automatically
 - therefore the user should not normally have to stop/re-run `start-trader-secure.bat` for GitHub commits
 - control-only local state remains preserved/reconciled; unexpected non-control local code changes still block auto-update rather than being destroyed
-- `dashboard/index.html` now bumps the final Liquid JS/CSS asset version and `_headers` requests no-store/no-cache to make stale UI delivery much less likely
+- `dashboard/index.html` now uses explicit v5/v2 cache-busts for the final navigation/calculator files and `_headers` requests no-store/no-cache
 
 ### 5. Existing stability fixes retained
 
@@ -141,9 +142,9 @@ Lifecycle/persistence/UI:
 ## Git/CI state
 
 - Work continues on `b3-auto-trader-phase1`, Draft PR #1; do not merge without explicit request.
-- Latest validated functional UI/runtime head: `b433747f4c6db916d869b08de849a3250e1663a4`.
+- Latest fully validated functional UI/runtime head before final cosmetic/cache-bust follow-ups: `b433747f4c6db916d869b08de849a3250e1663a4`.
 - GitHub Actions on that head passed dashboard smoke, Python tests/compile and Cloudflare typecheck.
-- Later commits after that head only update workstream docs and static cache headers unless otherwise noted.
+- Follow-up commits remove conflicting calculator CSS, increase coin Liquid bleed, and bump static asset versions; validate latest head before declaring QA complete.
 - Local `control/assets.json` may remain modified because the user added assets locally.
 - Runtime data under `b3_trader/data/` and generated `dashboard/runtime-demo.json` remain ignored by Git.
 
@@ -160,7 +161,7 @@ Lifecycle/persistence/UI:
    - averaging inputs are full-width stacked rows
    - average price is visibly larger
    - P/L amount and percentage are both visible
-   - primary and coin Liquid selectors visibly bleed outside the inner rail and spring when changed
+   - coin Liquid selector visibly crosses the inner rail boundary and springs when changed
 5. Leave the demo running to collect trade count, realized P/L, drawdown, concentration and candidate-quality evidence before changing live-trading scope.
 6. Finish rclone Google Drive backup verification after UI/demo validation.
 7. Leave real-money trading deferred to the separate future Work/workstream.
