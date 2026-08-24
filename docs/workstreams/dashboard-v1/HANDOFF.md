@@ -145,8 +145,8 @@ Lifecycle/persistence/UI:
 
 ## Exact next action
 
-1. Let the running local app receive the bootstrap update. Python changes should auto-exit with code 75 and be restarted by the already-running supervisor; do not manually restart the launcher unless this fails.
-2. Refresh an already-open browser once after that bootstrap runtime restart. Future dashboard-only commits should self-reload.
+1. Let the running local app receive the bootstrap update. Because the bootstrap includes Python changes, the Python process should automatically exit with code 75 and be restarted by the PowerShell supervisor that is already running. Do not manually stop/re-run `start-trader-secure.bat` unless this automatic bootstrap actually fails.
+2. Refresh an already-open pre-bootstrap browser once if necessary. After the new dashboard watcher is loaded, later dashboard-only commits should reload the page by themselves.
 3. Verify Home shows `1,000만원 자동매매 데모` and `/api/demo` updates.
 4. Verify Coin: full-width stacked averaging inputs, larger avg price, visible P/L, coin Liquid selector crossing the rail and springing.
 5. Leave the demo running to collect trade count, P/L, drawdown, concentration and candidate-quality evidence.
