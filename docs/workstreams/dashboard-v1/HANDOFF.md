@@ -88,6 +88,7 @@ The architecture is now explicit:
 - `b3_trader/*.py` runtime changes still require a Python-process reload; GitAutoSync requests exit code 75 and the existing PowerShell supervisor restarts the app automatically
 - therefore the user should not normally have to stop/re-run `start-trader-secure.bat` for GitHub commits
 - control-only local state remains preserved/reconciled; unexpected non-control local code changes still block auto-update rather than being destroyed
+- `dashboard/index.html` now bumps the final Liquid JS/CSS asset version and `_headers` requests no-store/no-cache to make stale UI delivery much less likely
 
 ### 5. Existing stability fixes retained
 
@@ -142,7 +143,7 @@ Lifecycle/persistence/UI:
 - Work continues on `b3-auto-trader-phase1`, Draft PR #1; do not merge without explicit request.
 - Latest validated functional UI/runtime head: `b433747f4c6db916d869b08de849a3250e1663a4`.
 - GitHub Actions on that head passed dashboard smoke, Python tests/compile and Cloudflare typecheck.
-- Later commits after that head only update workstream documentation/status unless otherwise noted.
+- Later commits after that head only update workstream docs and static cache headers unless otherwise noted.
 - Local `control/assets.json` may remain modified because the user added assets locally.
 - Runtime data under `b3_trader/data/` and generated `dashboard/runtime-demo.json` remain ignored by Git.
 
