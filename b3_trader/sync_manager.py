@@ -12,8 +12,8 @@ from typing import Callable
 from .runtime_state import RuntimeState
 from .telegram_notify import TelegramNotifier
 
-CODE_SUFFIXES = (".py", ".toml", ".yml", ".yaml", ".txt")
-CODE_PREFIXES = ("b3_trader/", "scripts/", ".github/", "Dockerfile", "cloudflare/")
+CODE_SUFFIXES = (".py", ".toml", ".yml", ".yaml", ".txt", ".js", ".css", ".html", ".ps1", ".bat")
+CODE_PREFIXES = ("b3_trader/", "dashboard/", "scripts/", ".github/", "Dockerfile", "cloudflare/")
 CONTROL_PATHS = ("control/assets.json", "control/runtime.json")
 
 
@@ -82,6 +82,10 @@ class GitAutoSync:
     def _control_only(paths: list[str]) -> bool:
         return bool(paths) and all(path in CONTROL_PATHS for path in paths)
 
+    @staticmethod
+    def _restart_required(paths: list[str]) -> bool:
+        return any(path.startswith(CODE_PREFIXES) or path.endswith(CODE_SUFFIXES) for path in paths)
+
     def _changed_from_base(self, base: str, ref: str) -> list[str]:
         return [line for line in self._git("diff", "--name-only", f"{base}..{ref}").splitlines() if line]
 
@@ -145,8 +149,6 @@ class GitAutoSync:
                         }
                         self.state.set_sync(payload)
                         return payload
-                    # Local-only commits are dashboard control state. Keep their current
-                    # file contents, move code to the remote head, then republish control.
                     self._git("reset", "--hard", f"origin/{self.branch}")
                     self._restore_control(preserved)
 
@@ -156,7 +158,7 @@ class GitAutoSync:
                 self._git("commit", "-m", message)
             self._git("push", "origin", f"HEAD:{self.branch}")
             commit = self._git("rev-parse", "HEAD")
-            code_changed = any(path.startswith(CODE_PREFIXES) or path.endswith(CODE_SUFFIXES) for path in remote_changed)
+            code_changed = self._restart_required(remote_changed)
             payload = {
                 "status": "published" if staged else "up_to_date",
                 "commit": commit,
@@ -196,7 +198,7 @@ class GitAutoSync:
 
             if self._is_ancestor(local, remote):
                 changed = [line for line in self._git("diff", "--name-only", f"{local}..{remote}").splitlines() if line]
-                code_changed = any(path.startswith(CODE_PREFIXES) or path.endswith(CODE_SUFFIXES) for path in changed)
+                code_changed = self._restart_required(changed)
                 if code_changed and self.block_code_updates:
                     payload = {"status": "blocked_live_code_update", "ts": time.time(), "local": local, "remote": remote, "changed": changed}
                     self.state.set_sync(payload)
@@ -231,7 +233,7 @@ class GitAutoSync:
                 self.state.set_sync(payload)
                 return payload
 
-            if self.block_code_updates and any(path.startswith(CODE_PREFIXES) or path.endswith(CODE_SUFFIXES) for path in remote_changed):
+            if self.block_code_updates and self._restart_required(remote_changed):
                 payload = {"status": "blocked_live_code_update", "ts": time.time(), "local": local, "remote": remote, "changed": remote_changed}
                 self.state.set_sync(payload)
                 return payload
@@ -242,7 +244,7 @@ class GitAutoSync:
             result = self.publish_control("Reconcile local trader control state")
             result["status"] = "reconciled"
             result["remote_changed"] = remote_changed
-            result["restart_required"] = any(path.startswith(CODE_PREFIXES) or path.endswith(CODE_SUFFIXES) for path in remote_changed)
+            result["restart_required"] = self._restart_required(remote_changed)
             self.state.set_sync(result)
             self._restart_if_needed(bool(result["restart_required"]))
             return result
@@ -262,6 +264,11 @@ class GitAutoSync:
         if not available:
             self._disabled_payload(reason)
             return
+        try:
+            self.check_once()
+        except Exception as exc:
+            self.state.set_error(exc, scope="git_sync")
+            self.state.set_sync({"status": "error", "ts": time.time(), "message": str(exc)})
         self._thread = threading.Thread(target=self._loop, name="git-auto-sync", daemon=True)
         self._thread.start()
 
