@@ -131,20 +131,64 @@ Initial catalog:
 - [x] Add one-command Windows setup script using Wrangler browser OAuth
 - [x] Generate/store ingest + first-owner secrets without printing them
 - [x] Enable snapshot publish + Pages deploy automatically after successful one-time setup
+- [x] Harden Windows Wrangler invocation and UTF-8 subprocess handling
+- [x] Fix Pages deploy config path handling
 
 ### 2C. Deployment path
 
 - [x] GitHub Actions viewer validation
 - [x] Optional direct GitHub -> Pages deploy workflow when Cloudflare GitHub secrets exist
 - [x] Missing GitHub Cloudflare secrets no longer block viewer validation; local Wrangler bridge is the default
-- [-] One-time account-side provisioning on the user's Windows PC via `scripts/setup-cloudflare-pages-viewer.ps1`
-- [ ] Confirm the final stable `*.pages.dev` URL and `/api/health`
-- [ ] Create first owner account from the browser
-- [ ] Confirm 20-second live PAPER snapshots on mobile
-- [ ] Confirm owner can see manual holdings and a viewer without permission cannot
+- [x] One-time account-side provisioning on the user's Windows PC
+- [x] Stable URL confirmed: `https://crypto-paper-viewer-ydh1121-cf36.pages.dev`
+- [x] `/api/health` confirmed `ok: true`
+- [x] First owner account created and logged in
+- [x] 20-second PAPER snapshots confirmed in the browser
+- [x] Owner manual holdings confirmed in the Pages viewer
+- [ ] Confirm a viewer without holdings permission cannot see private holdings
 - [x] Google Drive remains backup/export only
 
-After 2C account provisioning is verified, Phase 3 can start without waiting for a 24-hour soak test.
+## Phase 2.5 — Pages/local dashboard information parity
+
+Goal: keep the Windows PC and SQLite as the source of truth while making Pages the normal external/mobile read-only surface.
+
+### 2.5A. Navigation and first read-only workspace slice
+
+- [x] Add top-level `홈 / 코인 / 결과 / 기록 / 설정` navigation to Pages
+- [x] Keep one authenticated session across all viewer workspaces
+- [x] Add Home summary with PAPER capital, holdings, leader and research-node state
+- [x] Add Coin workspace using current compact leaderboard scores/state
+- [x] Add Results workspace with existing all-market search/filter/sort
+- [x] Add first Records summary from current snapshot
+- [x] Add read-only Settings/account/research-node workspace
+- [x] Keep owner invite management in Settings
+- [x] Preserve read-only remote contract; no pause/resume/strategy mutation endpoints
+
+### 2.5B. Detailed research data bridge
+
+- [-] Design compact per-market detail payload separate from the global snapshot
+- [ ] Publish current position, planned next entry/add, target/stop/trailing state
+- [ ] Publish recent PAPER fills per market
+- [ ] Publish completed-trade feedback and profile-learning history
+- [ ] Publish bounded equity history for charts
+- [ ] Publish bounded market-memory/score history for charts and diagnostics
+- [ ] Add D1/API storage that avoids resending every market's full history every 20 seconds
+- [ ] Add authenticated per-market detail endpoint
+
+### 2.5C. Local-equivalent read-only UI
+
+- [ ] Price/equity charts with useful ranges
+- [ ] Market-condition / buy-timing history
+- [ ] Detailed fill/history list
+- [ ] Learning/profile-change history
+- [ ] Next planned buy/add and protection levels
+- [ ] Plain-Korean decision/reason hierarchy aligned with `DESIGN.md`
+- [ ] Mobile Safari QA at 360–430 px
+- [ ] Desktop QA at 1280–1920 px
+- [ ] Verify polling preserves selected tab/coin/filter/scroll state
+- [ ] Verify 477-market rendering remains responsive
+
+Phase 3 may start after the Phase 2.5 data contract is stable; detailed visual polish can continue in parallel.
 
 ## Phase 3 — Upbit all-market PAPER
 
