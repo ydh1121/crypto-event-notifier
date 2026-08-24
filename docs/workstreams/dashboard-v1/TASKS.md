@@ -23,11 +23,12 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Prevent iOS focus zoom by enforcing >=16px focusable form text on mobile
 - [x] Prevent routine button-label wrapping and normalize mobile action geometry
 - [x] Stabilize repeated asset/panel heights when optional holding data is missing
-- [x] Replace broken mobile averaging grid with full-width stacked inputs and separate delete control
+- [x] Remove conflicting legacy mobile calculator grid and leave `navigation-v3.css` as the single mobile `.avg-row` geometry owner
+- [x] Use full-width stacked mobile `매수가` / `매수금액` inputs with separate delete control and result row
 - [x] Make saved average-price text materially larger on mobile
 - [x] Stop P/L from ellipsizing out of view; allow amount + percentage to wrap and stack metrics on narrow phones
 - [x] Rebuild Liquid Glass motion from current Photo-eBook contract: one rail/one moving indicator, measured geometry, stretch/overshoot/snap-back spring motion, press response and reduced-motion fallback
-- [x] Move selected Liquid indicators to outer overlay hosts with bleed so they visibly protrude beyond the inner rails
+- [x] Move selected Liquid indicators to outer overlay hosts; coin selector uses enough bleed to cross the inner rail boundary
 - [x] Add static asset cache-bust versions + no-store/no-cache headers for reliable UI update delivery
 - [-] User screenshot QA on current desktop + iPhone UI; tune only observed spacing/geometry/copy regressions
 
@@ -124,7 +125,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Python module compile check passes, including `b3_trader.auto_demo`
 - [x] Dashboard JS syntax/smoke checks pass, including final `navigation-v3.js` Liquid overlay layer
 - [x] Existing Cloudflare TypeScript check passes
-- [x] GitHub Actions passed on latest validated functional UI/runtime head `b433747f4c6db916d869b08de849a3250e1663a4`
+- [-] Re-check latest post-QA branch head after final calculator/Liquid/cache-bust commits
 
 ## Completion condition for this workstream
 
