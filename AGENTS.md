@@ -1,0 +1,90 @@
+# Crypto Auto Trader repository rules
+
+## Restart-safe workstream protocol
+
+Long-running work must never depend on one ChatGPT conversation staying open.
+
+Repository state is the source of truth. The active workstream is `docs/workstreams/dashboard-v1/` unless a newer active workstream explicitly replaces it.
+
+When starting or resuming in a new chat/session:
+
+1. Read this `AGENTS.md` first.
+2. Read `DESIGN.md` before UI work.
+3. Read the active workstream `TASKS.md` and `HANDOFF.md` before changing code.
+4. Check the current branch/commit against the handoff.
+5. Resume from the task marked `[-] active` or the handoff `Next action`; do not reconstruct progress from chat memory.
+6. After every meaningful completed unit, update `TASKS.md` and `HANDOFF.md` in the same work session.
+7. If interrupted mid-task, record partial files, checks not yet run, blockers, and the exact next command/action before stopping.
+
+Permanent product rules/specs belong in Git. Temporary research and QA notes may live in the workstream folder while active.
+
+## Runtime/source-of-truth roles
+
+- **Local SQLite**: authoritative runtime/trading journal and paper-forward-test data.
+- **Private GitHub**: application code, non-secret desired state, agent/workstream/design rules.
+- **Google Drive**: off-device backup of consistent SQLite snapshots and mirrors of non-secret control/dashboard files. Never treat a live SQLite file in Drive as the database.
+- **Telegram**: operational alerts only; no secret values in messages.
+- **Phone access**: LAN or Tailscale to the local API. Do not expose port 8765 directly to the public internet.
+- **Cloudflare Pages**: optional static dashboard shell only. It is not the live trading database or execution engine.
+
+Secrets (`.env`, dashboard token, Telegram token, future exchange keys) stay local and must remain excluded from Git/Drive.
+
+## Current scope boundary
+
+The current workstream stops at paper-forward-testing, dashboard/analytics, Telegram operations, backup/sync, multi-asset context profiles, and phone external access.
+
+**Real-money execution is intentionally deferred.** Do not add or enable live order placement in this workstream. Keep `LIVE_TRADING_ENABLED=false`. Future live execution must be handled as a separate workstream with explicit balance reconciliation, order idempotency, partial-fill handling, exchange balance as source of truth, hard daily-loss limits, and a small capped pilot.
+
+## UI/design contract
+
+Read and apply `DESIGN.md` before dashboard work.
+
+The visual baseline is the user's Photo-eBook project. Reuse its design principles, not its product-specific content: Apple-style system typography, grouped neutral canvas, calm card hierarchy, 8/12/16/24-based spacing, restrained blue accent, soft translucent borders/shadows, native horizontal scrolling, safe-area awareness, and high-quality responsive behavior.
+
+Do not create generic AI-dashboard styling: no neon gradients, excessive glass everywhere, arbitrary colored cards, dense icon grids, giant KPI typography, decorative charts without decision value, or gratuitous animation.
+
+Motion must communicate state or spatial continuity. Prefer short ease-out/spring-like transitions. Avoid animating every numeric refresh. Respect `prefers-reduced-motion`.
+
+Desktop improvements must not break mobile. Mobile controls need comfortable touch targets, safe-area clearance, natural vertical flow, and no horizontal page overflow.
+
+## Korean UI copy contract
+
+Korean UI copy must be concise, natural, and operational. Preserve technical meaning while avoiding translationese and repetitive AI patterns.
+
+Avoid habitual phrases such as `~에 대해`, `~을 통해`, `~할 수 있습니다`, `결론적으로`, hype wording, abstract noun chains, and unnecessary defensive explanations. Use consistent terms for the same concept.
+
+For market terms that are conventional in trading, English labels such as Regime, Entry, MDD, PnL, WATCH may remain when the surrounding Korean UI explains their meaning once.
+
+## Trading-analysis contract
+
+Keep two dimensions separate:
+
+- **Regime**: whether the surrounding market is supportive.
+- **Entry**: whether the current asset price/location is attractive.
+
+Never interpret a high Regime score alone as permission to chase price. Entry/risk guards remain separate.
+
+Multi-asset profiles use a common market model plus asset-specific context. Ticker-only additions may start as `generic_alt`, then GPT may research and refine related sectors/ecosystems/markets in `control/assets.json`.
+
+## Safety and changes
+
+- PAPER mode remains default and mandatory for this workstream.
+- Kill switch and risk guards must remain fail-closed.
+- Never commit credentials, tokens, private keys, or exchange secrets.
+- Never auto-apply code updates once a future live-trading mode is armed.
+- Prefer backward-compatible SQLite migrations (`CREATE TABLE IF NOT EXISTS`, additive columns/tables).
+- Runtime/database migrations require tests.
+- Dashboard mutations require authentication for non-loopback clients.
+- Do not loosen remote authentication merely to simplify phone access.
+
+## QA before considering a unit complete
+
+At minimum:
+
+- Python tests pass.
+- Python modules compile.
+- Dashboard static smoke checks pass.
+- Mobile layout has no obvious horizontal overflow at 360–430 px widths.
+- Desktop layout works at 1280–1920 px widths.
+- Existing Telegram/Git sync/PAPER operation does not regress.
+- Update the active workstream handoff with completed checks and exact next action.
