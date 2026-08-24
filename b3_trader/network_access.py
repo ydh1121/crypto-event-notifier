@@ -91,7 +91,8 @@ def _tailscale_status() -> dict[str, Any]:
 def network_status(port: int) -> dict[str, Any]:
     lan_ip = _lan_ipv4()
     tailscale = _tailscale_status()
-    tailscale_host = tailscale.get("dns_name") or tailscale.get("ipv4")
+    tailscale_ip = tailscale.get("ipv4")
+    tailscale_dns = tailscale.get("dns_name")
     return {
         "port": int(port),
         "lan": {
@@ -100,8 +101,12 @@ def network_status(port: int) -> dict[str, Any]:
         },
         "tailscale": {
             **tailscale,
-            "url": f"http://{tailscale_host}:{port}" if tailscale_host else None,
+            # Prefer the 100.x Tailscale address. It does not depend on MagicDNS.
+            "url": f"http://{tailscale_ip}:{port}" if tailscale_ip else None,
+            "dns_url": f"http://{tailscale_dns}:{port}" if tailscale_dns else None,
+            "preferred": "ipv4",
         },
         "public_port_forwarding_recommended": False,
+        "public_http_warning": "Do not use a public/WAN IP for this dashboard. Use LAN or Tailscale only.",
         "remote_auth_required": True,
     }
