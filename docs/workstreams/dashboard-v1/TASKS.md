@@ -87,18 +87,19 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Add loopback-only reveal/rotate endpoints for the phone connection code
 - [x] Add Tailscale setup as an optional path
 - [x] Confirm Tailscale 100.x requires the phone VPN switch to be ON
-- [x] User declined VPN-dependent phone access as the primary path
+- [x] User declined VPN-dependent phone access as the primary path and uninstalled Tailscale
 - [x] Add VPN-free Cloudflare Quick Tunnel launcher: `start-trader-secure.bat`
 - [x] Bind the trader to 127.0.0.1 in secure launcher mode so router forwarding cannot directly reach the app
 - [x] Surface current `https://*.trycloudflare.com` URL through `/api/network`
-- [x] Make VPN-free HTTPS Cloudflare access the primary phone-access UI and Tailscale optional
+- [x] Make VPN-free HTTPS Cloudflare access the primary phone-access UI
 - [x] Keep public HTTP/WAN access warning visible
-- [ ] Repair the user's diverged local branch and pull the secure launcher
-- [ ] Verify `start-trader-secure.bat` generates an HTTPS Quick Tunnel URL
-- [ ] Verify iPhone 5G access to that HTTPS URL with no VPN
+- [x] Repair the user's diverged local branch and pull the secure launcher
+- [x] Verify `start-trader-secure.bat` generates an HTTPS Quick Tunnel URL
+- [x] Verify iPhone/phone 5G access to the Cloudflare HTTPS URL with no VPN
 - [ ] Verify old public-IP `http://...:8765` access stops while secure launcher is active
 - [ ] Remove router port-forwarding/DMZ/UPnP exposure after the HTTPS path works
 - [ ] Rotate the phone connection code after public exposure is removed
+- [ ] Decide whether to keep temporary Quick Tunnel URLs or configure a stable named Cloudflare Tunnel later
 
 ## I. Real-money execution
 
@@ -113,10 +114,10 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 ## Validation status
 
-- [x] Holdings/calculator/sync/Tailscale baseline CI green
-- [-] VPN-free Cloudflare tunnel change CI pending
-- [x] Python module compile check passes on previous baseline
-- [x] Dashboard JavaScript checks pass on previous baseline
+- [x] Holdings/calculator/sync baseline CI green
+- [x] VPN-free Cloudflare tunnel changes CI green
+- [x] Python module compile check passes
+- [x] Dashboard JavaScript checks pass
 - [x] Existing Cloudflare TypeScript check remains green
 
 ## Completion condition for this workstream
