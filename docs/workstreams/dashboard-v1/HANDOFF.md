@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Phase 4 continuation: local multi-asset PAPER engine + beginner-facing dashboard + secure Cloudflare phone access + isolated Bithumb-wide auto PAPER demo.
+Phase 4 continuation: local multi-asset PAPER engine + beginner-facing dashboard + secure Cloudflare phone access + isolated Bithumb-wide 10M KRW automatic PAPER demo.
 
 ## User-approved scope
 
@@ -45,79 +45,89 @@ Do **not** build real-money execution in this workstream. Live execution remains
 
 ### 1. Averaging calculator layout
 
-Observed on iPhone: the first averaging row collapsed into a narrow two-column shape, labels/inputs were vertically misaligned, and the remove control competed with the amount input.
+Observed on iPhone/Chrome device emulation: the first averaging row still collapsed into an awkward multi-column legacy layout.
 
-Current fix in `dashboard/navigation-v3.css`:
-- mobile `.avg-row` has one explicit geometry owner
-- grid areas are `round/remove`, then full-width `price`, full-width `amount`, then `after`
-- inputs are full-width, 50 px high, 16 px text
-- action buttons and summary are separated by explicit spacing
-- existing 20-round persistence/calculation behavior is unchanged
+Final owner is now `dashboard/navigation-v3.css`, loaded after the legacy calculator CSS:
+- mobile `.avg-row` is forced to **flex-column**, not another competing CSS grid
+- round number sits at top-left
+- delete button is absolutely positioned top-right
+- `매수가` and `매수금액` each get a full-width 52 px input on their own row
+- input text is 16 px
+- calculated after-average message gets a separate full-width block
+- action buttons use two columns; `계획 비우기` gets its own full row
+- this deliberately overrides old `.avg-row` rules in `portfolio-tools.css`
 
 ### 2. Average price and P/L readability
 
-Observed on iPhone: saved average-price text was too small and current P/L was ellipsized, hiding the percentage/value.
+- saved average-price value is about 26–27 px on phone
+- P/L amount and percentage are separate inline pieces and may wrap instead of ellipsizing
+- <=430 px puts average-price and P/L tiles in one column so neither value is sacrificed
 
-Current fix:
-- average-price value is roughly 24–25 px on phone
-- current P/L gets more horizontal share at wider phone widths
-- P/L amount and percentage are rendered as separate inline pieces and may wrap instead of disappearing
-- <=430 px switches the two metrics to one column so neither value is sacrificed
+### 3. Liquid Glass selector now floats outside the rail
 
-### 3. Liquid Glass motion
+User explicitly requested that the active Liquid pill not be trapped inside the rail.
 
-The previous implementation mostly looked like a blue selected pill; it did not reproduce the approved spring/taffy feel.
+Current `dashboard/navigation-v3.js` architecture:
+- the scrollable rail remains the native iOS scrollport
+- the moving indicator is mounted in an **outer overlay host** (`.view-rail` for primary tabs and `.asset-chip-shell` for coin chips)
+- item geometry is translated from `getBoundingClientRect()` into host coordinates
+- the indicator uses a 3 px bleed, so it can visibly protrude beyond the inner rail
+- horizontal scroll updates the overlay position while leaving Safari momentum native
+- motion is stretch -> overshoot -> snap-back with the approved spring family
+- press interaction compresses the liquid skin slightly
+- `prefers-reduced-motion` remains supported
 
-Current implementation in `dashboard/navigation-v3.js` + `.css` follows the Photo-eBook contract:
-- one rail = one moving indicator = one geometry/motion owner
-- geometry comes from the active item's real `offsetLeft/Top/Width/Height`
-- active button itself does not paint a second blue plate after indicator mount
-- move animation uses stretch -> overshoot -> snap-back keyframes
-- approved spring family includes `cubic-bezier(0.34, 1.56, 0.64, 1)`
-- press interaction compresses the surface slightly
-- native iOS horizontal scrolling remains native; no custom touch momentum is installed
-- `prefers-reduced-motion` falls back to static/quiet motion
+This keeps Photo-eBook's rule: no JS replacement for iOS rail momentum; the rubber/taffy behavior belongs to the selected Liquid surface.
 
-Photo-eBook's current contract explicitly says horizontal rails should keep native iOS scrolling and **must not** add custom touch/pointer momentum; the "rubber" character belongs to the moving Liquid indicator, not a JavaScript replacement for Safari scrolling.
+### 4. GitHub -> local automatic synchronization
 
-### 4. Existing stability fixes retained
+The architecture is now explicit:
+- default remote polling interval is 15 seconds
+- static `dashboard/*.js|css|html` commits are fast-forwarded locally **without restarting Uvicorn** because StaticFiles serves them directly from disk
+- the dashboard watches sync state and reloads itself when dashboard files changed, including `updated`, `published`, and `reconciled` sync paths
+- `b3_trader/*.py` runtime changes still require a Python-process reload; GitAutoSync requests exit code 75 and the existing PowerShell supervisor restarts the app automatically
+- therefore the user should not normally have to stop/re-run `start-trader-secure.bat` for GitHub commits
+- control-only local state remains preserved/reconciled; unexpected non-control local code changes still block auto-update rather than being destroyed
 
-- `판단 근거 자세히 보기` open state survives 5-second rerenders
+### 5. Existing stability fixes retained
+
+- `판단 근거 자세히 보기` open state survives polling rerenders
 - mobile inputs avoid Safari focus zoom
 - routine button labels stay one line
 - ETH/BTC remains a built-in market reference, not a fake KRW asset
 - Telegram remains BUY_CANDIDATE-only
 
-## New isolated 10,000,000 KRW automatic PAPER demo
+## Isolated 10,000,000 KRW automatic PAPER demo
 
-User requested a demo before real execution that automatically searches the full Bithumb KRW market and trades suitable coins with a 10,000,000 KRW virtual seed.
+The demo is now owned by the **FastAPI app lifecycle**, not by a one-time child process created only when the shell launcher starts. This fixes the problem where code could sync but the newly added demo would not appear until a manual launcher restart.
 
-Implemented as `b3_trader/auto_demo.py` and intentionally isolated from the existing manual/watchlist PAPER portfolio.
+Implemented in `b3_trader/auto_demo.py` + `b3_trader/local_app.py`.
 
 Core rules:
 - start capital: 10,000,000 KRW
-- public Bithumb endpoints only; **no API key and no private/order endpoint calls**
-- scans the current Bithumb KRW market list every ~3 minutes
+- public Bithumb endpoints only; no private/order endpoints and no API key required
+- scans the current Bithumb KRW market list roughly every 3 minutes
 - excludes BTC, ETH and major stablecoins from candidate trading
-- filters out low-turnover assets and extreme 24h moves
-- ranks the liquid universe using liquidity + momentum, then applies the existing `AssetStrategy` to top candidates
-- entry requires existing `BUY_CANDIDATE` logic rather than a new unrelated signal model
-- adaptive base order starts from 500,000 KRW and uses the existing regime/entry confidence sizing function
-- max per-asset virtual position: 3,000,000 KRW
-- max total virtual exposure: 6,000,000 KRW
-- max simultaneous positions: 4
-- existing execution-risk logic is reused for spread, estimated slippage, BTC flash-crash and order-rate limits
-- the same asset can receive an additional PAPER buy only after cooldown while BUY_CANDIDATE still holds and caps permit it
-- exit on hard PAPER stop at -8% or broad-regime score below 45
+- filters low turnover and extreme 24h moves
+- ranks liquid universe using liquidity + momentum, then applies existing `AssetStrategy`
+- entry still requires existing `BUY_CANDIDATE`
+- adaptive entry sizing from 500,000 KRW base
+- max per asset 3,000,000 KRW
+- max total exposure 6,000,000 KRW
+- max simultaneous positions 4
+- reuses spread/slippage/BTC flash-crash/order-rate guards
+- additional PAPER buys allowed only after cooldown while BUY_CANDIDATE persists and caps permit
+- exit on -8% hard PAPER stop or regime score below 45
 - sell fill uses order-book-estimated executable price when available
 
-Persistence/UI:
-- separate SQLite: `b3_trader/data/auto_demo.sqlite3`
-- generated dashboard state: ignored `dashboard/runtime-demo.json`
-- `scripts/run-local.ps1` starts the demo automatically unless local environment sets `AUTO_DEMO_ENABLED=false`
-- if the demo process dies while the main launcher is alive, the launcher restarts it
-- Home dashboard gets a `1,000만원 자동매매 데모` card showing virtual equity, cash, held symbols and current candidates
-- this experiment never changes manually entered real holdings and never places real orders
+Lifecycle/persistence/UI:
+- separate SQLite: ignored `b3_trader/data/auto_demo.sqlite3`
+- generated runtime status remains ignored `dashboard/runtime-demo.json`
+- local app starts/supervises the demo in a daemon thread when `AUTO_DEMO_ENABLED` is not false
+- the status includes PID so an older external demo process can be observed rather than duplicated during migration
+- `/api/demo` exposes authenticated demo status to the dashboard
+- Home always mounts a `1,000만원 자동매매 데모` card; it shows virtual equity, cash, held symbols and current candidates
+- no demo state contaminates the main PAPER portfolio or manually entered real holdings
 
 ## Current phone-access decision
 
@@ -130,8 +140,8 @@ Persistence/UI:
 ## Git/CI state
 
 - Work continues on `b3-auto-trader-phase1`, Draft PR #1; do not merge without explicit request.
-- Latest functional head before this handoff update: `6e1791ef0af1e80d8e7440babde760e7d415ead1`.
-- GitHub Actions run for that functional head completed successfully: dashboard smoke, Python tests/compile, and Cloudflare typecheck all passed.
+- Latest code head before this handoff update: `bdc65f4b19fb82935f8c23e539c495072873ff65`.
+- GitHub Actions on that head completed successfully.
 - Local `control/assets.json` may remain modified because the user added assets locally.
 - Runtime data under `b3_trader/data/` and generated `dashboard/runtime-demo.json` remain ignored by Git.
 
@@ -141,15 +151,15 @@ Persistence/UI:
 
 ## Exact next action
 
-1. Let the user's local auto-sync receive the new branch head, or restart `start-trader-secure.bat` once if the new demo process is not running yet.
-2. On iPhone reload the current Cloudflare HTTPS page and verify:
-   - averaging rows are stacked cleanly and no input/removal button overlaps
-   - `내 평단` is clearly larger
-   - `현재 손익` amount and percentage are both visible
-   - moving blue Liquid selector visibly stretches/overshoots/springs when changing top navigation or coin chips
-3. On Home verify `1,000만원 자동매매 데모` appears and updates independently of the main PAPER account.
-4. Leave the demo running. Evaluate candidate quality, trade count, realized P/L, total return, drawdown and concentration before changing thresholds or discussing live execution.
-5. Capture new Home/Coin screenshots after the branch is active; tune only observed regressions.
+1. Allow the currently running local app up to about one old-sync interval to receive this bootstrap update. Because this update changes Python, the process should auto-exit with code 75 and be restarted by the already-running supervisor; the user should not manually restart the launcher unless that bootstrap fails.
+2. After the automatic runtime restart, refresh the browser once if it was already open on the pre-hot-reload JavaScript. From then on dashboard-only commits should self-reload.
+3. Verify on Home that `1,000만원 자동매매 데모` is visible and `/api/demo` is updating.
+4. Verify on Coin:
+   - averaging inputs are full-width stacked rows
+   - average price is visibly larger
+   - P/L amount and percentage are both visible
+   - primary and coin Liquid selectors visually bleed outside the inner rail and spring when changed
+5. Leave the demo running to collect trade count, realized P/L, drawdown, concentration and candidate-quality evidence before changing live-trading scope.
 6. Finish rclone Google Drive backup verification after UI/demo validation.
 7. Leave real-money trading deferred to the separate future Work/workstream.
 
@@ -157,7 +167,7 @@ Persistence/UI:
 
 - Keep all exchange execution PAPER-only.
 - Keep `LIVE_TRADING_ENABLED=false`; do not add live order execution here.
-- The isolated auto demo must use only public Bithumb market endpoints.
+- The isolated auto demo uses only public Bithumb market endpoints.
 - Never commit local tokens/secrets, Cloudflare credentials, public IPs or runtime SQLite files.
 - Do not expose port 8765 directly to the public internet.
 - Preserve remote bearer-token authentication.
