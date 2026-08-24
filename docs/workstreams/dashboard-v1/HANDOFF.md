@@ -85,8 +85,7 @@ Key changes:
 
 - The user's diverged local branch was repaired against `origin/b3-auto-trader-phase1` while preserving local data.
 - `control/assets.json` may remain locally modified by design.
-- Latest secure-launcher baseline passed CI.
-- Latest simplified-dashboard commit is waiting for/under CI at the time of this handoff.
+- Secure-launcher and latest simplified-dashboard changes both passed CI.
 
 ## Active task
 
