@@ -10,7 +10,7 @@
   const $$=(selector,root=document)=>[...root.querySelectorAll(selector)];
   const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
   const reduced=()=>window.matchMedia?.('(prefers-reduced-motion: reduce)').matches===true;
-  const UI_BUILD='2026.08.24-3';
+  const UI_BUILD='2026.08.24-4';
 
   function ensureIndicator(host,className){
     if(!host)return null;
@@ -125,10 +125,16 @@
     document.addEventListener('touchstart',event=>{if(event.touches.length!==1||interactiveSwipeTarget(event.target)){gesture=null;return}const touch=event.touches[0];gesture={x:touch.clientX,y:touch.clientY,t:performance.now(),view:appState()?.view||'overview'}},{passive:true});
     document.addEventListener('touchend',event=>{if(!gesture||event.changedTouches.length!==1){gesture=null;return}const touch=event.changedTouches[0],dx=touch.clientX-gesture.x,dy=touch.clientY-gesture.y,dt=performance.now()-gesture.t,start=gesture;gesture=null;if(dt>850||Math.abs(dx)<58||Math.abs(dx)<Math.abs(dy)*1.35)return;const direction=dx<0?1:-1;if(start.view==='assets'&&switchAdjacentAsset(direction))return;switchAdjacentView(direction)},{passive:true});
   }
-  function watchForDashboardSync(){let lastReload='';setInterval(()=>{const sync=appState()?.snapshot?.sync||{},changed=[...(Array.isArray(sync.changed)?sync.changed:[]),...(Array.isArray(sync.remote_changed)?sync.remote_changed:[])];if(!['updated','published','reconciled'].includes(sync.status)||!changed.some(path=>String(path).startsWith('dashboard/')))return;const marker=String(sync.to||sync.commit||sync.remote||changed.join('|'));if(!marker||marker===lastReload)return;lastReload=marker;const key=`cryptoDashboardReload:${marker}`;if(sessionStorage.getItem(key)==='1')return;sessionStorage.setItem(key,'1');setTimeout(()=>location.reload(),250)},1200)}
+  function reloadWithBuild(marker){
+    const url=new URL(window.location.href);
+    url.searchParams.set('ui',marker||UI_BUILD);
+    window.location.replace(url.toString());
+  }
+  function watchForDashboardSync(){let lastReload='';setInterval(()=>{const sync=appState()?.snapshot?.sync||{},changed=[...(Array.isArray(sync.changed)?sync.changed:[]),...(Array.isArray(sync.remote_changed)?sync.remote_changed:[])];if(!['updated','published','reconciled'].includes(sync.status)||!changed.some(path=>String(path).startsWith('dashboard/')))return;const marker=String(sync.to||sync.commit||sync.remote||changed.join('|'));if(!marker||marker===lastReload)return;lastReload=marker;const key=`cryptoDashboardReload:${marker}`;if(sessionStorage.getItem(key)==='1')return;sessionStorage.setItem(key,'1');setTimeout(()=>reloadWithBuild(marker.slice(0,12)),250)},1200)}
   function loadResearchUi(){
-    if(!document.querySelector('link[data-demo-research]')){const link=document.createElement('link');link.rel='stylesheet';link.href='./demo-research.css?v=3';link.dataset.demoResearch='1';document.head.appendChild(link)}
-    if(!window.__demoResearchLoading&&!window.__demoResearchLoaded){window.__demoResearchLoading=true;const script=document.createElement('script');script.src='./demo-research.js?v=3';script.onload=()=>{window.__demoResearchLoading=false};script.onerror=()=>{window.__demoResearchLoading=false};document.body.appendChild(script)}
+    const version=encodeURIComponent(UI_BUILD);
+    if(!document.querySelector('link[data-demo-research]')){const link=document.createElement('link');link.rel='stylesheet';link.href=`./demo-research.css?v=${version}`;link.dataset.demoResearch='1';document.head.appendChild(link)}
+    if(!window.__demoResearchLoading&&!window.__demoResearchLoaded){window.__demoResearchLoading=true;const script=document.createElement('script');script.src=`./demo-research.js?v=${version}`;script.onload=()=>{window.__demoResearchLoading=false};script.onerror=()=>{window.__demoResearchLoading=false};document.body.appendChild(script)}
   }
   function installBuildMarker(){
     const settings=$('[data-view-panel="settings"] .settings-grid');if(!settings||$('#uiBuildMarker'))return;
