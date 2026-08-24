@@ -7,43 +7,63 @@ It does not replace or modify the existing `cloudflare/` Container experiment.
 ## Purpose
 
 - free stable `*.pages.dev` address
-- GitHub push -> Cloudflare Pages deployment
 - owner/viewer login with long-lived secure session cookie
 - owner-created invite links
 - optional per-user permission to see manually entered holdings
 - outbound-only PC snapshot publishing
+- Git changes can be deployed by the 24/7 PC after local Git sync
 - no remote trading controls
 - no exchange API secrets, SQLite database or local admin token uploaded to Pages
 
-## Cloudflare resources
+## Recommended setup: local Wrangler bridge
 
-Create:
+The repository does not currently require Cloudflare API credentials in GitHub.
 
-1. one Cloudflare Pages project connected to this private GitHub repository,
-2. one D1 database,
-3. Pages Functions D1 binding named `DB`,
-4. encrypted secret `INGEST_TOKEN`,
-5. encrypted secret `OWNER_BOOTSTRAP_TOKEN`,
-6. optional environment variable `SESSION_DAYS` (default 30, max 90).
+On the Windows research PC, after the latest branch is synced, run once:
 
-### Pages Git settings
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-cloudflare-pages-viewer.ps1
+```
 
-Use:
+The setup performs these steps without printing secrets:
 
-- project name: your choice; this becomes `<project>.pages.dev`
-- production branch: `b3-auto-trader-phase1` while this PR remains the active test branch
-- root directory: `cloudflare-pages`
-- framework preset: None
-- build command: `npm run build`
-- build output directory: `public`
+1. validates the Pages viewer code,
+2. opens Wrangler browser OAuth if Cloudflare is not already authenticated,
+3. creates or reuses a Pages project,
+4. creates or reuses the D1 database,
+5. binds D1 as `DB` through a local ignored Wrangler config,
+6. applies D1 migrations,
+7. creates the ingest + first-owner bootstrap secrets,
+8. stores the ingest configuration only in local `.env`,
+9. stores the first-owner bootstrap key only under ignored `b3_trader/data/`, and copies it to the Windows clipboard when possible,
+10. deploys and verifies `/api/health`,
+11. enables snapshot publishing and local Pages auto-deploy components.
 
-Cloudflare Pages supports private GitHub repositories and deploys production-branch pushes automatically.
+Default project name:
 
-## D1 migration
+`crypto-paper-viewer-ydh1121.pages.dev`
 
-Run `migrations/0001_init.sql` against the D1 database, then bind that database to the Pages project as `DB` for both production and preview when needed.
+If that name cannot be created in the Cloudflare account, setup automatically tries a short unique suffix and records the resulting stable URL locally.
 
-The schema contains:
+After the one-time setup, the data/code path is:
+
+```text
+GitHub branch update
+  -> local GitAutoSync
+  -> cloudflare-pages-deploy component detects viewer changes
+  -> Pages deploy
+
+Windows PAPER engine
+  -> cloudflare-snapshot-publish every ~20s
+  -> D1 latest snapshot
+  -> authenticated pages.dev viewer
+```
+
+The auto-deployer checks the Git HEAD every ~30 seconds but only runs npm/typecheck/migration/deploy when `cloudflare-pages/**` actually changed. It does not restart or control the PAPER engine.
+
+## D1 schema
+
+`migrations/0001_init.sql` contains:
 
 - `users`
 - `invites`
@@ -51,38 +71,28 @@ The schema contains:
 - `snapshots`
 - `audit_log`
 
-## First owner
-
-Set `OWNER_BOOTSTRAP_TOKEN` to a strong random value in Cloudflare Pages secrets.
-
-Open the site, choose `처음 관리자 계정 만들기`, enter that bootstrap key once and create the owner account.
-
-After the owner exists, `/api/auth/bootstrap` refuses a second owner bootstrap even if the secret is known.
+The first owner is created from the site with the local bootstrap key. After an owner already exists, the bootstrap API refuses creating another owner from that key.
 
 ## Local PC publisher
 
-The local research supervisor has a disabled-by-default component named `cloudflare-snapshot-publish`.
+The research supervisor component is named `cloudflare-snapshot-publish`.
 
-Add these only to the PC's local `.env`:
+The setup script writes these values only to the PC's ignored `.env`:
 
 ```env
+CLOUDFLARE_VIEWER_PROJECT=<project-name>
+CLOUDFLARE_VIEWER_D1=<database-name>
 CLOUDFLARE_VIEWER_INGEST_URL=https://<project>.pages.dev/api/ingest
-CLOUDFLARE_VIEWER_INGEST_TOKEN=<same value as Cloudflare INGEST_TOKEN>
-CLOUDFLARE_PUBLISH_PRIVATE_HOLDINGS=false
+CLOUDFLARE_VIEWER_INGEST_TOKEN=<local secret>
+CLOUDFLARE_PUBLISH_PRIVATE_HOLDINGS=true
 ```
 
-Then restart once so the research supervisor receives the new environment, open local Settings and turn on `웹 상태판 데이터 보내기`.
-
-The default publish interval is 20 seconds and can be controlled locally through the research component manager.
-
-### Manual holdings privacy
-
-`CLOUDFLARE_PUBLISH_PRIVATE_HOLDINGS=false` is the default.
-
-When it is `true`, only the compact manual-holdings snapshot is sent; the raw local SQLite database is never uploaded. The Pages API serves that private snapshot only to:
+Raw SQLite is never uploaded. The published private section contains only a compact manual-holdings snapshot. It is returned only to:
 
 - the owner, or
 - viewers created with `내 자산정보도 보이기` permission.
+
+Set `CLOUDFLARE_PUBLISH_PRIVATE_HOLDINGS=false` at any time to stop sending manual holdings/average price while continuing public PAPER snapshot publishing.
 
 ## Security boundary
 
@@ -96,14 +106,24 @@ The Pages viewer has no API route for:
 - exchange credentials,
 - local Git control.
 
-The only machine-to-cloud write is `POST /api/ingest`, protected by `INGEST_TOKEN`.
+The only machine-to-cloud write is `POST /api/ingest`, protected by the ingest secret.
 
-## Local checks
+## Optional GitHub Actions deployment
 
-```bash
-cd cloudflare-pages
-npm install
-npm run typecheck
-```
+`.github/workflows/deploy-pages-viewer.yml` can deploy directly from GitHub if repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are configured later.
 
-Cloudflare account-side project creation, D1 binding and secrets are intentionally not committed to Git.
+If those GitHub secrets are absent, the workflow still validates the viewer and exits successfully; deployment stays delegated to the local Wrangler bridge. This avoids storing a Cloudflare API token in GitHub solely for this personal viewer.
+
+## Manual Cloudflare alternative
+
+If the local setup bridge is not used, the equivalent Pages settings are:
+
+- production branch: `b3-auto-trader-phase1`
+- root directory: `cloudflare-pages`
+- framework preset: None
+- build command: `npm run build`
+- build output directory: `public`
+- D1 binding: `DB`
+- secrets: `INGEST_TOKEN`, `OWNER_BOOTSTRAP_TOKEN`
+
+Google Drive remains backup/export only and is not the live web database.
