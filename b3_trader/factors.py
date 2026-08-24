@@ -67,6 +67,19 @@ def _ticker_return_pct(row: dict[str, Any]) -> float:
     return rate
 
 
+def eth_btc_relative_change_pct(eth_return_pct: float, btc_return_pct: float) -> float:
+    """Return the ETH/BTC relative move from independent KRW returns.
+
+    This lets the dashboard use ETH/BTC as a market reference even when the
+    exchange does not expose an ETH-BTC spot market to this KRW-only engine.
+    """
+    denominator = 1.0 + float(btc_return_pct) / 100.0
+    if denominator <= 0:
+        return 0.0
+    value = ((1.0 + float(eth_return_pct) / 100.0) / denominator - 1.0) * 100.0
+    return round(value, 4)
+
+
 def score_basket(
     returns_pct: list[float],
     markets: list[str],
@@ -241,8 +254,24 @@ class MarketFactorProvider:
         return values
 
     def snapshot(self) -> FactorSnapshot:
-        majors = self._returns(["KRW-BTC", "KRW-ETH"])
-        major_return = sum(majors) / len(majors) if majors else 0.0
+        major_rows = self.client.tickers(["KRW-BTC", "KRW-ETH"])
+        majors_by_market = {
+            str(row.get("market", "")).upper(): row for row in major_rows
+        }
+        btc_row = majors_by_market.get("KRW-BTC") or {}
+        eth_row = majors_by_market.get("KRW-ETH") or {}
+        btc_return = _ticker_return_pct(btc_row) if btc_row else 0.0
+        eth_return = _ticker_return_pct(eth_row) if eth_row else 0.0
+        major_values = [
+            value
+            for row, value in ((btc_row, btc_return), (eth_row, eth_return))
+            if row
+        ]
+        major_return = sum(major_values) / len(major_values) if major_values else 0.0
+        btc_price = float(btc_row.get("trade_price") or 0.0) if btc_row else 0.0
+        eth_price = float(eth_row.get("trade_price") or 0.0) if eth_row else 0.0
+        eth_btc_ratio = eth_price / btc_price if btc_price > 0 and eth_price > 0 else None
+        eth_btc_change = eth_btc_relative_change_pct(eth_return, btc_return)
 
         alt_markets = self._available(DEFAULT_ALT_BASKET)
         base_markets = self._available(DEFAULT_BASE_BASKET)
@@ -282,6 +311,10 @@ class MarketFactorProvider:
             factors=factors,
             details={
                 "major_24h_return_pct": round(major_return, 3),
+                "btc_24h_return_pct": round(btc_return, 3),
+                "eth_24h_return_pct": round(eth_return, 3),
+                "eth_btc_ratio": round(eth_btc_ratio, 10) if eth_btc_ratio is not None else None,
+                "eth_btc_24h_change_pct": eth_btc_change,
                 "alt": asdict(alt),
                 "base": asdict(base),
                 "gaming": asdict(gaming),
