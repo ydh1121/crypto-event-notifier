@@ -9,6 +9,7 @@ from typing import Any
 
 
 CLOUDFLARE_URL_FILE = Path("b3_trader/data/cloudflare-tunnel-url.txt")
+CLOUDFLARE_STABLE_FILE = Path("b3_trader/data/cloudflare-stable.json")
 
 
 def _lan_ipv4() -> str | None:
@@ -91,33 +92,76 @@ def _tailscale_status() -> dict[str, Any]:
         }
 
 
+def _stable_cloudflare_config() -> dict[str, Any] | None:
+    try:
+        if not CLOUDFLARE_STABLE_FILE.exists():
+            return None
+        payload = json.loads(CLOUDFLARE_STABLE_FILE.read_text(encoding="utf-8-sig"))
+        hostname = str(payload.get("hostname") or "").strip().lower()
+        tunnel_id = str(payload.get("tunnel_id") or "").strip()
+        if not hostname or not tunnel_id:
+            return None
+        return {
+            **payload,
+            "hostname": hostname,
+            "tunnel_id": tunnel_id,
+            "url": f"https://{hostname}",
+        }
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+
+
 def _cloudflare_status() -> dict[str, Any]:
+    stable = _stable_cloudflare_config()
     try:
         if not CLOUDFLARE_URL_FILE.exists():
             return {
                 "active": False,
-                "url": None,
-                "mode": "quick_tunnel",
+                "url": stable.get("url") if stable else None,
+                "mode": "named_tunnel" if stable else "quick_tunnel",
+                "configured": bool(stable),
+                "stable": bool(stable),
+                "vpn_required": False,
+                "https": True,
             }
+
         url = CLOUDFLARE_URL_FILE.read_text(encoding="utf-8-sig").strip()
-        if not url.startswith("https://") or ".trycloudflare.com" not in url:
+        if not url.startswith("https://"):
             return {
                 "active": False,
-                "url": None,
-                "mode": "quick_tunnel",
+                "url": stable.get("url") if stable else None,
+                "mode": "named_tunnel" if stable else "quick_tunnel",
+                "configured": bool(stable),
+                "stable": bool(stable),
             }
+
+        named = bool(stable and url.rstrip("/") == str(stable.get("url")).rstrip("/"))
+        quick = ".trycloudflare.com" in url
+        if not named and not quick:
+            return {
+                "active": False,
+                "url": stable.get("url") if stable else None,
+                "mode": "named_tunnel" if stable else "quick_tunnel",
+                "configured": bool(stable),
+                "stable": bool(stable),
+            }
+
         return {
             "active": True,
             "url": url,
-            "mode": "quick_tunnel",
+            "mode": "named_tunnel" if named else "quick_tunnel",
+            "configured": bool(stable) or quick,
+            "stable": named,
             "vpn_required": False,
             "https": True,
         }
     except OSError as exc:
         return {
             "active": False,
-            "url": None,
-            "mode": "quick_tunnel",
+            "url": stable.get("url") if stable else None,
+            "mode": "named_tunnel" if stable else "quick_tunnel",
+            "configured": bool(stable),
+            "stable": bool(stable),
             "message": f"{type(exc).__name__}: {exc}",
         }
 
@@ -142,7 +186,6 @@ def network_status(port: int, host: str = "0.0.0.0") -> dict[str, Any]:
         "cloudflare": cloudflare,
         "tailscale": {
             **tailscale,
-            # Prefer the 100.x Tailscale address. It does not depend on MagicDNS.
             "url": f"http://{tailscale_ip}:{port}" if tailscale_ip else None,
             "dns_url": f"http://{tailscale_dns}:{port}" if tailscale_dns else None,
             "preferred": "ipv4",
