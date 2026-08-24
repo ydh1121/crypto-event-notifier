@@ -81,19 +81,24 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 ## H. Phone / external access — current stopping point
 
-- [x] Add network-access status API (LAN address + Tailscale installed/connected state)
-- [x] Add phone-access panel in settings with copyable safe URL and token guidance
+- [x] Add network-access status API
+- [x] Add phone-access panel with connection-code guidance
 - [x] Rename Dashboard token to user-facing `휴대폰 연결 코드`
-- [x] Add a loopback-only API so the PC dashboard can reveal/copy the connection code without exposing it remotely
-- [x] Add loopback-only phone-code rotation endpoint/button
-- [x] Add `scripts/setup-phone-access.ps1` to install/open Tailscale with user approval
-- [x] Prefer direct Tailscale 100.x IPv4 URL instead of depending on MagicDNS/ts.net
-- [x] Add optional Windows Firewall rule scoped only to Tailscale `100.64.0.0/10`
-- [x] Add a visible warning when the dashboard is opened over a public HTTP/WAN address
-- [ ] Verify direct `http://100.x.x.x:8765` access from the user's phone on 5G with Tailscale VPN enabled
-- [ ] Confirm any public-IP/port-forwarding path is disabled after Tailscale works
-- [x] Keep remote clients behind Dashboard token authentication
-- [x] Explicitly warn against public port-forwarding of 8765
+- [x] Add loopback-only reveal/rotate endpoints for the phone connection code
+- [x] Add Tailscale setup as an optional path
+- [x] Confirm Tailscale 100.x requires the phone VPN switch to be ON
+- [x] User declined VPN-dependent phone access as the primary path
+- [x] Add VPN-free Cloudflare Quick Tunnel launcher: `start-trader-secure.bat`
+- [x] Bind the trader to 127.0.0.1 in secure launcher mode so router forwarding cannot directly reach the app
+- [x] Surface current `https://*.trycloudflare.com` URL through `/api/network`
+- [x] Make VPN-free HTTPS Cloudflare access the primary phone-access UI and Tailscale optional
+- [x] Keep public HTTP/WAN access warning visible
+- [ ] Repair the user's diverged local branch and pull the secure launcher
+- [ ] Verify `start-trader-secure.bat` generates an HTTPS Quick Tunnel URL
+- [ ] Verify iPhone 5G access to that HTTPS URL with no VPN
+- [ ] Verify old public-IP `http://...:8765` access stops while secure launcher is active
+- [ ] Remove router port-forwarding/DMZ/UPnP exposure after the HTTPS path works
+- [ ] Rotate the phone connection code after public exposure is removed
 
 ## I. Real-money execution
 
@@ -108,12 +113,12 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 ## Validation status
 
-- [x] Latest holdings/calculator/sync/Tailscale Python tests pass in GitHub Actions
-- [x] Latest Python module compile check passes
-- [x] Latest Dashboard `app.js`, `plain-language.js`, and `portfolio-tools.js` pass `node --check`
-- [x] Latest Dashboard structural smoke checks pass
+- [x] Holdings/calculator/sync/Tailscale baseline CI green
+- [-] VPN-free Cloudflare tunnel change CI pending
+- [x] Python module compile check passes on previous baseline
+- [x] Dashboard JavaScript checks pass on previous baseline
 - [x] Existing Cloudflare TypeScript check remains green
 
 ## Completion condition for this workstream
 
-This workstream stops when the redesigned dashboard, analytics/graphs, durable PAPER forward test, Telegram operations, Git/Drive backup path, multi-asset views, secure phone external access, and user-facing holdings/averaging tools are usable and verified. Real-money trading remains deferred.
+This workstream stops when the redesigned dashboard, analytics/graphs, durable PAPER forward test, Telegram operations, Git/Drive backup path, multi-asset views, VPN-free secure phone external access, and user-facing holdings/averaging tools are usable and verified. Real-money trading remains deferred.
