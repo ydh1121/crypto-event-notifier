@@ -6,8 +6,9 @@ $controlPaths = @("control/assets.json", "control/runtime.json")
 
 # This launcher is the normal always-on mode for the project. Keep GitHub polling
 # enabled and reasonably quick even when an older .env still contains the original
-# 60-second template value. python-dotenv does not override process environment.
+# template values. python-dotenv does not override process environment.
 $env:AUTO_GIT_SYNC = "true"
+$env:AUTO_GIT_PUSH_CONTROL = "true"
 $env:GIT_SYNC_INTERVAL_SECONDS = "15"
 
 # Windows PowerShell 5.1 can surface stderr from a successful native command
