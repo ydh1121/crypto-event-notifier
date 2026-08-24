@@ -8,6 +8,9 @@ from pathlib import Path
 from typing import Any
 
 
+CLOUDFLARE_URL_FILE = Path("b3_trader/data/cloudflare-tunnel-url.txt")
+
+
 def _lan_ipv4() -> str | None:
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
@@ -88,17 +91,55 @@ def _tailscale_status() -> dict[str, Any]:
         }
 
 
-def network_status(port: int) -> dict[str, Any]:
+def _cloudflare_status() -> dict[str, Any]:
+    try:
+        if not CLOUDFLARE_URL_FILE.exists():
+            return {
+                "active": False,
+                "url": None,
+                "mode": "quick_tunnel",
+            }
+        url = CLOUDFLARE_URL_FILE.read_text(encoding="utf-8-sig").strip()
+        if not url.startswith("https://") or ".trycloudflare.com" not in url:
+            return {
+                "active": False,
+                "url": None,
+                "mode": "quick_tunnel",
+            }
+        return {
+            "active": True,
+            "url": url,
+            "mode": "quick_tunnel",
+            "vpn_required": False,
+            "https": True,
+        }
+    except OSError as exc:
+        return {
+            "active": False,
+            "url": None,
+            "mode": "quick_tunnel",
+            "message": f"{type(exc).__name__}: {exc}",
+        }
+
+
+def network_status(port: int, host: str = "0.0.0.0") -> dict[str, Any]:
     lan_ip = _lan_ipv4()
     tailscale = _tailscale_status()
+    cloudflare = _cloudflare_status()
     tailscale_ip = tailscale.get("ipv4")
     tailscale_dns = tailscale.get("dns_name")
+    loopback_only = str(host).strip() in {"127.0.0.1", "localhost", "::1"}
+    lan_url = None if loopback_only else (f"http://{lan_ip}:{port}" if lan_ip else None)
     return {
         "port": int(port),
+        "bind_host": host,
+        "loopback_only": loopback_only,
         "lan": {
             "ipv4": lan_ip,
-            "url": f"http://{lan_ip}:{port}" if lan_ip else None,
+            "url": lan_url,
+            "enabled": bool(lan_url),
         },
+        "cloudflare": cloudflare,
         "tailscale": {
             **tailscale,
             # Prefer the 100.x Tailscale address. It does not depend on MagicDNS.
@@ -107,6 +148,9 @@ def network_status(port: int) -> dict[str, Any]:
             "preferred": "ipv4",
         },
         "public_port_forwarding_recommended": False,
-        "public_http_warning": "Do not use a public/WAN IP for this dashboard. Use LAN or Tailscale only.",
+        "public_http_warning": (
+            "Do not use a public/WAN IP for this dashboard. "
+            "For VPN-free phone access use the HTTPS Cloudflare Tunnel launcher."
+        ),
         "remote_auth_required": True,
     }
