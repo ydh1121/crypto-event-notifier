@@ -6,7 +6,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 - [-] User acceptance of Photo-eBook top navigation on PC + iPhone
 - [-] Verify Chrome remains responsive during full-market PAPER research
-- [-] Verify GitHub -> local sync runs without manual repair during a normal session
+- [-] Verify GitHub -> local sync remains reliable during long-run operation
 - [x] Preserve local SQLite/control state across restart
 - [x] Keep live exchange execution out of this workstream
 
@@ -55,6 +55,7 @@ Current managed components:
 - `warehouse-export` — every 5 minutes
 - `reference-version-watch` — every 6 hours
 - `cloudflare-snapshot-publish` — every 20 seconds after Pages setup
+- `cloudflare-market-detail-publish` — every 30 seconds after Pages setup
 - `cloudflare-pages-deploy` — checks every 30 seconds after Pages setup; deploys only on viewer-code changes
 
 Safety contract:
@@ -133,6 +134,8 @@ Initial catalog:
 - [x] Enable snapshot publish + Pages deploy automatically after successful one-time setup
 - [x] Harden Windows Wrangler invocation and UTF-8 subprocess handling
 - [x] Fix Pages deploy config path handling
+- [x] Prevent Pages npm install from dirtying the Git worktree with generated `package-lock.json`
+- [x] Verify Git auto-sync can receive the fix and Pages auto-deploy remains healthy
 
 ### 2C. Deployment path
 
@@ -166,29 +169,34 @@ Goal: keep the Windows PC and SQLite as the source of truth while making Pages t
 
 ### 2.5B. Detailed research data bridge
 
-- [-] Design compact per-market detail payload separate from the global snapshot
-- [ ] Publish current position, planned next entry/add, target/stop/trailing state
-- [ ] Publish recent PAPER fills per market
-- [ ] Publish completed-trade feedback and profile-learning history
-- [ ] Publish bounded equity history for charts
-- [ ] Publish bounded market-memory/score history for charts and diagnostics
-- [ ] Add D1/API storage that avoids resending every market's full history every 20 seconds
-- [ ] Add authenticated per-market detail endpoint
+- [x] Design compact per-market detail payload separate from the global snapshot
+- [x] Publish current position, planned next entry/add, target/stop/trailing state
+- [x] Publish recent PAPER fills per market
+- [x] Publish completed-trade feedback and profile-learning history
+- [x] Publish bounded equity history for charts
+- [x] Publish bounded market-memory/score history for charts and diagnostics
+- [x] Add D1/API storage that avoids resending every market's full history every 20 seconds
+- [x] Add authenticated per-market detail endpoint
+- [x] Add rotating detail publisher keyed by `exchange + market + strategy`
+- [x] Add size-aware multi-request batching so growing history does not break the publisher
+- [x] Runtime verify 40 markets stored successfully in two requests with max request < 1.5 MB
 
 ### 2.5C. Local-equivalent read-only UI
 
-- [ ] Price/equity charts with useful ranges
-- [ ] Market-condition / buy-timing history
-- [ ] Detailed fill/history list
-- [ ] Learning/profile-change history
-- [ ] Next planned buy/add and protection levels
-- [ ] Plain-Korean decision/reason hierarchy aligned with `DESIGN.md`
+- [-] Verify real authenticated browser rendering of the new detailed Coin workspace
+- [x] Add bounded equity chart to Coin detail
+- [x] Add market-condition / buy-timing / opportunity history chart
+- [x] Add recent fill/history list
+- [x] Add learning/profile-change history
+- [x] Add next planned buy/add and protection levels
+- [-] Refine plain-Korean decision/reason hierarchy aligned with `DESIGN.md`
+- [ ] Expand Records into a useful cross-market fill/learning view
 - [ ] Mobile Safari QA at 360–430 px
 - [ ] Desktop QA at 1280–1920 px
 - [ ] Verify polling preserves selected tab/coin/filter/scroll state
 - [ ] Verify 477-market rendering remains responsive
 
-Phase 3 may start after the Phase 2.5 data contract is stable; detailed visual polish can continue in parallel.
+Phase 3 may start after the Phase 2.5 data contract and real-browser detail rendering are stable; detailed visual polish can continue in parallel.
 
 ## Phase 3 — Upbit all-market PAPER
 
