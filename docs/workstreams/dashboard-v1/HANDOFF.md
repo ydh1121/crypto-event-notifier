@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Phase 4 continuation: local multi-asset PAPER engine + operational dashboard redesign/analytics + secure phone access.
+Local multi-asset PAPER forward-test console: redesigned dashboard + analytics + secure phone access preparation.
 
 ## User-approved scope
 
@@ -10,65 +10,76 @@ Proceed through dashboard redesign, charts/analytics, forward-test persistence, 
 
 Do **not** build real-money execution in this workstream. Live execution is a future separate Work/workstream.
 
-## Runtime that already works
+## Implemented and validated
 
 - Local FastAPI/Uvicorn server on port 8765
 - loopback dashboard authentication without stale-token lockout
-- remote/LAN clients require Dashboard token
-- B3 live market analysis in PAPER mode
-- Regime/Entry/context scoring
-- Bithumb/OKX public market inputs
-- PAPER buy/risk-off paths and execution guards
-- SQLite journal
-- GitHub auto-sync on branch `b3-auto-trader-phase1`
+- remote/LAN/Tailscale clients still require Dashboard token
+- B3 and ticker-added multi-asset PAPER analysis
+- Regime / Entry / asset-context diagnostics
+- Bithumb + OKX public market inputs
+- PAPER buy/risk-off paths and risk guards
+- SQLite asset snapshots, fills, events, and portfolio snapshots
+- PAPER cash/open-position restoration from persisted fills after restart
+- performance analytics: total/realized/unrealized PnL, return, closed trades, win rate, Profit Factor, MDD/current DD
+- asset price history + PAPER buy/sell markers
+- Regime/Entry history chart
+- portfolio equity chart
+- 1H / 6H / 24H / 7D chart ranges
 - Telegram local configuration + successful test message
-- ticker-based multi-asset registry
+- Telegram action/fill/risk-block/error notifications with cooldowns
+- 21:00 local PAPER daily summary
+- GitHub auto-sync on `b3-auto-trader-phase1`
+- responsive 5-view dashboard: 개요 / 자산 / 성과 / 활동 / 설정
+- network status API for LAN and Tailscale
+- phone-access settings panel with safe URL copy controls
+- `scripts/setup-phone-access.ps1` for Tailscale install/sign-in setup
+- explicit no-public-port-forwarding rule
+- restart-safe `AGENTS.md`, `DESIGN.md`, `TASKS.md`, `HANDOFF.md`
+
+GitHub Actions is green after these changes: Python tests/compile, dashboard JS syntax + smoke, existing Cloudflare TypeScript check.
 
 ## Design baseline
 
 Primary approved reference: `ydh1121/Photo-eBook` current UI and its `AGENTS.md`, `UI_REGRESSION_SPEC.md`, core tokens/layout/components.
 
-Permanent dashboard design rules now live in root `DESIGN.md`. Restart/session rules live in root `AGENTS.md`.
+Permanent dashboard design rules live in root `DESIGN.md`. Restart/session rules live in root `AGENTS.md`.
 
-Reference principles distilled from:
+Reference principles were distilled from the user-supplied public design/Korean-copy repositories. Do not copy third-party identity or large source passages; use the project-specific rules.
 
-- emilkowalski/skills: motion/UI detail discipline
-- meliwat/awesome-ios-design-md: explicit design-system specs for agents
-- VoltAgent/awesome-design-md Apple spec: restrained product hierarchy and structural spacing
-- leonxlnx/taste-skill / tastesmd: audit hierarchy/spacing before decoration; avoid generic AI UI
-- DaleSeo/korean-skills + KatFishNet reference: natural Korean, translationese/AI-pattern avoidance
-- user-provided GitHub topic/organization references for broader UI/code patterns
+## Current active task
 
-Do not copy third-party product identity or large chunks of source text; apply principles through the project-specific `DESIGN.md`.
+User-device verification and visual tuning.
 
-## Files added in this workstream
+## Exact next action in the current chat
 
-- `AGENTS.md`
-- `DESIGN.md`
-- `docs/workstreams/dashboard-v1/TASKS.md`
-- `docs/workstreams/dashboard-v1/HANDOFF.md`
+1. Let the running local app auto-pull/restart, or manually run:
+   - `git pull --ff-only origin b3-auto-trader-phase1`
+   - `.\start-trader.bat`
+2. Hard-refresh `http://127.0.0.1:8765` and visually inspect all five views.
+3. Fix any screenshot-based spacing/geometry issues without regressing mobile.
+4. In Settings > Phone access, verify the same-Wi-Fi URL from a phone.
+5. For outside-Wi-Fi access, run `.\scripts\setup-phone-access.ps1`, sign in to Tailscale on PC + phone with the same account, then use the Tailscale URL shown by the dashboard and enter the Dashboard token.
+6. Do not router-port-forward 8765.
+7. After phone access is confirmed, finish/verify the Google Drive rclone backup path if still desired, then close this workstream at the agreed stopping point.
 
-## Active task
+## Remaining known items before workstream closure
 
-`B. Dashboard information architecture and visual redesign`
-
-## Exact next action
-
-1. Extend `TradeJournal` with portfolio snapshot/history/performance queries.
-2. Make `MultiPaperPortfolio` restore from journal fills after restart.
-3. Record portfolio snapshots from `MultiAssetEngine`.
-4. Expose analytics/history/network APIs from `local_app.py`.
-5. Replace `dashboard/index.html`, `dashboard/styles.css`, and `dashboard/app.js` with the new 5-view responsive dashboard and dependency-light charts.
-6. Add Tailscale/LAN network status + setup script.
-7. Run/update tests and CI.
-8. Update TASKS/HANDOFF after each verified unit.
+- visual QA from the actual local dashboard screenshots
+- exact same-day DD baseline preservation across a restart (current positions/cash/history restore; daily DD baseline may restart from restored cost basis)
+- condition-performance breakdown only after enough completed PAPER trades exist
+- per-asset GPT research/profile notes
+- Google Drive rclone one-time local setup + real upload verification
+- same-Wi-Fi phone access verification
+- Tailscale external phone access verification
 
 ## Safety constraints
 
-- Keep PAPER-only behavior.
-- Keep `LIVE_TRADING_ENABLED=false` and do not add live order execution.
+- PAPER-only.
+- `LIVE_TRADING_ENABLED=false`.
+- No live order code in this workstream.
 - Never commit local tokens/secrets.
-- Do not expose port 8765 publicly; Tailscale/LAN only.
+- No public exposure of port 8765.
 - Preserve remote bearer-token authentication.
 
 ## Branch / PR
