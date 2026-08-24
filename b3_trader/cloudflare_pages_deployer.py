@@ -184,7 +184,9 @@ class CloudflarePagesDeployer:
         _remove_generated_package_lock()
         wrangler = _local_wrangler()
         _run([npm, "run", "typecheck"], cwd=VIEWER_DIR, timeout=180.0, env=child_env)
-        _run([node, "--check", "public/app.js"], cwd=VIEWER_DIR, timeout=60.0, env=child_env)
+        for script in ("public/app.js", "public/market-detail.js"):
+            if (VIEWER_DIR / script).exists():
+                _run([node, "--check", script], cwd=VIEWER_DIR, timeout=60.0, env=child_env)
 
         _run(
             [
