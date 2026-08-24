@@ -1,0 +1,180 @@
+name: Deploy Cloudflare Pages viewer
+
+on:
+  push:
+    branches:
+      - b3-auto-trader-phase1
+    paths:
+      - "cloudflare-pages/**"
+      - ".github/workflows/deploy-pages-viewer.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: cloudflare-pages-viewer-production
+  cancel-in-progress: false
+
+env:
+  PAGES_PROJECT: crypto-paper-viewer-ydh1121
+  D1_DATABASE: crypto-paper-viewer
+  PRODUCTION_BRANCH: b3-auto-trader-phase1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validate Cloudflare account credentials
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+
+      - name: Install and validate viewer
+        working-directory: cloudflare-pages
+        run: |
+          npm install
+          npm run typecheck
+          node --check public/app.js
+
+      - name: Ensure Pages project and D1 database
+        id: provision
+        working-directory: cloudflare-pages
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+
+          if ! npx wrangler pages project list --json | jq -e --arg name "$PAGES_PROJECT" '.[] | select(.name == $name)' >/dev/null; then
+            npx wrangler pages project create "$PAGES_PROJECT" --production-branch "$PRODUCTION_BRANCH"
+          fi
+
+          DB_ID="$(npx wrangler d1 list --json | jq -r --arg name "$D1_DATABASE" '.[] | select(.name == $name) | (.uuid // .id)' | head -n1)"
+          if [ -z "$DB_ID" ] || [ "$DB_ID" = "null" ]; then
+            npx wrangler d1 create "$D1_DATABASE" --location apac >/dev/null
+            DB_ID="$(npx wrangler d1 list --json | jq -r --arg name "$D1_DATABASE" '.[] | select(.name == $name) | (.uuid // .id)' | head -n1)"
+          fi
+          test -n "$DB_ID"
+          test "$DB_ID" != "null"
+
+          cat > wrangler.generated.jsonc <<EOF
+          {
+            "$schema": "./node_modules/wrangler/config-schema.json",
+            "name": "$PAGES_PROJECT",
+            "pages_build_output_dir": "./public",
+            "compatibility_date": "2026-08-24",
+            "d1_databases": [
+              {
+                "binding": "DB",
+                "database_name": "$D1_DATABASE",
+                "database_id": "$DB_ID"
+              }
+            ]
+          }
+          EOF
+
+          echo "database_id=$DB_ID" >> "$GITHUB_OUTPUT"
+          echo "viewer_url=https://${PAGES_PROJECT}.pages.dev" >> "$GITHUB_OUTPUT"
+
+      - name: Apply D1 migrations
+        working-directory: cloudflare-pages
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler d1 migrations apply "$D1_DATABASE" --remote --config wrangler.generated.jsonc
+
+      - name: Ensure viewer secrets
+        id: secrets
+        working-directory: cloudflare-pages
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          touch viewer-secrets.txt
+          chmod 600 viewer-secrets.txt
+
+          SECRET_LIST="$(npx wrangler pages secret list --project-name "$PAGES_PROJECT" 2>/dev/null || true)"
+
+          if ! printf '%s\n' "$SECRET_LIST" | grep -q 'INGEST_TOKEN'; then
+            INGEST_TOKEN="$(openssl rand -hex 32)"
+            printf '%s' "$INGEST_TOKEN" | npx wrangler pages secret put INGEST_TOKEN --project-name "$PAGES_PROJECT" >/dev/null
+            printf 'CLOUDFLARE_VIEWER_INGEST_URL=https://%s.pages.dev/api/ingest\n' "$PAGES_PROJECT" >> viewer-secrets.txt
+            printf 'CLOUDFLARE_VIEWER_INGEST_TOKEN=%s\n' "$INGEST_TOKEN" >> viewer-secrets.txt
+            echo "created_ingest=true" >> "$GITHUB_OUTPUT"
+          fi
+
+          if ! printf '%s\n' "$SECRET_LIST" | grep -q 'OWNER_BOOTSTRAP_TOKEN'; then
+            OWNER_TOKEN="$(openssl rand -hex 32)"
+            printf '%s' "$OWNER_TOKEN" | npx wrangler pages secret put OWNER_BOOTSTRAP_TOKEN --project-name "$PAGES_PROJECT" >/dev/null
+            printf 'OWNER_BOOTSTRAP_TOKEN=%s\n' "$OWNER_TOKEN" >> viewer-secrets.txt
+            echo "created_owner=true" >> "$GITHUB_OUTPUT"
+          fi
+
+          if [ ! -s viewer-secrets.txt ]; then
+            rm viewer-secrets.txt
+          fi
+
+      - name: Upload first-provision secret handoff
+        if: ${{ steps.secrets.outputs.created_ingest == 'true' || steps.secrets.outputs.created_owner == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: viewer-first-provision-secrets
+          path: cloudflare-pages/viewer-secrets.txt
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Deploy Pages viewer
+        working-directory: cloudflare-pages
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx wrangler pages deploy public \
+            --project-name "$PAGES_PROJECT" \
+            --branch "$PRODUCTION_BRANCH" \
+            --commit-hash "$GITHUB_SHA" \
+            --config wrangler.generated.jsonc
+
+      - name: Verify deployed health endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://${PAGES_PROJECT}.pages.dev/api/health"
+          for attempt in 1 2 3 4 5 6; do
+            if curl --fail --silent --show-error --max-time 15 "$URL" >/tmp/viewer-health.json; then
+              cat /tmp/viewer-health.json
+              exit 0
+            fi
+            sleep 5
+          done
+          exit 1
+
+      - name: Deployment summary
+        shell: bash
+        run: |
+          {
+            echo "### Cloudflare Pages viewer"
+            echo ""
+            echo "- URL: https://${PAGES_PROJECT}.pages.dev"
+            echo "- D1: ${D1_DATABASE}"
+            echo "- Production branch: ${PRODUCTION_BRANCH}"
+            echo "- Remote control: disabled / read-only viewer"
+            if [ "${{ steps.secrets.outputs.created_ingest }}" = "true" ] || [ "${{ steps.secrets.outputs.created_owner }}" = "true" ]; then
+              echo "- First-provision secrets: Actions artifact \`viewer-first-provision-secrets\` (1-day retention)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
