@@ -6,6 +6,8 @@ from typing import Any
 
 import requests
 
+from .user_language import telegram_plain_text
+
 
 class TelegramNotifier:
     def __init__(
@@ -63,11 +65,12 @@ class TelegramNotifier:
                 if now - last < min_interval_seconds:
                     return False
 
+        friendly_text = telegram_plain_text(text)
         response = self.session.post(
             f"https://api.telegram.org/bot{token}/sendMessage",
             data={
                 "chat_id": chat_id,
-                "text": text,
+                "text": friendly_text,
                 "disable_web_page_preview": "true",
                 "disable_notification": "true" if disable_notification else "false",
             },
