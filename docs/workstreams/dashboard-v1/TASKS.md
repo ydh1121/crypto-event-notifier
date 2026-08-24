@@ -28,6 +28,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Stop P/L from ellipsizing out of view; allow amount + percentage to wrap and stack metrics on narrow phones
 - [x] Rebuild Liquid Glass motion from current Photo-eBook contract: one rail/one moving indicator, measured geometry, stretch/overshoot/snap-back spring motion, press response and reduced-motion fallback
 - [x] Move selected Liquid indicators to outer overlay hosts with bleed so they visibly protrude beyond the inner rails
+- [x] Add static asset cache-bust versions + no-store/no-cache headers for reliable UI update delivery
 - [-] User screenshot QA on current desktop + iPhone UI; tune only observed spacing/geometry/copy regressions
 
 ## C. Charts and analytics
@@ -123,7 +124,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Python module compile check passes, including `b3_trader.auto_demo`
 - [x] Dashboard JS syntax/smoke checks pass, including final `navigation-v3.js` Liquid overlay layer
 - [x] Existing Cloudflare TypeScript check passes
-- [x] GitHub Actions passed on latest functional UI/runtime head `b433747f4c6db916d869b08de849a3250e1663a4`
+- [x] GitHub Actions passed on latest validated functional UI/runtime head `b433747f4c6db916d869b08de849a3250e1663a4`
 
 ## Completion condition for this workstream
 
