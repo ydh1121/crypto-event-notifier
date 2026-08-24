@@ -104,8 +104,8 @@ Operational state must be immediately readable without relying only on color.
 Examples:
 
 - `정상 감시` + neutral/success indicator
-- `신규 진입 일시정지`
-- `KILL SWITCH`
+- `새 매수 잠시 멈춤`
+- `긴급 정지`
 - `Telegram 연결`
 - `GitHub 최신`
 - `백업 대기/완료/오류`
@@ -116,17 +116,19 @@ Danger is reserved for actual destructive/risk states. Do not use red merely bec
 
 An asset card should expose:
 
-- ticker / market / context
-- current action (`WATCH`, `WAIT_PULLBACK`, `BUY_CANDIDATE`, `RISK_OFF`, `ERROR`)
+- ticker / market
+- current decision in ordinary Korean (`조금 더 지켜보기`, `가격이 내려오길 기다림`, `매수 후보`, `지금은 매수하지 않음`, `확인 필요`)
 - price and recent change
-- Regime / Entry / context score
-- relative strength, pullback, orderbook imbalance
+- `시장 분위기`, `매수 타이밍`, and related-market condition with both a 0–100 value and a plain-language grade
+- relative strength, pullback, orderbook balance only as secondary detail
 - position/average/value when present
 - a small 24h/selected-window sparkline
 
+Internal codes such as `WATCH`, `WAIT_PULLBACK`, `BUY_CANDIDATE`, `RISK_OFF`, `Regime`, `Entry`, and `Context` remain valid implementation vocabulary but must not be the primary user-facing wording.
+
 Score visuals use horizontal tracks or compact gauges; not oversized circular gauges.
 
-A card click/expand reveals detail history rather than placing every metric on the default surface.
+A card click/expand reveals technical detail rather than placing every metric on the default surface.
 
 ## 8. Charts
 
@@ -135,7 +137,7 @@ Charts exist to answer questions, not to decorate.
 Required charts:
 
 1. price history with paper buy/sell markers
-2. Regime and Entry history on the same time axis
+2. market-condition and buy-timing history on the same time axis
 3. portfolio equity curve
 4. optional exposure/drawdown history
 
@@ -144,7 +146,7 @@ Chart rules:
 - no 3D, gradient area fills, glow, or rainbow series
 - gridlines subtle and sparse
 - axes only when they add meaning
-- use the primary accent for price/equity; use a second restrained neutral/amber for Entry where necessary
+- use the primary accent for price/equity; use a second restrained neutral/amber for entry quality where necessary
 - buy/sell markers must remain distinguishable by shape/text as well as color
 - charts should support 1H / 6H / 24H / 7D windows when enough data exists
 - empty states explain that data is still being collected
@@ -172,7 +174,8 @@ The phone view is a real control surface, not a read-only miniature desktop.
 - no horizontal document overflow
 - destructive controls are not adjacent to routine controls without spacing/confirmation
 - chart panels can horizontally pan internally only when necessary
-- connection settings and Dashboard token remain available without exposing credentials in the page URL
+- connection settings use the user-facing name `휴대폰 연결 코드`; the implementation may continue to call it a dashboard token internally
+- the connection code may be revealed on the loopback PC UI, but remote clients must never receive it from an unauthenticated endpoint
 
 External access uses Tailscale or trusted LAN. Never instruct users to expose port 8765 directly to the internet.
 
@@ -183,26 +186,58 @@ Routine settings should be grouped by meaning rather than displayed as one dense
 Suggested groups:
 
 - 주문/포지션
-- 진입 기준
-- 시장 위험 차단
+- 매수 판단 기준
+- 자동으로 매수를 막는 조건
 - 알림/동기화
 
 Use bottom sheets on small screens and centered dialogs on desktop when practical.
 
-Saved secrets are never echoed back. Display only `설정됨` / masked state.
+Saved secrets are never echoed back. Display only `설정됨` / masked state, except the local-PC-only phone connection code described above.
 
-## 12. Korean copy
+## 12. Korean copy and beginner comprehension
 
-Use direct operational Korean.
+The default dashboard must be understandable to a non-trader older adult without a glossary. A reasonable review standard is: **a Korean user in their 60s who has never heard the terms Regime, Entry, Context, risk-off, drawdown, profit factor, spread, slippage, or bps should still understand what the screen is telling them to do.**
+
+Every primary state must answer three questions in ordinary Korean:
+
+1. 지금 사는 쪽인가, 기다리는 쪽인가?
+2. 왜 그렇게 판단했나?
+3. 숫자가 높고 낮은 것이 무슨 뜻인가?
+
+Required score wording:
+
+- Regime → `전체 시장 분위기`
+- Entry → `지금 매수 타이밍`
+- Context → `비슷한 코인들의 흐름`
+- RISK_OFF → `지금은 매수하지 않음`
+- WAIT_PULLBACK → `가격이 내려오길 기다림`
+- WATCH → `조금 더 지켜보기`
+- PAPER → `가상매매`
+- drawdown / DD → `하락폭`
+- realized PnL → `확정 손익`
+- Profit Factor → `번 돈 ÷ 잃은 돈`
+- Dashboard token → `휴대폰 연결 코드`
+
+Score values must not appear alone. Display a plain-language grade beside the number:
+
+- 0–39: `매우 나쁨`
+- 40–54: `좋지 않음`
+- 55–64: `보통`
+- 65–74: `좋음`
+- 75–100: `매우 좋음`
+
+Technical terminology may remain under `자세히 보기`, settings marked as advanced, logs, or developer-facing files. The top-level dashboard and Telegram alerts must use ordinary Korean first.
 
 Prefer:
 
-- `신규 진입을 멈췄습니다`
-- `지금은 매수 조건이 부족합니다`
-- `시장 강도는 양호하지만 진입 위치가 비쌉니다`
+- `지금은 새로 사지 않는 편이 낫습니다.`
+- `시장 분위기는 좋지만 지금 가격은 조금 비싸 보입니다.`
+- `전체 시장 분위기: 좋지 않음 (50/100)`
+- `지금 매수 타이밍: 좋지 않음 (52/100)`
 
 Avoid:
 
+- bare `RISK_OFF`, `Regime 49.62`, `Entry 52.23`, `Context 48.2`
 - long explanatory AI prose inside cards
 - excessive `~할 수 있습니다`
 - translated nouns such as `실행 가능성`, `전략적 함의` when a concrete verb works
