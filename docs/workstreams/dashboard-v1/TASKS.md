@@ -7,124 +7,109 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Add restart-safe repository protocol in `AGENTS.md`
 - [x] Add project-specific `DESIGN.md`
 - [x] Record Photo-eBook as the primary approved UI baseline
-- [x] Make Photo-eBook Korean copy contract + UI regression rules required references for relevant dashboard edits
-- [x] Make this workstream the continuation source for future chats/sessions
-- [x] Make non-trader/older-adult comprehension a permanent dashboard + Telegram copy requirement
+- [x] Apply Photo-eBook Korean copy + mobile regression rules to dashboard work
+- [x] Keep primary comprehension suitable for a Korean non-trader in their 60s
 
-## B. Dashboard information architecture and visual redesign
+## B. Dashboard UI / mobile UX
 
 - [x] Responsive navigation: 홈 / 코인 / 결과 / 기록 / 설정
-- [x] Rebuild top shell, KPI hierarchy, cards, spacing, status chips and mobile safe-area behavior
-- [x] Group strategy settings by purpose and hide advanced controls by default
-- [x] Add beginner-facing copy layer replacing primary Regime/Entry/Context/RISK_OFF/PAPER jargon
-- [x] Add plain-language 0–100 meanings
-- [x] Show manually entered holdings/average price/P&L prominently
-- [x] Preserve `판단 근거 자세히 보기` open/closed state across 5-second polling rerenders
-- [x] Prevent iOS focus zoom by enforcing >=16px focusable form text on mobile
-- [x] Prevent routine button-label wrapping and normalize mobile action geometry
-- [x] Stabilize repeated asset/panel heights when optional holding data is missing
-- [x] Remove conflicting legacy mobile calculator grid and leave `navigation-v3.css` as the single mobile `.avg-row` geometry owner
-- [x] Use full-width stacked mobile `매수가` / `매수금액` inputs with separate delete control and result row
-- [x] Make saved average-price text materially larger on mobile
-- [x] Stop P/L from ellipsizing out of view; allow amount + percentage to wrap and stack metrics on narrow phones
-- [x] Rebuild Liquid Glass motion from current Photo-eBook contract: one rail/one moving indicator, measured geometry, stretch/overshoot/snap-back spring motion, press response and reduced-motion fallback
-- [x] Move selected Liquid indicators to outer overlay hosts; coin selector uses enough bleed to cross the inner rail boundary
-- [x] Add static asset cache-bust versions + no-store/no-cache headers for reliable UI update delivery
-- [-] User screenshot QA on current desktop + iPhone UI; tune only observed spacing/geometry/copy regressions
+- [x] Preserve `판단 근거 자세히 보기` state across polling rerenders
+- [x] Prevent iOS input-focus zoom with >=16px focusable text
+- [x] Prevent routine button-label wrapping
+- [x] Rebuild mobile averaging calculator as full-width stacked rows
+- [x] Increase average-price readability and prevent P/L ellipsis loss
+- [x] Use one measured Liquid indicator with stretch/overshoot/snap-back motion
+- [x] Preserve native iOS horizontal rail momentum
+- [x] Fix detached/covering Liquid bug by moving rail glass/background to a lower visual layer and keeping labels/icons above the moving indicator
+- [x] Use separate horizontal/vertical Liquid bleed so the selector only slightly protrudes outside the rail instead of becoming an oversized blob
+- [-] User screenshot QA on current iPhone + desktop
 
-## C. Charts and analytics
+## C. Main multi-asset monitor
 
-- [x] Asset price history with PAPER buy/sell markers
-- [x] Market-condition + buy-timing history
-- [x] Portfolio equity time series
-- [x] Range selection: 1H / 6H / 24H / 7D
-- [x] Performance summary and per-asset results
-- [x] Hide technical factor detail behind `판단 근거 자세히 보기`
-- [x] Add ETH/BTC market-reference data derived from ETH-KRW and BTC-KRW
-- [ ] Add condition-performance breakdown after enough completed fills exist
+- [x] B3-style generalized live analysis for user-selected Bithumb KRW assets
+- [x] ETH/BTC built-in reference
+- [x] Manual holdings / average price / P&L in local SQLite
+- [x] Per-ticker averaging-down plans up to 20 rounds
+- [x] Suggested entry amount and account percentage on BUY_CANDIDATE
+- [x] Telegram automatic alerts reduced to fresh BUY_CANDIDATE only
 
-## D. Forward-test durability
+## D. Adaptive all-market PAPER research
 
-- [x] Persist portfolio snapshots to SQLite
-- [x] Restore PAPER cash/positions from journal fills after restart
-- [x] Keep forward-test history across restarts
-- [x] Add migration-safe journal/restore tests
-- [ ] Preserve the exact same-day drawdown baseline across restart instead of recalculating from restored cost basis
+- [x] Replace old shared 10M demo portfolio with **one independent 10,000,000 KRW PAPER account per Bithumb KRW market**
+- [x] Create/maintain accounts for every valid KRW market rather than filtering to a small candidate basket
+- [x] Scan public Bithumb KRW markets roughly every 3 minutes
+- [x] Reuse `AssetStrategy` scoring but do not require legacy BUY_CANDIDATE for every PAPER entry
+- [x] Add bounded `explore` and `idle_explore` entries with smaller weights when opportunity is constructive but old fixed thresholds are not met
+- [x] Keep spread / estimated-slippage / BTC flash-crash PAPER execution guards
+- [x] Position sizing is percentage-based from each coin's own 10M account
+- [x] Add hard stop, take-profit, trailing giveback, market-weakness and time/opportunity exits
+- [x] Persist independent cash, position, realized P/L, drawdown and equity history
+- [x] Rank markets by current PAPER return and expose current best performer
+- [-] Leave engine running long enough to collect meaningful trade-frequency / P&L / drawdown / win-rate evidence
 
-## E. Telegram operations
+## E. Per-coin feedback DB / bounded learning
 
-- [x] Local secret configuration + test message
-- [x] Plain-language Telegram copy
-- [x] Include suggested entry amount and account percentage on BUY_CANDIDATE
-- [x] Remove GitHub sync / start-stop noise
-- [x] User policy changed to **automatic BUY_CANDIDATE alerts only**
-- [x] Suppress WAIT/RISK_OFF/fill/risk-block/error/daily-summary automatic Telegram noise while retaining dashboard/journal records
-- [x] Add tests for the buy-candidate-only policy
+- [x] Persist per-market profile thresholds and base position weight in SQLite
+- [x] Store current signal / opportunity / intent per market
+- [x] Store every PAPER fill with timing, amount, weight, reason and signal snapshot
+- [x] Store completed-trade feedback: result, holding time, entry signal, profile before and profile after
+- [x] Update only the affected coin's PAPER profile after each closed trade
+- [x] Winning entries can relax toward their successful entry conditions
+- [x] Losing entries make the profile more selective and reduce base weight
+- [x] Bound adaptive thresholds and position weights to avoid runaway self-tuning
+- [x] Learning is DB-driven only; it does not rewrite Python source or enable live trading
+- [ ] After enough samples, add out-of-sample / holdout validation before promoting any profile as a live-trading candidate
 
-## F. Multi-asset workflow
+## F. PAPER research dashboard
 
-- [x] Ticker-only asset addition starts generic analysis
-- [x] Asset profiles support context mode + related markets
-- [x] Manually entered holding quantity/average price per ticker in local SQLite
-- [x] Per-ticker averaging-down calculator up to 20 rounds
-- [x] Suggested entry sizing on BUY_CANDIDATE
-- [x] Treat ETH/BTC as a built-in market reference instead of an unsupported KRW asset
-- [x] Add isolated 10,000,000 KRW PAPER auto-trading demo scanning Bithumb KRW markets without private credentials
-- [x] Demo universe ranking uses liquidity + momentum and existing `AssetStrategy`
-- [x] Demo reuses spread/slippage/BTC-flash/order-rate execution guards
-- [x] Demo supports adaptive sizing, per-asset cap, total exposure cap, max positions, cooldown averaging and emergency exits
-- [x] Demo persists separately in ignored `b3_trader/data/auto_demo.sqlite3`
-- [x] Move demo lifecycle inside FastAPI so Git-synced Python runtime updates can start it automatically without a manual launcher restart
-- [x] Add authenticated `/api/demo` and Home `1,000만원 자동매매 데모` card
-- [ ] Add per-asset analysis/profile notes for GPT-managed refinements
-- [-] Run Bithumb-wide PAPER demo long enough to evaluate trade frequency, P/L, drawdown and candidate quality before live execution
-- [-] Validate simultaneous multi-asset portfolio limits/context behavior using the user's already-added assets
+- [x] Home summary: number of markets, scan progress, active positions and current return leader
+- [x] Results workspace: `전체 코인 자동매매 연구`
+- [x] Ranking rows: return, trade count, win rate and current intent
+- [x] Per-coin detail: opportunity/regime/entry, suggested weight, adaptive profile version/thresholds
+- [x] Per-coin equity curve
+- [x] Per-coin trade history with time, side, virtual order amount, weight and result
+- [x] Per-coin learning history showing profile before/after changes
+- [x] Generate ignored per-market detail JSON under `dashboard/demo-runtime/`
+- [x] Allow direct ticker lookup for markets outside the visible top ranking
+- [-] User visual QA of the new research workspace
 
-## G. Backup and synchronization
+## G. GitHub / local synchronization
 
-- [x] GitHub code/control desired-state sync exists
-- [x] Local SQLite is the authoritative runtime DB
-- [x] Surface backup/sync status
-- [x] Control-only Git divergence reconciliation + one-time repair script
-- [x] Default GitHub poll reduced to 15 seconds
-- [x] Dashboard-only Git commits update local static files without restarting Uvicorn
-- [x] Browser watcher reloads dashboard changes for updated/published/reconciled sync states
-- [x] Python runtime changes automatically request exit code 75 and the running PowerShell supervisor restarts the app
-- [x] Normal GitHub commits no longer require the user to manually stop/re-run the secure launcher
-- [ ] Finish one-time rclone Google Drive setup/documentation
-- [ ] Verify consistent SQLite snapshot upload to `Crypto Auto Trader/backups`
-- [ ] Mirror non-secret `control/` and `dashboard/` to Drive
+- [x] GitHub branch remains `b3-auto-trader-phase1`
+- [x] Local SQLite remains authoritative runtime data
+- [x] Control-only divergence repair preserves `control/assets.json` and `control/runtime.json`
+- [x] Normal launcher forces Git auto-sync and control publishing on
+- [x] Normal launcher forces 15-second polling even if an older `.env` still contains the old template value
+- [x] Startup can safely preserve local control changes while realigning app code
+- [x] Startup prints local/remote Git sync state
+- [x] Dashboard-only changes avoid Uvicorn restart
+- [x] Python runtime changes use supervised exit code 75 and automatic restart
+- [ ] Finish rclone Google Drive setup and verify backups/mirrors
 
-## H. Phone / external access
+## H. Phone access
 
-- [x] VPN-free Cloudflare Quick Tunnel launcher: `start-trader-secure.bat`
-- [x] Bind local app to `127.0.0.1` in secure mode
-- [x] User verified HTTPS Cloudflare access from phone over 5G without VPN
-- [x] User verified old public-IP HTTP access is blocked
-- [x] Tailscale removed; do not make it the primary path
-- [x] Add one-time `scripts/setup-stable-cloudflare.ps1` for persistent named Tunnel + custom hostname
-- [x] Secure launcher automatically uses named Tunnel when local stable config exists; otherwise falls back to Quick Tunnel
-- [x] Stable hostname preserves browser origin so saved phone connection code persists across server restarts
-- [x] Add loopback-only one-tap phone link for Quick Tunnel onboarding using a URL fragment that is immediately cleared after import
-- [ ] User runs named-Tunnel setup if a Cloudflare-managed domain is available and verifies fixed URL across restart
-- [ ] Rotate phone connection code after stable access is verified because an older code appeared in chat/console logs
+- [x] Cloudflare HTTPS tunnel without phone VPN requirement
+- [x] Secure launcher binds app to `127.0.0.1`
+- [x] Public direct port path remains disabled
+- [x] Quick Tunnel fallback
+- [ ] Complete named/stable Cloudflare hostname setup if user wants a fixed URL
+- [ ] Rotate old exposed phone connection code after stable access is finalized
 
 ## I. Real-money execution
 
 - [>] **DEFERRED — separate future Work/workstream. Do not implement here.**
-- [>] Exchange balance as source of truth
-- [>] order idempotency/client order identifiers
-- [>] partial-fill and open-order reconciliation
-- [>] stale order cancellation
-- [>] hard daily-loss kill / maximum exposure at exchange balance level
-- [>] tightly capped live pilot
-- [>] live-mode update/change-approval workflow
+- [>] Select live candidates from PAPER evidence, not from one-off score snapshots
+- [>] Add exchange-balance source of truth, idempotency, partial-fill/open-order reconciliation and stale-order cancellation
+- [>] Add exchange-level hard exposure/daily-loss limits
+- [>] Run a tightly capped live pilot only after adequate forward-test and holdout evidence
 
 ## Validation status
 
-- [x] `b433747f4c6db916d869b08de849a3250e1663a4` passed Python tests/compile, dashboard smoke and Cloudflare typecheck
-- [-] Await current branch CI after final calculator single-owner cleanup, Liquid bleed and cache-bust updates
+- [x] Current adaptive research implementation passed Python tests + module compile
+- [x] Current Liquid/research dashboard implementation passed Node dashboard smoke checks
+- [x] Current branch passed Cloudflare typecheck
+- [x] PR #1 remains Draft and unmerged
 
-## Completion condition for this workstream
+## Completion condition
 
-Stop when the redesigned dashboard is user-approved on PC + phone, the isolated 10,000,000 KRW Bithumb-wide PAPER demo has accumulated enough forward-test evidence to judge the strategy, multi-asset PAPER behavior is validated, Google Drive backup is verified, and secure phone access is convenient enough for normal use. Real-money execution remains deferred.
+Finish this workstream when mobile/dashboard UX is approved, adaptive per-coin PAPER research has accumulated enough evidence to identify robust candidates rather than lucky short-term winners, backup is verified, and phone access is convenient. Real-money execution stays deferred.
