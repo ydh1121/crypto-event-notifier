@@ -8,11 +8,13 @@ from pathlib import Path
 from typing import Any
 
 import requests
+from dotenv import load_dotenv
 
 from .config import Settings
 from .research_control import platform_snapshot
 
-DEMO_STATUS_PATH = Path("dashboard/runtime-demo.json")
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DEMO_STATUS_PATH = REPO_ROOT / "dashboard/runtime-demo.json"
 MAX_RANKING_ROWS = 5000
 MAX_BODY_BYTES = 1_800_000
 
@@ -54,6 +56,8 @@ def _compact_market(row: dict[str, Any]) -> dict[str, Any]:
 
 def _manual_holdings(journal_db: str, price_by_market: dict[str, float]) -> dict[str, Any]:
     path = Path(journal_db)
+    if not path.is_absolute():
+        path = REPO_ROOT / path
     if not path.exists():
         return {"holdings": [], "invested_krw": 0.0, "value_krw": 0.0, "pnl_krw": 0.0}
     conn = sqlite3.connect(str(path), timeout=10)
@@ -109,9 +113,11 @@ class CloudflareSnapshotPublisher:
     """Outbound-only publisher for the read-only Cloudflare Pages viewer."""
 
     def __init__(self) -> None:
+        load_dotenv(REPO_ROOT / ".env", override=True)
         self.settings = Settings()
 
     def build_snapshot(self) -> dict[str, Any]:
+        load_dotenv(REPO_ROOT / ".env", override=True)
         demo = _read_json(DEMO_STATUS_PATH)
         leaderboard_source = demo.get("leaderboard") if isinstance(demo.get("leaderboard"), list) else []
         leaderboard = [
@@ -151,6 +157,7 @@ class CloudflareSnapshotPublisher:
         return {"source_ts": public_payload["source_updated_at"], "public": public_payload, "private": private_payload}
 
     def publish_once(self) -> dict[str, Any]:
+        load_dotenv(REPO_ROOT / ".env", override=True)
         url = os.getenv("CLOUDFLARE_VIEWER_INGEST_URL", "").strip()
         token = os.getenv("CLOUDFLARE_VIEWER_INGEST_TOKEN", "").strip()
         if not url or not token:
