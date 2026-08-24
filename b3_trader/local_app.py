@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import os
 import secrets
 import threading
+import time
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from pathlib import Path
@@ -14,6 +16,7 @@ from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Reques
 from fastapi.staticfiles import StaticFiles
 
 from .assets import AssetProfile, AssetRegistry, default_profile, normalize_market
+from .auto_demo import AutoPaperDemo, SCAN_INTERVAL_SECONDS, STATUS_PATH
 from .config import Settings
 from .journal import TradeJournal
 from .local_engine import MultiAssetEngine
@@ -64,6 +67,35 @@ def _downsample(rows: list[dict[str, Any]], target: int = 420) -> list[dict[str,
     if sampled[-1] is not rows[-1]:
         sampled.append(rows[-1])
     return sampled[: target + 1]
+
+
+def _env_enabled(name: str, default: bool = True) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() not in {"0", "false", "off", "no"}
+
+
+def _pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+
+
+def _read_demo_status() -> dict[str, Any]:
+    if not STATUS_PATH.exists():
+        return {}
+    try:
+        raw = json.loads(STATUS_PATH.read_text(encoding="utf-8"))
+        return raw if isinstance(raw, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
 
 
 def create_app() -> FastAPI:
@@ -129,27 +161,93 @@ def create_app() -> FastAPI:
         notifier=notifier,
     )
 
+    demo_enabled = _env_enabled("AUTO_DEMO_ENABLED", True)
+    demo_stop = threading.Event()
+    demo_thread: threading.Thread | None = None
+
+    def demo_snapshot() -> dict[str, Any]:
+        payload = _read_demo_status()
+        updated_at = float(payload.get("updated_at") or 0.0)
+        stale_after = max(420.0, float(SCAN_INTERVAL_SECONDS) * 2.2)
+        fresh = bool(updated_at and time.time() - updated_at <= stale_after)
+        if not payload:
+            return {
+                "enabled": demo_enabled,
+                "running": False,
+                "paper_only": True,
+                "start_krw": 10_000_000.0,
+                "cash_krw": 10_000_000.0,
+                "equity_krw": 10_000_000.0,
+                "positions": [],
+                "candidates": [],
+                "recent_fills": [],
+                "updated_at": 0.0,
+                "state": "starting" if demo_enabled else "disabled",
+            }
+        return {
+            **payload,
+            "enabled": demo_enabled,
+            "fresh": fresh,
+            "running": bool(payload.get("running")) and fresh,
+            "state": "running" if bool(payload.get("running")) and fresh else "waiting",
+        }
+
+    def external_demo_is_alive() -> bool:
+        payload = _read_demo_status()
+        if not payload:
+            return False
+        pid = int(payload.get("pid") or 0)
+        if pid and pid != os.getpid():
+            return _pid_alive(pid)
+        if not pid:
+            updated_at = float(payload.get("updated_at") or 0.0)
+            return bool(updated_at and time.time() - updated_at < max(240.0, SCAN_INTERVAL_SECONDS + 45.0))
+        return False
+
+    def demo_worker() -> None:
+        while not demo_stop.is_set():
+            if external_demo_is_alive():
+                if demo_stop.wait(20.0):
+                    return
+                continue
+            try:
+                AutoPaperDemo().run(stop_event=demo_stop)
+            except Exception as exc:
+                state.set_error(exc, scope="auto_demo")
+                if demo_stop.wait(15.0):
+                    return
+            else:
+                return
+
+    def start_demo() -> None:
+        nonlocal demo_thread
+        if not demo_enabled or (demo_thread and demo_thread.is_alive()):
+            return
+        demo_thread = threading.Thread(target=demo_worker, name="bithumb-auto-paper-demo", daemon=True)
+        demo_thread.start()
+
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         print(
             f"Dashboard: http://127.0.0.1:{settings.service_port}\n"
             "Local browser: automatic loopback authentication enabled.\n"
-            f"Dashboard token for phone/LAN/Tailscale: {token}\n"
-            "Phone on same Wi-Fi: use this PC's LAN IP with the same port."
+            "Phone connection code: available from the local Settings screen."
         )
         engine.start()
         git_sync.start()
         backup.start()
+        start_demo()
         try:
             yield
         finally:
+            demo_stop.set()
             git_sync.stop()
             backup.stop()
             engine.stop()
             user_tools.close()
             journal.close()
 
-    app = FastAPI(title="Crypto Auto Trader", version="0.6.0", lifespan=lifespan)
+    app = FastAPI(title="Crypto Auto Trader", version="0.7.0", lifespan=lifespan)
 
     def auth(
         request: Request,
@@ -201,11 +299,16 @@ def create_app() -> FastAPI:
             "assets": len(snapshot["assets"]),
             "paused": snapshot["paused"],
             "kill_switch": snapshot["kill_switch"],
+            "auto_demo": demo_snapshot().get("state"),
         }
 
     @app.get("/api/state", dependencies=[Depends(auth)])
     def api_state() -> dict[str, Any]:
         return {"mode": "PAPER", **state.snapshot()}
+
+    @app.get("/api/demo", dependencies=[Depends(auth)])
+    def api_demo() -> dict[str, Any]:
+        return demo_snapshot()
 
     @app.get("/api/analytics", dependencies=[Depends(auth)])
     def analytics() -> dict[str, Any]:
@@ -535,6 +638,7 @@ def create_app() -> FastAPI:
     app.state.backup = backup
     app.state.telegram_store = telegram_store
     app.state.dashboard_token = token
+    app.state.demo_enabled = demo_enabled
     return app
 
 
