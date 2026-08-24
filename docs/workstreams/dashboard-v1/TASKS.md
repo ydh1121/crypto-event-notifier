@@ -23,6 +23,10 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Prevent iOS focus zoom by enforcing >=16px focusable form text on mobile
 - [x] Prevent routine button-label wrapping and normalize mobile action geometry
 - [x] Stabilize repeated asset/panel heights when optional holding data is missing
+- [x] Fix iPhone averaging-calculator row geometry: round/remove/price/amount/after-average use explicit mobile grid areas
+- [x] Make saved average-price text materially larger on mobile
+- [x] Stop P/L from ellipsizing out of view; allow amount + percentage to wrap inside the P/L tile when necessary
+- [x] Rebuild Liquid Glass motion from the current Photo-eBook contract: one rail/one moving indicator, measured geometry, spring easing, stretch/overshoot/snap-back motion, press response and reduced-motion fallback
 - [-] User screenshot QA on current desktop + iPhone UI; tune only observed spacing/geometry/copy regressions
 
 ## C. Charts and analytics
@@ -62,7 +66,16 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Per-ticker averaging-down calculator up to 20 rounds
 - [x] Suggested entry sizing on BUY_CANDIDATE
 - [x] Treat ETH/BTC as a built-in market reference instead of an unsupported KRW asset
+- [x] Add an isolated 10,000,000 KRW PAPER auto-trading demo that scans Bithumb KRW markets without private API credentials
+- [x] Demo universe ranking uses liquidity + momentum, excludes major stable/reference assets, and rejects extreme 24h moves
+- [x] Demo reuses the existing AssetStrategy for market/entry scoring
+- [x] Demo reuses execution guards for spread, estimated slippage, BTC flash-crash and order-rate limits
+- [x] Demo supports adaptive entry sizing, per-asset cap, total exposure cap, max open positions, averaging only while the same BUY_CANDIDATE persists, and emergency exits on hard stop / weak regime
+- [x] Demo state persists separately in `b3_trader/data/auto_demo.sqlite3` and never contaminates the main PAPER portfolio
+- [x] Local launcher starts/restarts the isolated demo process automatically unless `AUTO_DEMO_ENABLED=false`
+- [x] Home dashboard shows demo equity, cash, open positions and current candidates from generated runtime state
 - [ ] Add per-asset analysis/profile notes for GPT-managed refinements
+- [-] Run the isolated Bithumb-wide PAPER demo long enough to evaluate trade frequency, realized P/L, drawdown and candidate quality before live execution work begins
 - [-] Validate simultaneous multi-asset portfolio limits/context behavior using the user's already-added assets
 
 ## G. Backup and synchronization
@@ -102,12 +115,12 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 ## Validation status
 
-- [x] Latest Python tests pass, including ETH/BTC relative-strength and BUY-candidate-only Telegram policy tests
-- [x] Python module compile check passes
-- [x] Dashboard JS syntax/smoke checks pass, including final `ux-stability.js` and `ux-polish.css` wiring
+- [x] Latest Python tests pass
+- [x] Python module compile check passes, including `b3_trader.auto_demo`
+- [x] Dashboard JS syntax/smoke checks pass, including final `navigation-v3.js` and Liquid Glass layer wiring
 - [x] Existing Cloudflare TypeScript check passes
-- [x] Latest GitHub Actions run is green
+- [x] Latest GitHub Actions run on the current functional head is green
 
 ## Completion condition for this workstream
 
-Stop when the redesigned dashboard is user-approved on PC + phone, multi-asset PAPER behavior is validated, Google Drive backup is verified, and secure phone access is convenient enough for normal use. Real-money execution remains deferred.
+Stop when the redesigned dashboard is user-approved on PC + phone, the isolated 10,000,000 KRW Bithumb-wide PAPER demo has accumulated enough forward-test evidence to judge the strategy, multi-asset PAPER behavior is validated, Google Drive backup is verified, and secure phone access is convenient enough for normal use. Real-money execution remains deferred.
