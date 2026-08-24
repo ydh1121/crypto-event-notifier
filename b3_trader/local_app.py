@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import subprocess
 import threading
 import time
 from contextlib import asynccontextmanager
@@ -79,6 +80,19 @@ def _env_enabled(name: str, default: bool = True) -> bool:
 def _pid_alive(pid: int) -> bool:
     if pid <= 0:
         return False
+    if os.name == "nt":
+        try:
+            completed = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                text=True,
+                capture_output=True,
+                timeout=5,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return False
+        text = completed.stdout.strip()
+        return completed.returncode == 0 and str(pid) in text and not text.startswith("INFO:")
     try:
         os.kill(pid, 0)
         return True
