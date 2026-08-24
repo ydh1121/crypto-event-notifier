@@ -10,6 +10,7 @@ from typing import Any, Callable
 
 from dotenv import load_dotenv
 
+from .cloudflare_market_detail_publisher import CloudflareMarketDetailPublisher
 from .cloudflare_pages_deployer import CloudflarePagesDeployer
 from .cloudflare_snapshot_publisher import CloudflareSnapshotPublisher
 from .reference_components import ReferenceComponentWatcher
@@ -73,12 +74,14 @@ class ResearchSupervisor:
         self.warehouse = ResearchWarehouse()
         self.reference_watcher = ReferenceComponentWatcher()
         self.cloudflare_publisher = CloudflareSnapshotPublisher()
+        self.cloudflare_market_detail_publisher = CloudflareMarketDetailPublisher()
         self.cloudflare_deployer = CloudflarePagesDeployer()
         self.states: dict[str, ComponentState] = {}
         self.runners: dict[str, Callable[[], dict[str, Any]]] = {
             "warehouse-export": self.warehouse.export_once,
             "reference-version-watch": self.reference_watcher.check_once,
             "cloudflare-snapshot-publish": self.cloudflare_publisher.publish_once,
+            "cloudflare-market-detail-publish": self.cloudflare_market_detail_publisher.publish_once,
             "cloudflare-pages-deploy": self.cloudflare_deployer.deploy_once,
         }
         self.threads: dict[str, threading.Thread] = {}
