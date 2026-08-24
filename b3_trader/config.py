@@ -65,7 +65,7 @@ class Settings:
     auto_git_sync: bool = field(default_factory=lambda: _bool("AUTO_GIT_SYNC", True))
     auto_git_push_control: bool = field(default_factory=lambda: _bool("AUTO_GIT_PUSH_CONTROL", True))
     git_sync_branch: str = field(default_factory=lambda: _str("GIT_SYNC_BRANCH", "b3-auto-trader-phase1"))
-    git_sync_interval_seconds: float = field(default_factory=lambda: _float("GIT_SYNC_INTERVAL_SECONDS", 60.0))
+    git_sync_interval_seconds: float = field(default_factory=lambda: _float("GIT_SYNC_INTERVAL_SECONDS", 15.0))
     git_repo_dir: str = field(default_factory=lambda: _str("GIT_REPO_DIR", "."))
     backup_interval_seconds: float = field(default_factory=lambda: _float("BACKUP_INTERVAL_SECONDS", 3600.0))
     local_backup_dir: str = field(default_factory=lambda: _str("LOCAL_BACKUP_DIR", "b3_trader/data/backups"))
