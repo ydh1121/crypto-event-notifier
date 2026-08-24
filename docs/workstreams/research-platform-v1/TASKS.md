@@ -54,12 +54,15 @@ Current managed components:
 
 - `warehouse-export` — every 5 minutes
 - `reference-version-watch` — every 6 hours
+- `cloudflare-snapshot-publish` — every 20 seconds after Pages setup
+- `cloudflare-pages-deploy` — checks every 30 seconds after Pages setup; deploys only on viewer-code changes
 
 Safety contract:
 
 - cannot place orders
 - cannot change PAPER strategy profiles
 - cannot auto-promote external code
+- Pages viewer and Pages deployment remain read-only with respect to trading
 
 ### 1C. External repository registry/version watch
 
@@ -104,13 +107,44 @@ Initial catalog:
 
 ## Phase 2 — Cloudflare Pages viewer + invite users
 
-- [-] Stable free `*.pages.dev` viewer architecture/scaffold
-- [ ] GitHub -> Pages auto deploy
-- [ ] outbound local snapshot publisher
-- [ ] Cloudflare D1 owner/viewer accounts and invites
-- [ ] secure session cookie
-- [ ] owner-selectable visibility for manual holdings
-- [ ] Google Drive remains backup/export only
+### 2A. Viewer application
+
+- [x] Separate `cloudflare-pages/` Pages/Functions viewer from the old Container experiment
+- [x] Read-only mobile/desktop viewer UI
+- [x] D1 schema for users, invites, sessions, snapshots and audit log
+- [x] First-owner bootstrap flow
+- [x] Owner/viewer login with secure session cookie
+- [x] Owner-created invite links
+- [x] Per-viewer `내 자산정보도 보이기` permission
+- [x] Authenticated `/api/ingest` machine-to-cloud snapshot route
+- [x] Authenticated latest snapshot API
+- [x] Keep all remote trading/control endpoints out of the Pages viewer
+
+### 2B. 24/7 PC bridge
+
+- [x] Outbound local PAPER snapshot publisher
+- [x] Compact authenticated manual-holdings snapshot; raw SQLite never uploads
+- [x] Reload local `.env` at publish time so setup does not require trader restart
+- [x] Local Pages deployer checks Git changes and deploys viewer-only code
+- [x] Local deployer runs typecheck + D1 migrations + Pages health check before recording success
+- [x] Add `cloudflare-pages-deploy` to Research Supervisor
+- [x] Add one-command Windows setup script using Wrangler browser OAuth
+- [x] Generate/store ingest + first-owner secrets without printing them
+- [x] Enable snapshot publish + Pages deploy automatically after successful one-time setup
+
+### 2C. Deployment path
+
+- [x] GitHub Actions viewer validation
+- [x] Optional direct GitHub -> Pages deploy workflow when Cloudflare GitHub secrets exist
+- [x] Missing GitHub Cloudflare secrets no longer block viewer validation; local Wrangler bridge is the default
+- [-] One-time account-side provisioning on the user's Windows PC via `scripts/setup-cloudflare-pages-viewer.ps1`
+- [ ] Confirm the final stable `*.pages.dev` URL and `/api/health`
+- [ ] Create first owner account from the browser
+- [ ] Confirm 20-second live PAPER snapshots on mobile
+- [ ] Confirm owner can see manual holdings and a viewer without permission cannot
+- [x] Google Drive remains backup/export only
+
+After 2C account provisioning is verified, Phase 3 can start without waiting for a 24-hour soak test.
 
 ## Phase 3 — Upbit all-market PAPER
 
