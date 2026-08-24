@@ -4,6 +4,7 @@ import json
 import time
 from typing import Any
 
+from .auto_demo_v2 import *  # noqa: F401,F403
 from .auto_demo_v2 import AutoPaperDemo as AutoPaperDemoV2
 from .auto_demo_v2 import DB_PATH, DemoStore as DemoStoreV2, _num
 
