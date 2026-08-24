@@ -19,26 +19,12 @@ on:
       - ".dockerignore"
       - ".github/workflows/b3-trader-tests.yml"
       - ".github/workflows/deploy-b3-cloudflare.yml"
-  push:
-    branches:
-      - b3-auto-trader-phase1
-    paths:
-      - "AGENTS.md"
-      - "DESIGN.md"
-      - "docs/workstreams/**"
-      - "b3_trader/**"
-      - "control/**"
-      - "dashboard/**"
-      - "scripts/**"
-      - "start-trader.bat"
-      - "start-trader-secure.bat"
-      - "LOCAL_MULTI_ASSET.md"
-      - "cloudflare/**"
-      - "cloudflare-pages/**"
-      - "Dockerfile"
-      - ".dockerignore"
-      - ".github/workflows/b3-trader-tests.yml"
-      - ".github/workflows/deploy-b3-cloudflare.yml"
+      - ".github/workflows/deploy-pages-viewer.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: b3-trader-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   python-test:
@@ -93,6 +79,7 @@ jobs:
       - run: grep -q 'navigation-v3.js' dashboard/index.html
       - run: grep -q 'navigation-v3.css' dashboard/index.html
       - run: grep -q 'research-capital.js' dashboard/index.html
+      - run: grep -q 'research-components.js' dashboard/index.html
       - run: grep -q 'Phone access' dashboard/index.html
 
   cloudflare-typecheck:
@@ -125,4 +112,4 @@ jobs:
       - run: test -s public/styles.css
       - run: test -s migrations/0001_init.sql
       - run: grep -q 'READ ONLY' public/index.html
-      - run: grep -q 'functions/api/ingest' README.md
+      - run: grep -q 'setup-cloudflare-pages-viewer.ps1' README.md
