@@ -10,6 +10,7 @@ from typing import Any, Callable
 
 from dotenv import load_dotenv
 
+from .cloudflare_pages_deployer import CloudflarePagesDeployer
 from .cloudflare_snapshot_publisher import CloudflareSnapshotPublisher
 from .reference_components import ReferenceComponentWatcher
 from .research_control import COMPONENT_DEFINITIONS, STATUS_PATH, atomic_json, load_control
@@ -62,7 +63,7 @@ class ComponentState:
 
 
 class ResearchSupervisor:
-    """Non-trading sidecar for storage, web snapshots and external-version observation."""
+    """Non-trading sidecar for storage, web snapshots, Pages deployment and version observation."""
 
     def __init__(self) -> None:
         load_dotenv()
@@ -72,11 +73,13 @@ class ResearchSupervisor:
         self.warehouse = ResearchWarehouse()
         self.reference_watcher = ReferenceComponentWatcher()
         self.cloudflare_publisher = CloudflareSnapshotPublisher()
+        self.cloudflare_deployer = CloudflarePagesDeployer()
         self.states: dict[str, ComponentState] = {}
         self.runners: dict[str, Callable[[], dict[str, Any]]] = {
             "warehouse-export": self.warehouse.export_once,
             "reference-version-watch": self.reference_watcher.check_once,
             "cloudflare-snapshot-publish": self.cloudflare_publisher.publish_once,
+            "cloudflare-pages-deploy": self.cloudflare_deployer.deploy_once,
         }
         self.threads: dict[str, threading.Thread] = {}
         self.wake_events: dict[str, threading.Event] = {}
@@ -125,6 +128,7 @@ class ResearchSupervisor:
                     "can_place_orders": False,
                     "can_modify_strategy_profiles": False,
                     "auto_promote_external_code": False,
+                    "cloudflare_viewer_read_only": True,
                 },
             }
         atomic_json(STATUS_PATH, payload)
