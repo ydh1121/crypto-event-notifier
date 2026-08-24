@@ -13,6 +13,7 @@
   let detailMarket='';
   let detailSignature='';
   let busy=false;
+  let timer=0;
 
   async function apiJson(path){
     if(typeof window.api==='function')return window.api(path);
@@ -38,6 +39,9 @@
     let box=q('#demoCapitalOverview');
     if(!box){box=document.createElement('section');box.id='demoCapitalOverview';box.className='demo-capital-overview';grid.insertAdjacentElement('beforebegin',box)}
     const x=aggregateNumbers(summary);
+    const signature=[x.count,x.start,x.equity,x.cash,x.pnl].join('|');
+    if(box.dataset.signature===signature)return;
+    box.dataset.signature=signature;
     box.innerHTML=`
       <div class="demo-capital-primary">
         <span>전체 가상 운용자금</span>
@@ -62,7 +66,7 @@
       const pnl=n(row.equity_krw)-10_000_000;
       delta.className=`demo-rank-capital-delta ${tone(pnl)}`;
       delta.textContent=`${pnl>=0?'+':''}${won(pnl)}`;
-      delta.title=`가상계좌 1,000만원 대비 현재 증감액`;
+      delta.title='가상계좌 1,000만원 대비 현재 증감액';
     });
   }
 
@@ -87,6 +91,9 @@
     let box=q('#demoCoinCapital',detail);
     if(!box){box=document.createElement('section');box.id='demoCoinCapital';box.className='demo-coin-capital';head.insertAdjacentElement('afterend',box)}
     const x=detailNumbers(data);
+    const signature=[x.equity,x.cash,x.positionValue,x.realized,x.unrealized,x.stateLabel].join('|');
+    if(box.dataset.signature===signature)return;
+    box.dataset.signature=signature;
     box.innerHTML=`
       <div class="demo-coin-capital-main">
         <div><span>이 코인 가상계좌</span><b>${won(x.start)} <i>→</i> <strong class="${tone(x.pnl)}">${won(x.equity)}</strong></b><small>${esc(x.stateLabel)}</small></div>
@@ -100,7 +107,7 @@
       </div>`;
   }
 
-  async function syncDetail(){
+  async function syncDetail({force=false}={}){
     const market=selectedMarket();if(!market)return;
     try{
       const response=await fetch(`./demo-runtime/${encodeURIComponent(market)}.json?t=${Date.now()}`,{cache:'no-store'});
@@ -108,27 +115,32 @@
       const data=await response.json();
       const s=data?.summary||{},position=data?.position||{};
       const signature=[market,s.signal_ts,s.equity_krw,s.cash_krw,position.value_krw,position.unrealized_pnl_krw,data?.state_label].join('|');
-      if(signature===detailSignature&&q('#demoCoinCapital'))return;
+      if(!force&&signature===detailSignature&&q('#demoCoinCapital'))return;
       detailSignature=signature;detailMarket=market;renderDetailCapital(data);
     }catch(_err){}
   }
 
-  async function sync(){
+  async function sync({forceDetail=false}={}){
     if(busy||document.hidden||!q('#demoResearch'))return;
     busy=true;
-    try{summary=await apiJson('/api/demo');renderAggregate();decorateLeaderboard();await syncDetail()}catch(_err){}finally{busy=false}
+    try{
+      summary=await apiJson('/api/demo');
+      renderAggregate();
+      decorateLeaderboard();
+      await syncDetail({force:forceDetail});
+    }catch(_err){}finally{busy=false}
   }
 
-  const observer=new MutationObserver(records=>{
-    if(!q('#demoResearch'))return;
-    let needs=false;
-    for(const record of records){
-      if(record.target?.closest?.('#demoResearch')||record.addedNodes?.length){needs=true;break}
-    }
-    if(!needs)return;
-    queueMicrotask(()=>{renderAggregate();decorateLeaderboard();const market=selectedMarket();if(market!==detailMarket)syncDetail()});
-  });
+  function install(){
+    sync({forceDetail:true});
+    timer=window.setInterval(()=>sync({forceDetail:false}),15000);
+    document.addEventListener('click',event=>{
+      if(!event.target.closest?.('#demoList .demo-rank-row'))return;
+      setTimeout(()=>syncDetail({force:true}),80);
+    },true);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync({forceDetail:true})});
+  }
 
-  function install(){observer.observe(document.body,{subtree:true,childList:true});sync();setInterval(sync,15000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync()})}
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});
+  else install();
 })();
