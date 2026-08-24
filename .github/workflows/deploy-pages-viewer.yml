@@ -1,18 +1,6 @@
 name: Deploy Cloudflare Pages viewer
 
 on:
-  push:
-    branches:
-      - b3-auto-trader-phase1
-    paths:
-      - "cloudflare-pages/**"
-      - ".github/workflows/deploy-pages-viewer.yml"
-  pull_request:
-    branches:
-      - master
-    paths:
-      - "cloudflare-pages/**"
-      - ".github/workflows/deploy-pages-viewer.yml"
   workflow_dispatch:
 
 concurrency:
@@ -26,7 +14,6 @@ env:
 
 jobs:
   deploy:
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -50,7 +37,7 @@ jobs:
             echo "configured=true" >> "$GITHUB_OUTPUT"
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "Cloudflare GitHub secrets are not configured; validation continues and deployment is delegated to the local Wrangler bridge."
+            echo "Cloudflare GitHub secrets are not configured; use the local Wrangler bridge instead."
           fi
 
       - name: Install and validate viewer
@@ -93,14 +80,14 @@ jobs:
               {
                 "binding": "DB",
                 "database_name": "$D1_DATABASE",
-                "database_id": "$DB_ID"
+                "database_id": "$DB_ID",
+                "migrations_dir": "migrations"
               }
             ]
           }
           EOF
 
           echo "database_id=$DB_ID" >> "$GITHUB_OUTPUT"
-          echo "viewer_url=https://${PAGES_PROJECT}.pages.dev" >> "$GITHUB_OUTPUT"
 
       - name: Apply D1 migrations
         if: ${{ steps.cf.outputs.configured == 'true' }}
@@ -192,15 +179,10 @@ jobs:
             if [ "${{ steps.cf.outputs.configured }}" = "true" ]; then
               echo "- URL: https://${PAGES_PROJECT}.pages.dev"
               echo "- D1: ${D1_DATABASE}"
-              echo "- Production branch: ${PRODUCTION_BRANCH}"
               echo "- Deployment path: GitHub Actions"
-              if [ "${{ steps.secrets.outputs.created_ingest }}" = "true" ] || [ "${{ steps.secrets.outputs.created_owner }}" = "true" ]; then
-                echo "- First-provision secrets: Actions artifact \`viewer-first-provision-secrets\` (1-day retention)"
-              fi
             else
-              echo "- Viewer code validation passed."
-              echo "- GitHub Cloudflare secrets are absent, so account-side deployment was skipped without failing CI."
-              echo "- Use the Windows local Wrangler setup bridge; no API token needs to be pasted into chat."
+              echo "- Viewer validation passed, but GitHub Cloudflare secrets are not configured."
+              echo "- Default deployment path: Windows local Wrangler bridge."
             fi
             echo "- Remote control: disabled / read-only viewer"
           } >> "$GITHUB_STEP_SUMMARY"
