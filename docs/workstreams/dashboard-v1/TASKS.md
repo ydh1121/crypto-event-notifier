@@ -9,6 +9,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Record Photo-eBook as the primary approved UI baseline
 - [x] Record external design/Korean-copy references as distilled guidance, not code/content to blindly copy
 - [x] Make this workstream the continuation source for future chats/sessions
+- [x] Make non-trader/older-adult comprehension a permanent dashboard + Telegram copy requirement
 
 ## B. Dashboard information architecture and visual redesign
 
@@ -17,7 +18,9 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Remove the current narrow-left-content / empty-right-space desktop feel
 - [x] Group strategy settings by purpose instead of one dense matrix
 - [x] Keep existing controls wired through the redesign
-- [-] User visual QA on the live local dashboard; tune spacing/geometry only from actual screenshots
+- [x] Add a beginner-facing copy layer that replaces Regime/Entry/Context/RISK_OFF/PAPER/DD/Profit Factor on primary surfaces
+- [x] Add plain-language 0–100 score meanings: 매우 나쁨 / 좋지 않음 / 보통 / 좋음 / 매우 좋음
+- [-] User visual QA on the live local dashboard; tune spacing/geometry/copy only from actual screenshots
 
 ## C. Charts and analytics
 
@@ -28,6 +31,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Add range selection (1H / 6H / 24H / 7D)
 - [x] Add performance summary: total return, realized/unrealized PnL, closed trades, win rate, profit factor, MDD/current DD
 - [x] Add condition diagnostics showing why an asset is WATCH / WAIT_PULLBACK / BUY_CANDIDATE / RISK_OFF
+- [x] Hide technical factor detail behind `왜 이렇게 판단했는지 자세히 보기` while keeping the primary decision plain
 - [ ] Add condition-performance breakdown after enough completed fills exist to make it meaningful
 
 ## D. Forward-test durability
@@ -47,6 +51,8 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Alert on risk blocks (spread/slippage/BTC flash) with anti-spam cooldown
 - [x] Alert on engine/asset errors with anti-spam cooldown
 - [x] Add daily PAPER performance summary
+- [x] Translate outgoing trading jargon into ordinary Korean before delivery
+- [x] Add tests for score meaning and Telegram jargon translation
 
 ## F. Multi-asset workflow
 
@@ -69,6 +75,8 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 - [x] Add network-access status API (LAN address + Tailscale installed/connected state)
 - [x] Add phone-access panel in settings with copyable safe URL and token guidance
+- [x] Rename Dashboard token to user-facing `휴대폰 연결 코드`
+- [x] Add a loopback-only API so the PC dashboard can reveal/copy the connection code without exposing it remotely
 - [x] Add `scripts/setup-phone-access.ps1` to install/open Tailscale with user approval
 - [ ] Verify same-Wi-Fi phone access on the user's device
 - [ ] Verify Tailscale external phone access on the user's device
@@ -88,10 +96,11 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 ## Validation status
 
-- [x] Python tests pass in GitHub Actions
-- [x] Python module compile check passes
-- [x] Dashboard JS `node --check` passes
-- [x] Dashboard structural smoke checks pass
+- [-] Latest plain-language change CI pending
+- [x] Previous Python tests pass in GitHub Actions
+- [x] Previous Python module compile check passes
+- [x] Previous Dashboard JS `node --check` passes
+- [x] Previous Dashboard structural smoke checks pass
 - [x] Existing Cloudflare TypeScript check remains green
 
 ## Completion condition for this workstream
