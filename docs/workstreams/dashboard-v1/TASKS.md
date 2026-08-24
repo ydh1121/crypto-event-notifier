@@ -90,6 +90,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Dashboard-only Git commits update local static files without restarting Uvicorn
 - [x] Browser watcher reloads dashboard changes for updated/published/reconciled sync states
 - [x] Python runtime changes automatically request exit code 75 and the running PowerShell supervisor restarts the app
+- [x] Normal GitHub commits no longer require the user to manually stop/re-run the secure launcher
 - [ ] Finish one-time rclone Google Drive setup/documentation
 - [ ] Verify consistent SQLite snapshot upload to `Crypto Auto Trader/backups`
 - [ ] Mirror non-secret `control/` and `dashboard/` to Drive
