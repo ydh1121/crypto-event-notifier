@@ -2,118 +2,117 @@
 
 ## Active state
 
-This follow-on workstream is now active for low-risk research/viewer infrastructure while `dashboard-v1` stabilization continues in parallel.
+This is the active top-level expansion workstream. `dashboard-v1` remains the local UI stabilization sub-workstream.
 
-Hard boundary: **PAPER-only**. No live exchange execution, private exchange endpoints or automatic promotion of external code.
+Hard boundary: **PAPER-only**. No live exchange execution, private exchange order endpoints, remote strategy mutation, or automatic promotion of external code.
 
-## Current implemented slice
+## Current verified runtime
 
-### 24/7 local research node
+Windows PC is the 24/7 research server.
 
-The Windows PC is the long-running research server.
-
-Operational roles:
 - local SQLite: authoritative PAPER/runtime state
 - Parquet + DuckDB: secondary analytical warehouse
-- research supervisor: non-trading sidecar
-- private GitHub: source/specs/reference catalog
-- Google Drive: future backup/export only
-- Cloudflare Pages/D1: Phase 2 viewer/login layer, not yet deployed
+- Research Supervisor: non-trading sidecar
+- private GitHub: source/spec/reference registry
+- Google Drive: backup/export only
+- Cloudflare Pages + Functions + D1: authenticated external/mobile read-only viewer
 
-### Research supervisor
+Verified Pages URL:
 
-Files:
-- `b3_trader/research_supervisor.py`
-- `b3_trader/research_control.py`
-- `b3_trader/research_warehouse.py`
-- `b3_trader/reference_components.py`
+`https://crypto-paper-viewer-ydh1121-cf36.pages.dev`
+
+Verified in the real Cloudflare account on 2026-08-24:
+
+- Wrangler OAuth login
+- Pages project creation/reuse
+- D1 creation/binding/migrations
+- Pages secrets
+- initial deploy
+- `/api/health` returns `ok: true`
+- first owner bootstrap and login
+- 20-second PAPER snapshot delivery
+- owner-only manual holdings display
+- Windows Wrangler/Python UTF-8 and Pages config-path deployment issues fixed
+
+## Research supervisor
 
 Managed periodic components:
-- `warehouse-export` — default 5 minutes
-- `reference-version-watch` — default 6 hours
 
-The supervisor reloads local control state live. Component enable/disable changes do not restart the trader. `지금 실행` increments a run nonce and wakes that component for an immediate cycle.
+- `warehouse-export` — 5 minutes
+- `reference-version-watch` — 6 hours
+- `cloudflare-snapshot-publish` — 20 seconds
+- `cloudflare-pages-deploy` — 30-second viewer-code change check
 
-Safety:
-- cannot place orders
-- cannot modify PAPER profiles
-- cannot auto-promote/download/execute reference repositories
-- component failure is isolated from the trader
+Component failure remains isolated from the PAPER engine. Remote Pages users cannot change component state.
 
-Local runtime files:
-- `b3_trader/data/research-platform/components.json`
-- `b3_trader/data/research-platform/status.json`
-- `b3_trader/data/research-platform/supervisor.log`
-- `b3_trader/data/research-platform/reference-components-state.json`
-- `b3_trader/data/research-warehouse/`
+## Current Pages data contract
 
-All remain ignored/local.
+The global snapshot currently contains:
 
-### Local research control API
+- aggregate PAPER capital/equity/cash/P&L
+- scan progress and active-position count
+- compact all-market leaderboard
+- per-market current price, account/equity state, average entry, unrealized P/L, trade count/win rate
+- regime / entry / opportunity / suggested weight / current intent
+- Research Supervisor summary
+- optional authenticated manual holdings
 
-Files:
-- `b3_trader/research_routes.py`
-- integrated into `b3_trader/local_app.py`
+Raw SQLite is never uploaded.
 
-Endpoints:
-- `GET /api/research/components` — authenticated read status
-- `PATCH /api/research/components/{name}` — loopback/local PC only
-- `POST /api/research/components/{name}/run` — loopback/local PC only
+## Phase 2.5 implementation started
 
-Remote/Tunnel clients can view component status but cannot mutate it.
+The Pages viewer now has the same top-level information architecture as the local dashboard:
 
-### Dashboard component manager
+- `홈`
+- `코인`
+- `결과`
+- `기록`
+- `설정`
 
-Files:
-- `dashboard/research-components.js`
-- `dashboard/research-components.css`
-- loaded by `dashboard/research-capital.js`
+First slice added:
 
-Settings now gets a full-width `데이터 수집 · 연구 구성요소` panel showing:
-- research supervisor online/offline
-- per-component health
-- interval
-- last success
-- latest export summary
-- external repo update/failure counts
-- local-only `켜기/끄기`
-- local-only `지금 실행`
+- Home: aggregate PAPER state, permitted manual holdings, leader, research-node summary
+- Coin: current per-market account state and plain-Korean regime/entry/opportunity scores from the compact snapshot
+- Results: all-market search/filter/sort; rows open Coin detail
+- Records: current snapshot/trade-count summary
+- Settings: read-only account/research-node state plus owner invite management
 
-The visible build pill is patched to `UI 2026.08.24-9` when this module loads.
-
-## Validation
-
-CI must cover:
-- Python tests
-- Python module compile
-- dashboard JS syntax/smoke including `research-capital.js` and `research-components.js`
-- Cloudflare typecheck
-
-New unit coverage:
-- local component control persistence/bounds
-- run nonce increment
-- research status/reference summary
+Remote contract remains read-only. There are no Pages endpoints for pause/resume, kill switch, strategy changes, asset mutation, or order execution.
 
 ## Current next action
 
-Do not wait 24 hours before continuing.
+Proceed with **Phase 2.5B — detailed research data bridge**.
 
-Proceed to **Phase 2 — Cloudflare Pages viewer scaffold**:
-1. create a separate Pages/Functions project so the existing Cloudflare Container experiment is untouched,
-2. serve a read-first dashboard at free `*.pages.dev`,
-3. add authenticated snapshot ingestion from the 24/7 PC,
-4. add D1 owner/viewer/invite/session schema,
-5. keep all remote actions read-only,
-6. add local outbound snapshot publisher,
-7. prepare GitHub -> Pages deployment configuration.
+Do not put all historical data into the 20-second global snapshot. Design a separate bounded per-market detail path so 477 markets do not resend full history continuously.
 
-Actual Cloudflare project creation/binding/deployment may require the user's Cloudflare account session/credentials; source scaffolding can be completed in Git first.
+Next implementation order:
 
-## Parallel observations that no longer block Phase 2
+1. define compact per-market detail payload from the existing local PAPER detail data,
+2. add D1 storage/API for latest per-market detail,
+3. publish only changed/recent selected detail slices on a slower cadence,
+4. expose current trade plan / next add / target / stop / trailing state,
+5. expose recent fills and completed-trade feedback,
+6. expose bounded equity + market-memory history for charts,
+7. build the Pages Coin/Records detailed views on that API,
+8. mobile/desktop QA and polling-state preservation.
 
-- Photo-eBook navigation acceptance on PC/iPhone
+After the Phase 2.5 data contract is stable, Phase 3 Upbit adapter work can begin while UI polish continues.
+
+## Parallel observations
+
+These continue without blocking the roadmap:
+
+- local dashboard Photo-eBook navigation acceptance on PC/iPhone
 - Chrome long-run responsiveness
 - Git auto-sync long-run behavior
 - Parquet growth/day and retention sizing
+- negative permission test: invited viewer without holdings permission must not receive private holdings
 
-These remain tracked but should not stall infrastructure development.
+## Later roadmap
+
+- Phase 3: Upbit all-KRW PAPER via common exchange adapter
+- Phase 4: Strategy Lab — conservative/balanced/aggressive/DCA/countertrend/swing and combinations
+- Phase 5: on-chain + Korean/global community language + news + macro event-risk features
+- Phase 6: local AI research service
+- Phase 7: walk-forward/holdout/challenger validation
+- Phase 8: robust live-candidate promotion research; real-money work remains a separate future workstream
