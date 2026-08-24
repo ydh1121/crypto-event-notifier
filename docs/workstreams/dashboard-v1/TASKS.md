@@ -23,10 +23,11 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Prevent iOS focus zoom by enforcing >=16px focusable form text on mobile
 - [x] Prevent routine button-label wrapping and normalize mobile action geometry
 - [x] Stabilize repeated asset/panel heights when optional holding data is missing
-- [x] Fix iPhone averaging-calculator row geometry: round/remove/price/amount/after-average use explicit mobile grid areas
+- [x] Replace broken mobile averaging grid with full-width stacked inputs and separate delete control
 - [x] Make saved average-price text materially larger on mobile
-- [x] Stop P/L from ellipsizing out of view; allow amount + percentage to wrap inside the P/L tile when necessary
-- [x] Rebuild Liquid Glass motion from the current Photo-eBook contract: one rail/one moving indicator, measured geometry, spring easing, stretch/overshoot/snap-back motion, press response and reduced-motion fallback
+- [x] Stop P/L from ellipsizing out of view; allow amount + percentage to wrap and stack metrics on narrow phones
+- [x] Rebuild Liquid Glass motion from current Photo-eBook contract: one rail/one moving indicator, measured geometry, stretch/overshoot/snap-back spring motion, press response and reduced-motion fallback
+- [x] Move selected Liquid indicators to outer overlay hosts with bleed so they visibly protrude beyond the inner rails
 - [-] User screenshot QA on current desktop + iPhone UI; tune only observed spacing/geometry/copy regressions
 
 ## C. Charts and analytics
@@ -66,16 +67,15 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Per-ticker averaging-down calculator up to 20 rounds
 - [x] Suggested entry sizing on BUY_CANDIDATE
 - [x] Treat ETH/BTC as a built-in market reference instead of an unsupported KRW asset
-- [x] Add an isolated 10,000,000 KRW PAPER auto-trading demo that scans Bithumb KRW markets without private API credentials
-- [x] Demo universe ranking uses liquidity + momentum, excludes major stable/reference assets, and rejects extreme 24h moves
-- [x] Demo reuses the existing AssetStrategy for market/entry scoring
-- [x] Demo reuses execution guards for spread, estimated slippage, BTC flash-crash and order-rate limits
-- [x] Demo supports adaptive entry sizing, per-asset cap, total exposure cap, max open positions, averaging only while the same BUY_CANDIDATE persists, and emergency exits on hard stop / weak regime
-- [x] Demo state persists separately in `b3_trader/data/auto_demo.sqlite3` and never contaminates the main PAPER portfolio
-- [x] Local launcher starts/restarts the isolated demo process automatically unless `AUTO_DEMO_ENABLED=false`
-- [x] Home dashboard shows demo equity, cash, open positions and current candidates from generated runtime state
+- [x] Add isolated 10,000,000 KRW PAPER auto-trading demo scanning Bithumb KRW markets without private credentials
+- [x] Demo universe ranking uses liquidity + momentum and existing `AssetStrategy`
+- [x] Demo reuses spread/slippage/BTC-flash/order-rate execution guards
+- [x] Demo supports adaptive sizing, per-asset cap, total exposure cap, max positions, cooldown averaging and emergency exits
+- [x] Demo persists separately in ignored `b3_trader/data/auto_demo.sqlite3`
+- [x] Move demo lifecycle inside FastAPI so Git-synced Python runtime updates can start it automatically without a manual launcher restart
+- [x] Add authenticated `/api/demo` and Home `1,000만원 자동매매 데모` card
 - [ ] Add per-asset analysis/profile notes for GPT-managed refinements
-- [-] Run the isolated Bithumb-wide PAPER demo long enough to evaluate trade frequency, realized P/L, drawdown and candidate quality before live execution work begins
+- [-] Run Bithumb-wide PAPER demo long enough to evaluate trade frequency, P/L, drawdown and candidate quality before live execution
 - [-] Validate simultaneous multi-asset portfolio limits/context behavior using the user's already-added assets
 
 ## G. Backup and synchronization
@@ -84,6 +84,10 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Local SQLite is the authoritative runtime DB
 - [x] Surface backup/sync status
 - [x] Control-only Git divergence reconciliation + one-time repair script
+- [x] Default GitHub poll reduced to 15 seconds
+- [x] Dashboard-only Git commits update local static files without restarting Uvicorn
+- [x] Browser watcher reloads dashboard changes for updated/published/reconciled sync states
+- [x] Python runtime changes automatically request exit code 75 and the running PowerShell supervisor restarts the app
 - [ ] Finish one-time rclone Google Drive setup/documentation
 - [ ] Verify consistent SQLite snapshot upload to `Crypto Auto Trader/backups`
 - [ ] Mirror non-secret `control/` and `dashboard/` to Drive
@@ -117,9 +121,9 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 - [x] Latest Python tests pass
 - [x] Python module compile check passes, including `b3_trader.auto_demo`
-- [x] Dashboard JS syntax/smoke checks pass, including final `navigation-v3.js` and Liquid Glass layer wiring
+- [x] Dashboard JS syntax/smoke checks pass, including final `navigation-v3.js` Liquid overlay layer
 - [x] Existing Cloudflare TypeScript check passes
-- [x] Latest GitHub Actions run on the current functional head is green
+- [x] GitHub Actions passed on the latest code head before documentation-only updates
 
 ## Completion condition for this workstream
 
