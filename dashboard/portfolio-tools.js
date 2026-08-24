@@ -8,7 +8,7 @@ function isSafePrivateHost(host){
     if(parts[0]===10||parts[0]===127)return true;
     if(parts[0]===192&&parts[1]===168)return true;
     if(parts[0]===172&&parts[1]>=16&&parts[1]<=31)return true;
-    if(parts[0]===100&&parts[1]>=64&&parts[1]<=127)return true; // Tailscale/CGNAT range
+    if(parts[0]===100&&parts[1]>=64&&parts[1]<=127)return true;
     return false;
   }
   return host.endsWith('.ts.net');
@@ -20,7 +20,7 @@ function showPublicAccessWarning(){
   const banner=document.createElement('div');
   banner.id='publicAccessWarning';
   banner.className='public-access-warning';
-  banner.textContent='공개 인터넷 주소로 접속 중입니다. 휴대폰 연결 코드는 암호화되지 않은 HTTP로 전송될 수 있습니다. 이 주소는 사용하지 말고 Tailscale 100.x 주소를 사용하세요.';
+  banner.textContent='공인 IP의 HTTP 주소로 접속 중입니다. 휴대폰 연결 코드와 화면 내용이 암호화되지 않을 수 있습니다. 이 주소는 사용하지 말고 HTTPS Cloudflare 연결 주소를 사용하세요.';
   document.body.prepend(banner);
 }
 
@@ -166,13 +166,35 @@ function bindPersonalTools(){
   };
 }
 
+function renderVpnFreePhoneAccess(){
+  const n=ui.network||{},cf=n.cloudflare||{},lan=n.lan||{},ts=n.tailscale||{};
+  const pill=document.getElementById('tailscalePill');
+  if(pill){pill.textContent=cf.active?'HTTPS 연결됨':'외부 연결 설정';pill.className=`status-pill ${cf.active?'good':'neutral'}`}
+  const body=document.getElementById('phoneAccessBody');if(!body)return;
+  body.classList.remove('empty-state');
+  let html='';
+  if(cf.active&&cf.url){
+    html+=accessCard('외부 접속 · 권장',true,cf.url,'','휴대폰에 VPN 앱을 켤 필요가 없습니다. Cloudflare가 HTTPS로 이 PC와 휴대폰을 연결합니다.');
+  }else{
+    html+=`<div class="access-card"><div class="access-card-top"><h4>외부 접속 · 권장</h4><span class="status-pill neutral">설정 전</span></div><p>VPN 없이 휴대폰에서 접속하려면 기존 트레이더를 종료한 뒤 보안 실행 파일을 사용합니다.</p><div class="access-url"><code>.\\start-trader-secure.bat</code><button class="copy-button" data-copy=".\\start-trader-secure.bat">복사</button></div><p>실행하면 무료 HTTPS 주소가 표시됩니다. 주소는 프로그램을 다시 켤 때 바뀔 수 있습니다.</p></div>`;
+  }
+  if(!cf.active&&lan.url)html+=accessCard('같은 Wi-Fi',true,lan.url,'','같은 Wi-Fi 안에서만 사용하는 내부 주소입니다.');
+  if(ts.installed){
+    html+=`<details class="access-optional"><summary>다른 연결 방법 보기</summary><p>Tailscale은 휴대폰 VPN 연결이 필요한 선택사항입니다. 사용하지 않아도 됩니다.</p>${ts.url?`<div class="access-url"><code>${esc(ts.url)}</code></div>`:''}</details>`;
+  }
+  body.innerHTML=html;
+  document.querySelectorAll('[data-copy]').forEach(btn=>btn.onclick=()=>copyText(btn.dataset.copy,btn));
+  const warning=document.querySelector('.phone-warning');
+  if(warning)warning.textContent='공인 IP의 http://주소로 8765 포트에 직접 접속하지 않습니다. VPN을 쓰지 않을 경우 위 HTTPS Cloudflare 연결을 사용합니다.';
+}
+
 function augmentPhoneAccess(){
   const panel=document.querySelector('.phone-panel');if(!panel)return;
-  const ts=ui.network?.tailscale||{};
+  const cf=ui.network?.cloudflare||{};
   let extra=document.getElementById('phoneToolsExtra');
   if(!extra){extra=document.createElement('div');extra.id='phoneToolsExtra';extra.className='phone-code-extra';panel.appendChild(extra)}
-  const tailText=ts.url?`외부에서는 ${ts.url} 주소를 먼저 사용하세요. 이름으로 된 ts.net 주소보다 100.x 직접 주소가 더 단순합니다.`:'Tailscale 연결 후 100.x 직접 주소가 표시됩니다.';
-  extra.innerHTML=`<div class="network-direct-note">${esc(tailText)}</div>${isLoopback()?'<div class="button-row"><button id="rotatePhoneCode" class="button secondary compact">휴대폰 연결 코드 새로 만들기</button></div>':''}`;
+  const accessText=cf.active&&cf.url?'현재 HTTPS 외부 연결이 켜져 있습니다. 휴대폰에서는 위 주소를 사용하세요.':'현재는 VPN 없는 HTTPS 외부 연결이 꺼져 있습니다.';
+  extra.innerHTML=`<div class="network-direct-note">${esc(accessText)}</div>${isLoopback()?'<div class="button-row"><button id="rotatePhoneCode" class="button secondary compact">휴대폰 연결 코드 새로 만들기</button></div>':''}`;
   const rotate=document.getElementById('rotatePhoneCode');if(rotate)rotate.onclick=async()=>{
     if(!confirm('기존 휴대폰 연결 코드를 폐기하고 새 코드로 바꿀까요? 기존 폰에서는 다시 입력해야 합니다.'))return;
     try{const result=await api('/api/local/phone-code/rotate',{method:'POST'});localPhoneCode=result.code;localPhoneCodeVisible=true;if(typeof augmentLocalPhoneCode==='function')augmentLocalPhoneCode();alert('새 휴대폰 연결 코드를 만들었습니다.')}catch(err){alert(err.message)}
@@ -183,8 +205,7 @@ const baseSelectMarket=selectMarket;
 selectMarket=function(market,openAssetView=false){baseSelectMarket(market,openAssetView);setTimeout(loadPersonalTools,0)};
 const baseRenderSelectedAsset=renderSelectedAsset;
 renderSelectedAsset=function(){baseRenderSelectedAsset();renderEntryGuide();renderHoldingSummary()};
-const baseRenderNetwork=renderNetwork;
-renderNetwork=function(){baseRenderNetwork();augmentPhoneAccess()};
+renderNetwork=function(){renderVpnFreePhoneAccess();augmentPhoneAccess()};
 
 ensurePersonalTools();showPublicAccessWarning();
 setTimeout(loadPersonalTools,0);
