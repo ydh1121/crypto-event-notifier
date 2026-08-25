@@ -33,6 +33,10 @@ class CloudflareMarketDetailPublisher(base.CloudflareMarketDetailPublisher):
             previous = base._compact_detail
             base._compact_detail = _compact_detail_with_strategy_lab
             try:
-                return super().publish_once()
+                result = super().publish_once()
+                if isinstance(result, dict):
+                    result["strategy_lab_detail"] = True
+                    result["detail_payload_version"] = 3
+                return result
             finally:
                 base._compact_detail = previous
