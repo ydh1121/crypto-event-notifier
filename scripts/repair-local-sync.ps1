@@ -4,25 +4,47 @@ $branch = "b3-auto-trader-phase1"
 Set-Location $repo
 
 Write-Host "Crypto Auto Trader - local Git sync repair"
-Write-Host "This preserves control/assets.json and control/runtime.json, then realigns code to origin/$branch."
+Write-Host "This preserves control state and generated PAPER runtime files, then realigns code to origin/$branch."
 
 if (-not (Test-Path ".git")) { throw "This folder is not a Git clone." }
 
 $controlFiles = @("control/assets.json", "control/runtime.json")
 $selfPath = "scripts/repair-local-sync.ps1"
-$safeDirtyPaths = @($controlFiles + $selfPath)
+$safeDirtyExact = @(
+  $controlFiles +
+  $selfPath +
+  "dashboard/runtime-demo.json" +
+  "dashboard/runtime-demo.tmp" +
+  "dashboard/runtime-demo-upbit.json" +
+  "dashboard/runtime-demo-upbit.tmp" +
+  "dashboard/runtime-build.json" +
+  "dashboard/runtime-build.json.tmp"
+)
+$safeDirtyPrefixes = @(
+  "dashboard/demo-runtime/",
+  "dashboard/demo-runtime-upbit/",
+  "b3_trader/data/"
+)
 
-# The normal recovery command deliberately checks out the newest copy of this
-# script before running it. That makes this file appear dirty against the old
-# local HEAD. Treat only this script itself as a safe transient change; every
-# other non-control local change still blocks the reset.
+function Test-SafeDirtyPath([string]$Path) {
+  if ($Path -in $safeDirtyExact) { return $true }
+  foreach ($prefix in $safeDirtyPrefixes) {
+    if ($Path.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) { return $true }
+  }
+  return $false
+}
+
+# The recovery command may check out the newest copy of this script before
+# running it. Generated PAPER runtime files are also expected to change while
+# the 24/7 server is running. Treat only those known runtime/control paths as
+# safe; every other local code change still blocks the reset.
 $dirtyLines = @(& git status --porcelain) | Where-Object { $_ }
 $dirtyPaths = @($dirtyLines | ForEach-Object {
   if ($_.Length -ge 4) { $_.Substring(3).Trim() }
 }) | Where-Object { $_ }
-$unsafeDirty = @($dirtyPaths | Where-Object { $_ -notin $safeDirtyPaths })
+$unsafeDirty = @($dirtyPaths | Where-Object { -not (Test-SafeDirtyPath $_) })
 if ($unsafeDirty.Count -gt 0) {
-  Write-Host "Repair stopped because non-control local changes exist:" -ForegroundColor Yellow
+  Write-Host "Repair stopped because non-runtime local changes exist:" -ForegroundColor Yellow
   $unsafeDirty | Sort-Object -Unique | ForEach-Object { Write-Host "  $_" }
   Write-Host "No reset was performed. Ask GPT to review these files before continuing."
   exit 2
@@ -74,7 +96,7 @@ try {
 
 $after = (& git rev-parse --short HEAD).Trim()
 Write-Host "Repair complete. Local code now matches origin/$branch at $after." -ForegroundColor Green
-Write-Host "Your local .env, dashboard token, Telegram settings, SQLite data, holdings, averaging plans, and backups were not deleted."
+Write-Host "Your local .env, dashboard token, Telegram settings, SQLite data, Bithumb/Upbit PAPER runtime, holdings, averaging plans, and backups were not deleted."
 if (Test-Path "dashboard/navigation-v3.js") {
   Write-Host "Dashboard navigation v3 files are present."
 } else {
