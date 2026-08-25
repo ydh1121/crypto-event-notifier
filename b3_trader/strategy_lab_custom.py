@@ -283,6 +283,35 @@ def custom_experiments(path: Path = DB_PATH) -> list[dict[str, Any]]:
         conn.close()
 
 
+class _ForwardOnlyStrategyLabStore(StrategyLabStore):
+    """Skip source memories already included in an experiment's creation baseline."""
+
+    def _process_style(
+        self,
+        *,
+        experiment: dict[str, Any],
+        spec: StyleSpec,
+        row: dict[str, Any],
+        account: dict[str, Any],
+        learning: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        if int(row.get("id") or 0) <= int(account.get("last_memory_id") or 0):
+            return None
+        return super()._process_style(
+            experiment=experiment,
+            spec=spec,
+            row=row,
+            account=account,
+            learning=learning,
+        )
+
+    @staticmethod
+    def _mark_account(account: dict[str, Any], price: float, memory_id: int) -> None:
+        if int(memory_id) <= int(account.get("last_memory_id") or 0):
+            return
+        StrategyLabStore._mark_account(account, price, memory_id)
+
+
 class ConfiguredStrategyLabRunner:
     """Strategy Lab runner that loads persisted local custom style specs safely."""
 
@@ -293,7 +322,7 @@ class ConfiguredStrategyLabRunner:
         # Construct the base store with built-ins only, then expose saved custom
         # specs strictly for this processing window.
         _unregister_custom_specs()
-        store = StrategyLabStore(self.path)
+        store = _ForwardOnlyStrategyLabStore(self.path)
         try:
             custom_count = register_custom_specs(self.path)
             results = [store.process_exchange(exchange) for exchange in ("bithumb", "upbit")]
