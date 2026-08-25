@@ -237,19 +237,30 @@ Goal: keep the Windows PC and SQLite as the source of truth while making Pages t
 
 Architecture: Strategy Lab reuses the same `research_market_memory_mx` rows already collected by Phase 3. It does not multiply exchange API calls. Lab tables are isolated from the active adaptive PAPER accounts.
 
-- [-] 보수적 — implementation complete, Windows shadow-PAPER runtime verification pending
-- [-] 균형 — implementation complete, Windows shadow-PAPER runtime verification pending
-- [-] 공격적 — implementation complete, Windows shadow-PAPER runtime verification pending
-- [-] 분할매수 — implementation complete, Windows shadow-PAPER runtime verification pending
-- [-] 역추세 — implementation complete, Windows shadow-PAPER runtime verification pending
-- [-] 스윙 — implementation complete, Windows shadow-PAPER runtime verification pending
-- [-] isolated metrics/learning state per style — dedicated accounts/trades/learning/metrics tables implemented; live verification pending
-- [-] read-only Strategy Lab summary in Pages — six-card Bithumb/Upbit comparison implemented; deploy/browser verification pending
+- [x] 보수적 — Windows shadow-PAPER runtime verified
+- [x] 균형 — Windows shadow-PAPER runtime verified
+- [x] 공격적 — Windows shadow-PAPER runtime verified
+- [x] 분할매수 — Windows shadow-PAPER runtime verified
+- [x] 역추세 — Windows shadow-PAPER runtime verified
+- [x] 스윙 — Windows shadow-PAPER runtime verified
+- [x] isolated metrics/learning state per style — dedicated accounts/trades/learning/metrics tables live
+- [x] read-only Strategy Lab summary in Pages — Bithumb/Upbit comparison deployed and health checked
 - [x] include fee + slippage assumptions in shadow execution model
 - [x] keep Strategy Lab unable to mutate the active adaptive PAPER account tables
-- [ ] multi-style experiment launcher for user-created combinations
-- [ ] per-market Strategy Lab drilldown / experiment history UI
-- [ ] minimum-sample and stability gates before any strategy is considered a candidate
+- [x] multi-style experiment launcher for user-created combinations — loopback/local-only creation and pause/resume
+- [x] per-market Strategy Lab drilldown / experiment history UI — selected market only, read-only Pages detail
+- [-] minimum-sample and stability gates before any strategy is considered a candidate — implementation complete; Windows snapshot/runtime verification pending
+
+Candidate gate contract:
+
+- minimum 30 completed trades
+- minimum 5 traded markets
+- at least 50% profitable-market share
+- no single market above 60% of absolute realized-PnL concentration
+- maximum drawdown no worse than -12%
+- positive expectancy and positive aggregate return
+- Profit Factor at least 1.10
+- candidate status is research-only; automatic promotion remains disabled
 
 ## Phase 5+ — context AI and promotion research
 
