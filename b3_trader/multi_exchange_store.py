@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 import time
 from pathlib import Path
@@ -9,6 +10,7 @@ from .auto_demo_v2 import AdaptiveProfile, DB_PATH, START_KRW
 
 DEFAULT_EXCHANGE = "bithumb"
 DEFAULT_STRATEGY = "adaptive"
+BITHUMB_CUTOVER_MIGRATION = "bithumb_legacy_to_scoped_v1"
 
 
 def paper_key(exchange: str, market: str, strategy: str) -> str:
@@ -19,8 +21,8 @@ class MultiExchangeStore:
     """Phase 3 storage keyed by exchange + market + strategy.
 
     The existing Bithumb-only research_* tables stay untouched. This store owns
-    parallel *_mx tables. Legacy Bithumb data is copied only when explicitly
-    requested during the later Bithumb cutover; Upbit never triggers that copy.
+    parallel *_mx tables. Legacy Bithumb data is copied only during the guarded
+    cutover; Upbit never triggers that copy.
     """
 
     def __init__(self, path: Path = DB_PATH, *, migrate_legacy: bool = False) -> None:
@@ -182,6 +184,12 @@ class MultiExchangeStore:
             );
             CREATE INDEX IF NOT EXISTS idx_research_market_memory_mx_scope_ts
                 ON research_market_memory_mx(exchange, market, strategy, ts DESC);
+
+            CREATE TABLE IF NOT EXISTS research_store_migrations (
+                name TEXT PRIMARY KEY,
+                applied_ts REAL NOT NULL,
+                details_json TEXT NOT NULL DEFAULT '{}'
+            );
             """
         )
         self.conn.commit()
@@ -191,8 +199,30 @@ class MultiExchangeStore:
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
         ).fetchone())
 
+    def migration_record(self, name: str) -> dict[str, Any]:
+        row = self.conn.execute(
+            "SELECT name,applied_ts,details_json FROM research_store_migrations WHERE name=?", (name,)
+        ).fetchone()
+        if not row:
+            return {}
+        result = dict(row)
+        try:
+            details = json.loads(str(result.pop("details_json") or "{}"))
+        except json.JSONDecodeError:
+            details = {}
+        result["details"] = details if isinstance(details, dict) else {}
+        return result
+
+    def _record_migration(self, name: str, details: dict[str, Any]) -> None:
+        self.conn.execute(
+            """INSERT INTO research_store_migrations(name,applied_ts,details_json) VALUES(?,?,?)
+               ON CONFLICT(name) DO UPDATE SET applied_ts=excluded.applied_ts,details_json=excluded.details_json""",
+            (name, time.time(), json.dumps(details, ensure_ascii=False, separators=(",", ":"))),
+        )
+        self.conn.commit()
+
     def migrate_legacy_bithumb(self) -> dict[str, int]:
-        """Copy the latest legacy Bithumb state at cutover time. Safe to rerun."""
+        """Copy legacy Bithumb state before the scoped cutover. Safe to rerun before cutover."""
         counts: dict[str, int] = {}
         before = self.conn.total_changes
         if self._table_exists("research_accounts"):
@@ -318,6 +348,78 @@ class MultiExchangeStore:
             counts["memory"] = self.conn.total_changes - before
         self.conn.commit()
         return counts
+
+    def verify_legacy_bithumb_parity(self) -> dict[str, Any]:
+        table_pairs = {
+            "accounts": ("research_accounts", "research_accounts_mx"),
+            "profiles": ("research_profiles", "research_profiles_mx"),
+            "signals": ("research_signals", "research_signals_mx"),
+            "fills": ("research_fills", "research_fills_mx"),
+            "feedback": ("research_feedback", "research_feedback_mx"),
+            "equity": ("research_equity", "research_equity_mx"),
+            "memory": ("research_market_memory", "research_market_memory_mx"),
+        }
+        counts: dict[str, dict[str, int]] = {}
+        errors: list[str] = []
+        for name, (legacy_table, scoped_table) in table_pairs.items():
+            legacy_count = int(self.conn.execute(f"SELECT COUNT(*) FROM {legacy_table}").fetchone()[0]) if self._table_exists(legacy_table) else 0
+            scoped_count = int(self.conn.execute(
+                f"SELECT COUNT(*) FROM {scoped_table} WHERE exchange=? AND strategy=?",
+                (DEFAULT_EXCHANGE, DEFAULT_STRATEGY),
+            ).fetchone()[0])
+            counts[name] = {"legacy": legacy_count, "scoped": scoped_count}
+            if legacy_count != scoped_count:
+                errors.append(f"{name} count mismatch {legacy_count}!={scoped_count}")
+
+        state_checks = {
+            "accounts": """SELECT COUNT(*) FROM research_accounts l LEFT JOIN research_accounts_mx x
+                ON x.exchange=? AND x.market=l.market AND x.strategy=?
+                WHERE x.market IS NULL OR x.symbol IS NOT l.symbol OR x.name IS NOT l.name
+                   OR x.cash_krw IS NOT l.cash_krw OR x.volume IS NOT l.volume OR x.avg_price IS NOT l.avg_price
+                   OR x.realized_pnl IS NOT l.realized_pnl OR x.peak_equity IS NOT l.peak_equity
+                   OR x.max_drawdown_pct IS NOT l.max_drawdown_pct OR x.peak_price IS NOT l.peak_price
+                   OR x.last_buy_at IS NOT l.last_buy_at OR x.last_trade_at IS NOT l.last_trade_at
+                   OR x.entry_ts IS NOT l.entry_ts OR x.entry_signal_json IS NOT l.entry_signal_json
+                   OR x.updated_ts IS NOT l.updated_ts""",
+            "profiles": """SELECT COUNT(*) FROM research_profiles l LEFT JOIN research_profiles_mx x
+                ON x.exchange=? AND x.market=l.market AND x.strategy=?
+                WHERE x.market IS NULL OR x.regime_floor IS NOT l.regime_floor OR x.entry_floor IS NOT l.entry_floor
+                   OR x.exploration_floor IS NOT l.exploration_floor OR x.base_weight_pct IS NOT l.base_weight_pct
+                   OR x.max_position_pct IS NOT l.max_position_pct OR x.closed_trades IS NOT l.closed_trades
+                   OR x.wins IS NOT l.wins OR x.ema_return_pct IS NOT l.ema_return_pct
+                   OR x.version IS NOT l.version OR x.updated_ts IS NOT l.updated_ts""",
+            "signals": """SELECT COUNT(*) FROM research_signals l LEFT JOIN research_signals_mx x
+                ON x.exchange=? AND x.market=l.market AND x.strategy=?
+                WHERE x.market IS NULL OR x.symbol IS NOT l.symbol OR x.ts IS NOT l.ts OR x.price IS NOT l.price
+                   OR x.turnover_24h IS NOT l.turnover_24h OR x.change_24h_pct IS NOT l.change_24h_pct
+                   OR x.liquidity_score IS NOT l.liquidity_score OR x.regime_score IS NOT l.regime_score
+                   OR x.entry_score IS NOT l.entry_score OR x.opportunity_score IS NOT l.opportunity_score
+                   OR x.strategy_action IS NOT l.strategy_action OR x.trade_intent IS NOT l.trade_intent
+                   OR x.suggested_weight_pct IS NOT l.suggested_weight_pct OR x.reason IS NOT l.reason
+                   OR x.signal_json IS NOT l.signal_json""",
+        }
+        mismatches: dict[str, int] = {}
+        for name, sql in state_checks.items():
+            if not self._table_exists(f"research_{name}"):
+                mismatches[name] = 0
+                continue
+            mismatch = int(self.conn.execute(sql, (DEFAULT_EXCHANGE, DEFAULT_STRATEGY)).fetchone()[0])
+            mismatches[name] = mismatch
+            if mismatch:
+                errors.append(f"{name} state mismatch rows={mismatch}")
+        return {"ok": not errors, "counts": counts, "state_mismatches": mismatches, "errors": errors}
+
+    def cutover_legacy_bithumb(self) -> dict[str, Any]:
+        existing = self.migration_record(BITHUMB_CUTOVER_MIGRATION)
+        if existing:
+            return {"status": "already_applied", "migration": existing}
+        migrated = self.migrate_legacy_bithumb()
+        verification = self.verify_legacy_bithumb_parity()
+        if not verification.get("ok"):
+            raise RuntimeError("Bithumb legacy->scoped verification failed: " + "; ".join(verification.get("errors") or []))
+        details = {"exchange": DEFAULT_EXCHANGE, "strategy": DEFAULT_STRATEGY, "migrated": migrated, "verification": verification}
+        self._record_migration(BITHUMB_CUTOVER_MIGRATION, details)
+        return {"status": "applied", **details}
 
     def ensure_market(self, exchange: str, market: str, strategy: str, symbol: str, name: str) -> None:
         exchange, market, strategy = exchange.lower(), market.upper(), strategy.lower()
