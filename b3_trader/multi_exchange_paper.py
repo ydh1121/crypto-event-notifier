@@ -67,8 +67,9 @@ class MultiExchangePaperDemo(AutoPaperDemo):
 
     def _rank_universe(self, tickers: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], float]:
         rows, breadth = super()._rank_universe(tickers)
-        if self.market_limit > 0:
-            rows = rows[: self.market_limit]
+        market_limit = max(0, int(getattr(self, "market_limit", 0) or 0))
+        if market_limit > 0:
+            rows = rows[:market_limit]
         return rows, breadth
 
     def _write_market_detail(self, market: str) -> None:
