@@ -203,7 +203,7 @@ class MultiExchangeStore:
                     entry_signal_json,updated_ts)
                 SELECT ?,market,?,symbol,name,cash_krw,volume,avg_price,realized_pnl,peak_equity,
                     max_drawdown_pct,peak_price,last_buy_at,last_trade_at,entry_ts,entry_signal_json,updated_ts
-                FROM research_accounts
+                FROM research_accounts WHERE 1=1
                 ON CONFLICT(exchange,market,strategy) DO UPDATE SET
                     symbol=excluded.symbol,name=excluded.name,cash_krw=excluded.cash_krw,
                     volume=excluded.volume,avg_price=excluded.avg_price,realized_pnl=excluded.realized_pnl,
@@ -222,7 +222,7 @@ class MultiExchangeStore:
                     max_position_pct,closed_trades,wins,ema_return_pct,version,updated_ts)
                 SELECT ?,market,?,regime_floor,entry_floor,exploration_floor,base_weight_pct,
                     max_position_pct,closed_trades,wins,ema_return_pct,version,updated_ts
-                FROM research_profiles
+                FROM research_profiles WHERE 1=1
                 ON CONFLICT(exchange,market,strategy) DO UPDATE SET
                     regime_floor=excluded.regime_floor,entry_floor=excluded.entry_floor,
                     exploration_floor=excluded.exploration_floor,base_weight_pct=excluded.base_weight_pct,
@@ -241,7 +241,7 @@ class MultiExchangeStore:
                     suggested_weight_pct,reason,signal_json)
                 SELECT ?,market,?,symbol,ts,price,turnover_24h,change_24h_pct,liquidity_score,
                     regime_score,entry_score,opportunity_score,strategy_action,trade_intent,
-                    suggested_weight_pct,reason,signal_json FROM research_signals
+                    suggested_weight_pct,reason,signal_json FROM research_signals WHERE 1=1
                 ON CONFLICT(exchange,market,strategy) DO UPDATE SET
                     symbol=excluded.symbol,ts=excluded.ts,price=excluded.price,
                     turnover_24h=excluded.turnover_24h,change_24h_pct=excluded.change_24h_pct,
