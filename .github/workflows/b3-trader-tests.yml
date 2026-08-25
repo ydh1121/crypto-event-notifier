@@ -119,5 +119,6 @@ jobs:
       - run: test -s public/strategy-lab-v1.css
       - run: test -s migrations/0001_init.sql
       - run: grep -q 'READ ONLY' public/index.html
-      - run: grep -q 'strategy-lab-v1.js?v=2' public/index.html
+      - run: grep -q 'strategy-lab-v1.js?v=3' public/index.html
+      - run: grep -q 'strategy-lab-v1.css?v=3' public/index.html
       - run: grep -q 'setup-cloudflare-pages-viewer.ps1' README.md
