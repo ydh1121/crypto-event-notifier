@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from b3_trader.auto_demo_v2 import DemoStore, START_KRW
-from b3_trader.multi_exchange_store import MultiExchangeStore, paper_key
+from b3_trader.multi_exchange_store import BITHUMB_CUTOVER_MIGRATION, MultiExchangeStore, paper_key
 from b3_trader.scoped_paper_store import ScopedPaperStore
 
 
@@ -60,4 +60,43 @@ def test_legacy_bithumb_migration_is_explicit_and_refreshes_latest_state(tmp_pat
     assert mx.account("bithumb", "KRW-BTC", "adaptive")["cash_krw"] == 9_250_000.0
     mx.migrate_legacy_bithumb()
     assert mx.account("bithumb", "KRW-BTC", "adaptive")["cash_krw"] == 8_750_000.0
+    mx.close()
+
+
+def test_guarded_cutover_records_marker_and_does_not_reimport_on_restart(tmp_path: Path) -> None:
+    db = tmp_path / "paper.sqlite3"
+    legacy = DemoStore(db)
+    legacy.ensure_market("KRW-BTC", "BTC", "비트코인")
+    account = legacy.all_accounts()["KRW-BTC"]
+    account["cash_krw"] = 9_100_000.0
+    legacy.save_account(account)
+    legacy.close()
+
+    mx = MultiExchangeStore(db)
+    cutover = mx.cutover_legacy_bithumb()
+    assert cutover["status"] == "applied"
+    assert cutover["verification"]["ok"] is True
+    assert mx.migration_record(BITHUMB_CUTOVER_MIGRATION)
+    assert mx.account("bithumb", "KRW-BTC", "adaptive")["cash_krw"] == 9_100_000.0
+    mx.close()
+
+    # Legacy data is now stale by definition. A later scoped startup must not
+    # import it again and overwrite post-cutover state.
+    legacy = DemoStore(db)
+    account = legacy.all_accounts()["KRW-BTC"]
+    account["cash_krw"] = 7_000_000.0
+    legacy.save_account(account)
+    legacy.close()
+
+    scoped = ScopedPaperStore("bithumb", "adaptive", path=db)
+    account = scoped.all_accounts()["KRW-BTC"]
+    account["cash_krw"] = 8_800_000.0
+    scoped.save_account(account)
+    scoped.close()
+
+    mx = MultiExchangeStore(db)
+    second = mx.cutover_legacy_bithumb()
+    assert second["status"] == "already_applied"
+    assert mx.account("bithumb", "KRW-BTC", "adaptive")["cash_krw"] == 8_800_000.0
+    assert mx.account("bithumb", "KRW-BTC", "adaptive")["cash_krw"] != 7_000_000.0
     mx.close()
