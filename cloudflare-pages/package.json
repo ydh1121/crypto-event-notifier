@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "scripts": {
     "build": "npm run typecheck",
-    "typecheck": "tsc --noEmit && node --check public/app.js && node --check public/local-parity.js && node --check public/asset-local-port.js && node --check public/records-port.js && node --check public/viewer-shell-v3.js && node --check public/exchange-phase3.js && node --check public/market-detail.js"
+    "typecheck": "tsc --noEmit && node --check public/app.js && node --check public/local-parity.js && node --check public/asset-local-port.js && node --check public/records-port.js && node --check public/viewer-shell-v3.js && node --check public/exchange-phase3.js && node --check public/strategy-lab-v1.js && node --check public/market-detail.js"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260823.1",
