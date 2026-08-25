@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 from .config import Settings
 from .http_retry import post_with_retry
+from .multi_exchange_store import BITHUMB_CUTOVER_MIGRATION
 from .research_control import platform_snapshot
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -271,6 +272,23 @@ def _recent_scoped_records(exchange: str, strategy: str = "adaptive", path: Path
         conn.close()
 
 
+def _migration_applied(name: str, path: Path = DEMO_DB_PATH) -> bool:
+    if not path.exists():
+        return False
+    conn = sqlite3.connect(str(path), timeout=10)
+    try:
+        table = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='research_store_migrations'"
+        ).fetchone()
+        if not table:
+            return False
+        return bool(conn.execute("SELECT 1 FROM research_store_migrations WHERE name=?", (name,)).fetchone())
+    except sqlite3.Error:
+        return False
+    finally:
+        conn.close()
+
+
 class CloudflareSnapshotPublisher:
     """Outbound-only publisher for the read-only Cloudflare Pages viewer."""
 
@@ -289,7 +307,11 @@ class CloudflareSnapshotPublisher:
             str(row.get("market")): _number(row.get("price"))
             for row in leaderboard if row.get("market")
         }
-        recent_bithumb = _recent_research_records()
+        recent_bithumb = (
+            _recent_scoped_records("bithumb")
+            if _migration_applied(BITHUMB_CUTOVER_MIGRATION)
+            else _recent_research_records()
+        )
         recent_upbit = _recent_scoped_records("upbit")
         public_payload = {
             "version": 2,
