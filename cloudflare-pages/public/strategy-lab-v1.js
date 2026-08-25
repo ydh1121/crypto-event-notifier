@@ -4,7 +4,7 @@
 
   const q=(s,r=document)=>r.querySelector(s);
   const n=v=>Number(v||0);
-  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   const pct=(v,d=2)=>`${n(v)>=0?'+':''}${n(v).toFixed(d)}%`;
   const won=v=>`${Math.round(n(v)).toLocaleString('ko-KR')}원`;
   const price=v=>{const x=n(v);if(!x)return'-';const d=x>=1000?0:x>=100?1:x>=1?3:x>=.1?5:8;return`${x.toLocaleString('ko-KR',{maximumFractionDigits:d})}원`};
@@ -28,23 +28,31 @@
   function currentMarket(){return typeof state!=='undefined'?(state.coinMarket||q('#coinSelect')?.value||''):(q('#coinSelect')?.value||'')}
   function currentViewerExchange(){const x=typeof state!=='undefined'?state.snapshot?.public?.exchange:'';return ['bithumb','upbit'].includes(x)?x:viewerExchange}
   function isCustom(row){return String(row?.style||'').startsWith('custom_')}
+  function candidateMeta(row,criteria={}){
+    const c=row?.candidate||{};
+    if(row?.status==='paused'||c.status==='paused')return{label:'일시정지',className:'paused',detail:'검증 중지'};
+    if(c.status==='candidate')return{label:'후보 통과',className:'candidate',detail:`게이트 ${n(c.passed_gates).toFixed(0)}/${n(c.total_gates).toFixed(0)}`};
+    if(c.status==='rejected')return{label:'게이트 미통과',className:'rejected',detail:`게이트 ${n(c.passed_gates).toFixed(0)}/${n(c.total_gates).toFixed(0)}`};
+    const need=n(criteria.min_closed_trades)||30;
+    return{label:`검증 ${n(c.closed_trades||row?.closed_trades).toFixed(0)}/${need}`,className:'warming',detail:`종목 ${n(c.traded_markets).toFixed(0)}/${n(criteria.min_traded_markets)||5}`};
+  }
 
   function render(force=false){
     const el=root();if(!el)return;
-    const data=lab(),all=Array.isArray(data.experiments)?data.experiments:[];
+    const data=lab(),all=Array.isArray(data.experiments)?data.experiments:[],criteria=data.candidate_criteria||{};
     if(!all.length){el.classList.add('hidden');return}
     const rows=all.filter(r=>r.exchange===exchange).sort((a,b)=>n(b.return_pct)-n(a.return_pct));
     if(!rows.length){el.classList.add('hidden');return}
-    const signature=`${exchange}|${n(data.updated_at)}|${rows.map(r=>`${r.style}:${n(r.return_pct)}:${n(r.closed_trades)}:${n(r.active_positions)}:${r.status}`).join('|')}`;
+    const signature=`${exchange}|${n(data.updated_at)}|${rows.map(r=>`${r.style}:${n(r.return_pct)}:${n(r.closed_trades)}:${n(r.active_positions)}:${r.status}:${r.candidate?.status||''}:${n(r.candidate?.passed_gates)}`).join('|')}`;
     if(!force&&signature===lastSignature)return;
     lastSignature=signature;
     el.classList.remove('hidden');
     const running=rows.filter(r=>r.status==='running');
     const ranked=(running.length?running:rows).slice().sort((a,b)=>n(b.return_pct)-n(a.return_pct));
     const leader=ranked[0];
-    const enough=rows.filter(r=>n(r.closed_trades)>=20).length;
+    const candidates=rows.filter(r=>r.candidate?.status==='candidate').length;
     const custom=rows.filter(isCustom).length;
-    el.innerHTML=`<div class="strategy-lab-head"><div><p class="kicker">STRATEGY LAB · PHASE 4</p><h3>같은 시장 데이터로 전략별 PAPER 결과를 비교합니다.</h3><p>기본 6개 전략${custom?`과 사용자 조합 ${custom}개`:''}가 같은 시장 기억을 재사용합니다. 각 실험은 별도 PAPER 계좌와 학습상태를 가집니다.</p></div><div class="strategy-lab-switch"><button type="button" data-lab-exchange="bithumb" class="${exchange==='bithumb'?'active':''}">빗썸</button><button type="button" data-lab-exchange="upbit" class="${exchange==='upbit'?'active':''}">업비트</button></div></div><div class="strategy-lab-summary"><div><span>현재 1위</span><b>${esc(leader?.label||leader?.style||'-')}</b><small class="${tone(leader?.return_pct)}">${leader?pct(leader.return_pct):'-'} 누적</small></div><div><span>비교 전략</span><b>${rows.length}개</b><small>기본 6 · 사용자 ${custom}</small></div><div><span>표본 20회 이상</span><b>${enough}개</b><small>표본이 적으면 순위 해석 주의</small></div><div><span>실행 모델</span><b>PAPER</b><small>수수료·슬리피지 포함</small></div></div><div class="strategy-lab-grid">${rows.map((r,i)=>{const trades=n(r.closed_trades),sample=trades>=20?'표본 형성':'초기 표본',rank=ranked.findIndex(x=>x.experiment_id===r.experiment_id)+1;return`<article class="strategy-lab-style ${rank===1?'leader':''} ${isCustom(r)?'custom':''}"><div class="strategy-lab-style-head"><span><i>${rank>0?rank:'–'}</i><b>${esc(r.label||r.style)}</b></span><strong class="${tone(r.return_pct)}">${pct(r.return_pct)}</strong></div><p>${esc(r.description||'')}</p><div class="strategy-lab-metrics"><div><span>최대 낙폭</span><b class="${tone(r.max_drawdown_pct)}">${pct(r.max_drawdown_pct)}</b></div><div><span>승률</span><b>${n(r.win_rate_pct).toFixed(1)}%</b></div><div><span>기대값</span><b class="${tone(r.expectancy_pct)}">${pct(r.expectancy_pct)}</b></div><div><span>완료 거래</span><b>${trades.toLocaleString('ko-KR')}</b></div><div><span>현재 보유</span><b>${n(r.active_positions).toLocaleString('ko-KR')}</b></div><div><span>Profit Factor</span><b>${n(r.profit_factor)>=999?'∞':n(r.profit_factor).toFixed(2)}</b></div></div><footer><span>${isCustom(r)?'사용자 조합':exchangeLabel(exchange)}</span><span class="${r.status==='paused'?'paused':trades>=20?'ready':'warming'}">${r.status==='paused'?'일시정지':sample}</span></footer></article>`}).join('')}</div>`;
+    el.innerHTML=`<div class="strategy-lab-head"><div><p class="kicker">STRATEGY LAB · PHASE 4</p><h3>같은 시장 데이터로 전략별 PAPER 결과를 비교합니다.</h3><p>기본 6개 전략${custom?`과 사용자 조합 ${custom}개`:''}가 같은 시장 기억을 재사용합니다. 수익률만 보지 않고 표본·종목 분산·낙폭·기대값·손익 집중도 게이트를 함께 봅니다.</p></div><div class="strategy-lab-switch"><button type="button" data-lab-exchange="bithumb" class="${exchange==='bithumb'?'active':''}">빗썸</button><button type="button" data-lab-exchange="upbit" class="${exchange==='upbit'?'active':''}">업비트</button></div></div><div class="strategy-lab-summary"><div><span>현재 수익률 1위</span><b>${esc(leader?.label||leader?.style||'-')}</b><small class="${tone(leader?.return_pct)}">${leader?pct(leader.return_pct):'-'} 누적</small></div><div><span>비교 전략</span><b>${rows.length}개</b><small>기본 6 · 사용자 ${custom}</small></div><div><span>후보 게이트 통과</span><b>${candidates}개</b><small>자동 승격은 하지 않음</small></div><div><span>최소 검증 표본</span><b>${n(criteria.min_closed_trades)||30}회</b><small>${n(criteria.min_traded_markets)||5}종목 이상 분산</small></div></div><div class="strategy-lab-grid">${rows.map(r=>{const trades=n(r.closed_trades),rank=ranked.findIndex(x=>x.experiment_id===r.experiment_id)+1,c=r.candidate||{},cm=candidateMeta(r,criteria);return`<article class="strategy-lab-style ${rank===1?'leader':''} ${isCustom(r)?'custom':''}"><div class="strategy-lab-style-head"><span><i>${rank>0?rank:'–'}</i><b>${esc(r.label||r.style)}</b></span><strong class="${tone(r.return_pct)}">${pct(r.return_pct)}</strong></div><p>${esc(r.description||'')}</p><div class="strategy-lab-metrics"><div><span>최대 낙폭</span><b class="${tone(r.max_drawdown_pct)}">${pct(r.max_drawdown_pct)}</b></div><div><span>승률</span><b>${n(r.win_rate_pct).toFixed(1)}%</b></div><div><span>기대값</span><b class="${tone(r.expectancy_pct)}">${pct(r.expectancy_pct)}</b></div><div><span>완료 거래</span><b>${trades.toLocaleString('ko-KR')}</b></div><div><span>거래 종목</span><b>${n(c.traded_markets).toFixed(0)}</b></div><div><span>Profit Factor</span><b>${n(r.profit_factor)>=999?'∞':n(r.profit_factor).toFixed(2)}</b></div></div><div class="strategy-lab-gate-mini"><span>수익 종목 ${n(c.profitable_market_share)*100?`${(n(c.profitable_market_share)*100).toFixed(0)}%`:'-'}</span><span>손익 집중 ${n(c.pnl_concentration_share)*100?`${(n(c.pnl_concentration_share)*100).toFixed(0)}%`:'-'}</span><span>${esc(cm.detail)}</span></div><footer><span>${isCustom(r)?'사용자 조합':exchangeLabel(exchange)}</span><span class="${cm.className}">${esc(cm.label)}</span></footer></article>`}).join('')}</div><p class="strategy-lab-candidate-note">후보 통과는 PAPER 연구상 검증 게이트를 통과했다는 뜻이며 실제 주문 전략으로 자동 승격되지 않습니다.</p>`;
   }
 
   function ensureMarketCard(){
