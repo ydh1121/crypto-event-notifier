@@ -26,7 +26,7 @@ Phase 0 remains the release gate for calling the current dashboard stable, but i
 - [x] Persist export checkpoints locally so restart does not duplicate old rows
 - [x] Keep SQLite authoritative; Parquet remains secondary analytical history
 - [ ] Add retention/compaction policy after real volume is measured
-- [ ] Add Upbit partitions after Phase 3 adapter exists
+- [x] Add scoped multi-exchange/Upbit history partitions for Phase 3
 - [ ] Add news/community/on-chain/macro partitions in Phase 5
 
 Local root:
@@ -56,6 +56,7 @@ Current managed components:
 - `reference-version-watch` — every 6 hours
 - `cloudflare-snapshot-publish` — every 20 seconds after Pages setup
 - `cloudflare-market-detail-publish` — every 30 seconds after Pages setup
+- `upbit-paper-research` — Phase 3 Upbit KRW PAPER; currently enabled at 180-second post-scan interval
 - `cloudflare-pages-deploy` — checks every 30 seconds after Pages setup; deploys only on viewer-code changes
 
 Safety contract:
@@ -136,6 +137,7 @@ Initial catalog:
 - [x] Fix Pages deploy config path handling
 - [x] Prevent Pages npm install from dirtying the Git worktree with generated `package-lock.json`
 - [x] Verify Git auto-sync can receive the fix and Pages auto-deploy remains healthy
+- [-] Add bounded retry/backoff for transient Cloudflare 429/5xx/timeouts; implementation added, latest Windows runtime verification pending
 
 ### 2C. Deployment path
 
@@ -217,13 +219,18 @@ Phase 2.5 implementation is no longer blocking Phase 3. Remaining items are veri
 
 - [x] Implement common read-only public exchange adapter interface for Bithumb + Upbit
 - [x] Add Upbit public quotation client using official market/ticker/orderbook/candle endpoints
-- [-] Upbit full KRW market collection — implementation added; Windows runtime smoke verification pending
-- [ ] Introduce durable identity `exchange + market + strategy` in the local PAPER store without destroying current Bithumb history
-- [ ] Create isolated 10M PAPER account per `exchange + market + strategy`
-- [ ] Add Upbit scan/scoring loop using the common adapter
-- [ ] Add exchange field to warehouse partitions and global viewer rows
-- [ ] Bithumb/Upbit cross-venue comparison
-- [ ] Promote multi-exchange engine only after Bithumb regression/PAPER smoke passes
+- [x] Runtime verify complete public KRW universes: Bithumb 477/477 and Upbit 286/286
+- [x] Introduce durable scoped identity `exchange + market + strategy` without destroying current legacy Bithumb history
+- [x] Create isolated 10M PAPER account per scoped Upbit `exchange + market + strategy`
+- [x] Add Upbit scan/scoring/PAPER loop using the common adapter
+- [x] Runtime verify one full Upbit 286-market PAPER pass with Supervisor healthy and no engine error
+- [x] Export scoped multi-exchange fills/feedback/equity/market-memory to the analytical warehouse
+- [x] Add exchange dimension and Bithumb/Upbit payloads to the global viewer snapshot contract
+- [x] Add Bithumb + Upbit per-market detail rotation using the existing D1 `exchange + market + strategy` key
+- [-] Runtime verify latest multi-exchange snapshot/detail publisher contract after Windows auto-sync to the current HEAD
+- [-] Add `빗썸 / 업비트 / 거래소 비교` viewer selector and shared-market comparison workspace; implementation added, Pages/browser validation pending
+- [-] Verify mobile exchange comparison UX without horizontal-table dependence
+- [ ] Promote Bithumb itself onto the scoped multi-exchange engine only after legacy Bithumb regression/PAPER smoke passes
 
 ## Phase 4 — strategy laboratory
 
