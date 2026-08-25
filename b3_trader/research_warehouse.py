@@ -20,6 +20,10 @@ EXPORT_TABLES = (
     "research_fills",
     "research_feedback",
     "research_equity",
+    "research_market_memory_mx",
+    "research_fills_mx",
+    "research_feedback_mx",
+    "research_equity_mx",
 )
 
 
