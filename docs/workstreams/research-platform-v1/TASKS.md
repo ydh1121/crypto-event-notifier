@@ -5,14 +5,14 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 ## Phase 0 — current dashboard/PAPER stabilization gate
 
 - [-] User acceptance of Photo-eBook top navigation on PC + iPhone
-- [-] Verify Chrome remains responsive during full-market PAPER research
+- [-] Verify Chrome remains responsive during full-market PAPER research; MutationObserver feedback-loop guards added, current Pages/browser verification pending
 - [-] Verify GitHub -> local sync remains reliable during long-run operation
 - [x] Preserve local SQLite/control state across restart
 - [x] Keep live exchange execution out of this workstream
 
 Phase 0 remains the release gate for calling the current dashboard stable, but it no longer blocks low-risk sidecar/viewer work. PAPER execution semantics remain unchanged.
 
-## Phase 1 — 24/7 local data foundation
+## Phase 1 — 24시간 local data foundation
 
 ### 1A. Analytical warehouse
 
@@ -57,12 +57,14 @@ Current managed components:
 - `cloudflare-snapshot-publish` — every 20 seconds after Pages setup
 - `cloudflare-market-detail-publish` — every 30 seconds after Pages setup
 - `upbit-paper-research` — Phase 3 Upbit KRW PAPER; currently enabled at 180-second post-scan interval
+- `strategy-lab-shadow` — Phase 4 six-style shadow PAPER comparison using existing market-memory rows
 - `cloudflare-pages-deploy` — checks every 30 seconds after Pages setup; deploys only on viewer-code changes
 
 Safety contract:
 
 - cannot place orders
-- cannot change PAPER strategy profiles
+- cannot change active PAPER strategy profiles
+- Strategy Lab uses dedicated shadow-PAPER tables and cannot mutate active adaptive accounts
 - cannot auto-promote external code
 - Pages viewer and Pages deployment remain read-only with respect to trading
 
@@ -104,7 +106,7 @@ Initial catalog:
 
 - [x] CI: Python tests + compile, dashboard smoke and Cloudflare typecheck passed for the initial Phase 1 foundation
 - [x] CI: component-control API/supervisor/dashboard slice passed Python tests + compile, dashboard smoke and Cloudflare typecheck
-- [ ] Long-run observation remains useful for retention sizing, but no longer blocks Phase 2 work
+- [ ] Long-run observation remains useful for retention sizing, but no longer blocks later phases
 - [ ] Measure storage growth/day before choosing retention and compaction
 
 ## Phase 2 — Cloudflare Pages viewer + invite users
@@ -137,7 +139,7 @@ Initial catalog:
 - [x] Fix Pages deploy config path handling
 - [x] Prevent Pages npm install from dirtying the Git worktree with generated `package-lock.json`
 - [x] Verify Git auto-sync can receive the fix and Pages auto-deploy remains healthy
-- [-] Add bounded retry/backoff for transient Cloudflare 429/5xx/timeouts; implementation added, latest Windows runtime verification pending
+- [x] Add bounded retry/backoff for transient Cloudflare 429/5xx/timeouts
 
 ### 2C. Deployment path
 
@@ -209,11 +211,9 @@ Goal: keep the Windows PC and SQLite as the source of truth while making Pages t
 - [x] Persist result filter/sort/search/selected coin/list scroll in browser storage across polling
 - [-] Refine plain-Korean decision/reason hierarchy aligned with `DESIGN.md`
 - [-] Mobile Safari QA at 360–430 px — v3 page-wide mobile pass implemented; final real-device re-check remains useful
-- [-] Desktop QA at 1280–1920 px — v3 wider Results/holdings layout implemented; final browser re-check remains useful
-- [-] Verify 477-market rendering remains responsive — `content-visibility` + mobile master/detail implemented; long-run observation remains useful
-- [-] Runtime/browser verify the global `recent_records` bridge after publisher restart
-
-Phase 2.5 implementation is no longer blocking Phase 3. Remaining items are verification/polish gates, not data-contract blockers.
+- [-] Desktop QA at 1280–1920 px — MutationObserver feedback-loop fix added; final Chrome re-check pending
+- [-] Verify 477-market rendering remains responsive — `content-visibility` + mobile master/detail + observer-loop guards implemented; final Chrome observation pending
+- [x] Runtime verify the global `recent_records` bridge after publisher restart
 
 ## Phase 3 — Upbit all-market PAPER
 
@@ -227,21 +227,29 @@ Phase 2.5 implementation is no longer blocking Phase 3. Remaining items are veri
 - [x] Export scoped multi-exchange fills/feedback/equity/market-memory to the analytical warehouse
 - [x] Add exchange dimension and Bithumb/Upbit payloads to the global viewer snapshot contract
 - [x] Add Bithumb + Upbit per-market detail rotation using the existing D1 `exchange + market + strategy` key
-- [-] Runtime verify latest multi-exchange snapshot/detail publisher contract after Windows auto-sync to the current HEAD
-- [-] Add `빗썸 / 업비트 / 거래소 비교` viewer selector and shared-market comparison workspace; implementation added, Pages/browser validation pending
+- [x] Runtime verify latest multi-exchange snapshot/detail publisher contract after Windows auto-sync
+- [-] Add `빗썸 / 업비트 / 거래소 비교` viewer selector and shared-market comparison workspace; implementation deployed, final Chrome/browser acceptance pending
 - [-] Verify mobile exchange comparison UX without horizontal-table dependence
-- [ ] Promote Bithumb itself onto the scoped multi-exchange engine only after legacy Bithumb regression/PAPER smoke passes
+- [x] Promote Bithumb onto the scoped multi-exchange engine after legacy state migration/regression checks
+- [x] Runtime verify Bithumb scoped cutover: 477/477, legacy frozen, Cloudflare scoped records live
 
 ## Phase 4 — strategy laboratory
 
-- [ ] 보수적
-- [ ] 균형
-- [ ] 공격적
-- [ ] 분할매수
-- [ ] 역추세
-- [ ] 스윙
-- [ ] multi-style experiment launcher
-- [ ] isolated metrics/learning state per style
+Architecture: Strategy Lab reuses the same `research_market_memory_mx` rows already collected by Phase 3. It does not multiply exchange API calls. Lab tables are isolated from the active adaptive PAPER accounts.
+
+- [-] 보수적 — implementation complete, Windows shadow-PAPER runtime verification pending
+- [-] 균형 — implementation complete, Windows shadow-PAPER runtime verification pending
+- [-] 공격적 — implementation complete, Windows shadow-PAPER runtime verification pending
+- [-] 분할매수 — implementation complete, Windows shadow-PAPER runtime verification pending
+- [-] 역추세 — implementation complete, Windows shadow-PAPER runtime verification pending
+- [-] 스윙 — implementation complete, Windows shadow-PAPER runtime verification pending
+- [-] isolated metrics/learning state per style — dedicated accounts/trades/learning/metrics tables implemented; live verification pending
+- [-] read-only Strategy Lab summary in Pages — six-card Bithumb/Upbit comparison implemented; deploy/browser verification pending
+- [x] include fee + slippage assumptions in shadow execution model
+- [x] keep Strategy Lab unable to mutate the active adaptive PAPER account tables
+- [ ] multi-style experiment launcher for user-created combinations
+- [ ] per-market Strategy Lab drilldown / experiment history UI
+- [ ] minimum-sample and stability gates before any strategy is considered a candidate
 
 ## Phase 5+ — context AI and promotion research
 
