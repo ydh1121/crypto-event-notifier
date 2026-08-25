@@ -13,6 +13,7 @@ from .config import Settings
 from .http_retry import post_with_retry
 from .multi_exchange_store import BITHUMB_CUTOVER_MIGRATION
 from .research_control import platform_snapshot
+from .strategy_lab_snapshot import read_strategy_lab_snapshot
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEMO_STATUS_PATH = REPO_ROOT / "dashboard/runtime-demo.json"
@@ -313,8 +314,9 @@ class CloudflareSnapshotPublisher:
             else _recent_research_records()
         )
         recent_upbit = _recent_scoped_records("upbit")
+        strategy_lab = read_strategy_lab_snapshot(DEMO_DB_PATH)
         public_payload = {
-            "version": 2,
+            "version": 3,
             "paper_only": True,
             "exchange": "bithumb",
             "strategy": "adaptive",
@@ -337,6 +339,7 @@ class CloudflareSnapshotPublisher:
             "leaderboard": leaderboard,
             "research_node": platform_snapshot(),
             "recent_records": recent_bithumb,
+            "strategy_lab": strategy_lab,
             # Phase 3 contract. New UI can switch/compare without breaking old readers.
             "exchanges": {"bithumb": bithumb, "upbit": upbit},
             "exchange_records": {"bithumb": recent_bithumb, "upbit": recent_upbit},
@@ -345,7 +348,8 @@ class CloudflareSnapshotPublisher:
         if _bool_env("CLOUDFLARE_PUBLISH_PRIVATE_HOLDINGS", False):
             private_payload["manual_holdings"] = _manual_holdings(self.settings.journal_db, price_by_market)
         source_ts = max(
-            _number(public_payload.get("source_updated_at")), _number(public_payload.get("multi_exchange_updated_at"))
+            _number(public_payload.get("source_updated_at")), _number(public_payload.get("multi_exchange_updated_at")),
+            _number(strategy_lab.get("updated_at")),
         )
         return {"source_ts": source_ts, "public": public_payload, "private": private_payload}
 
@@ -377,6 +381,7 @@ class CloudflareSnapshotPublisher:
         except ValueError:
             result = {"ok": True}
         exchanges = snapshot["public"].get("exchanges") or {}
+        lab = snapshot["public"].get("strategy_lab") or {}
         return {
             "status": "published", "configured": True, "bytes": len(body), "retries": retries,
             "markets": len(snapshot["public"].get("leaderboard") or []),
@@ -384,6 +389,7 @@ class CloudflareSnapshotPublisher:
                 name: len((payload or {}).get("leaderboard") or [])
                 for name, payload in exchanges.items() if isinstance(payload, dict)
             },
+            "strategy_lab_experiments": len(lab.get("experiments") or []),
             "source_ts": snapshot.get("source_ts"), "private_holdings_enabled": bool(snapshot.get("private")),
             "remote": result if isinstance(result, dict) else {},
         }
