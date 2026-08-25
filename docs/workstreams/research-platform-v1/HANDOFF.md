@@ -21,25 +21,19 @@ Verified Pages URL:
 
 `https://crypto-paper-viewer-ydh1121-cf36.pages.dev`
 
-Verified in the real Cloudflare account:
+Already runtime verified:
 
-- Wrangler OAuth login
-- Pages project creation/reuse
-- D1 creation/binding/migrations
-- Pages secrets
-- `/api/health` returns `ok: true`
-- first owner bootstrap and login
-- 20-second PAPER snapshot delivery
-- owner manual holdings display
-- Windows Wrangler/Python UTF-8 and Pages config-path deployment issues fixed
-- local Git auto-sync recovered and repeatedly verified
-- Pages auto-deploy verified `healthy` / `up_to_date`
-- per-market detail publisher runtime verified with 40 markets stored in 2 size-aware requests
-- Research Supervisor self-healing and Windows atomic status-write collision fix verified in long-running logs
+- Wrangler OAuth / Pages / D1 / secrets / health
+- first owner bootstrap/login
+- 20-second compact PAPER snapshots
+- owner manual holdings
+- per-market detail publisher with size-aware request splitting
+- Windows Git auto-sync + Pages auto-deploy
+- Research Supervisor self-healing and Windows atomic-status write hardening
 
 ## Research supervisor
 
-Managed periodic components:
+Managed components:
 
 - `warehouse-export` — 5 minutes
 - `reference-version-watch` — 6 hours
@@ -47,154 +41,121 @@ Managed periodic components:
 - `cloudflare-market-detail-publish` — 30 seconds
 - `cloudflare-pages-deploy` — 30-second viewer-code change check
 
-Component failure remains isolated from the PAPER engine. Remote Pages users cannot change component state.
+Remote Pages users cannot mutate component state or trading/PAPER strategy state.
 
 ## Current Pages data contract
 
-The global snapshot contains:
+The global snapshot contains aggregate PAPER capital/equity/cash/P&L, scan progress, compact all-market leaderboard, current per-market PAPER state/scores, Research Supervisor status, optional permitted manual holdings, and bounded cross-market fill/learning records.
 
-- aggregate PAPER capital/equity/cash/P&L
-- scan progress and active-position count
-- compact 477-market leaderboard
-- per-market current price, account/equity state, average entry, unrealized P/L, trade count/win rate
-- regime / entry / opportunity / suggested weight / current intent
-- Research Supervisor component summary
-- optional authenticated manual holdings
-- bounded recent cross-market fills and completed-trade learning records for the Records workspace
+A separate detail path stores bounded research keyed by `exchange + market + strategy`. Current Bithumb identity is `bithumb|KRW-XXX|adaptive` and already carries position, trade plan, target/stop/trailing state, recent fills, learning/profile changes, equity history and market-memory/score history.
 
-A separate per-market detail path stores bounded detailed PAPER research by `exchange + market + strategy` without bloating the 20-second global snapshot.
+Raw SQLite is never uploaded.
 
-Current detail payload contains:
+## Final Pages UI ownership after local-vs-Pages audit
 
-- current PAPER position/account state
-- next entry/add plan, target, hard stop and trailing state
-- recent PAPER fills
-- completed-trade feedback and profile-learning changes
-- bounded equity history
-- bounded market-memory / regime / entry / opportunity history
-- selected signal diagnostics such as pullback, volatility, orderbook imbalance and BTC/ETH context
+The current viewer intentionally avoids multiple broad patch layers fighting over the same screen.
 
-Current implementation uses `bithumb|KRW-XXX|adaptive`; the key shape is ready for Phase 3 Upbit and Phase 4 strategy variants.
+- `local-parity.js/css` — Liquid navigation and desktop Results research split
+- `asset-local-port.js/css` — Coin workspace and browser-only averaging tools
+- `records-port.js/css` — cross-market activity timeline
+- `viewer-shell-v3.js/css` — final Home / Results / Settings composition, holdings dashboard, mobile QA and polling-state persistence
 
-The Windows detail publisher rotates through the market universe while prioritizing active/high-opportunity markets. Payloads are size-aware and automatically split into <=1.5 MB requests. Raw SQLite is never uploaded.
-
-## Phase 2.5 UI architecture after full local-vs-Pages audit
-
-The real current local dashboard was re-reviewed from its final runtime cascade rather than from conversation history. The relevant local load order includes base styles plus plain-language, portfolio tools, UX polish, Liquid navigation, PAPER research, research capital and research component layers.
-
-The Pages viewer now intentionally uses focused owners instead of stacking many broad patch layers:
-
-- `local-parity.js/css` — Liquid top/bottom navigation and desktop Results research split
-- `asset-local-port.js/css` — Coin workspace, local-derived asset analysis, charts and browser-only averaging tools
-- `records-port.js/css` — cross-market fills/learning Records timeline
-- `viewer-shell-v2.js/css` — consolidated Home / Results / Settings composition, mobile Results master/detail and polling-state persistence
-
-Older `viewer-best-port` and `mobile-qa` broad patch layers remain in source history but are no longer loaded by `index.html`.
+`viewer-shell-v2`, `viewer-best-port` and `mobile-qa` remain only in source history and are not loaded by the current index.
 
 ### Home
 
-Current composition:
-
-- aggregate PAPER capital card
-- compact permitted manual holdings with clickable coin rows
-- actual top opportunity-score coins as quick cards
-- actual market-average regime / entry / opportunity context
-- scan progress
-- research-service health
-
-The old duplicate leader/node summary block is hidden once the consolidated shell is active.
+- aggregate PAPER capital
+- full permitted manual-holdings dashboard with invested/current value/P&L
+- best/worst current holding and allocation view
+- clickable per-asset holdings rows
+- actual top opportunity-score quick cards
+- market-average regime/entry/opportunity context
+- scan progress and research-service health
 
 ### Coin
 
-`asset-local-port` remains the canonical local-derived surface:
-
 - Liquid coin chip rail
 - large current-price hero
-- actual permitted holding average price / current P&L
+- actual permitted holding average price/current P&L
 - plain-Korean current decision
-- regime / entry / related-flow scores
+- regime/entry/related-flow scores
 - expandable diagnostics
-- browser-only holding and averaging calculator; no PC/SQLite mutation
-- shared 1H / 6H / 24H / 7D price/score range
-- PAPER markers and bounded research history
-- optional collapsed detailed PAPER plan/fills/learning section
+- shared 1H/6H/24H/7D price and score range
+- browser-only holding/averaging calculator; no PC/SQLite write
+- on mobile charts are shown before manual tools to reduce scrolling friction
 
 ### Results
 
 Desktop:
 
-- search / sort / status filters
-- left all-market leaderboard
-- right selected-market live PAPER detail
-- current leader / aggregate state summary
+- wider left ranking panel
+- compact row hierarchy: rank / coin+state / current price+average / return+holding/P&L context
+- no dedicated clipped holding column
+- right selected-market PAPER detail
 
 Mobile:
 
-- `코인 목록 / 선택 코인 상세` master-detail switch instead of stacking all 477 rows above detail
-- selected-market detail has a sticky back-to-list control
-- raw intent strings are normalized to Korean labels
-- unavailable plan prices are represented as calculation state, never invented values
-- persisted search / sort / filter / selected market / list scroll
-- `content-visibility` is used to reduce long-list rendering cost
+- `코인 목록 / 선택 코인 상세` master-detail switch
+- sticky return-to-list control
+- touch-sized search/sort/filter controls
+- raw trade-intent normalization
+- unavailable prices shown as calculation state rather than invented numbers
+- saved search/sort/filter/selected market/list scroll across polling
+- long-list `content-visibility`
 
 ### Records
 
-The old summary-only view is replaced by a cross-market timeline:
-
-- cumulative fills / learning counts
-- buy / sell / learning filters
-- recent PAPER buy/sell records
-- completed-trade profile-learning changes
-- clicking a record opens that coin
-
-The compact `recent_records` bridge reads only bounded fields from local PAPER research tables. Raw SQLite and full signal JSON remain local.
+Cross-market timeline with buy/sell/learning filters. Clicking a record opens the corresponding coin.
 
 ### Settings
 
-The local `데이터 수집 · 연구 구성요소` experience is ported as read-only status:
+Read-only `데이터 수집 · 연구 구성요소` status showing component description, state, interval, recent success/result/error and external-reference status. Local control buttons are intentionally excluded.
 
-- component label and description
-- enabled/runtime status
-- real interval
-- recent successful run
-- last result / error
-- external reference-watch summary
-- clear read-only permission status
+## Phase 2.5 remaining observations
 
-Local `끄기`, `지금 실행`, strategy mutation, kill/pause/resume and other PC-control actions are intentionally not present on Pages.
+Implementation is no longer blocking Phase 3. Continue observing:
 
-Owner invite/account management remains available in Settings.
+- iPhone Safari 360–430 px real-device usability after v3
+- desktop 1280–1920 layout after wider Results/holdings dashboard
+- long-run 477-market responsiveness
+- `recent_records` runtime after the publisher restart
+- invited viewer negative permission test for private holdings
 
-## Current next action
+These are verification/polish items, not blockers for the Phase 3 data architecture.
 
-Finish the **Phase 2.5C runtime verification gate** against the consolidated viewer shell before starting Phase 3.
+## Phase 3 — started
 
-One consolidated verification pass should cover:
+The first Phase 3 slice is now implemented without changing the current Bithumb PAPER execution path.
 
-1. Windows auto-sync reaches the latest branch head and the Python snapshot publisher restarts cleanly after the `recent_records` change,
-2. Pages auto-deploy records the same head and stays healthy,
-3. one iPhone Safari sweep across Home / Coin / Results / Records / Settings confirms no clipping, blank oversized plan cards or bottom-nav overlap,
-4. Results polling preserves search / sort / filter / selected coin / list scroll instead of jumping every 15 seconds,
-5. the 477-market list remains responsive on mobile and desktop,
-6. Records shows real cross-market fill/learning data after the new snapshot contract is live,
-7. desktop 1280–1920 visual QA checks the consolidated shell against the local dashboard's useful information hierarchy.
+Added:
 
-After those checks pass, Phase 3 Upbit all-KRW PAPER can start. Further cosmetic polish can continue later, but state loss, mobile usability, 477-market responsiveness or data-bridge failures remain blockers.
+- `b3_trader/upbit_client.py` — read-only Upbit quotation client
+- `b3_trader/exchange_public.py` — common public Bithumb/Upbit adapter interface
+- `scripts/check-phase3-public.py` — Bithumb/Upbit KRW market/ticker coverage smoke check
+
+Upbit public collection uses the official trading-pair list, quote-currency ticker list, orderbook and minute-candle APIs. No Upbit API key or private order endpoint is introduced.
+
+Next Phase 3 engineering order:
+
+1. runtime-smoke the Upbit KRW market/ticker collector on Windows,
+2. introduce durable local identity `exchange + market + strategy` while preserving existing Bithumb history,
+3. create isolated 10M PAPER account per identity,
+4. add Upbit scan/scoring loop via the common public adapter,
+5. add exchange dimension to warehouse/Pages snapshot rows,
+6. add Bithumb vs Upbit cross-venue comparison,
+7. promote the multi-exchange engine only after Bithumb regression/PAPER smoke passes.
 
 ## Parallel observations
-
-These continue without blocking the roadmap:
 
 - Chrome long-run responsiveness
 - Git auto-sync long-run behavior
 - Parquet growth/day and retention sizing
-- negative permission test: invited viewer without holdings permission must not receive private holdings
+- private-holdings negative permission test
 
 ## Later roadmap
 
-- Phase 3: Upbit all-KRW PAPER via common exchange adapter
-- Phase 4: Strategy Lab — conservative/balanced/aggressive/DCA/countertrend/swing and combinations
-- Phase 5: on-chain + Korean/global community language + news + macro event-risk features
+- Phase 4: Strategy Lab — conservative/balanced/aggressive/DCA/countertrend/swing
+- Phase 5: on-chain + community language + news + macro event-risk
 - Phase 6: local AI research service
 - Phase 7: walk-forward/holdout/challenger validation
 - Phase 8: robust live-candidate promotion research; real-money work remains a separate future workstream
