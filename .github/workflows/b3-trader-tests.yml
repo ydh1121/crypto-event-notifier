@@ -54,6 +54,7 @@ jobs:
       - run: test -s dashboard/demo-research.js
       - run: test -s dashboard/research-capital.js
       - run: test -s dashboard/research-components.js
+      - run: test -s dashboard/strategy-lab-local.js
       - run: test -s dashboard/styles.css
       - run: test -s dashboard/plain-language.css
       - run: test -s dashboard/portfolio-tools.css
@@ -62,6 +63,7 @@ jobs:
       - run: test -s dashboard/demo-research.css
       - run: test -s dashboard/research-capital.css
       - run: test -s dashboard/research-components.css
+      - run: test -s dashboard/strategy-lab-local.css
       - run: node --check dashboard/app.js
       - run: node --check dashboard/plain-language.js
       - run: node --check dashboard/portfolio-tools.js
@@ -70,6 +72,7 @@ jobs:
       - run: node --check dashboard/demo-research.js
       - run: node --check dashboard/research-capital.js
       - run: node --check dashboard/research-components.js
+      - run: node --check dashboard/strategy-lab-local.js
       - run: grep -q 'data-view-panel="overview"' dashboard/index.html
       - run: grep -q 'data-view-panel="performance"' dashboard/index.html
       - run: grep -q 'plain-language.js' dashboard/index.html
@@ -80,6 +83,8 @@ jobs:
       - run: grep -q 'navigation-v3.css' dashboard/index.html
       - run: grep -q 'research-capital.js' dashboard/index.html
       - run: grep -q 'research-components.js' dashboard/index.html
+      - run: grep -q 'strategy-lab-local.js' dashboard/index.html
+      - run: grep -q 'strategy-lab-local.css' dashboard/index.html
       - run: grep -q 'Phone access' dashboard/index.html
 
   cloudflare-typecheck:
@@ -110,6 +115,9 @@ jobs:
       - run: node --check public/app.js
       - run: test -s public/index.html
       - run: test -s public/styles.css
+      - run: test -s public/strategy-lab-v1.js
+      - run: test -s public/strategy-lab-v1.css
       - run: test -s migrations/0001_init.sql
       - run: grep -q 'READ ONLY' public/index.html
+      - run: grep -q 'strategy-lab-v1.js?v=2' public/index.html
       - run: grep -q 'setup-cloudflare-pages-viewer.ps1' README.md
