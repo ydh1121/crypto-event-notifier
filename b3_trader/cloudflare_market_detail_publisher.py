@@ -6,8 +6,9 @@ import time
 from pathlib import Path
 from typing import Any
 
-import requests
 from dotenv import load_dotenv
+
+from .http_retry import post_with_retry
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 STATE_PATH = REPO_ROOT / "b3_trader/data/research-platform/cloudflare-market-detail-state.json"
@@ -306,21 +307,23 @@ class CloudflareMarketDetailPublisher:
         batches = _split_batches(details)
         total_bytes = 0
         total_stored = 0
+        total_retries = 0
         remote_results: list[dict[str, Any]] = []
         batch_sizes: list[int] = []
         stored_by_exchange = {name: 0 for name in picked_by_exchange}
 
         for batch_details, body in batches:
-            response = requests.post(
+            response, retries = post_with_retry(
                 url,
                 data=body,
                 headers={
                     "Authorization": f"Bearer {token}", "Content-Type": "application/json",
-                    "User-Agent": "crypto-auto-trader-market-detail-publisher/2.0",
+                    "User-Agent": "crypto-auto-trader-market-detail-publisher/3.0",
                 },
                 timeout=30,
+                attempts=3,
             )
-            response.raise_for_status()
+            total_retries += retries
             try:
                 remote = response.json()
             except ValueError:
@@ -348,6 +351,7 @@ class CloudflareMarketDetailPublisher:
                 "stored": total_stored,
                 "stored_by_exchange": stored_by_exchange,
                 "requests": len(batches),
+                "retries": total_retries,
                 "bytes": total_bytes,
                 "batch_bytes": batch_sizes,
                 "remote": remote_results,
@@ -356,8 +360,8 @@ class CloudflareMarketDetailPublisher:
         return {
             "status": "published", "configured": True, "published": len(details), "stored": total_stored,
             "published_by_exchange": picked_by_exchange, "stored_by_exchange": stored_by_exchange,
-            "requests": len(batches), "bytes": total_bytes, "max_request_bytes": max(batch_sizes, default=0),
-            "cursors": next_cursors,
+            "requests": len(batches), "retries": total_retries, "bytes": total_bytes,
+            "max_request_bytes": max(batch_sizes, default=0), "cursors": next_cursors,
         }
 
 
