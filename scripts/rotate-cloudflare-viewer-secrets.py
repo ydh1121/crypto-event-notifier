@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import secrets
 import sys
+import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -47,14 +48,45 @@ def _put_secret(wrangler: str, project: str, name: str, value: str) -> None:
     )
 
 
+def _read_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def _publish_until_propagated(token: str, timeout_seconds: float = 35.0) -> dict:
+    os.environ["CLOUDFLARE_VIEWER_INGEST_TOKEN"] = token
+    deadline = time.monotonic() + timeout_seconds
+    last_error: Exception | None = None
+    attempt = 0
+    while time.monotonic() < deadline:
+        attempt += 1
+        try:
+            result = CloudflareSnapshotPublisher().publish_once()
+            if result.get("status") == "published":
+                result["rotation_verify_attempts"] = attempt
+                return result
+            last_error = RuntimeError(f"unexpected publish status: {result.get('status')}")
+        except Exception as exc:  # Cloudflare secret propagation may briefly return 401.
+            last_error = exc
+        time.sleep(min(5.0, 1.5 + attempt * 0.75))
+    if last_error:
+        raise RuntimeError(f"new ingest token did not become active within {timeout_seconds:.0f}s") from last_error
+    raise RuntimeError("new ingest token verification timed out")
+
+
 def main() -> None:
     values = dotenv_values(ENV_PATH) if ENV_PATH.exists() else {}
     project = str(values.get("CLOUDFLARE_VIEWER_PROJECT") or "").strip()
     old_ingest = str(values.get("CLOUDFLARE_VIEWER_INGEST_TOKEN") or "").strip()
+    old_owner = _read_text(BOOTSTRAP_PATH)
     if not project:
         raise SystemExit("Cloudflare viewer project is not configured. Run the normal viewer setup first.")
     if not old_ingest:
         raise SystemExit("Local ingest token is missing; refusing rotation because rollback would be unsafe.")
+    if not old_owner:
+        raise SystemExit("Local owner bootstrap token is missing; refusing rotation because rollback would be unsafe.")
 
     wrangler = _local_wrangler()
     _ensure_login(wrangler)
@@ -66,30 +98,42 @@ def main() -> None:
     print(f"project={project}")
     print("Secret values will not be printed.")
 
-    # OWNER_BOOTSTRAP_TOKEN is independent of the live publisher, so rotate it first.
-    _put_secret(wrangler, project, "OWNER_BOOTSTRAP_TOKEN", new_owner)
-
+    owner_changed = False
     ingest_changed = False
     try:
+        _put_secret(wrangler, project, "OWNER_BOOTSTRAP_TOKEN", new_owner)
+        owner_changed = True
         _put_secret(wrangler, project, "INGEST_TOKEN", new_ingest)
         ingest_changed = True
+
         _update_env({"CLOUDFLARE_VIEWER_INGEST_TOKEN": new_ingest})
         _atomic_text(BOOTSTRAP_PATH, new_owner + "\n")
+        os.environ["CLOUDFLARE_VIEWER_INGEST_TOKEN"] = new_ingest
 
-        result = CloudflareSnapshotPublisher().publish_once()
-        if result.get("status") != "published":
-            raise RuntimeError(f"post-rotation publish verification failed: {result.get('status')}")
+        result = _publish_until_propagated(new_ingest)
     except Exception:
+        rollback_errors: list[str] = []
         if ingest_changed:
             try:
                 _put_secret(wrangler, project, "INGEST_TOKEN", old_ingest)
                 _update_env({"CLOUDFLARE_VIEWER_INGEST_TOKEN": old_ingest})
-            except Exception:
-                print("WARNING: automatic ingest-token rollback also failed. Run the viewer setup before resuming publishing.")
+                os.environ["CLOUDFLARE_VIEWER_INGEST_TOKEN"] = old_ingest
+            except Exception as exc:
+                rollback_errors.append(f"INGEST_TOKEN rollback failed: {type(exc).__name__}")
+        if owner_changed:
+            try:
+                _put_secret(wrangler, project, "OWNER_BOOTSTRAP_TOKEN", old_owner)
+                _atomic_text(BOOTSTRAP_PATH, old_owner + "\n")
+            except Exception as exc:
+                rollback_errors.append(f"OWNER_BOOTSTRAP_TOKEN rollback failed: {type(exc).__name__}")
+        if rollback_errors:
+            print("WARNING: " + "; ".join(rollback_errors))
+            print("Run the normal Cloudflare Pages viewer setup before resuming publishing.")
         raise
 
     print("rotation_status=PASS")
     print("ingest_publish_check=PASS")
+    print(f"propagation_attempts={int(result.get('rotation_verify_attempts') or 1)}")
     print("The previous viewer ingest/bootstrap tokens are no longer valid.")
 
 
