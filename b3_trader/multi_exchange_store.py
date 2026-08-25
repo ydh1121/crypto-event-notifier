@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import json
 import sqlite3
 import time
 from pathlib import Path
 from typing import Any
 
-from .auto_demo_v2 import AdaptiveProfile, DB_PATH, START_KRW, _json_load, _num
+from .auto_demo_v2 import AdaptiveProfile, DB_PATH, START_KRW
 
 DEFAULT_EXCHANGE = "bithumb"
 DEFAULT_STRATEGY = "adaptive"
@@ -20,10 +19,11 @@ class MultiExchangeStore:
     """Phase 3 storage keyed by exchange + market + strategy.
 
     The existing Bithumb-only research_* tables stay untouched. This store owns
-    parallel *_mx tables and can copy legacy rows into the scoped schema safely.
+    parallel *_mx tables. Legacy Bithumb data is copied only when explicitly
+    requested during the later Bithumb cutover; Upbit never triggers that copy.
     """
 
-    def __init__(self, path: Path = DB_PATH) -> None:
+    def __init__(self, path: Path = DB_PATH, *, migrate_legacy: bool = False) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         self.path = path
         self.conn = sqlite3.connect(str(path), check_same_thread=False, timeout=30)
@@ -31,7 +31,8 @@ class MultiExchangeStore:
         self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.execute("PRAGMA synchronous=NORMAL")
         self._init_schema()
-        self.migrate_legacy_bithumb()
+        if migrate_legacy:
+            self.migrate_legacy_bithumb()
 
     def _init_schema(self) -> None:
         self.conn.executescript(
@@ -191,43 +192,64 @@ class MultiExchangeStore:
         ).fetchone())
 
     def migrate_legacy_bithumb(self) -> dict[str, int]:
-        """Copy old market-only data once. Safe to call repeatedly."""
+        """Copy the latest legacy Bithumb state at cutover time. Safe to rerun."""
         counts: dict[str, int] = {}
         before = self.conn.total_changes
         if self._table_exists("research_accounts"):
             self.conn.execute(
-                """INSERT OR IGNORE INTO research_accounts_mx(
+                """INSERT INTO research_accounts_mx(
                     exchange,market,strategy,symbol,name,cash_krw,volume,avg_price,realized_pnl,
                     peak_equity,max_drawdown_pct,peak_price,last_buy_at,last_trade_at,entry_ts,
                     entry_signal_json,updated_ts)
                 SELECT ?,market,?,symbol,name,cash_krw,volume,avg_price,realized_pnl,peak_equity,
                     max_drawdown_pct,peak_price,last_buy_at,last_trade_at,entry_ts,entry_signal_json,updated_ts
-                FROM research_accounts""",
+                FROM research_accounts
+                ON CONFLICT(exchange,market,strategy) DO UPDATE SET
+                    symbol=excluded.symbol,name=excluded.name,cash_krw=excluded.cash_krw,
+                    volume=excluded.volume,avg_price=excluded.avg_price,realized_pnl=excluded.realized_pnl,
+                    peak_equity=excluded.peak_equity,max_drawdown_pct=excluded.max_drawdown_pct,
+                    peak_price=excluded.peak_price,last_buy_at=excluded.last_buy_at,
+                    last_trade_at=excluded.last_trade_at,entry_ts=excluded.entry_ts,
+                    entry_signal_json=excluded.entry_signal_json,updated_ts=excluded.updated_ts""",
                 (DEFAULT_EXCHANGE, DEFAULT_STRATEGY),
             )
             counts["accounts"] = self.conn.total_changes - before
             before = self.conn.total_changes
         if self._table_exists("research_profiles"):
             self.conn.execute(
-                """INSERT OR IGNORE INTO research_profiles_mx(
+                """INSERT INTO research_profiles_mx(
                     exchange,market,strategy,regime_floor,entry_floor,exploration_floor,base_weight_pct,
                     max_position_pct,closed_trades,wins,ema_return_pct,version,updated_ts)
                 SELECT ?,market,?,regime_floor,entry_floor,exploration_floor,base_weight_pct,
                     max_position_pct,closed_trades,wins,ema_return_pct,version,updated_ts
-                FROM research_profiles""",
+                FROM research_profiles
+                ON CONFLICT(exchange,market,strategy) DO UPDATE SET
+                    regime_floor=excluded.regime_floor,entry_floor=excluded.entry_floor,
+                    exploration_floor=excluded.exploration_floor,base_weight_pct=excluded.base_weight_pct,
+                    max_position_pct=excluded.max_position_pct,closed_trades=excluded.closed_trades,
+                    wins=excluded.wins,ema_return_pct=excluded.ema_return_pct,
+                    version=excluded.version,updated_ts=excluded.updated_ts""",
                 (DEFAULT_EXCHANGE, DEFAULT_STRATEGY),
             )
             counts["profiles"] = self.conn.total_changes - before
             before = self.conn.total_changes
         if self._table_exists("research_signals"):
             self.conn.execute(
-                """INSERT OR IGNORE INTO research_signals_mx(
+                """INSERT INTO research_signals_mx(
                     exchange,market,strategy,symbol,ts,price,turnover_24h,change_24h_pct,liquidity_score,
                     regime_score,entry_score,opportunity_score,strategy_action,trade_intent,
                     suggested_weight_pct,reason,signal_json)
                 SELECT ?,market,?,symbol,ts,price,turnover_24h,change_24h_pct,liquidity_score,
                     regime_score,entry_score,opportunity_score,strategy_action,trade_intent,
-                    suggested_weight_pct,reason,signal_json FROM research_signals""",
+                    suggested_weight_pct,reason,signal_json FROM research_signals
+                ON CONFLICT(exchange,market,strategy) DO UPDATE SET
+                    symbol=excluded.symbol,ts=excluded.ts,price=excluded.price,
+                    turnover_24h=excluded.turnover_24h,change_24h_pct=excluded.change_24h_pct,
+                    liquidity_score=excluded.liquidity_score,regime_score=excluded.regime_score,
+                    entry_score=excluded.entry_score,opportunity_score=excluded.opportunity_score,
+                    strategy_action=excluded.strategy_action,trade_intent=excluded.trade_intent,
+                    suggested_weight_pct=excluded.suggested_weight_pct,reason=excluded.reason,
+                    signal_json=excluded.signal_json""",
                 (DEFAULT_EXCHANGE, DEFAULT_STRATEGY),
             )
             counts["signals"] = self.conn.total_changes - before
