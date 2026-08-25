@@ -16,7 +16,7 @@ from .cloudflare_snapshot_publisher import CloudflareSnapshotPublisher
 from .reference_components import ReferenceComponentWatcher
 from .research_control import COMPONENT_DEFINITIONS, STATUS_PATH, atomic_json, load_control
 from .research_warehouse import ResearchWarehouse
-from .strategy_lab import StrategyLabRunner
+from .strategy_lab_custom import ConfiguredStrategyLabRunner
 from .upbit_paper_runner import UpbitPaperResearchRunner
 
 LOG_PATH = Path("b3_trader/data/research-platform/supervisor.log")
@@ -79,7 +79,7 @@ class ResearchSupervisor:
         self.cloudflare_market_detail_publisher = CloudflareMarketDetailPublisher()
         self.cloudflare_deployer = CloudflarePagesDeployer()
         self.upbit_paper_runner = UpbitPaperResearchRunner()
-        self.strategy_lab_runner = StrategyLabRunner()
+        self.strategy_lab_runner = ConfiguredStrategyLabRunner()
         self.states: dict[str, ComponentState] = {}
         self.runners: dict[str, Callable[[], dict[str, Any]]] = {
             "warehouse-export": self.warehouse.export_once,
