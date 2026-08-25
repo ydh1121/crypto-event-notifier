@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f5f5f7">
-  <meta name="crypto-viewer-build" content="2026.08.26-11">
+  <meta name="crypto-viewer-build" content="2026.08.26-12">
   <title>Crypto Research</title>
   <link rel="stylesheet" href="/styles.css?v=3">
   <link rel="stylesheet" href="/workspaces.css?v=1">
@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="/records-port.css?v=1">
   <link rel="stylesheet" href="/viewer-shell-v3.css?v=1">
   <link rel="stylesheet" href="/exchange-phase3.css?v=1">
+  <link rel="stylesheet" href="/strategy-lab-v1.css?v=1">
 </head>
 <body>
   <header class="top-shell">
@@ -97,6 +98,7 @@
 
       <section class="viewer-page" data-view-panel="results">
         <div class="section-head page-head"><div><p class="kicker">가상매매 결과</p><h2>이 판단이 실제로 잘 맞았는지</h2><p>가상으로 사고판 결과를 누적해서 확인합니다.</p></div><span id="leaderText" class="leader-text">-</span></div>
+        <section id="strategyLabCard" class="strategy-lab-card hidden"></section>
         <section class="market-card results-card">
           <div class="market-controls"><input id="searchInput" type="search" placeholder="코인 검색" autocomplete="off"><select id="sortSelect" aria-label="정렬"><option value="return_desc">수익률 높은 순</option><option value="return_asc">수익률 낮은 순</option><option value="position_desc">보유금액 큰 순</option><option value="pnl_desc">미실현손익 큰 순</option><option value="trades_desc">거래횟수 많은 순</option><option value="opportunity_desc">기회점수 높은 순</option></select></div>
           <div class="filter-row" id="filterRow"><button class="active" data-filter="all">전체</button><button data-filter="holding">보유 중</button><button data-filter="completed">매매 완료</button><button data-filter="profit">수익</button><button data-filter="loss">손실</button></div>
@@ -123,6 +125,7 @@
   <script src="/local-parity.js?v=1"></script>
   <script src="/asset-local-port.js?v=1"></script>
   <script src="/records-port.js?v=1"></script>
-  <script src="/viewer-shell-v3.js?v=1"></script>
+  <script src="/viewer-shell-v3.js?v=2"></script>
+  <script src="/strategy-lab-v1.js?v=1"></script>
 </body>
 </html>
