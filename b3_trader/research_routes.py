@@ -7,6 +7,7 @@ from fastapi import Body, Depends, FastAPI, HTTPException, Request
 
 from .research_control import COMPONENT_DEFINITIONS, patch_component, platform_snapshot
 from .strategy_lab import STYLE_SPECS
+from .strategy_lab_candidates import read_strategy_lab_candidates
 from .strategy_lab_custom import (
     CUSTOM_PREFIX,
     create_custom_experiment,
@@ -81,17 +82,26 @@ def install_research_routes(
     def strategy_lab_state(request: Request) -> dict[str, Any]:
         client_host = request.client.host if request.client else ""
         snapshot = read_strategy_lab_snapshot()
+        candidate_state = read_strategy_lab_candidates()
+        evaluations = candidate_state.get("evaluations") if isinstance(candidate_state.get("evaluations"), dict) else {}
         builtins = [
             {"style": key, **asdict(spec)}
             for key, spec in STYLE_SPECS.items()
             if not str(key).startswith(CUSTOM_PREFIX)
         ]
+        custom_rows = custom_experiments()
+        for row in custom_rows:
+            evaluation = evaluations.get(str(row.get("experiment_id")))
+            if isinstance(evaluation, dict):
+                row["candidate"] = evaluation
         return {
             "paper_only": True,
             "can_control": client_host in LOOPBACK_HOSTS,
             "control_scope": "local_pc_only",
             "builtins": builtins,
-            "custom": custom_experiments(),
+            "custom": custom_rows,
+            "candidate_criteria": candidate_state.get("criteria") or {},
+            "candidate_summary": candidate_state.get("summary") or {},
             "snapshot": snapshot,
         }
 
