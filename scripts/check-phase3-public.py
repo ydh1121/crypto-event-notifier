@@ -1,10 +1,22 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+VENV_PYTHON = REPO_ROOT / ".venv" / "Scripts" / "python.exe"
+CURRENT_PYTHON = Path(sys.executable).resolve()
+
+if VENV_PYTHON.exists() and CURRENT_PYTHON != VENV_PYTHON.resolve():
+    result = subprocess.run(
+        [str(VENV_PYTHON), "-X", "utf8", str(Path(__file__).resolve()), *sys.argv[1:]],
+        cwd=str(REPO_ROOT),
+        check=False,
+    )
+    raise SystemExit(result.returncode)
+
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -28,6 +40,7 @@ def check(name: str) -> dict[str, object]:
 
 
 def main() -> None:
+    print(f"python={sys.executable}")
     print(json.dumps({name: check(name) for name in ("bithumb", "upbit")}, ensure_ascii=False, indent=2))
 
 
