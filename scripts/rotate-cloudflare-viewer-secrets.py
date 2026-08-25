@@ -25,6 +25,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from dotenv import dotenv_values
 
+from b3_trader.cloudflare_pages_deployer import CloudflarePagesDeployer
 from b3_trader.cloudflare_pages_setup import (
     BOOTSTRAP_PATH,
     ENV_PATH,
@@ -55,7 +56,16 @@ def _read_text(path: Path) -> str:
         return ""
 
 
-def _publish_until_propagated(token: str, timeout_seconds: float = 35.0) -> dict:
+def _force_pages_deploy() -> dict:
+    result = CloudflarePagesDeployer().deploy_once(force=True)
+    if result.get("status") != "deployed" or not result.get("health_ok"):
+        raise RuntimeError(
+            f"Pages redeploy failed after secret update: status={result.get('status')} health_ok={result.get('health_ok')}"
+        )
+    return result
+
+
+def _publish_until_ready(token: str, timeout_seconds: float = 30.0) -> dict:
     os.environ["CLOUDFLARE_VIEWER_INGEST_TOKEN"] = token
     deadline = time.monotonic() + timeout_seconds
     last_error: Exception | None = None
@@ -68,11 +78,11 @@ def _publish_until_propagated(token: str, timeout_seconds: float = 35.0) -> dict
                 result["rotation_verify_attempts"] = attempt
                 return result
             last_error = RuntimeError(f"unexpected publish status: {result.get('status')}")
-        except Exception as exc:  # Cloudflare secret propagation may briefly return 401.
+        except Exception as exc:
             last_error = exc
-        time.sleep(min(5.0, 1.5 + attempt * 0.75))
+        time.sleep(min(4.0, 1.0 + attempt * 0.5))
     if last_error:
-        raise RuntimeError(f"new ingest token did not become active within {timeout_seconds:.0f}s") from last_error
+        raise RuntimeError(f"new ingest token was not accepted after Pages redeploy within {timeout_seconds:.0f}s") from last_error
     raise RuntimeError("new ingest token verification timed out")
 
 
@@ -100,6 +110,7 @@ def main() -> None:
 
     owner_changed = False
     ingest_changed = False
+    pages_redeployed = False
     try:
         _put_secret(wrangler, project, "OWNER_BOOTSTRAP_TOKEN", new_owner)
         owner_changed = True
@@ -110,9 +121,13 @@ def main() -> None:
         _atomic_text(BOOTSTRAP_PATH, new_owner + "\n")
         os.environ["CLOUDFLARE_VIEWER_INGEST_TOKEN"] = new_ingest
 
-        result = _publish_until_propagated(new_ingest)
+        print("Redeploying Pages so the new secrets become active...")
+        deploy = _force_pages_deploy()
+        pages_redeployed = True
+        result = _publish_until_ready(new_ingest)
     except Exception:
         rollback_errors: list[str] = []
+        print("Rotation verification failed; restoring previous secrets.")
         if ingest_changed:
             try:
                 _put_secret(wrangler, project, "INGEST_TOKEN", old_ingest)
@@ -126,13 +141,25 @@ def main() -> None:
                 _atomic_text(BOOTSTRAP_PATH, old_owner + "\n")
             except Exception as exc:
                 rollback_errors.append(f"OWNER_BOOTSTRAP_TOKEN rollback failed: {type(exc).__name__}")
+
+        if not rollback_errors and (ingest_changed or owner_changed or pages_redeployed):
+            try:
+                print("Redeploying Pages with the restored secrets...")
+                _force_pages_deploy()
+                _publish_until_ready(old_ingest, timeout_seconds=20.0)
+                print("rollback_status=PASS")
+            except Exception as exc:
+                rollback_errors.append(f"Pages rollback redeploy/verify failed: {type(exc).__name__}")
+
         if rollback_errors:
             print("WARNING: " + "; ".join(rollback_errors))
             print("Run the normal Cloudflare Pages viewer setup before resuming publishing.")
         raise
 
     print("rotation_status=PASS")
+    print("pages_redeploy=PASS")
     print("ingest_publish_check=PASS")
+    print(f"deployed_head={str(deploy.get('head') or '')[:7]}")
     print(f"propagation_attempts={int(result.get('rotation_verify_attempts') or 1)}")
     print("The previous viewer ingest/bootstrap tokens are no longer valid.")
 
