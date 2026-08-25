@@ -23,6 +23,8 @@ from .auto_demo_v2 import (
 from .exchange_public import PublicExchangeAdapter, PublicMarket, public_exchange
 from .scoped_paper_store import ScopedPaperStore
 
+MARKET_MEMORY_RETENTION_DAYS = 45
+
 
 class MultiExchangePaperDemo(AutoPaperDemo):
     """Phase 3 PAPER runtime scoped by exchange + market + strategy.
@@ -122,9 +124,19 @@ class MultiExchangePaperDemo(AutoPaperDemo):
                 "max_spread_bps": MAX_SPREAD_BPS,
                 "max_slippage_bps": MAX_SLIPPAGE_BPS,
                 "public_market_data_only": True,
+                "market_memory_retention_days": MARKET_MEMORY_RETENTION_DAYS,
             },
         }
         _atomic_json(self.status_path, payload)
+
+    def scan_once(self) -> None:
+        super().scan_once()
+        cutoff = time.time() - MARKET_MEMORY_RETENTION_DAYS * 86400.0
+        self.store.conn.execute(
+            "DELETE FROM research_market_memory_mx WHERE exchange=? AND strategy=? AND ts < ?",
+            (self.exchange, self.strategy_name, cutoff),
+        )
+        self.store.conn.commit()
 
     def run_once(self) -> None:
         try:
