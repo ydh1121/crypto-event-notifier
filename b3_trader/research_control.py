@@ -40,6 +40,13 @@ COMPONENT_DEFINITIONS: dict[str, dict[str, Any]] = {
         "default_interval_seconds": 30,
         "min_interval_seconds": 20,
     },
+    "upbit-paper-research": {
+        "label": "업비트 전체 PAPER 연구",
+        "description": "업비트 KRW 전체 종목을 독립 1,000만원 PAPER 계좌로 연구합니다. 공개 시세 API만 사용합니다.",
+        "default_enabled": False,
+        "default_interval_seconds": 60,
+        "min_interval_seconds": 30,
+    },
     "cloudflare-pages-deploy": {
         "label": "웹 화면 자동 배포",
         "description": "GitHub에서 새 웹 화면을 받은 뒤 Pages 코드가 바뀐 경우에만 pages.dev로 자동 배포합니다.",
