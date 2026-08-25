@@ -1,10 +1,22 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+VENV_PYTHON = REPO_ROOT / ".venv" / "Scripts" / "python.exe"
+CURRENT_PYTHON = Path(sys.executable).resolve()
+
+if VENV_PYTHON.exists() and CURRENT_PYTHON != VENV_PYTHON.resolve():
+    result = subprocess.run(
+        [str(VENV_PYTHON), "-X", "utf8", str(Path(__file__).resolve()), *sys.argv[1:]],
+        cwd=str(REPO_ROOT),
+        check=False,
+    )
+    raise SystemExit(result.returncode)
+
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -14,6 +26,7 @@ from b3_trader.multi_exchange_store import MultiExchangeStore
 
 
 def main() -> None:
+    print(f"python={sys.executable}")
     print("=== PHASE 3 PUBLIC ADAPTERS ===")
     for exchange in ("bithumb", "upbit"):
         adapter = public_exchange(exchange)
