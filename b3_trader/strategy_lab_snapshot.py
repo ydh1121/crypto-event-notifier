@@ -7,6 +7,7 @@ from typing import Any
 
 from .auto_demo_v2 import DB_PATH
 from .strategy_lab import FEE_RATE, SLIPPAGE_RATE, SOURCE_STRATEGY, STYLE_SPECS
+from .strategy_lab_candidates import candidate_criteria, read_strategy_lab_candidates
 
 
 def _num(value: Any, default: float = 0.0) -> float:
@@ -17,14 +18,17 @@ def _num(value: Any, default: float = 0.0) -> float:
 
 
 def read_strategy_lab_snapshot(path: Path = DB_PATH) -> dict[str, Any]:
+    candidate_state = read_strategy_lab_candidates(path)
     base = {
-        "version": 1,
+        "version": 2,
         "paper_only": True,
         "source": "research_market_memory_mx",
         "source_strategy": SOURCE_STRATEGY,
         "execution_model": {"fee_rate": FEE_RATE, "slippage_rate": SLIPPAGE_RATE},
         "styles": [asdict(spec) for spec in STYLE_SPECS.values()],
         "experiments": [],
+        "candidate_criteria": candidate_criteria(),
+        "candidate_summary": candidate_state.get("summary") or {},
         "source_cursors": {},
         "updated_at": 0.0,
     }
@@ -46,6 +50,7 @@ def read_strategy_lab_snapshot(path: Path = DB_PATH) -> dict[str, Any]:
                JOIN strategy_lab_experiments e USING(experiment_id)
                ORDER BY m.exchange,m.return_pct DESC"""
         ).fetchall()
+        evaluations = candidate_state.get("evaluations") if isinstance(candidate_state.get("evaluations"), dict) else {}
         experiments: list[dict[str, Any]] = []
         for source in rows:
             row = dict(source)
@@ -54,6 +59,9 @@ def read_strategy_lab_snapshot(path: Path = DB_PATH) -> dict[str, Any]:
                 "expectancy_pct", "profit_factor", "total_equity_krw", "aggregate_start_krw",
             ):
                 row[key] = round(_num(row.get(key)), 6 if key == "return_pct" else 4)
+            evaluation = evaluations.get(str(row.get("experiment_id")))
+            if isinstance(evaluation, dict):
+                row["candidate"] = evaluation
             experiments.append(row)
         cursors = {
             str(row["exchange"]): int(row["last_memory_id"])
