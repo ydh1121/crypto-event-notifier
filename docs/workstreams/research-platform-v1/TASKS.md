@@ -185,8 +185,9 @@ Goal: keep the Windows PC and SQLite as the source of truth while making Pages t
 
 - [x] Verify real authenticated browser rendering of detailed Coin/Results data on desktop and iPhone
 - [x] Complete page-by-page audit against the current local dashboard final CSS/JS cascade
-- [x] Consolidate overlapping broad viewer patches into one `viewer-shell-v2` owner for Home / Results / Settings
+- [x] Consolidate Home / Results / Settings into one final `viewer-shell-v3` owner
 - [x] Keep `asset-local-port` as the canonical local-derived Coin workspace owner
+- [x] Keep `records-port` as the cross-market activity owner
 - [x] Add local-derived Liquid navigation and coin chip rail without remote control APIs
 - [x] Add bounded equity chart to Coin detail
 - [x] Add market-condition / buy-timing / opportunity history chart
@@ -194,28 +195,35 @@ Goal: keep the Windows PC and SQLite as the source of truth while making Pages t
 - [x] Add learning/profile-change history
 - [x] Add next planned buy/add and protection levels
 - [x] Add browser-only manual holding / averaging calculator without PC or SQLite writes
-- [x] Add compact local-style manual holdings summary on Home
+- [x] Expand Home manual holdings into a dashboard with invested/value/P&L, best/worst holding and allocation view
 - [x] Add Home opportunity quick cards using actual research scores
 - [x] Add full read-only `데이터 수집 · 연구 구성요소` status view in Settings
 - [x] Add compact recent cross-market fills/learning payload to the global snapshot
 - [x] Expand Records into a cross-market fill/learning timeline
+- [x] Rework desktop Results leaderboard into a wider compact row layout without the clipped dedicated holding column
 - [x] Add mobile Results master/detail mode so 477 rows and selected detail are not vertically stacked
+- [x] Move Coin charts ahead of manual tools on mobile and make tools single-column/touch-friendly
 - [x] Normalize raw trade-intent labels and unavailable plan values without inventing prices
+- [x] Persist result filter/sort/search/selected coin/list scroll in browser storage across polling
 - [-] Refine plain-Korean decision/reason hierarchy aligned with `DESIGN.md`
-- [-] Mobile Safari QA at 360–430 px — real iPhone issues identified and v2 layout implemented; re-verification pending
-- [-] Desktop QA at 1280–1920 px — local-vs-Pages video audit complete; consolidated shell re-verification pending
-- [-] Verify polling preserves selected tab/coin/filter/sort/search/scroll state — persistence implemented; runtime verification pending
-- [-] Verify 477-market rendering remains responsive — `content-visibility` + mobile master/detail implemented; runtime verification pending
-- [-] Runtime/browser verify the new global `recent_records` bridge after the publisher restart
+- [-] Mobile Safari QA at 360–430 px — v3 page-wide mobile pass implemented; final real-device re-check remains useful
+- [-] Desktop QA at 1280–1920 px — v3 wider Results/holdings layout implemented; final browser re-check remains useful
+- [-] Verify 477-market rendering remains responsive — `content-visibility` + mobile master/detail implemented; long-run observation remains useful
+- [-] Runtime/browser verify the global `recent_records` bridge after publisher restart
 
-Phase 3 starts only after the remaining active Phase 2.5C verification items above are stable. Visual polish may continue later, but navigation/state loss, mobile clipping, long-list responsiveness and data-bridge failures are blockers.
+Phase 2.5 implementation is no longer blocking Phase 3. Remaining items are verification/polish gates, not data-contract blockers.
 
 ## Phase 3 — Upbit all-market PAPER
 
-- [ ] common public exchange adapter
-- [ ] Upbit full KRW market collection
-- [ ] independent 10M account per `exchange + market + strategy`
+- [x] Implement common read-only public exchange adapter interface for Bithumb + Upbit
+- [x] Add Upbit public quotation client using official market/ticker/orderbook/candle endpoints
+- [-] Upbit full KRW market collection — implementation added; Windows runtime smoke verification pending
+- [ ] Introduce durable identity `exchange + market + strategy` in the local PAPER store without destroying current Bithumb history
+- [ ] Create isolated 10M PAPER account per `exchange + market + strategy`
+- [ ] Add Upbit scan/scoring loop using the common adapter
+- [ ] Add exchange field to warehouse partitions and global viewer rows
 - [ ] Bithumb/Upbit cross-venue comparison
+- [ ] Promote multi-exchange engine only after Bithumb regression/PAPER smoke passes
 
 ## Phase 4 — strategy laboratory
 
