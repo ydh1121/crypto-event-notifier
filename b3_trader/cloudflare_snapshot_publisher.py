@@ -7,10 +7,10 @@ import time
 from pathlib import Path
 from typing import Any
 
-import requests
 from dotenv import load_dotenv
 
 from .config import Settings
+from .http_retry import post_with_retry
 from .research_control import platform_snapshot
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -164,7 +164,14 @@ def _manual_holdings(journal_db: str, price_by_market: dict[str, float]) -> dict
     }
 
 
-def _records_payload(fill_rows: list[sqlite3.Row], feedback_rows: list[sqlite3.Row], fill_count: int, feedback_count: int, *, exchange: str) -> dict[str, Any]:
+def _records_payload(
+    fill_rows: list[sqlite3.Row],
+    feedback_rows: list[sqlite3.Row],
+    fill_count: int,
+    feedback_count: int,
+    *,
+    exchange: str,
+) -> dict[str, Any]:
     fills = [
         {
             "exchange": exchange,
@@ -198,7 +205,10 @@ def _records_payload(fill_rows: list[sqlite3.Row], feedback_rows: list[sqlite3.R
             }
         )
     latest = max([0.0] + [_number(row.get("ts")) for row in fills] + [_number(row.get("ts")) for row in feedback])
-    return {"fills": fills, "feedback": feedback, "fill_count": fill_count, "feedback_count": feedback_count, "updated_at": latest}
+    return {
+        "fills": fills, "feedback": feedback, "fill_count": fill_count,
+        "feedback_count": feedback_count, "updated_at": latest,
+    }
 
 
 def _recent_research_records(path: Path = DEMO_DB_PATH) -> dict[str, Any]:
@@ -330,23 +340,23 @@ class CloudflareSnapshotPublisher:
         body = json.dumps(snapshot, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         if len(body) > MAX_BODY_BYTES:
             raise RuntimeError(f"snapshot is too large: {len(body)} bytes")
-        response = requests.post(
+        response, retries = post_with_retry(
             url,
             data=body,
             headers={
                 "Authorization": f"Bearer {token}", "Content-Type": "application/json",
-                "User-Agent": "crypto-auto-trader-local-publisher/1.0",
+                "User-Agent": "crypto-auto-trader-local-publisher/2.0",
             },
             timeout=20,
+            attempts=3,
         )
-        response.raise_for_status()
         try:
             result = response.json()
         except ValueError:
             result = {"ok": True}
         exchanges = snapshot["public"].get("exchanges") or {}
         return {
-            "status": "published", "configured": True, "bytes": len(body),
+            "status": "published", "configured": True, "bytes": len(body), "retries": retries,
             "markets": len(snapshot["public"].get("leaderboard") or []),
             "exchange_markets": {
                 name: len((payload or {}).get("leaderboard") or [])
