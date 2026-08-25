@@ -183,20 +183,32 @@ Goal: keep the Windows PC and SQLite as the source of truth while making Pages t
 
 ### 2.5C. Local-equivalent read-only UI
 
-- [-] Verify real authenticated browser rendering of the new detailed Coin workspace
+- [x] Verify real authenticated browser rendering of detailed Coin/Results data on desktop and iPhone
+- [x] Complete page-by-page audit against the current local dashboard final CSS/JS cascade
+- [x] Consolidate overlapping broad viewer patches into one `viewer-shell-v2` owner for Home / Results / Settings
+- [x] Keep `asset-local-port` as the canonical local-derived Coin workspace owner
+- [x] Add local-derived Liquid navigation and coin chip rail without remote control APIs
 - [x] Add bounded equity chart to Coin detail
 - [x] Add market-condition / buy-timing / opportunity history chart
 - [x] Add recent fill/history list
 - [x] Add learning/profile-change history
 - [x] Add next planned buy/add and protection levels
+- [x] Add browser-only manual holding / averaging calculator without PC or SQLite writes
+- [x] Add compact local-style manual holdings summary on Home
+- [x] Add Home opportunity quick cards using actual research scores
+- [x] Add full read-only `데이터 수집 · 연구 구성요소` status view in Settings
+- [x] Add compact recent cross-market fills/learning payload to the global snapshot
+- [x] Expand Records into a cross-market fill/learning timeline
+- [x] Add mobile Results master/detail mode so 477 rows and selected detail are not vertically stacked
+- [x] Normalize raw trade-intent labels and unavailable plan values without inventing prices
 - [-] Refine plain-Korean decision/reason hierarchy aligned with `DESIGN.md`
-- [ ] Expand Records into a useful cross-market fill/learning view
-- [ ] Mobile Safari QA at 360–430 px
-- [ ] Desktop QA at 1280–1920 px
-- [ ] Verify polling preserves selected tab/coin/filter/scroll state
-- [ ] Verify 477-market rendering remains responsive
+- [-] Mobile Safari QA at 360–430 px — real iPhone issues identified and v2 layout implemented; re-verification pending
+- [-] Desktop QA at 1280–1920 px — local-vs-Pages video audit complete; consolidated shell re-verification pending
+- [-] Verify polling preserves selected tab/coin/filter/sort/search/scroll state — persistence implemented; runtime verification pending
+- [-] Verify 477-market rendering remains responsive — `content-visibility` + mobile master/detail implemented; runtime verification pending
+- [-] Runtime/browser verify the new global `recent_records` bridge after the publisher restart
 
-Phase 3 may start after the Phase 2.5 data contract and real-browser detail rendering are stable; detailed visual polish can continue in parallel.
+Phase 3 starts only after the remaining active Phase 2.5C verification items above are stable. Visual polish may continue later, but navigation/state loss, mobile clipping, long-list responsiveness and data-bridge failures are blockers.
 
 ## Phase 3 — Upbit all-market PAPER
 
