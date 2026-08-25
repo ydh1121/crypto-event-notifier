@@ -73,6 +73,8 @@ def _blend_spec(primary: str, secondary: str, mix_ratio: float, overrides: dict[
         bv = getattr(b, field)
         value = float(av) * ratio + float(bv) * (1.0 - ratio)
         payload[field] = int(round(value)) if field == "max_buys" else value
+    # The custom dictionary key is unique, while spec.key deliberately preserves
+    # the primary style's special entry behavior (DCA/contrarian/swing/etc.).
     payload["key"] = primary
     payload["label"] = f"{a.label} + {b.label}"
     payload["description"] = f"{a.label} {ratio * 100:.0f}%와 {b.label} {(1.0-ratio) * 100:.0f}% 기준을 혼합한 사용자 실험입니다."
@@ -162,12 +164,13 @@ def create_custom_experiment(
     clean_label = " ".join(str(label or "").split())[:48]
     if len(clean_label) < 2:
         raise ValueError("label is too short")
+    _unregister_custom_specs()
     spec = _blend_spec(primary_style, secondary_style, mix_ratio, overrides)
     conn = _connect(path)
     try:
-        # Ensure the default Strategy Lab tables exist without leaking previously
-        # registered custom styles into the default experiment bootstrap.
-        _unregister_custom_specs()
+        # Ensure default Strategy Lab tables exist while only the six built-ins are
+        # registered. This prevents a custom style from being bootstrapped onto the
+        # other exchange by StrategyLabStore._ensure_default_experiments().
         bootstrap = StrategyLabStore(path)
         bootstrap.close()
         total = int(conn.execute("SELECT COUNT(*) FROM strategy_lab_custom_specs").fetchone()[0])
@@ -198,7 +201,6 @@ def create_custom_experiment(
                 ),
             )
             seeded = _seed_accounts(conn, exp_id, exchange)
-        register_custom_specs(path)
         return {
             "experiment_id": exp_id,
             "exchange": exchange,
@@ -213,6 +215,7 @@ def create_custom_experiment(
         }
     finally:
         conn.close()
+        _unregister_custom_specs()
 
 
 def set_custom_experiment_status(experiment: str, status: str, path: Path = DB_PATH) -> dict[str, Any]:
@@ -238,7 +241,6 @@ def set_custom_experiment_status(experiment: str, status: str, path: Path = DB_P
                 "UPDATE strategy_lab_custom_specs SET updated_ts=? WHERE experiment_id=?",
                 (now, experiment),
             )
-        register_custom_specs(path)
         return {
             "experiment_id": experiment,
             "exchange": row["exchange"],
@@ -248,6 +250,7 @@ def set_custom_experiment_status(experiment: str, status: str, path: Path = DB_P
         }
     finally:
         conn.close()
+        _unregister_custom_specs()
 
 
 def custom_experiments(path: Path = DB_PATH) -> list[dict[str, Any]]:
@@ -287,8 +290,8 @@ class ConfiguredStrategyLabRunner:
         self.path = path
 
     def run_once(self) -> dict[str, Any]:
-        # Prevent custom styles from being mistaken for built-in defaults when the
-        # base store performs its bootstrap, then register only the saved specs.
+        # Construct the base store with built-ins only, then expose saved custom
+        # specs strictly for this processing window.
         _unregister_custom_specs()
         store = StrategyLabStore(self.path)
         try:
@@ -298,7 +301,7 @@ class ConfiguredStrategyLabRunner:
             experiments = snapshot.get("experiments") or []
             leaders: dict[str, dict[str, Any] | None] = {}
             for exchange in ("bithumb", "upbit"):
-                candidates = [row for row in experiments if row.get("exchange") == exchange]
+                candidates = [row for row in experiments if row.get("exchange") == exchange and row.get("status") == "running"]
                 candidates.sort(
                     key=lambda row: (_num(row.get("return_pct")), -abs(_num(row.get("max_drawdown_pct")))),
                     reverse=True,
@@ -316,3 +319,4 @@ class ConfiguredStrategyLabRunner:
             }
         finally:
             store.close()
+            _unregister_custom_specs()
