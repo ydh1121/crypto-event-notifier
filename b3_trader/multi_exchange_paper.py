@@ -1,0 +1,152 @@
+from __future__ import annotations
+
+import argparse
+import os
+import threading
+import time
+from pathlib import Path
+from typing import Any
+
+from .asset_strategy import AssetStrategy
+from .auto_demo_v2 import (
+    BUY_COOLDOWN_SECONDS,
+    DEFAULT_BASE_WEIGHT_PCT,
+    MAX_POSITION_PCT,
+    MAX_SLIPPAGE_BPS,
+    MAX_SPREAD_BPS,
+    SCAN_INTERVAL_SECONDS,
+    START_KRW,
+    AutoPaperDemo,
+    _atomic_json,
+    _num,
+)
+from .exchange_public import PublicExchangeAdapter, PublicMarket, public_exchange
+from .scoped_paper_store import ScopedPaperStore
+
+
+class MultiExchangePaperDemo(AutoPaperDemo):
+    """Phase 3 PAPER runtime scoped by exchange + market + strategy.
+
+    No private exchange API is used. It reuses the existing adaptive PAPER
+    execution semantics while sourcing quotation data through a public adapter.
+    """
+
+    def __init__(
+        self,
+        exchange: str = "upbit",
+        strategy_name: str = "adaptive",
+        *,
+        market_limit: int = 0,
+    ) -> None:
+        self.exchange = exchange.strip().lower()
+        self.strategy_name = strategy_name.strip().lower()
+        self.market_limit = max(0, int(market_limit))
+        self.client: PublicExchangeAdapter = public_exchange(self.exchange)
+        self.strategy = AssetStrategy()
+        self.store = ScopedPaperStore(self.exchange, self.strategy_name)
+        self.prices: dict[str, float] = {}
+        self.names: dict[str, str] = {}
+        self.market_meta: dict[str, PublicMarket] = {}
+        self.scan_number = 0
+        self.last_scan_started = 0.0
+        self.last_scan_completed = 0.0
+        self.status_path = Path(f"dashboard/runtime-demo-{self.exchange}.json")
+        self.detail_dir = Path(f"dashboard/demo-runtime-{self.exchange}")
+
+    def _all_tickers(self) -> tuple[list[dict[str, Any]], dict[str, str]]:
+        markets = self.client.krw_markets()
+        self.market_meta = {row.market: row for row in markets}
+        names = {row.market: row.name for row in markets}
+        # Seed every KRW market immediately so each exchange/market/strategy owns
+        # an independent 10M account even when a smoke run limits scoring work.
+        for row in markets:
+            self.store.ensure_market(row.market, row.symbol, row.name)
+        return self.client.krw_tickers(), names
+
+    def _rank_universe(self, tickers: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], float]:
+        rows, breadth = super()._rank_universe(tickers)
+        if self.market_limit > 0:
+            rows = rows[: self.market_limit]
+        return rows, breadth
+
+    def _write_market_detail(self, market: str) -> None:
+        detail = self.store.market_detail(market)
+        if detail:
+            _atomic_json(self.detail_dir / f"{market.replace('/', '_')}.json", detail)
+
+    def _write_status(self, *, scanned: int, total: int, error: str = "") -> None:
+        leaderboard = self.store.leaderboard(5000)
+        active_positions = sum(1 for row in leaderboard if row["has_position"])
+        total_equity = sum(_num(row.get("equity_krw")) for row in leaderboard)
+        total_cash = sum(_num(row.get("cash_krw")) for row in leaderboard)
+        best = leaderboard[0] if leaderboard else None
+        warning_count = sum(1 for row in self.market_meta.values() if row.warning)
+        payload = {
+            "running": not bool(error),
+            "paper_only": True,
+            "phase": 3,
+            "mode": "multi_exchange_per_coin_adaptive_research",
+            "exchange": self.exchange,
+            "strategy": self.strategy_name,
+            "identity": "exchange+market+strategy",
+            "pid": os.getpid(),
+            "start_krw": START_KRW,
+            "per_market_start_krw": START_KRW,
+            "market_count": len(leaderboard),
+            "scanned_count": scanned,
+            "scan_total": total,
+            "active_positions": active_positions,
+            "warning_markets": warning_count,
+            "aggregate_virtual_capital_krw": START_KRW * len(leaderboard),
+            "equity_krw": round(total_equity, 2),
+            "cash_krw": round(total_cash, 2),
+            "positions": [row for row in leaderboard if row["has_position"]],
+            "candidates": sorted(leaderboard, key=lambda row: row["opportunity_score"], reverse=True)[:30],
+            "leaderboard": leaderboard,
+            "best_market": best,
+            "updated_at": time.time(),
+            "last_scan_started": self.last_scan_started,
+            "last_scan_completed": self.last_scan_completed,
+            "scan_number": self.scan_number,
+            "error": error,
+            "rules": {
+                "each_scope_start_krw": START_KRW,
+                "scan_interval_seconds": SCAN_INTERVAL_SECONDS,
+                "max_position_pct": MAX_POSITION_PCT,
+                "base_weight_pct": DEFAULT_BASE_WEIGHT_PCT,
+                "buy_cooldown_seconds": BUY_COOLDOWN_SECONDS,
+                "bounded_exploration": True,
+                "adaptive_profile_learning": True,
+                "dynamic_exit_plan": True,
+                "staged_add_plan": True,
+                "max_spread_bps": MAX_SPREAD_BPS,
+                "max_slippage_bps": MAX_SLIPPAGE_BPS,
+                "public_market_data_only": True,
+            },
+        }
+        _atomic_json(self.status_path, payload)
+
+    def run_once(self) -> None:
+        try:
+            self.scan_once()
+        finally:
+            self.store.close()
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Phase 3 multi-exchange PAPER research")
+    parser.add_argument("--exchange", default="upbit", choices=["bithumb", "upbit"])
+    parser.add_argument("--strategy", default="adaptive")
+    parser.add_argument("--limit", type=int, default=0, help="Score only top N markets; all accounts are still seeded")
+    parser.add_argument("--once", action="store_true", help="Run one scan and exit")
+    args = parser.parse_args()
+
+    demo = MultiExchangePaperDemo(args.exchange, args.strategy, market_limit=args.limit)
+    if args.once:
+        demo.run_once()
+    else:
+        demo.run(threading.Event())
+
+
+if __name__ == "__main__":
+    main()
