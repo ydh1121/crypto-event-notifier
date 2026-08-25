@@ -10,7 +10,7 @@ from typing import Any, Callable
 
 from dotenv import load_dotenv
 
-from .cloudflare_market_detail_publisher import CloudflareMarketDetailPublisher
+from .cloudflare_market_detail_strategy_lab import CloudflareMarketDetailPublisher
 from .cloudflare_pages_deployer import CloudflarePagesDeployer
 from .cloudflare_snapshot_publisher import CloudflareSnapshotPublisher
 from .reference_components import ReferenceComponentWatcher
