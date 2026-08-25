@@ -47,6 +47,13 @@ COMPONENT_DEFINITIONS: dict[str, dict[str, Any]] = {
         "default_interval_seconds": 60,
         "min_interval_seconds": 30,
     },
+    "strategy-lab-shadow": {
+        "label": "전략 연구실",
+        "description": "동일한 시장 기억 데이터를 보수적·균형·공격적·분할매수·역추세·스윙 전략이 독립 PAPER 계좌로 비교합니다.",
+        "default_enabled": True,
+        "default_interval_seconds": 60,
+        "min_interval_seconds": 30,
+    },
     "cloudflare-pages-deploy": {
         "label": "웹 화면 자동 배포",
         "description": "GitHub에서 새 웹 화면을 받은 뒤 Pages 코드가 바뀐 경우에만 pages.dev로 자동 배포합니다.",
