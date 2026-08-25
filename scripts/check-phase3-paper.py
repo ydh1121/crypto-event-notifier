@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from b3_trader.exchange_public import public_exchange
 from b3_trader.multi_exchange_paper import MultiExchangePaperDemo
@@ -30,7 +35,7 @@ def main() -> None:
     print("\n=== UPBIT PAPER SMOKE: TOP 3 ===")
     demo = MultiExchangePaperDemo("upbit", "adaptive", market_limit=3)
     demo.run_once()
-    status_path = Path("dashboard/runtime-demo-upbit.json")
+    status_path = REPO_ROOT / "dashboard/runtime-demo-upbit.json"
     if not status_path.exists():
         raise RuntimeError("Upbit PAPER status file was not created")
     status = json.loads(status_path.read_text(encoding="utf-8"))
@@ -63,7 +68,11 @@ def main() -> None:
     print("\n=== PHASE 3 STORAGE AFTER SCAN ===")
     store = MultiExchangeStore()
     print(json.dumps({"counts": store.counts(), "scopes": store.scope_counts()}, ensure_ascii=False, indent=2))
-    upbit_accounts = [row for row in store.scope_counts() if row.get("exchange") == "upbit" and row.get("strategy") == "adaptive"]
+    upbit_accounts = [
+        row
+        for row in store.scope_counts()
+        if row.get("exchange") == "upbit" and row.get("strategy") == "adaptive"
+    ]
     if not upbit_accounts or int(upbit_accounts[0].get("accounts") or 0) <= 0:
         raise RuntimeError("Upbit exchange+market+strategy accounts are missing")
     store.close()
