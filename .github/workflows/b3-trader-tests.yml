@@ -91,43 +91,59 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: find public/modules -name '*.js' -print0 | xargs -0 -n1 node --check
-      - name: Validate build 30 source contract
+      - name: Validate build 31 source contract
         shell: bash
         run: |
           set -euo pipefail
           for file in \
             public/index.html public/modules/main.js public/modules/core/router.js public/modules/core/store.js \
             public/modules/shared/charts.js public/modules/shared/decision.js public/modules/shared/averaging.js \
-            public/modules/services/sectors.js public/modules/pages/dashboard.js public/modules/pages/research.js \
-            public/modules/pages/assets.js public/modules/pages/paper.js public/modules/pages/strategy.js \
-            public/modules/pages/sectors.js public/modules/pages/records.js public/modules/styles/build29.css \
-            public/modules/styles/exchange-ui.css migrations/0001_init.sql migrations/0003_sector_history.sql; do
+            public/modules/services/sectors.js public/modules/services/coin-profile.js \
+            public/modules/pages/dashboard.js public/modules/pages/research.js public/modules/pages/assets.js \
+            public/modules/pages/paper.js public/modules/pages/strategy.js public/modules/pages/sectors.js \
+            public/modules/pages/records.js public/modules/styles/build29.css public/modules/styles/exchange-ui.css \
+            public/modules/styles/sectors.css functions/api/sector-summary.ts functions/api/coin-profile.ts \
+            functions/lib/coin-taxonomy.ts functions/lib/exchange-market-names.ts \
+            migrations/0001_init.sql migrations/0003_sector_history.sql migrations/0004_coin_profile_cache.sql; do
             test -s "$file"
           done
-          grep -q 'crypto-viewer-build" content="2026.08.26-30' public/index.html
-          grep -q 'type="module" src="/modules/main.js?v=7"' public/index.html
-          grep -q '/modules/styles/exchange-ui.css?v=1' public/index.html
+          grep -q 'crypto-viewer-build" content="2026.08.26-31' public/index.html
+          grep -q 'type="module" src="/modules/main.js?v=8"' public/index.html
+          grep -q '/modules/styles/sectors.css?v=2' public/index.html
+          grep -q '/modules/styles/exchange-ui.css?v=2' public/index.html
           grep -q "'sectors'" public/modules/core/router.js
+          grep -q 'sectorCoinSort' public/modules/core/store.js
           grep -q 'function patchDashboard' public/modules/pages/dashboard.js
-          grep -q "if(m.type==='snapshot')patchDashboard()" public/modules/pages/dashboard.js
-          ! grep -q "if(m.type==='snapshot')render()" public/modules/pages/dashboard.js
-          grep -q 'data-watch-market' public/modules/pages/dashboard.js
-          grep -q 'researchMarket:watch.dataset.watchMarket' public/modules/pages/dashboard.js
-          grep -q 'data-sector-jump' public/modules/pages/dashboard.js
-          grep -q "navigate('sectors')" public/modules/pages/dashboard.js
-          grep -q 'function reconcileSectorFlow' public/modules/pages/dashboard.js
-          grep -q 'dashboard-bottom-grid' public/modules/pages/dashboard.js
-          grep -q '실시간 요약' public/modules/pages/dashboard.js
-          grep -q '@keyframes valueTick' public/modules/styles/exchange-ui.css
-          grep -q '.dashboard-bottom-grid' public/modules/styles/exchange-ui.css
-          grep -q 'data-sector-market' public/modules/pages/sectors.js
-          grep -q "navigate?.('research')" public/modules/pages/sectors.js
-          grep -q "'24h'" public/modules/pages/sectors.js
-          grep -q 'refreshLive' public/modules/pages/records.js
-          grep -q 'feed.prepend' public/modules/pages/records.js
-          grep -q 'sector_history' functions/api/sector-summary.ts
-          test -s ../docs/VIEWER_BUILD30_PLAN.md
-          grep -q 'in-place' ../docs/VIEWER_BUILD30_PLAN.md
+          grep -q '실시간 관제' public/modules/pages/dashboard.js
+          grep -q 'data-pulse-market' public/modules/pages/dashboard.js
+          grep -q '이 영역은 무엇을 보나' public/modules/pages/dashboard.js
+          grep -q 'max-width:1320px' public/modules/styles/exchange-ui.css
+          grep -q '.section-panel>header button{white-space:nowrap' public/modules/styles/exchange-ui.css
+          grep -q 'data-sector-sort' public/modules/pages/sectors.js
+          grep -q 'turnover_desc' public/modules/pages/sectors.js
+          grep -q 'change_desc' public/modules/pages/sectors.js
+          grep -q 'opportunity_desc' public/modules/pages/sectors.js
+          grep -q 'name_ko' public/modules/pages/sectors.js
+          grep -q 'name_en' public/modules/pages/sectors.js
+          grep -q '이 섹터는 무엇을 하나' public/modules/pages/sectors.js
+          grep -q '무슨 사업을 하나' public/modules/pages/sectors.js
+          grep -q 'getCoinProfile' public/modules/services/coin-profile.js
+          grep -q 'getCoinProfile' public/modules/pages/sectors.js
+          grep -q 'data-sector-research' public/modules/pages/sectors.js
+          grep -q 'exchangeMarketNames' functions/api/sector-summary.ts
+          grep -q 'taxonomy_source' functions/api/sector-summary.ts
+          ! grep -q 'slice(0, 14)' functions/api/sector-summary.ts
+          grep -q 'CoinGecko' functions/api/coin-profile.ts
+          grep -q 'coin_profile_cache' functions/api/coin-profile.ts
+          grep -q '미분류 검토' functions/lib/coin-taxonomy.ts
+          grep -q 'TAXONOMY_SOURCE_NOTE' functions/lib/coin-taxonomy.ts
+          grep -q 'korean_name' functions/lib/exchange-market-names.ts
+          grep -q 'english_name' functions/lib/exchange-market-names.ts
+          grep -q 'CREATE TABLE IF NOT EXISTS coin_profile_cache' migrations/0004_coin_profile_cache.sql
+          test -s ../docs/VIEWER_BUILD31_PLAN.md
+          grep -q '14-coin cap' ../docs/VIEWER_BUILD31_PLAN.md
+          grep -q 'CoinGecko' ../docs/VIEWER_BUILD31_PLAN.md
+          grep -q 'CoinMarketCap' ../docs/VIEWER_BUILD31_PLAN.md
       - name: Ensure retired Pages UI assets are physically absent
         shell: bash
         run: |
