@@ -110,10 +110,14 @@ class CoinProfileResearchCycle:
             normalized.append({"source": source, "url": _safe_url(url), "label": label, "language": language, "weight": weight})
         profile["evidence"] = normalized[:16]
 
+    @staticmethod
+    def _is_korean_text(text: str) -> bool:
+        return len(re.findall(r"[가-힣]", text)) >= 20
+
     def _deepen_profile(self, row: dict[str, str], profile: dict[str, Any], reasons: list[str]) -> dict[str, Any]:
         deep_chunks: list[str] = []
         references = (
-            (profile.get("homepage"), "official_site_deep", "공식 홈페이지 본문"),
+            (profile.get("homepage"), "official_site", "공식 홈페이지 본문"),
             (profile.get("official_docs"), "official_docs", "공식 Docs"),
             (profile.get("whitepaper"), "whitepaper", "공식 백서"),
         )
@@ -127,7 +131,7 @@ class CoinProfileResearchCycle:
             if not text:
                 continue
             deep_chunks.append(text)
-            language = "ko" if re.search(r"[가-힣]{8,}", text) else "en"
+            language = "ko" if self._is_korean_text(text) else "en"
             self._merge_evidence(profile, source, url, label, language, 1.0)
             if language == "ko" and not _text(profile.get("description_ko")):
                 profile["description_ko"] = _first_sentences(text, 1400)
@@ -144,7 +148,7 @@ class CoinProfileResearchCycle:
 
         extra = "\n".join(deep_chunks)
         existing_en = _text(profile.get("description_en"))
-        if extra and not re.search(r"[가-힣]{8,}", extra):
+        if extra and not self._is_korean_text(extra):
             deep_en = _first_sentences(extra, 2200)
             if deep_en and deep_en not in existing_en:
                 profile["description_en"] = (existing_en + "\n" + deep_en).strip()[:6000]
@@ -166,7 +170,7 @@ class CoinProfileResearchCycle:
         source_count = len(unique_sources)
         profile["source_count"] = source_count
         has_korean = bool(_text(profile.get("business_summary_ko")) or _text(profile.get("description_ko")))
-        trusted = any(source in unique_sources for source in {"bithumb_manual", "upbit_datalab", "official_site", "official_site_deep", "official_docs", "whitepaper"})
+        trusted = any(source in unique_sources for source in {"bithumb_manual", "upbit_datalab", "official_site", "official_docs", "whitepaper"})
         if has_korean and trusted and source_count >= 2:
             profile["research_status"] = "verified"
         elif has_korean and source_count >= 2:
