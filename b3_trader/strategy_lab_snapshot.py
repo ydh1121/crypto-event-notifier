@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .auto_demo_v2 import DB_PATH
+from .performance_analytics import read_performance_analytics
 from .strategy_lab import FEE_RATE, SLIPPAGE_RATE, SOURCE_STRATEGY, STYLE_SPECS
 from .strategy_lab_candidates import candidate_criteria, read_strategy_lab_candidates
 
@@ -19,8 +20,9 @@ def _num(value: Any, default: float = 0.0) -> float:
 
 def read_strategy_lab_snapshot(path: Path = DB_PATH) -> dict[str, Any]:
     candidate_state = read_strategy_lab_candidates(path)
+    analytics = read_performance_analytics(path)
     base = {
-        "version": 2,
+        "version": 3,
         "paper_only": True,
         "source": "research_market_memory_mx",
         "source_strategy": SOURCE_STRATEGY,
@@ -30,6 +32,10 @@ def read_strategy_lab_snapshot(path: Path = DB_PATH) -> dict[str, Any]:
         "candidate_criteria": candidate_criteria(),
         "candidate_summary": candidate_state.get("summary") or {},
         "source_cursors": {},
+        "history_bucket_seconds": int(analytics.get("history_bucket_seconds") or 300),
+        "strategy_equity_history": analytics.get("strategy_equity_history") or {},
+        "coin_matrix": analytics.get("coin_matrix") or {"bithumb": [], "upbit": []},
+        "paper_history": analytics.get("paper_history") or {"bithumb": [], "upbit": [], "combined": []},
         "updated_at": 0.0,
     }
     if not path.exists():
