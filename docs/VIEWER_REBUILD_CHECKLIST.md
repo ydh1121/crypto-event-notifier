@@ -8,6 +8,7 @@
 - 페이지 간 자동 이동으로 상세를 대신하지 않는다.
 - 한 기능의 DOM은 한 페이지 모듈만 소유한다.
 - 공통 상태/HTTP/라우팅/포맷은 `public/modules/core|shared|services`만 소유한다.
+- 외부 공개 트레이딩 UI 레퍼런스는 `docs/TRADING_UI_REFERENCE.md`를 기준으로 하되 우리 권한/데이터 모델에 맞게 적용한다.
 
 ## 0. 모듈 아키텍처
 - [x] core/http: HTTP/JSON 오류 처리 공통화
@@ -20,7 +21,9 @@
 - [x] shared/components: KPI/점수/로딩/빈상태/거래소 segment
 - [x] services/market-detail: 코인 상세 API + 짧은 캐시
 - [x] pages/*: 페이지별 DOM 소유권 분리
+- [x] 거래소 UI 상태를 research/paper/strategy/records 별도로 분리
 - [x] 기존 app.js/canonical/exchange/records/strategy DOM 후처리 스크립트 미로딩
+- [x] 외부 공개 트레이딩 UI 레퍼런스/채택 원칙 문서화
 
 ## 1. 대시보드
 - [x] 먼저 확인할 것
@@ -30,7 +33,7 @@
 - [x] 전략 후보/검증중/미통과 요약
 - [x] 지금 볼 코인
 - [x] 거래소별 PAPER 요약
-- [ ] 최근 중요 변화 타임라인
+- [x] 최근 중요 변화 타임라인 - 두 거래소 최근 체결/학습 통합
 
 ## 2. 리서치
 - [x] PC master-detail 2열 고정
@@ -59,6 +62,7 @@
 
 ## 3. 자산
 - [x] 현재 평가액/투입원금/손익/수익률/종목수
+- [x] 외부 조회용 자산 배분 시각화
 - [x] PC 좌측 보유종목 목록
 - [x] PC 우측 선택 종목 상세
 - [x] 보유종목 클릭 시 탭 이동 금지
@@ -66,7 +70,6 @@
 - [x] 선택 종목 빗썸 판단/점수/PAPER 참고
 - [x] 선택 종목 업비트 판단/점수/PAPER 참고
 - [x] 로컬 PC에서만 보유/물타기 계획 관리한다는 권한 표시
-- [ ] 외부 조회용 자산 배분 시각화
 - [ ] 로컬 averaging plan을 read-only snapshot으로 외부 Viewer에 표시
 - [ ] 포트폴리오 평가액/손익 history chart
 
@@ -87,6 +90,7 @@
 - [x] 현재 진입/추가매수/목표/손절/분할 계획
 - [x] 최근 체결/학습
 - [x] 빗썸↔업비트 공통 코인 비교표
+- [x] 거래소 비교 검색/정렬/전체 보기
 - [x] 비교표 sticky header
 - [ ] 전체 PAPER equity curve
 - [ ] 전체 drawdown curve
@@ -112,14 +116,14 @@
 ## 6. 기록
 - [x] 최상위 독립 화면
 - [x] 빗썸/업비트 선택
+- [x] 기간 필터 - 최근 1H/6H/24H/7D/전체
+- [x] 코인 검색 필터
 - [x] 전체/매수/매도/학습 필터
 - [x] 누적 체결/누적 학습/최근 매도손익/마지막 기록
 - [x] 체결가/금액/실현손익/이유/시간
 - [x] 학습 전후 시장/진입/비중 변화
 - [x] 기록 클릭에 의한 강제 리서치 이동 없음
-- [ ] 기간 필터
-- [ ] 코인 필터
-- [ ] 전략 필터
+- [ ] 전략 필터 - 현재 snapshot record payload에 전략 식별값 없음
 - [ ] 판단 상태 변경 기록 별도 탭
 - [ ] 시스템 이벤트 기록 별도 탭
 
@@ -152,7 +156,8 @@
 - [x] 전략 연구 모듈
 - [x] 기록 모듈
 - [x] 시스템 모듈
-- [ ] V6 CI/배포 검사
+- [x] V6 static/remote 배포 checker 구현
+- [ ] 최신 HEAD GitHub Actions PASS
 - [ ] Windows/Pages 실제 배포 PASS
 - [ ] PC 브라우저 영상 QA
 - [ ] 모바일 390/430 QA
