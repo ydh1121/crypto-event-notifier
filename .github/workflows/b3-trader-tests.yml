@@ -41,7 +41,7 @@ jobs:
       - run: pip install -r b3_trader/requirements.txt pytest
       - run: python -m pytest -q b3_trader/tests
       - run: python -m py_compile b3_trader/*.py scripts/check-viewer-modular.py
-      - name: Validate coin profile enrichment contract
+      - name: Validate coin profile and performance analytics contracts
         shell: bash
         run: |
           set -euo pipefail
@@ -55,6 +55,11 @@ jobs:
           grep -q 'coin-profile-enrichment' b3_trader/research_supervisor.py
           grep -q '전체 코인 사업·섹터 전수조사' b3_trader/research_control.py
           grep -q 'pypdf' b3_trader/requirements.txt
+          grep -q 'strategy_lab_equity_history' b3_trader/performance_analytics.py
+          grep -q 'paper_portfolio_history' b3_trader/performance_analytics.py
+          grep -q 'coin_matrix' b3_trader/performance_analytics.py
+          grep -q 'read_performance_analytics' b3_trader/strategy_lab_snapshot.py
+          grep -q '"version": 3' b3_trader/strategy_lab_snapshot.py
 
   dashboard-smoke:
     runs-on: ubuntu-latest
@@ -108,24 +113,25 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: find public/modules -name '*.js' -print0 | xargs -0 -n1 node --check
-      - name: Validate build 32 source contract
+      - name: Validate build 33 source contract
         shell: bash
         run: |
           set -euo pipefail
           for file in \
             public/index.html public/modules/main.js public/modules/core/router.js public/modules/core/store.js \
+            public/modules/shared/selectors.js public/modules/shared/charts.js \
             public/modules/pages/dashboard.js public/modules/pages/research.js public/modules/pages/assets.js \
             public/modules/pages/paper.js public/modules/pages/strategy.js public/modules/pages/sectors.js \
             public/modules/pages/records.js public/modules/services/coin-profile.js public/modules/services/sectors.js \
-            public/modules/styles/sectors.css public/modules/styles/exchange-ui.css public/modules/styles/build32.css \
+            public/modules/styles/strategy.css public/modules/styles/sectors.css public/modules/styles/exchange-ui.css public/modules/styles/build32.css \
             functions/api/sector-summary.ts functions/api/coin-profile.ts functions/api/ingest-coin-profiles.ts \
             functions/api/coin-profile-backlog.ts functions/lib/coin-taxonomy.ts \
             migrations/0004_coin_profile_cache.sql migrations/0005_coin_profile_evidence.sql; do
             test -s "$file"
           done
-          grep -q 'crypto-viewer-build" content="2026.08.26-32' public/index.html
-          grep -q 'type="module" src="/modules/main.js?v=9"' public/index.html
-          grep -q '/modules/styles/build32.css?v=1' public/index.html
+          grep -q 'crypto-viewer-build" content="2026.08.27-33' public/index.html
+          grep -q 'type="module" src="/modules/main.js?v=10"' public/index.html
+          grep -q '/modules/styles/strategy.css?v=3' public/index.html
           grep -q '프로젝트별 설명 수집 중' public/modules/pages/sectors.js
           grep -q 'profile.business_summary_ko' public/modules/pages/sectors.js
           ! grep -q "chosen?.sector_business||''" public/modules/pages/sectors.js
@@ -135,16 +141,25 @@ jobs:
           grep -q 'business_summary_ko' functions/api/ingest-coin-profiles.ts
           grep -q 'evidence_json' functions/api/ingest-coin-profiles.ts
           grep -q 'env.DB.batch' functions/api/ingest-coin-profiles.ts
-          grep -q 'korean_missing' functions/api/coin-profile-backlog.ts
-          grep -q 'sector_unresolved' functions/api/coin-profile-backlog.ts
-          grep -q 'weak_evidence' functions/api/coin-profile-backlog.ts
+          grep -q 'round-robin' functions/api/coin-profile-backlog.ts
+          grep -q 'eligible_by_exchange' functions/api/coin-profile-backlog.ts
+          grep -q 'quality_pending_by_exchange' functions/api/coin-profile-backlog.ts
           grep -q 'canonical_sector' functions/api/sector-summary.ts
           grep -q 'researched_count' functions/api/sector-summary.ts
           grep -q 'evidenceText' functions/lib/coin-taxonomy.ts
           grep -q 'last_verified_at' migrations/0005_coin_profile_evidence.sql
           grep -q 'community_json' migrations/0005_coin_profile_evidence.sql
+          grep -q 'strategyEquityHistory' public/modules/shared/selectors.js
+          grep -q 'strategyCoinRows' public/modules/shared/selectors.js
+          grep -q 'paperPortfolioHistory' public/modules/shared/selectors.js
+          grep -q '전략 equity curve' public/modules/pages/strategy.js
+          grep -q '코인별 성과' public/modules/pages/strategy.js
+          grep -q '코인 × 전략' public/modules/pages/strategy.js
+          grep -q '전체 PAPER equity / drawdown' public/modules/pages/strategy.js
           test -s ../docs/VIEWER_BUILD32_PLAN.md
+          test -s ../docs/VIEWER_BUILD33_PLAN.md
           grep -q '전체 코인 사업·섹터 전수조사' ../docs/VIEWER_BUILD32_PLAN.md
+          grep -q 'Strategy / PAPER Performance Analytics' ../docs/VIEWER_BUILD33_PLAN.md
       - name: Ensure retired Pages UI assets are physically absent
         shell: bash
         run: |
