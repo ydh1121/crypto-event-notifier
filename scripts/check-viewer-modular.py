@@ -21,14 +21,15 @@ BUILD30_PLAN = ROOT / "docs/VIEWER_BUILD30_PLAN.md"
 BUILD31_PLAN = ROOT / "docs/VIEWER_BUILD31_PLAN.md"
 BUILD32_PLAN = ROOT / "docs/VIEWER_BUILD32_PLAN.md"
 BUILD33_PLAN = ROOT / "docs/VIEWER_BUILD33_PLAN.md"
+BUILD34_PLAN = ROOT / "docs/VIEWER_BUILD34_PLAN.md"
 REQUIRED = [
     "modules/core/http.js", "modules/core/store.js", "modules/core/router.js", "modules/core/auth.js", "modules/core/snapshot.js",
     "modules/shared/format.js", "modules/shared/selectors.js", "modules/shared/components.js", "modules/shared/charts.js",
     "modules/shared/decision.js", "modules/shared/averaging.js", "modules/services/market-detail.js", "modules/services/sectors.js",
     "modules/services/coin-profile.js", "modules/pages/dashboard.js", "modules/pages/research.js", "modules/pages/assets.js",
     "modules/pages/paper.js", "modules/pages/strategy.js", "modules/pages/sectors.js", "modules/pages/records.js", "modules/pages/system.js",
-    "modules/main.js", "modules/styles/charts.css", "modules/styles/strategy.css", "modules/styles/sectors.css", "modules/styles/build29.css",
-    "modules/styles/exchange-ui.css", "modules/styles/build32.css",
+    "modules/main.js", "modules/styles/charts.css", "modules/styles/strategy.css", "modules/styles/sectors.css", "modules/styles/records-system.css",
+    "modules/styles/build29.css", "modules/styles/exchange-ui.css", "modules/styles/build32.css",
 ]
 LEGACY_ROOT_PATTERNS = (
     "app.js", "asset-local-port.*", "asset-parity-shell.*", "exchange-phase3.*", "local-parity.*", "market-detail.*",
@@ -74,8 +75,9 @@ def main() -> None:
     index=text(INDEX); main_js=text(PUBLIC/"modules/main.js"); router_js=text(PUBLIC/"modules/core/router.js"); store_js=text(PUBLIC/"modules/core/store.js")
     selectors_js=text(PUBLIC/"modules/shared/selectors.js"); dashboard_js=text(PUBLIC/"modules/pages/dashboard.js"); research_js=text(PUBLIC/"modules/pages/research.js")
     assets_js=text(PUBLIC/"modules/pages/assets.js"); paper_js=text(PUBLIC/"modules/pages/paper.js"); strategy_js=text(PUBLIC/"modules/pages/strategy.js")
-    records_js=text(PUBLIC/"modules/pages/records.js"); sectors_js=text(PUBLIC/"modules/pages/sectors.js"); build29_css=text(PUBLIC/"modules/styles/build29.css")
-    exchange_css=text(PUBLIC/"modules/styles/exchange-ui.css"); build32_css=text(PUBLIC/"modules/styles/build32.css"); strategy_css=text(PUBLIC/"modules/styles/strategy.css")
+    records_js=text(PUBLIC/"modules/pages/records.js"); system_js=text(PUBLIC/"modules/pages/system.js"); sectors_js=text(PUBLIC/"modules/pages/sectors.js")
+    build29_css=text(PUBLIC/"modules/styles/build29.css"); exchange_css=text(PUBLIC/"modules/styles/exchange-ui.css"); build32_css=text(PUBLIC/"modules/styles/build32.css")
+    strategy_css=text(PUBLIC/"modules/styles/strategy.css"); records_system_css=text(PUBLIC/"modules/styles/records-system.css")
     tokens_css=text(PUBLIC/"modules/styles/tokens.css"); paper_css=text(PUBLIC/"modules/styles/paper.css")
     sector_api=text(ROOT/"cloudflare-pages/functions/api/sector-summary.ts"); ingest_profiles=text(ROOT/"cloudflare-pages/functions/api/ingest-coin-profiles.ts")
     backlog_api=text(ROOT/"cloudflare-pages/functions/api/coin-profile-backlog.ts"); taxonomy=text(ROOT/"cloudflare-pages/functions/lib/coin-taxonomy.ts")
@@ -86,8 +88,8 @@ def main() -> None:
     requirements=text(ROOT/"b3_trader/requirements.txt"); repair=text(ROOT/"scripts/repair-local-sync.ps1"); gitignore=text(ROOT/".gitignore")
 
     static = {
-        "build_33": 'crypto-viewer-build" content="2026.08.27-33' in index,
-        "module_entry_v10": 'type="module" src="/modules/main.js?v=10"' in index,
+        "build_34": 'crypto-viewer-build" content="2026.08.27-34' in index,
+        "module_entry_v11": 'type="module" src="/modules/main.js?v=11"' in index,
         "all_required_modules": all((PUBLIC/path).exists() for path in REQUIRED),
         "apple_finance_tokens": all(token in tokens_css for token in ("#f5f5f7","#1d1d1f","#0066cc","tabular-nums")),
         "quiet_filter_chips": ".chip-row button.active" in build29_css,
@@ -95,10 +97,11 @@ def main() -> None:
         "legacy_files_physically_absent": legacy_files_absent(),
         "seven_main_nav": all(f'data-route="{route}"' in index for route in ("dashboard","research","assets","paper","strategy","sectors","records")),
         "router_sector_route": "'sectors'" in router_js and "ROUTES" in router_js,
-        "single_store": "from'./core/store.js'" in main_js and "createSectorsPage" in main_js,
+        "single_store": "from'./core/store.js'" in main_js and "createSectorsPage" in main_js and "createSystemPage" in main_js,
         "research_filtered_selection": "filteredRows" in research_js and "현재 조건에서 선택할 코인이 없습니다." in research_js,
         "paper_primary_hierarchy": ".paper-detail-kpis>span:nth-child(3)" in build29_css,
         "asset_direct_average": "추천 타점 · 즉시 평단" in assets_js and "calculateDirectAverage" in assets_js,
+        "asset_averaging_read_only": all(token in assets_js for token in ("물타기 계산기","최대 20회","저장본","DB 원본을 수정하지 않습니다")) and "averagingPlan" in selectors_js,
         "dashboard_live_patch": "function patchDashboard" in dashboard_js and "if(m.type==='snapshot')patchDashboard()" in dashboard_js,
         "dashboard_no_snapshot_full_render": "if(m.type==='snapshot')render()" not in dashboard_js,
         "dashboard_bottom_aligned": "max-width:1320px" in exchange_css,
@@ -129,6 +132,10 @@ def main() -> None:
         "strategy_coin_matrix": all(token in strategy_js for token in ("코인 × 전략","strategyCoinRows","strategy-matrix-workspace")) and "strategyCoinRows" in selectors_js,
         "paper_portfolio_equity_drawdown": all(token in strategy_js for token in ("전체 PAPER equity / drawdown","paperPortfolioHistory","전체 PAPER 자산곡선","전체 PAPER Drawdown")) and "paperPortfolioHistory" in selectors_js,
         "strategy_analytics_state": all(token in store_js for token in ("strategyTab:'overview'","strategyRange:'24h'","strategyCoinMarket:''")),
+        "system_operations_backend": all(token in control for token in ("_git_summary","_cloudflare_summary","_warehouse_summary","_telegram_summary",'"operations":operations','"secret_values_exposed":False')),
+        "system_operations_ui": all(token in system_js for token in ("코드 동기화","Pages · 데이터 전송","Parquet 분석 창고","알림 준비 상태","operationCards")) and ".operations-grid" in records_system_css,
+        "system_component_diagnostics": "componentDiagnostics" in system_js and "component-diagnostic" in system_js and ".component-diagnostic" in records_system_css,
+        "system_secret_guard": all(token in control for token in ("token_configured","chat_configured","secret_values_exposed")) and "토큰과 Chat ID 실제 값은 표시하거나 전송하지 않습니다." in system_js,
         "runtime_tmp_safe": "dashboard/runtime-demo-upbit.json.tmp" in gitignore and "dashboard/runtime-demo*.tmp" in repair,
         "privacy_contract": "AES-256-GCM" in text(PRIVATE_STORAGE),
         "taste_contract": "Do not change the approved information architecture" in text(TASTES),
@@ -137,11 +144,12 @@ def main() -> None:
         "build31_plan": "14-coin cap" in text(BUILD31_PLAN),
         "build32_plan": all(token in text(BUILD32_PLAN) for token in ("전체 코인 사업·섹터 전수조사","community","strategy equity curve")),
         "build33_plan": all(token in text(BUILD33_PLAN) for token in ("Strategy / PAPER Performance Analytics","Strategy equity curve","Coin × strategy comparison","Overall adaptive PAPER equity / drawdown")),
+        "build34_plan": all(token in text(BUILD34_PLAN) for token in ("Operations Visibility","Git status","Cloudflare status","Warehouse status","Telegram readiness")),
     }
     print("\n=== MODULAR VIEWER V6 CONTRACT ===")
     print(json.dumps(static, ensure_ascii=False, indent=2))
     errors=[]; pending=[]
-    if not all(static.values()): errors.append("build 33 source contract is incomplete")
+    if not all(static.values()): errors.append("build 34 source contract is incomplete")
     if not local or not remote or local != remote: pending.append("Git local/remote HEAD has not synchronized yet")
 
     deploy=read_json(DEPLOY); url=str(deploy.get("viewer_url") or "").rstrip("/"); head=str(deploy.get("deployed_head") or "")
@@ -149,25 +157,27 @@ def main() -> None:
     if not head or (local and not head.startswith(local)): pending.append("Pages has not deployed the current Git HEAD")
     if not deploy.get("health_ok"): pending.append("Pages health check is not green")
 
-    remote_contract={"index_status":0,"main_status":0,"strategy_status":0,"strategy_css_status":0,"sectors_status":0,"build_33":False,"module_entry_v10":False,"legacy_files_absent":False,"strategy_analytics_ui":False,"coin_profile_ui":False}
+    remote_contract={"index_status":0,"main_status":0,"system_status":0,"records_css_status":0,"strategy_status":0,"sectors_status":0,"build_34":False,"module_entry_v11":False,"legacy_files_absent":False,"system_operations_ui":False,"strategy_analytics_ui":False,"coin_profile_ui":False}
     if url:
         nonce=str(time.time_ns())
         si,ri=fetch(f"{url}/?modular={nonce}")
-        sm,rm=fetch(f"{url}/modules/main.js?v=10&modular={nonce}")
+        sm,rm=fetch(f"{url}/modules/main.js?v=11&modular={nonce}")
+        sy,rsy=fetch(f"{url}/modules/pages/system.js?modular={nonce}")
+        src,rrc=fetch(f"{url}/modules/styles/records-system.css?v=4&modular={nonce}")
         st,rst=fetch(f"{url}/modules/pages/strategy.js?modular={nonce}")
-        sc,rsc=fetch(f"{url}/modules/styles/strategy.css?v=3&modular={nonce}")
         ss,rs=fetch(f"{url}/modules/pages/sectors.js?modular={nonce}")
         legacy_statuses={path:fetch(f"{url}/{path}?retired={nonce}")[0] for path in REMOTE_LEGACY_PATHS}
         remote_contract.update({
-            "index_status":si,"main_status":sm,"strategy_status":st,"strategy_css_status":sc,"sectors_status":ss,
-            "build_33":'crypto-viewer-build" content="2026.08.27-33' in ri,
-            "module_entry_v10":'type="module" src="/modules/main.js?v=10"' in ri and "createSectorsPage" in rm,
+            "index_status":si,"main_status":sm,"system_status":sy,"records_css_status":src,"strategy_status":st,"sectors_status":ss,
+            "build_34":'crypto-viewer-build" content="2026.08.27-34' in ri,
+            "module_entry_v11":'type="module" src="/modules/main.js?v=11"' in ri and "createSystemPage" in rm,
             "legacy_files_absent":all(status==404 for status in legacy_statuses.values()),
-            "strategy_analytics_ui":all(token in rst for token in ("전략 equity curve","코인별 성과","코인 × 전략","전체 PAPER equity / drawdown")) and "strategy-paper-charts" in rsc,
+            "system_operations_ui":all(token in rsy for token in ("코드 동기화","Pages · 데이터 전송","Parquet 분석 창고","알림 준비 상태")) and "operations-grid" in rrc,
+            "strategy_analytics_ui":all(token in rst for token in ("전략 equity curve","코인별 성과","코인 × 전략","전체 PAPER equity / drawdown")),
             "coin_profile_ui":"프로젝트별 설명 수집 중" in rs and "profile.business_summary_ko" in rs,
         })
         print("remote_legacy_statuses="+json.dumps(legacy_statuses,ensure_ascii=False,sort_keys=True))
-        if any(code!=200 for code in (si,sm,st,sc,ss)): pending.append("build 33 viewer assets are not reachable yet")
+        if any(code!=200 for code in (si,sm,sy,src,st,ss)): pending.append("build 34 viewer assets are not reachable yet")
         elif not all(value for key,value in remote_contract.items() if not key.endswith("_status")): pending.append("Pages is still serving the previous viewer build")
     else:
         pending.append("viewer URL is not available in deploy state")
