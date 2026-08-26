@@ -5,18 +5,20 @@
   const nativeFetch=window.fetch.bind(window);
   const nativeSetInterval=window.setInterval.bind(window);
   const NativeMutationObserver=window.MutationObserver;
-  const stats={longTasks:0,maxLongTaskMs:0,marketPasses:0,marketNodeWrites:0,snapshotRequests:0};
+  const stats={longTasks:0,maxLongTaskMs:0,marketPasses:0,marketNodeWrites:0,snapshotRequests:0,snapshotErrors:0,snapshotRetries:0,parityObserverSkips:0};
   let patched=false;
   let snapshotInFlight=null;
+  let paritySelectionFrame=0;
 
   const activeView=()=>{try{return typeof state!=='undefined'?state.activeView:''}catch{return''}};
   const stackSource=()=>{try{return String(new Error().stack||'')}catch{return''}};
+  const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
   window.setInterval=(callback,delay,...args)=>{
     const stack=stackSource();
     let nextDelay=Number(delay)||0;
     let guard=null;
-    if(stack.includes('exchange-phase3.js')&&nextDelay<=1000)nextDelay=5000;
+    if(stack.includes('exchange-phase3.js')&&nextDelay<=1000){nextDelay=30000;guard=()=>activeView()==='results'}
     if(stack.includes('asset-local-port.js')&&nextDelay===15000){nextDelay=30000;guard=()=>activeView()==='coin'}
     if(stack.includes('records-port.js')&&nextDelay===15000){nextDelay=30000;guard=()=>activeView()==='records'}
     if(stack.includes('strategy-lab-v1.js')&&nextDelay===15000){nextDelay=30000;guard=()=>activeView()==='results'}
@@ -27,9 +29,18 @@
 
   if(NativeMutationObserver){
     window.MutationObserver=class ViewerMutationObserver extends NativeMutationObserver{
+      constructor(callback){
+        const source=stackSource();
+        super(callback);
+        this.__viewerSource=source;
+      }
       observe(target,options={}){
         const next={...options};
         if(target?.id==='marketList'){
+          if(String(this.__viewerSource||'').includes('local-parity.js')){
+            stats.parityObserverSkips+=1;
+            return;
+          }
           next.attributes=false;
           delete next.attributeFilter;
           next.childList=true;
@@ -112,6 +123,16 @@
     return data;
   }
 
+  function ensureParitySelection(box){
+    if(activeView()!=='results'||paritySelectionFrame)return;
+    paritySelectionFrame=requestAnimationFrame(()=>{
+      paritySelectionFrame=0;
+      if(box.querySelector(':scope>[data-open-market].is-active'))return;
+      const first=box.querySelector(':scope>[data-open-market]');
+      if(first)first.click();
+    });
+  }
+
   function patchCore(){
     if(patched)return;
     if(typeof state==='undefined'||typeof filteredRows!=='function'||typeof request!=='function')return;
@@ -152,6 +173,7 @@
       [...box.querySelectorAll(':scope>[data-open-market]')].forEach(node=>{if(!wanted.has(node.dataset.openMarket||''))node.remove()});
       box.scrollTop=Math.max(0,Math.min(scroll,box.scrollHeight-box.clientHeight));
       document.dispatchEvent(new CustomEvent('viewer:marketrowsupdated'));
+      ensureParitySelection(box);
     };
 
     const renderActive=()=>{
@@ -171,6 +193,7 @@
       document.querySelectorAll('[data-view-panel]').forEach(panel=>panel.classList.toggle('active',panel.dataset.viewPanel===view));
       document.querySelectorAll('#viewerNav button[data-view]').forEach(button=>button.classList.toggle('active',button.dataset.view===view));
       renderActive();
+      if(view==='results')ensureParitySelection(document.getElementById('marketList'));
       document.dispatchEvent(new CustomEvent('viewer:viewchange',{detail:{view}}));
     };
 
@@ -188,21 +211,33 @@
       if(!state.user)return;
       if(snapshotInFlight)return snapshotInFlight;
       snapshotInFlight=(async()=>{
-        stats.snapshotRequests+=1;
+        const attempt=async()=>{
+          stats.snapshotRequests+=1;
+          return request('/api/snapshot');
+        };
         try{
-          let data=await request('/api/snapshot');
+          let data;
+          try{data=await attempt()}
+          catch(err){
+            stats.snapshotErrors+=1;
+            if(Number(err?.status)>=500&&Number(err?.status)<600){stats.snapshotRetries+=1;await sleep(300);data=await attempt()}
+            else throw err;
+          }
           data=projectSnapshotData(data);
           if(data.user)state.user=data.user;
           renderSnapshot(data);
           return data;
-        }catch(err){if(err?.status===401){state.user=null;showAuth()}return null}
-        finally{snapshotInFlight=null}
+        }catch(err){
+          stats.snapshotErrors+=1;
+          if(err?.status===401){state.user=null;showAuth()}
+          return null;
+        }finally{snapshotInFlight=null}
       })();
       return snapshotInFlight;
     };
 
     document.addEventListener('viewer:viewchange',()=>{if(!document.hidden)requestAnimationFrame(()=>{try{window.cryptoResearchExchange?.mode==='compare'&&document.querySelector('[data-view-panel="results"]')?.classList.contains('active')}catch{}})});
-    window.__viewerPerformance={version:1,stats,get activeView(){return activeView()},get snapshotBusy(){return Boolean(snapshotInFlight)}};
+    window.__viewerPerformance={version:2,stats,get activeView(){return activeView()},get snapshotBusy(){return Boolean(snapshotInFlight)}};
   }
 
   setTimeout(patchCore,0);
