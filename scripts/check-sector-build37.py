@@ -48,7 +48,7 @@ def main() -> None:
         "ime_guard_installed": "installSectorImeGuard" in main_js and "compositionstart" in ime and "compositionend" in ime and "event.isComposing" in ime,
         "table_sort_installed": "installTableSortEnhancer" in main_js and "strategy-overview" in sorter and "strategy-coins" in sorter and "strategy-matrix" in sorter and "paper-compare" in sorter,
         "table_sort_bidirectional": "current.dir==='desc'?'asc':'desc'" in sorter and "aria-sort" in sorter,
-        "table_sort_layout_safe": "smart-sort-arrow" in build37_css and "grid-template-columns" not in build37_css,
+        "table_sort_layout_safe": "smart-sort-arrow" in build37_css and "min-width:" not in build37_css and "grid-template-columns:repeat(" not in build37_css,
         "content_integrity_library": all(token in integrity for token in ("evaluateProfileIntegrity", "content_foreign_identity", "provider_foreign_identity", "homepage_foreign_identity", "content_lead_name_mismatch")),
         "full_content_audit_api": all(token in integrity_api for token in ("evaluateProfileIntegrity", "audit_scope", "foreign_projects", "business_preview")),
         "per_market_integrity_guard": "status:finding.reasons.length?'mismatch':'ok'" in per_market_integrity,
