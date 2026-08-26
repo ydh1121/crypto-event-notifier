@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from .cloudflare_market_detail_strategy_lab import CloudflareMarketDetailPublisher
 from .cloudflare_pages_deployer import CloudflarePagesDeployer
 from .cloudflare_snapshot_publisher import CloudflareSnapshotPublisher
-from .coin_profile_enricher import CoinProfileEnricher
+from .coin_profile_research_cycle import CoinProfileResearchCycle
 from .reference_components import ReferenceComponentWatcher
 from .research_control import COMPONENT_DEFINITIONS, STATUS_PATH, atomic_json, load_control
 from .research_warehouse import ResearchWarehouse
@@ -78,7 +78,7 @@ class ResearchSupervisor:
         self.reference_watcher = ReferenceComponentWatcher()
         self.cloudflare_publisher = CloudflareSnapshotPublisher()
         self.cloudflare_market_detail_publisher = CloudflareMarketDetailPublisher()
-        self.coin_profile_enricher = CoinProfileEnricher()
+        self.coin_profile_research = CoinProfileResearchCycle()
         self.cloudflare_deployer = CloudflarePagesDeployer()
         self.upbit_paper_runner = UpbitPaperResearchRunner()
         self.strategy_lab_runner = ConfiguredStrategyLabRunner()
@@ -88,7 +88,7 @@ class ResearchSupervisor:
             "reference-version-watch": self.reference_watcher.check_once,
             "cloudflare-snapshot-publish": self.cloudflare_publisher.publish_once,
             "cloudflare-market-detail-publish": self.cloudflare_market_detail_publisher.publish_once,
-            "coin-profile-enrichment": self.coin_profile_enricher.run_once,
+            "coin-profile-enrichment": self.coin_profile_research.run_once,
             "upbit-paper-research": self.upbit_paper_runner.run_once,
             "strategy-lab-shadow": self.strategy_lab_runner.run_once,
             "cloudflare-pages-deploy": self.cloudflare_deployer.deploy_once,
