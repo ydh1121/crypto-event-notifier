@@ -76,9 +76,9 @@ def main() -> None:
     build29_css=text(PUBLIC/"modules/styles/build29.css"); exchange_css=text(PUBLIC/"modules/styles/exchange-ui.css"); build32_css=text(PUBLIC/"modules/styles/build32.css")
     tokens_css=text(PUBLIC/"modules/styles/tokens.css"); paper_css=text(PUBLIC/"modules/styles/paper.css")
     sector_api=text(ROOT/"cloudflare-pages/functions/api/sector-summary.ts"); profile_api=text(ROOT/"cloudflare-pages/functions/api/coin-profile.ts")
-    ingest_profiles=text(ROOT/"cloudflare-pages/functions/api/ingest-coin-profiles.ts"); taxonomy=text(ROOT/"cloudflare-pages/functions/lib/coin-taxonomy.ts")
+    ingest_profiles=text(ROOT/"cloudflare-pages/functions/api/ingest-coin-profiles.ts"); backlog_api=text(ROOT/"cloudflare-pages/functions/api/coin-profile-backlog.ts"); taxonomy=text(ROOT/"cloudflare-pages/functions/lib/coin-taxonomy.ts")
     migration4=text(ROOT/"cloudflare-pages/migrations/0004_coin_profile_cache.sql"); migration5=text(ROOT/"cloudflare-pages/migrations/0005_coin_profile_evidence.sql")
-    enricher=text(ROOT/"b3_trader/coin_profile_enricher.py"); supervisor=text(ROOT/"b3_trader/research_supervisor.py"); control=text(ROOT/"b3_trader/research_control.py")
+    enricher=text(ROOT/"b3_trader/coin_profile_enricher.py"); precision_cycle=text(ROOT/"b3_trader/coin_profile_research_cycle.py"); supervisor=text(ROOT/"b3_trader/research_supervisor.py"); control=text(ROOT/"b3_trader/research_control.py")
     requirements=text(ROOT/"b3_trader/requirements.txt"); repair=text(ROOT/"scripts/repair-local-sync.ps1"); gitignore=text(ROOT/".gitignore")
 
     static = {
@@ -110,7 +110,9 @@ def main() -> None:
         "coin_profile_ingest": all(token in ingest_profiles for token in ("INGEST_TOKEN","coin_profile_cache","business_summary_ko","evidence_json","canonical_sector","env.DB.batch")),
         "coin_profile_multisource": all(token in enricher for token in ("bithumb_manual","coinmarketcap","coingecko","official_site","source_code","community")),
         "coin_profile_korean_manual": all(token in enricher for token in ("BITHUMB_MANUAL_URL","_read_manual_pdf","description_ko","purpose_ko","PdfReader","feed-content")),
-        "coin_profile_supervisor": "CoinProfileEnricher" in supervisor and '"coin-profile-enrichment"' in supervisor and '"coin-profile-enrichment"' in control,
+        "coin_profile_supervisor": "CoinProfileResearchCycle" in supervisor and '"coin-profile-enrichment"' in supervisor and '"coin-profile-enrichment"' in control,
+        "coin_profile_precision_cycle": all(token in precision_cycle for token in ("class CoinProfileResearchCycle","PRECISION_PER_EXCHANGE","coin-profile-backlog","_precision_once","general = self.base.run_once()")),
+        "coin_profile_balanced_backlog": all(token in backlog_api for token in ("queryExchange('bithumb')","queryExchange('upbit')","round-robin","perExchange")),
         "coin_profile_no_sector_fallback": "profile.business_summary_ko||profile.description_ko||profile.business_summary_en||profile.description_en" in sectors_js and "chosen?.sector_business||''" not in sectors_js,
         "coin_profile_evidence_ui": all(token in sectors_js for token in ("근거 출처","match_confidence","last_verified_at","coin-profile-community")) and "profile-verification" in build32_css,
         "sector_enriched_classification": all(token in sector_api for token in ("canonical_sector","research_status","business_summary_ko","researched_count","unresolved_count")) and "evidenceText" in sector_api,
