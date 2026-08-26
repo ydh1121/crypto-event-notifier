@@ -12,10 +12,11 @@ import requests
 ROOT = Path(__file__).resolve().parents[1]
 VENV = ROOT / ".venv" / "Scripts" / "python.exe"
 INDEX = ROOT / "cloudflare-pages/public/index.html"
-JS = ROOT / "cloudflare-pages/public/viewer-canonical-v3.js"
-CSS = ROOT / "cloudflare-pages/public/viewer-canonical-v3.css"
+JS = ROOT / "cloudflare-pages/public/viewer-canonical-v4.js"
+CSS = ROOT / "cloudflare-pages/public/viewer-canonical-v4.css"
 STRATEGY = ROOT / "cloudflare-pages/public/strategy-lab-v2.js"
 RECORDS = ROOT / "cloudflare-pages/public/records-port.js"
+SITEMAP = ROOT / "docs/workstreams/viewer-sitemap-v4.md"
 DEPLOY = ROOT / "b3_trader/data/research-platform/cloudflare-pages-deploy-state.json"
 
 
@@ -66,32 +67,32 @@ def main() -> None:
     css = CSS.read_text(encoding="utf-8", errors="replace") if CSS.exists() else ""
     strategy = STRATEGY.read_text(encoding="utf-8", errors="replace") if STRATEGY.exists() else ""
     records = RECORDS.read_text(encoding="utf-8", errors="replace") if RECORDS.exists() else ""
+    sitemap = SITEMAP.read_text(encoding="utf-8", errors="replace") if SITEMAP.exists() else ""
     static = {
-        "build_22": 'crypto-viewer-build" content="2026.08.26-22' in index,
-        "canonical_v3_js": "viewer-canonical-v3.js?v=1" in index,
-        "canonical_v3_css": "viewer-canonical-v3.css?v=1" in index,
-        "strategy_v2": "strategy-lab-v2.js?v=1" in index,
-        "old_shell_unlinked": "viewer-shell-v3.js" not in index and "viewer-shell-v3.css" not in index,
-        "old_canonical_unlinked": "viewer-canonical-v2.js" not in index and "viewer-canonical-v2.css" not in index,
-        "four_main_nav": all(f'>{x}</button>' in index for x in ("개요", "자산", "리서치", "PAPER")),
-        "single_row_header": "top.insertBefore(nav,actions)" in js and "grid-template-columns:auto 1fr auto" in css,
-        "combined_paper_pnl": "전체 PAPER 증감" in js and "빗썸+업비트 합산" in js,
-        "paper_total_amount": "전체 증감액" in js and "paper-primary" in css,
-        "paper_all_reset": "전체 보기" in js and "resetPaperFilters" in js,
-        "paper_single_workspace": "canonicalPaperRecords" in js and "view==='records'" in js and "view='results'" in js,
+        "build_23": 'crypto-viewer-build" content="2026.08.26-23' in index,
+        "canonical_v4_js": "viewer-canonical-v4.js?v=1" in index,
+        "canonical_v4_css": "viewer-canonical-v4.css?v=1" in index,
+        "old_canonical_unlinked": "viewer-canonical-v3.js" not in index and "viewer-canonical-v3.css" not in index,
+        "sitemap_documented": all(x in sitemap for x in ("Dashboard", "Research", "PAPER", "Assets")),
+        "four_main_nav": all(f'>{x}</button>' in index for x in ("대시보드", "리서치", "PAPER", "자산")),
+        "dashboard_zones": all(x in js for x in ("먼저 확인할 것", "전체 PAPER 증감", "지금 볼 코인", "PAPER 거래소별 상태")),
+        "research_split": "v4-research-shell" in css and "v4ResearchSide" in js and "v4ResearchMain" in js,
+        "research_inline_paper": "PAPER 참고" in js and "PAPER에서 보기" in js,
+        "paper_default_summary": "let paperMode='summary'" in js and "data-paper-mode=\"summary\"" in js,
+        "paper_sections": all(x in js for x in ("코인별 성과", "전략 비교", "거래 기록", "거래소 비교")),
+        "combined_paper_pnl": "전체 PAPER 증감" in js and "빗썸+업비트 통합" in js,
+        "assets_no_forced_navigation": "누르면 리서치로 이동" not in js,
         "records_no_forced_navigation": "switchView('coin')" not in records,
-        "research_paper_separation": all(x in js for x in ("paperResearchExtra", "strategyLabMarketCard", "canonical-hidden")),
-        "strategy_table": "strategy-table-row" in strategy and "strategy-table-wrap" in css,
+        "strategy_table": "strategy-table-row" in strategy,
         "compare_sticky_header": "phase3-compare-header" in css and "position:sticky" in css,
-        "loading_state_model": "canonical-state loading" in js and "불러오는 중입니다" in js,
     }
-    print("\n=== CANONICAL V3 JOURNEY CONTRACT ===")
+    print("\n=== CANONICAL V4 SITEMAP CONTRACT ===")
     print(json.dumps(static, ensure_ascii=False, indent=2))
 
     pending: list[str] = []
     errors: list[str] = []
     if not all(static.values()):
-        errors.append("canonical v3 source contract is incomplete")
+        errors.append("canonical v4 sitemap contract is incomplete")
     if not local or not remote or local != remote:
         pending.append("Git local/remote HEAD has not synchronized yet")
 
@@ -105,33 +106,23 @@ def main() -> None:
     if not deploy.get("health_ok"):
         pending.append("Pages health check is not green")
 
-    remote_contract = {
-        "index_status": 0,
-        "js_status": 0,
-        "css_status": 0,
-        "strategy_status": 0,
-        "build_22": False,
-        "canonical_v3_loaded": False,
-        "old_layers_absent": False,
-    }
+    remote_contract = {"index_status":0,"js_status":0,"css_status":0,"build_23":False,"canonical_v4_loaded":False,"old_v3_absent":False}
     if url:
         nonce = str(time.time_ns())
         si, ri = fetch(f"{url}/?canonical={nonce}")
-        sj, rj = fetch(f"{url}/viewer-canonical-v3.js?v=1&canonical={nonce}")
-        sc, rc = fetch(f"{url}/viewer-canonical-v3.css?v=1&canonical={nonce}")
-        ss, rs = fetch(f"{url}/strategy-lab-v2.js?v=1&canonical={nonce}")
+        sj, rj = fetch(f"{url}/viewer-canonical-v4.js?v=1&canonical={nonce}")
+        sc, rc = fetch(f"{url}/viewer-canonical-v4.css?v=1&canonical={nonce}")
         remote_contract.update({
-            "index_status": si,
-            "js_status": sj,
-            "css_status": sc,
-            "strategy_status": ss,
-            "build_22": 'crypto-viewer-build" content="2026.08.26-22' in ri,
-            "canonical_v3_loaded": "__viewerCanonicalV3Loaded" in rj and "canonical-v3" in rc and "__strategyLabViewerV2Loaded" in rs,
-            "old_layers_absent": "viewer-canonical-v2.js" not in ri and "viewer-shell-v3.js" not in ri,
+            "index_status":si,
+            "js_status":sj,
+            "css_status":sc,
+            "build_23":'crypto-viewer-build" content="2026.08.26-23' in ri,
+            "canonical_v4_loaded":"__viewerCanonicalV4Loaded" in rj and "canonical-v4" in rc,
+            "old_v3_absent":"viewer-canonical-v3.js" not in ri,
         })
-        if any(x != 200 for x in (si, sj, sc, ss)):
-            pending.append("canonical v3 viewer assets are not reachable yet")
-        elif not all((remote_contract["build_22"], remote_contract["canonical_v3_loaded"], remote_contract["old_layers_absent"])):
+        if any(x != 200 for x in (si,sj,sc)):
+            pending.append("canonical v4 viewer assets are not reachable yet")
+        elif not all((remote_contract["build_23"],remote_contract["canonical_v4_loaded"],remote_contract["old_v3_absent"])):
             pending.append("Pages is still serving the previous viewer build")
     else:
         pending.append("viewer URL is not available in deploy state")
@@ -140,17 +131,15 @@ def main() -> None:
     print(json.dumps(remote_contract, ensure_ascii=False, indent=2))
     print("\n=== RESULT ===")
     if errors:
-        for x in errors:
-            print(f"ERROR: {x}")
-        print("VIEWER_CANONICAL_V3=FAIL")
+        for x in errors: print(f"ERROR: {x}")
+        print("VIEWER_CANONICAL_V4=FAIL")
         raise SystemExit(1)
     if pending:
-        for x in pending:
-            print(f"PENDING: {x}")
-        print("VIEWER_CANONICAL_V3=WARMING")
+        for x in pending: print(f"PENDING: {x}")
+        print("VIEWER_CANONICAL_V4=WARMING")
         return
     print("BROWSER_JOURNEY_QA_REQUIRED=true")
-    print("VIEWER_CANONICAL_V3=PASS")
+    print("VIEWER_CANONICAL_V4=PASS")
 
 
 if __name__ == "__main__":
