@@ -9,7 +9,7 @@ import{createResearchPage}from'./pages/research.js';
 import{createAssetsPage}from'./pages/assets.js';
 import{createPaperPage}from'./pages/paper.js';
 import{createStrategyPage}from'./pages/strategy.js';
-import{createSectorsPage}from'./pages/sectors.js';
+import{createSectorsPage}from'./pages/sectors-v36.js?v=36';
 import{createRecordsPage}from'./pages/records.js';
 import{createSystemPage}from'./pages/system.js?v=35';
 
