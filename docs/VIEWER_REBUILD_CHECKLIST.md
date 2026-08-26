@@ -23,7 +23,7 @@
 - [x] services/market-detail: 코인 상세 API + 짧은 캐시
 - [x] pages/*: 페이지별 DOM 소유권 분리
 - [x] 거래소 UI 상태를 research/paper/strategy/records 별도로 분리
-- [x] 차트 기간 상태를 research/paper 별도로 분리
+- [x] 차트 기간 상태를 research/paper/strategy/sector 별도로 분리
 - [x] 기존 app.js/canonical/exchange/records/strategy DOM 후처리 스크립트 미로딩
 - [x] 외부 공개 트레이딩 UI 레퍼런스/채택 원칙 문서화
 
@@ -33,9 +33,11 @@
 - [x] 시장 상태/관찰 후보
 - [x] 빗썸+업비트 전체 PAPER 증감액/수익률
 - [x] 전략 후보/검증중/미통과 요약
-- [x] 지금 볼 코인
+- [x] 지금 볼 코인 + 클릭 시 해당 거래소/코인 리서치 이동
 - [x] 거래소별 PAPER 요약
+- [x] 섹터 자금 집중 요약 + 섹터 화면 이동
 - [x] 최근 중요 변화 타임라인 - 두 거래소 최근 체결/학습 통합
+- [x] snapshot 수신 시 전체 DOM 재생성 없이 수치/행 단위 갱신
 
 ## 2. 리서치
 - [x] PC master-detail 2열 고정
@@ -43,7 +45,7 @@
 - [x] 시장/진입/후보 요약
 - [x] 티커/코인명 검색
 - [x] 전체/매수후보/눌림대기/관찰/매수금지/PAPER보유 필터
-- [x] 검색/필터 결과 0건이면 우측의 이전 코인 상세을 제거
+- [x] 검색/필터 결과 0건이면 우측의 이전 코인 상세 제거
 - [x] 우선 후보 목록
 - [x] 코인 클릭 시 같은 화면 우측 상세 갱신
 - [x] 현재 판단을 가격보다 우선 표시
@@ -73,9 +75,11 @@
 - [x] 보유 수량/평단/현재가/평가액/손익
 - [x] 선택 종목 빗썸 판단/점수/PAPER 참고
 - [x] 선택 종목 업비트 판단/점수/PAPER 참고
+- [x] 추천 타점 + 입력 금액 기준 즉시 평단 계산
+- [x] 최대 20회 별도 물타기 계산기
+- [x] 로컬 averaging plan을 read-only snapshot으로 외부 Viewer에 표시
 - [x] 로컬 PC에서만 보유/물타기 계획 관리한다는 권한 표시
-- [ ] 로컬 averaging plan을 read-only snapshot으로 외부 Viewer에 표시
-- [ ] 포트폴리오 평가액/손익 history chart
+- [ ] 실제 보유 포트폴리오 평가액/손익 history chart
 
 ## 4. PAPER
 - [x] 요약 / 코인별 성과 / 거래소 비교 3영역 분리
@@ -99,8 +103,8 @@
 - [x] 빗썸↔업비트 공통 코인 비교표
 - [x] 거래소 비교 검색/정렬/전체 보기
 - [x] 비교표 sticky header
-- [ ] 전체 PAPER equity curve
-- [ ] 전체 drawdown curve
+- [x] 전체 PAPER equity curve
+- [x] 전체 PAPER drawdown curve
 
 ## 5. 전략 연구
 - [x] 최상위 독립 화면
@@ -113,13 +117,29 @@
 - [x] 후보 Gate 8개 기준 표시
 - [x] 자동승격 없음 표시
 - [x] 사용자 조합전략은 로컬 PC 전용 관리 표시
-- [ ] 전략 equity curve
-- [ ] 전략별 코인 성과 상세표
-- [ ] 코인 × 전략 matrix/detail
+- [x] 전략 equity curve + drawdown
+- [x] 전략별 코인 성과 상세표
+- [x] 코인 × 전략 matrix/detail
+- [x] 전체 adaptive PAPER benchmark equity/drawdown
 - [ ] Phase 7 walk-forward 화면
 - [ ] Phase 8 candidate promotion 화면
 
-## 6. 기록
+## 6. 섹터
+- [x] 최상위 독립 화면
+- [x] 빗썸/업비트 독립 선택
+- [x] 섹터별 거래대금/가중등락/기회점수/PAPER 집중도
+- [x] 전체 코인 목록 - 14개 제한 제거
+- [x] 24H 거래대금/24H 등락/기회점수 오름차순·내림차순 정렬
+- [x] 한글명 우선 + 영문명 + 티커 표시
+- [x] 섹터 개요/사업 설명
+- [x] 코인별 고유 한국어 사업 설명 + 근거 출처
+- [x] 공식 설명서/홈페이지/Docs·백서/CMC·CoinGecko 다중 출처 조사
+- [x] 일반 전수조사 + 저품질 종목 2차 정밀조사
+- [x] 거래소별 독립 조사 cursor + 균형 backlog
+- [x] 섹터 history D1 누적
+- [x] 코인에서 리서치 이동
+
+## 7. 기록
 - [x] 최상위 독립 화면
 - [x] 빗썸/업비트 선택
 - [x] 기간 필터 - 최근 1H/6H/24H/7D/전체
@@ -128,32 +148,38 @@
 - [x] 누적 체결/누적 학습/최근 매도손익/마지막 기록
 - [x] 체결가/금액/실현손익/이유/시간
 - [x] 학습 전후 시장/진입/비중 변화
+- [x] 신규 기록만 맨 위에 실시간 삽입 + 기존 검색 focus 유지
 - [x] 기록 클릭에 의한 강제 리서치 이동 없음
 - [ ] 전략 필터 - 현재 snapshot record payload에 전략 식별값 없음
 - [ ] 판단 상태 변경 기록 별도 탭
 - [ ] 시스템 이벤트 기록 별도 탭
 
-## 7. 시스템
+## 8. 시스템
 - [x] 주 Navigation에서 분리, 우측 최신상태/사용자 버튼으로 접근
 - [x] 연구 노드 상태
-- [x] 구성요소 목록
+- [x] 구성요소 목록 + 주기/횟수/최근성공/오류/결과 상세
 - [x] 계정/권한
 - [x] 관리자 사용자 초대
 - [x] PAPER ONLY / READ ONLY / Cloudflare→PC 제어없음 / 실제주문없음
-- [ ] Git local/remote/CI 상세
-- [ ] Cloudflare snapshot/detail/deploy 상세
-- [ ] Warehouse/Drive backup 상세
-- [ ] Telegram BUY_CANDIDATE 상태
-- [ ] 로컬 전용 휴대폰 연결/제어 상태 외부 요약
+- [x] Git local/remote/자동동기화 상세
+- [ ] GitHub Actions CI 상태를 Viewer에서 직접 표시
+- [x] Cloudflare snapshot/detail/deploy 상세
+- [x] Warehouse 상세
+- [x] SQLite/Drive backup 상세
+- [x] Telegram BUY_CANDIDATE 전용 알림 상태
+- [x] 로컬 전용 휴대폰/원격접속 상태 외부 안전 요약
+- [x] 토큰/Chat ID/IP/DNS/local path/rclone remote path 외부 미노출
 
-## 8. 로컬 PC 전용 - 외부 Pages에 쓰기 기능 추가 금지
+## 9. 로컬 PC 전용 - 외부 Pages에 쓰기 기능 추가 금지
 - [x] 보유 수량/평단 저장은 로컬
 - [x] 보유 정보 삭제는 로컬
 - [x] 물타기 최대 20회 계획 저장/수정/삭제는 로컬
 - [x] 사용자 조합 전략 생성/일시정지/재개는 로컬
+- [x] Telegram 설정/테스트는 로컬
+- [x] 백업 즉시 실행은 로컬
 - [x] Cloudflare Pages는 읽기 전용
 
-## 9. 구현 순서 / QA
+## 10. 구현 순서 / QA
 - [x] V6 모듈 경계 정의
 - [x] 대시보드 모듈
 - [x] 리서치 master-detail 모듈
@@ -162,14 +188,14 @@
 - [x] 전략 연구 모듈
 - [x] 기록 모듈
 - [x] 시스템 모듈
+- [x] 섹터 모듈
 - [x] V6 static/remote 배포 checker 구현
-- [x] 최신 기능 HEAD GitHub Actions PASS - Python / Dashboard / Cloudflare / modular viewer
-- [x] Windows/Pages 실제 배포 PASS - VIEWER_MODULAR_V6=PASS
-- [x] PC 브라우저 영상 QA 1차 - 2026-08-26 18:35, 전체 IA/master-detail 방향 개선 확인
-- [ ] build 26 집중 QA - 리서치 0건 상태/기간차트/자산 첫화면/PAPER 체결차트
-- [ ] 모바일 390/430 QA
-- [ ] 남은 `[ ]` 기능을 우선순위대로 복구/구현
+- [x] Windows/Pages 실제 배포 PASS - Build 34 `VIEWER_MODULAR_V6=PASS`
+- [x] PC 브라우저 영상/스크린샷 QA 반복 반영 - IA/master-detail/밀도/필터/대시보드/섹터
+- [ ] 모바일 390/430 집중 QA
+- [ ] 남은 `[ ]` 기능을 우선순위대로 구현
 
-## 10. Dead UI asset 정리
-- [ ] build 26 CI + Windows/Pages PASS 후 기존 `app.js` / canonical / exchange-phase3 / local-parity / asset-local-port / records-port / strategy-lab-v2 dead UI asset 삭제
-- [ ] 삭제 후 Cloudflare Pages typecheck/배포 재검증
+## 11. Dead UI asset 정리
+- [x] 기존 Pages `app.js` / canonical / exchange-phase3 / local-parity / asset-local-port / records-port / strategy-lab-v2 계열 물리 삭제
+- [x] 최상위 404 추가로 retired asset URL 실제 404 보장
+- [x] 삭제 후 Cloudflare Pages typecheck/배포/checker 재검증
