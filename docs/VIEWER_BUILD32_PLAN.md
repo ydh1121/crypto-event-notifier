@@ -17,6 +17,8 @@
 
 `coin-profile-enrichment` supervisor component가 90초 간격으로 현재 빗썸·업비트 KRW market catalog를 다시 읽고 순환한다. 한 번 실행할 때 bounded batch만 조사해 외부 API rate limit을 피하고, cursor가 전체 market을 끝까지 돌면 다음 cycle을 시작한다. 신규상장·리브랜딩·사업 변경에 대응할 수 있도록 반복 검증한다.
 
+초기 전수조사는 한 번에 화면을 막는 작업이 아니라 백그라운드에서 누적되며, 섹터 화면의 `프로젝트 조사` 수치와 supervisor component의 processed/cursor/completed_cycles로 진행률을 확인한다.
+
 수집 결과는 D1 `coin_profile_cache`에 다음과 같이 누적한다.
 
 - business_summary_ko / business_summary_en
