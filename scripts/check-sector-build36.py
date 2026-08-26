@@ -28,9 +28,10 @@ def main() -> None:
     page = text(PUBLIC / "modules" / "pages" / "sectors-v36.js")
     css = text(PUBLIC / "modules" / "styles" / "build36.css")
     identity = text(ROOT / "b3_trader" / "coin_profile_identity_safe.py")
-    cycle = text(ROOT / "b3_trader" / "coin_profile_research_cycle_v36.py")
+    audit_client = text(ROOT / "b3_trader" / "coin_profile_identity_audit.py")
     supervisor = text(ROOT / "b3_trader" / "research_supervisor.py")
     backlog = text(ROOT / "cloudflare-pages" / "functions" / "api" / "coin-profile-backlog-v36.ts")
+    audit_api = text(ROOT / "cloudflare-pages" / "functions" / "api" / "coin-profile-identity-audit.ts")
     repair = text(ROOT / "cloudflare-pages" / "functions" / "api" / "ingest-coin-profiles-repair.ts")
     plan = text(ROOT / "docs" / "VIEWER_BUILD36_PLAN.md")
 
@@ -40,13 +41,15 @@ def main() -> None:
         "sector_search": "data-sector-search" in page and "섹터 · 코인명 · 영문명 · 티커 검색" in page,
         "sector_filter_chips": all(token in page for token in ("조사완료", "추가조사", "상승", "하락", "미분류")),
         "sector_korean_primary": "profile.business_summary_ko||profile.description_ko||''" in page,
-        "sector_identity_hide": "sameProjectName" in page and "매칭 재검증 중" not in page and "자동 재조사" in page,
+        "sector_identity_hide": "sameProjectName" in page and "자동 재조사" in page and "거래소 공식명" in page,
         "sector_mobile_no_forced_table": "min-width:0!important" in css and "grid-template-columns:repeat(3,minmax(0,1fr))" in css and "min-width:650px" not in css,
         "identity_safe_enricher": all(token in identity for token in ("IdentitySafeCoinProfileEnricher", "row_matches_candidate", "_read_manual_pdf_checked", "project_name_matches")),
         "strict_cmc_cg": "if not matched" in identity and "and row_matches_candidate(row, item.get(\"name\"))" in identity,
         "manual_pdf_identity": "if not _identity_in_text(row, text)" in identity,
         "supervisor_v36": "CoinProfileResearchCycleV36" in supervisor,
         "identity_audit_backlog": all(token in backlog for token in ("identity_mismatch", "exchangeMarketNames", "identity_mismatch_by_exchange", "audit_scope")),
+        "identity_audit_api": all(token in audit_api for token in ("cached_english_name", "official_english_name", "audit_scope", "mismatches")),
+        "identity_audit_command": "coin-profile-identity-audit" in audit_client,
         "identity_repair_ingest": "identity_repairs" in repair and "ON CONFLICT(exchange,market) DO UPDATE SET" in repair,
         "build36_plan": "ticker alone" in plan and "Mobile <=760px" in plan,
     }
