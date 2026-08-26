@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import threading
 import time
 from pathlib import Path
 from typing import Any
+
+import requests
 
 from .config import Settings
 
@@ -93,6 +96,22 @@ def _git_summary(settings: Settings) -> dict[str, Any]:
     }
 
 
+def _local_api_json(settings: Settings, path: str) -> dict[str, Any]:
+    """Read the local dashboard over loopback and keep the public snapshot sanitized."""
+    try:
+        response = requests.get(
+            f"http://127.0.0.1:{int(settings.service_port)}{path}",
+            timeout=1.2,
+            headers={"User-Agent": "crypto-research-operations-status/1.0"},
+        )
+        if not response.ok:
+            return {}
+        value = response.json()
+        return value if isinstance(value, dict) else {}
+    except (requests.RequestException, ValueError):
+        return {}
+
+
 def _component_last_result(status_components: dict[str, Any], name: str) -> dict[str, Any]:
     source = status_components.get(name)
     if not isinstance(source, dict):
@@ -158,15 +177,76 @@ def _warehouse_summary(status_components: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _telegram_summary(settings: Settings) -> dict[str, Any]:
-    token_configured = bool(settings.telegram_token.strip())
-    chat_configured = bool(settings.telegram_chat_id.strip())
+def _backup_summary(settings: Settings) -> dict[str, Any]:
+    runtime = _local_api_json(settings, "/api/state")
+    backup = runtime.get("backup") if isinstance(runtime.get("backup"), dict) else {}
+    local_dir = Path(settings.local_backup_dir)
+    if not local_dir.is_absolute():
+        local_dir = REPO_ROOT / local_dir
+    files = sorted(local_dir.glob("crypto-trader-*.sqlite3"), key=lambda p: p.stat().st_mtime, reverse=True) if local_dir.exists() else []
+    latest = files[0] if files else None
+    latest_mtime = float(latest.stat().st_mtime) if latest else 0.0
+    latest_bytes = int(latest.stat().st_size) if latest else 0
+    drive_status = str(backup.get("drive") or ("configured" if settings.rclone_remote else "disabled"))
     return {
-        "enabled": bool(settings.telegram_enabled),
+        "status": str(backup.get("status") or ("ready" if latest else "waiting")),
+        "last_backup_at": float(backup.get("ts") or latest_mtime),
+        "local_backup_count": len(files),
+        "latest_local_bytes": latest_bytes,
+        "drive_configured": bool(settings.rclone_remote.strip()),
+        "rclone_installed": shutil.which("rclone") is not None,
+        "drive_status": drive_status,
+        "drive_uploaded": drive_status == "uploaded_and_mirrored",
+        "local_path_exposed": False,
+        "remote_path_exposed": False,
+    }
+
+
+def _telegram_summary(settings: Settings) -> dict[str, Any]:
+    local = _local_api_json(settings, "/api/telegram/status")
+    enabled = bool(local.get("enabled", settings.telegram_enabled))
+    token_configured = bool(local.get("token_configured", bool(settings.telegram_token.strip())))
+    chat_configured = bool(local.get("chat_configured", bool(local.get("chat_id") or settings.telegram_chat_id.strip())))
+    automatic_alerts = str(local.get("automatic_alerts") or "buy_candidate_only")
+    return {
+        "enabled": enabled,
         "token_configured": token_configured,
         "chat_configured": chat_configured,
-        "ready": bool(settings.telegram_enabled and token_configured and chat_configured),
+        "ready": bool(enabled and token_configured and chat_configured),
+        "automatic_alerts": automatic_alerts,
+        "buy_candidate_only": automatic_alerts == "buy_candidate_only",
+        "buy_candidate_sent_count": int(local.get("buy_candidate_sent_count") or 0),
+        "last_buy_candidate_sent_at": float(local.get("last_buy_candidate_sent_at") or 0.0),
+        "last_send_error_at": float(local.get("last_send_error_at") or 0.0),
         "secret_values_exposed": False,
+    }
+
+
+def _remote_access_summary(settings: Settings) -> dict[str, Any]:
+    local = _local_api_json(settings, "/api/network")
+    cloudflare = local.get("cloudflare") if isinstance(local.get("cloudflare"), dict) else {}
+    tailscale = local.get("tailscale") if isinstance(local.get("tailscale"), dict) else {}
+    lan = local.get("lan") if isinstance(local.get("lan"), dict) else {}
+    return {
+        "local_dashboard_online": bool(local),
+        "loopback_only": bool(local.get("loopback_only", str(settings.service_host).strip() in {"127.0.0.1", "localhost", "::1"})),
+        "lan_enabled": bool(lan.get("enabled")),
+        "cloudflare": {
+            "active": bool(cloudflare.get("active")),
+            "configured": bool(cloudflare.get("configured")),
+            "stable": bool(cloudflare.get("stable")),
+            "mode": str(cloudflare.get("mode") or "none"),
+            "https": bool(cloudflare.get("https", True)),
+            "vpn_required": bool(cloudflare.get("vpn_required", False)),
+        },
+        "tailscale": {
+            "installed": bool(tailscale.get("installed")),
+            "connected": bool(tailscale.get("connected")),
+        },
+        "remote_auth_required": bool(local.get("remote_auth_required", True)),
+        "public_port_forwarding_recommended": bool(local.get("public_port_forwarding_recommended", False)),
+        "address_values_exposed": False,
+        "viewer_can_control_pc": False,
     }
 
 
@@ -234,6 +314,8 @@ def platform_snapshot(*, control_path: Path = CONTROL_PATH, status_path: Path = 
         "git": _git_summary(settings),
         "cloudflare": _cloudflare_summary(status_components),
         "warehouse": _warehouse_summary(status_components),
+        "backup": _backup_summary(settings),
         "telegram": _telegram_summary(settings),
+        "remote_access": _remote_access_summary(settings),
     }
-    return {"version":2,"paper_only":True,"supervisor_running":supervisor_fresh,"supervisor_pid":int(status.get("pid") or 0),"supervisor_started_at":float(status.get("started_at") or 0.0),"updated_at":status_updated_at,"control_revision":int(control.get("revision") or 1),"components":components,"references":reference_summary,"operations":operations,"safety":{"can_place_orders":False,"can_modify_strategy_profiles":False,"auto_promote_external_code":False,"viewer_can_control_pc":False,"secret_values_exposed":False}}
+    return {"version":3,"paper_only":True,"supervisor_running":supervisor_fresh,"supervisor_pid":int(status.get("pid") or 0),"supervisor_started_at":float(status.get("started_at") or 0.0),"updated_at":status_updated_at,"control_revision":int(control.get("revision") or 1),"components":components,"references":reference_summary,"operations":operations,"safety":{"can_place_orders":False,"can_modify_strategy_profiles":False,"auto_promote_external_code":False,"viewer_can_control_pc":False,"secret_values_exposed":False,"local_addresses_exposed":False,"remote_paths_exposed":False}}
