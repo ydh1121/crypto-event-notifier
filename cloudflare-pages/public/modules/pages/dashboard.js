@@ -27,7 +27,7 @@ export function createDashboardPage({store,navigate}){
       <section class="priority-strip"><header><h3>먼저 확인할 것</h3><span>최대 3개</span></header><div>${alerts.slice(0,3).map(a=>`<button class="priority-item ${a.tone}" data-route="${a.route}"><span></span><div><b>${esc(a.title)}</b><small>${esc(a.desc)}</small></div><em>보기</em></button>`).join('')}</div></section>
       <section class="dashboard-kpis">
         <button data-route="assets" class="summary-tile"><span>내 실제 자산</span><b>${hs?money(hs.value_krw):'등록 없음'}</b><small class="${tone(assetPnl)}">${hs?`${assetPnl>=0?'+':''}${money(assetPnl)} · ${pct(assetRate)}`:'보유자산'}</small></button>
-        <button data-route="research" class="summary-tile"><span>시장 상태 · 빗썸</span><b>${sm.avgRegime.toFixed(0)}<i>/100</i></b><small>관찰 후보 ${sm.candidates}개</small></button>
+        <button data-route="research" class="summary-tile"><span>시장 상태 · 빗썸</span><b>${sm.avgRegime.toFixed(0)}<i>/100</i></b><small>매수 후보 ${sm.buyCandidates} · 기회65+ ${sm.opportunityCandidates}</small></button>
         <button data-route="paper" class="summary-tile primary"><span>전체 PAPER 증감</span><b class="${tone(cp.pnl)}">${cp.pnl>=0?'+':''}${money(cp.pnl)}</b><small>${pct(paperRate)} · 빗썸+업비트</small></button>
         <button data-route="strategy" class="summary-tile"><span>전략 검증</span><b>${n(cs.candidate)} 후보</b><small>검증 중 ${n(cs.warming)} · 미통과 ${n(cs.rejected)}</small></button>
       </section>
