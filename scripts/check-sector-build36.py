@@ -36,7 +36,7 @@ def main() -> None:
     plan = text(ROOT / "docs" / "VIEWER_BUILD36_PLAN.md")
 
     checks = {
-        "sector_build_36": 'crypto-sector-build" content="2026.08.27-36' in index,
+        "sector_build_36_or_newer": any(f'crypto-sector-build" content="2026.08.27-{v}' in index for v in (36, 37)),
         "sector_v36_entry": "./pages/sectors-v36.js?v=36" in main_js,
         "sector_search": "data-sector-search" in page and "섹터 · 코인명 · 영문명 · 티커 검색" in page,
         "sector_filter_chips": all(token in page for token in ("조사완료", "추가조사", "상승", "하락", "미분류")),
