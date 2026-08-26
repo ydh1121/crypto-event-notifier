@@ -41,7 +41,7 @@ jobs:
       - run: pip install -r b3_trader/requirements.txt pytest
       - run: python -m pytest -q b3_trader/tests
       - run: python -m py_compile b3_trader/*.py scripts/check-viewer-modular.py
-      - name: Validate coin profile and performance analytics contracts
+      - name: Validate research, performance and operations contracts
         shell: bash
         run: |
           set -euo pipefail
@@ -60,6 +60,11 @@ jobs:
           grep -q 'coin_matrix' b3_trader/performance_analytics.py
           grep -q 'read_performance_analytics' b3_trader/strategy_lab_snapshot.py
           grep -q '"version": 3' b3_trader/strategy_lab_snapshot.py
+          grep -q '_git_summary' b3_trader/research_control.py
+          grep -q '_cloudflare_summary' b3_trader/research_control.py
+          grep -q '_warehouse_summary' b3_trader/research_control.py
+          grep -q '_telegram_summary' b3_trader/research_control.py
+          grep -q 'secret_values_exposed' b3_trader/research_control.py
 
   dashboard-smoke:
     runs-on: ubuntu-latest
@@ -113,7 +118,7 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: find public/modules -name '*.js' -print0 | xargs -0 -n1 node --check
-      - name: Validate build 33 source contract
+      - name: Validate build 34 source contract
         shell: bash
         run: |
           set -euo pipefail
@@ -122,16 +127,17 @@ jobs:
             public/modules/shared/selectors.js public/modules/shared/charts.js \
             public/modules/pages/dashboard.js public/modules/pages/research.js public/modules/pages/assets.js \
             public/modules/pages/paper.js public/modules/pages/strategy.js public/modules/pages/sectors.js \
-            public/modules/pages/records.js public/modules/services/coin-profile.js public/modules/services/sectors.js \
-            public/modules/styles/strategy.css public/modules/styles/sectors.css public/modules/styles/exchange-ui.css public/modules/styles/build32.css \
+            public/modules/pages/records.js public/modules/pages/system.js public/modules/services/coin-profile.js public/modules/services/sectors.js \
+            public/modules/styles/strategy.css public/modules/styles/sectors.css public/modules/styles/records-system.css \
+            public/modules/styles/exchange-ui.css public/modules/styles/build32.css \
             functions/api/sector-summary.ts functions/api/coin-profile.ts functions/api/ingest-coin-profiles.ts \
             functions/api/coin-profile-backlog.ts functions/lib/coin-taxonomy.ts \
             migrations/0004_coin_profile_cache.sql migrations/0005_coin_profile_evidence.sql; do
             test -s "$file"
           done
-          grep -q 'crypto-viewer-build" content="2026.08.27-33' public/index.html
-          grep -q 'type="module" src="/modules/main.js?v=10"' public/index.html
-          grep -q '/modules/styles/strategy.css?v=3' public/index.html
+          grep -q 'crypto-viewer-build" content="2026.08.27-34' public/index.html
+          grep -q 'type="module" src="/modules/main.js?v=11"' public/index.html
+          grep -q '/modules/styles/records-system.css?v=4' public/index.html
           grep -q '프로젝트별 설명 수집 중' public/modules/pages/sectors.js
           grep -q 'profile.business_summary_ko' public/modules/pages/sectors.js
           ! grep -q "chosen?.sector_business||''" public/modules/pages/sectors.js
@@ -156,10 +162,21 @@ jobs:
           grep -q '코인별 성과' public/modules/pages/strategy.js
           grep -q '코인 × 전략' public/modules/pages/strategy.js
           grep -q '전체 PAPER equity / drawdown' public/modules/pages/strategy.js
+          grep -q '코드 동기화' public/modules/pages/system.js
+          grep -q 'Pages · 데이터 전송' public/modules/pages/system.js
+          grep -q 'Parquet 분석 창고' public/modules/pages/system.js
+          grep -q '알림 준비 상태' public/modules/pages/system.js
+          grep -q 'componentDiagnostics' public/modules/pages/system.js
+          grep -q 'operations-grid' public/modules/styles/records-system.css
+          grep -q 'component-diagnostic' public/modules/styles/records-system.css
+          grep -q '물타기 계산기' public/modules/pages/assets.js
+          grep -q 'DB 원본을 수정하지 않습니다' public/modules/pages/assets.js
           test -s ../docs/VIEWER_BUILD32_PLAN.md
           test -s ../docs/VIEWER_BUILD33_PLAN.md
+          test -s ../docs/VIEWER_BUILD34_PLAN.md
           grep -q '전체 코인 사업·섹터 전수조사' ../docs/VIEWER_BUILD32_PLAN.md
           grep -q 'Strategy / PAPER Performance Analytics' ../docs/VIEWER_BUILD33_PLAN.md
+          grep -q 'Operations Visibility' ../docs/VIEWER_BUILD34_PLAN.md
       - name: Ensure retired Pages UI assets are physically absent
         shell: bash
         run: |
