@@ -17,7 +17,7 @@
   function ensureRoot(){
     const panel=q('[data-view-panel="records"]');if(!panel)return null;
     panel.classList.add('records-port-active');
-    let root=q('#recordsPort',panel);if(root)return root;
+    let root=document.getElementById('recordsPort')||q('#recordsPort',panel);if(root)return root;
     root=document.createElement('section');root.id='recordsPort';root.className='records-port';panel.appendChild(root);return root;
   }
   function itemsFrom(data){
