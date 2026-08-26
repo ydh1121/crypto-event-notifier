@@ -52,27 +52,11 @@
     });
   }
 
-  function contextHost(view){
-    const head=pageHead(view);if(!head)return null;
-    let host=q(':scope>.ia-head-tools',head);
-    if(!host){host=document.createElement('div');host.className='ia-head-tools';head.appendChild(host)}
-    return host;
-  }
-
-  function renderContext(view){
-    const host=contextHost(view);if(!host)return;
-    if(view==='settings'){host.replaceChildren();return}
-    const mode=exchangeMode();
-    const b=exchangeData('bithumb'),u=exchangeData('upbit');
-    const bc=n(b?.market_count)||n(b?.leaderboard?.length),uc=n(u?.market_count)||n(u?.leaderboard?.length);
-    host.innerHTML=`<div class="ia-exchange-filter"><span>데이터 기준</span><div><button type="button" data-ia-exchange="bithumb" class="${mode==='bithumb'?'active':''}">빗썸${bc?` <small>${bc}</small>`:''}</button><button type="button" data-ia-exchange="upbit" class="${mode==='upbit'?'active':''}">업비트${uc?` <small>${uc}</small>`:''}</button>${view==='results'?`<button type="button" data-ia-exchange="compare" class="compare ${mode==='compare'?'active':''}">거래소 비교</button>`:''}</div></div>`;
-  }
-
-  function renderAllContexts(){['home','coin','results','records'].forEach(renderContext)}
-
   function dashboardHeading(id,title,desc){
     let node=q(`#${id}`);if(!node){node=document.createElement('div');node.id=id;node.className='ia-section-heading'}
-    node.innerHTML=`<div><h3>${title}</h3><p>${desc}</p></div>`;
+    let copy=q(':scope>.ia-section-copy',node);
+    if(!copy){copy=document.createElement('div');copy.className='ia-section-copy';copy.innerHTML='<h3></h3><p></p>';node.prepend(copy)}
+    const h=q('h3',copy),p=q('p',copy);if(h)h.textContent=title;if(p)p.textContent=desc;
     return node;
   }
 
@@ -87,6 +71,23 @@
     const focus=q('#v3HomeFocus',panel);if(focus&&focus.previousElementSibling!==capital)capital.insertAdjacentElement('afterend',focus);
     q('.home-grid',panel)?.classList.add('ia-hide-legacy-home');
   }
+
+  function contextHost(view){
+    const anchor=view==='home'?q('#iaPaperHeading'):pageHead(view);if(!anchor)return null;
+    let host=q(':scope>.ia-head-tools',anchor);
+    if(!host){host=document.createElement('div');host.className='ia-head-tools';anchor.appendChild(host)}
+    return host;
+  }
+
+  function renderContext(view){
+    const host=contextHost(view);if(!host)return;
+    const mode=exchangeMode();
+    const b=exchangeData('bithumb'),u=exchangeData('upbit');
+    const bc=n(b?.market_count)||n(b?.leaderboard?.length),uc=n(u?.market_count)||n(u?.leaderboard?.length);
+    host.innerHTML=`<div class="ia-exchange-filter"><span>${view==='home'?'PAPER 데이터':'데이터 기준'}</span><div><button type="button" data-ia-exchange="bithumb" class="${mode==='bithumb'?'active':''}">빗썸${bc?` <small>${bc}</small>`:''}</button><button type="button" data-ia-exchange="upbit" class="${mode==='upbit'?'active':''}">업비트${uc?` <small>${uc}</small>`:''}</button>${view==='results'?`<button type="button" data-ia-exchange="compare" class="compare ${mode==='compare'?'active':''}">거래소 비교</button>`:''}</div></div>`;
+  }
+
+  function renderAllContexts(){['home','coin','results','records'].forEach(renderContext)}
 
   function selectCoin(market){
     if(!market)return;
@@ -146,7 +147,7 @@
 
   function refresh(){
     document.documentElement.classList.add('ia-v5');
-    applyNavLabels();applyPageCopy();renderAllContexts();arrangeDashboard();
+    applyNavLabels();applyPageCopy();arrangeDashboard();renderAllContexts();
     const view=stateRef()?.activeView||'';
     if(view==='coin')arrangeCoin();
     if(view==='results')arrangeResults();
