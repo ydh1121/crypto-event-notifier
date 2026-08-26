@@ -47,6 +47,11 @@ jobs:
           set -euo pipefail
           grep -q 'class CoinProfileEnricher' b3_trader/coin_profile_enricher.py
           grep -q 'BITHUMB_MANUAL_URL' b3_trader/coin_profile_enricher.py
+          grep -q 'class CoinProfileResearchCycle' b3_trader/coin_profile_research_cycle.py
+          grep -q 'PRECISION_PER_EXCHANGE = 3' b3_trader/coin_profile_research_cycle.py
+          grep -q 'coin-profile-backlog' b3_trader/coin_profile_research_cycle.py
+          grep -q 'precision_official' b3_trader/coin_profile_research_cycle.py
+          grep -q 'CoinProfileResearchCycle' b3_trader/research_supervisor.py
           grep -q 'coin-profile-enrichment' b3_trader/research_supervisor.py
           grep -q '전체 코인 사업·섹터 전수조사' b3_trader/research_control.py
           grep -q 'pypdf' b3_trader/requirements.txt
@@ -114,7 +119,8 @@ jobs:
             public/modules/pages/records.js public/modules/services/coin-profile.js public/modules/services/sectors.js \
             public/modules/styles/sectors.css public/modules/styles/exchange-ui.css public/modules/styles/build32.css \
             functions/api/sector-summary.ts functions/api/coin-profile.ts functions/api/ingest-coin-profiles.ts \
-            functions/lib/coin-taxonomy.ts migrations/0004_coin_profile_cache.sql migrations/0005_coin_profile_evidence.sql; do
+            functions/api/coin-profile-backlog.ts functions/lib/coin-taxonomy.ts \
+            migrations/0004_coin_profile_cache.sql migrations/0005_coin_profile_evidence.sql; do
             test -s "$file"
           done
           grep -q 'crypto-viewer-build" content="2026.08.26-32' public/index.html
@@ -129,6 +135,9 @@ jobs:
           grep -q 'business_summary_ko' functions/api/ingest-coin-profiles.ts
           grep -q 'evidence_json' functions/api/ingest-coin-profiles.ts
           grep -q 'env.DB.batch' functions/api/ingest-coin-profiles.ts
+          grep -q 'korean_missing' functions/api/coin-profile-backlog.ts
+          grep -q 'sector_unresolved' functions/api/coin-profile-backlog.ts
+          grep -q 'weak_evidence' functions/api/coin-profile-backlog.ts
           grep -q 'canonical_sector' functions/api/sector-summary.ts
           grep -q 'researched_count' functions/api/sector-summary.ts
           grep -q 'evidenceText' functions/lib/coin-taxonomy.ts
