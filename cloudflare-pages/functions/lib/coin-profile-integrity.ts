@@ -34,7 +34,7 @@ function symbolOf(market:unknown){return clean(market).toUpperCase().replace(/^(
 function tickerHit(text:string,symbol:string){if(!symbol||genericTickers.has(symbol)||symbol.length<2)return false;return new RegExp(`(^|[^A-Z0-9])${symbol.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}([^A-Z0-9]|$)`).test(text.toUpperCase())}
 function jsonArray(value:unknown):any[]{try{const parsed=JSON.parse(clean(value)||'[]');return Array.isArray(parsed)?parsed:[]}catch{return[]}}
 function urlText(value:unknown){try{const url=new URL(clean(value));return `${url.hostname}${url.pathname}`.toLowerCase()}catch{return''}}
-function leadIdentity(text:string){const value=clean(text).slice(0,180);const match=value.match(/^([A-Za-z가-힣][A-Za-z0-9가-힣._-]{1,32})(?:\(([A-Z0-9._-]{2,12})\))?(?:은|는|이|가)\b?/);if(!match)return null;const name=clean(match[1]),ticker=clean(match[2]).toUpperCase();if(genericLeads.has(name))return null;return{name,ticker}}
+function leadIdentity(text:string){const value=clean(text).slice(0,180);const match=value.match(/^([A-Za-z가-힣][A-Za-z0-9가-힣._-]{1,32})(?:\(([A-Z0-9._-]{2,12})\))?(?:은|는|이|가)/);if(!match)return null;const name=clean(match[1]),ticker=clean(match[2]).toUpperCase();if(genericLeads.has(name))return null;return{name,ticker}}
 
 export function knownProjects(...maps:Array<Map<string,ExchangeMarketName>>){const seen=new Set<string>();const out:Array<{market:string;symbol:string;english_name:string;korean_name:string}>=[];for(const map of maps){for(const item of map.values()){const symbol=symbolOf(item.market),key=`${symbol}|${normName(item.english_name)}`;if(!symbol||seen.has(key))continue;seen.add(key);out.push({market:item.market,symbol,english_name:clean(item.english_name),korean_name:clean(item.korean_name)})}}return out}
 
@@ -44,7 +44,7 @@ export function evaluateProfileIntegrity(row:ProfileIntegrityRow,official:Exchan
   if(official?.english_name&&!sameProjectName(row.english_name,official.english_name))reasons.push('cached_name_mismatch');
   const lead=clean(row.business_summary_ko||row.description_ko||row.description_en).slice(0,700),leadNorm=normName(lead.slice(0,260)),leadStart=normName(lead.slice(0,160));
   const currentAppears=Boolean((normName(officialEn).length>=4&&leadNorm.includes(normName(officialEn)))||(normName(officialKo).length>=2&&leadNorm.includes(normName(officialKo))));
-  const leadId=leadIdentity(lead);if(leadId&&!sameProjectName(leadId.name,officialEn)&&!sameProjectName(leadId.name,officialKo)&&(leadId.ticker&&leadId.ticker!==currentSymbol||!leadId.ticker))reasons.push('content_lead_name_mismatch');
+  const leadId=leadIdentity(lead);if(leadId&&!sameProjectName(leadId.name,officialEn)&&!sameProjectName(leadId.name,officialKo)&&((leadId.ticker&&leadId.ticker!==currentSymbol)||!leadId.ticker))reasons.push('content_lead_name_mismatch');
   const evidence=jsonArray(row.evidence_json),homeText=urlText(row.homepage),providerNorm=normName(row.provider_id);
   const add=(project:{symbol:string;english_name:string;korean_name:string},signal:string)=>{const key=`${project.symbol}|${normName(project.english_name)}`;let hit=foreign.get(key);if(!hit){hit={symbol:project.symbol,english_name:project.english_name,korean_name:project.korean_name,signals:new Set()};foreign.set(key,hit)}hit.signals.add(signal)};
   for(const project of known){if(project.symbol===currentSymbol&&sameProjectName(project.english_name,officialEn))continue;const foreignEn=normName(project.english_name),foreignKo=normName(project.korean_name);if(foreignEn.length<5)continue;
