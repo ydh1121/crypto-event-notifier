@@ -1,3 +1,4 @@
+import{decisionLabel}from'./decision.js';
 export const n=v=>Number(v||0);
 export const money=v=>`${Math.round(n(v)).toLocaleString('ko-KR')}원`;
 export const pct=(v,d=2)=>`${n(v)>=0?'+':''}${n(v).toFixed(d)}%`;
@@ -7,5 +8,5 @@ export const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 export const dt=ts=>n(ts)?new Date(n(ts)*1000).toLocaleString('ko-KR'):'-';
 export function age(ts){const x=n(ts);if(!x)return'데이터 대기';const sec=Math.max(0,Math.floor(Date.now()/1000-x));if(sec<60)return`${sec}초 전`;if(sec<3600)return`${Math.floor(sec/60)}분 전`;return`${Math.floor(sec/3600)}시간 전`}
 export function scoreGrade(v){const x=n(v);if(x<40)return'매우 나쁨';if(x<55)return'좋지 않음';if(x<65)return'보통';if(x<75)return'좋음';return'매우 좋음'}
-export function decisionLabel(row){const raw=String(row?.trade_intent||'').toLowerCase();if(row?.has_position)return'보유 상태 관리 중';if(raw.includes('buy')||raw.includes('enter'))return'매수 후보';if(raw.includes('pullback'))return'가격이 내려오길 기다림';if(raw.includes('risk')||raw.includes('block'))return'지금은 매수하지 않음';return'조금 더 지켜보기'}
+export{decisionLabel};
 export function stateLabel(row){if(row?.state_label)return row.state_label;if(row?.has_position)return'보유 중';if(n(row?.closed_trades)>0)return'매매 완료 · 대기';return'미진입'}
