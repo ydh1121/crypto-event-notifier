@@ -2,14 +2,20 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import threading
 import time
 from pathlib import Path
 from typing import Any
 
+from .config import Settings
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTROL_PATH = Path("b3_trader/data/research-platform/components.json")
 STATUS_PATH = Path("b3_trader/data/research-platform/status.json")
 REFERENCE_STATE_PATH = Path("b3_trader/data/research-platform/reference-components-state.json")
+WAREHOUSE_STATE_PATH = Path("b3_trader/data/research-warehouse/warehouse-state.json")
+PAGES_DEPLOY_STATE_PATH = Path("b3_trader/data/research-platform/cloudflare-pages-deploy-state.json")
 
 COMPONENT_DEFINITIONS: dict[str, dict[str, Any]] = {
     "warehouse-export": {"label":"AI 분석 데이터 저장","description":"가상매매·시장 기억 데이터를 Parquet 분석 창고에 추가 저장합니다.","default_enabled":True,"default_interval_seconds":300,"min_interval_seconds":60},
@@ -60,6 +66,110 @@ def _read_json(path: Path) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _git_text(*args: str) -> str:
+    try:
+        result = subprocess.run(
+            ["git", *args], cwd=REPO_ROOT, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def _git_summary(settings: Settings) -> dict[str, Any]:
+    branch = _git_text("branch", "--show-current") or settings.git_sync_branch
+    local_head = _git_text("rev-parse", "--short", "HEAD")
+    origin_ref = f"refs/remotes/origin/{settings.git_sync_branch}"
+    origin_head = _git_text("rev-parse", "--short", origin_ref)
+    return {
+        "branch": branch,
+        "configured_branch": settings.git_sync_branch,
+        "local_head": local_head,
+        "origin_head": origin_head,
+        "aligned": bool(local_head and origin_head and local_head == origin_head),
+        "auto_sync_enabled": bool(settings.auto_git_sync),
+        "mutates_from_viewer": False,
+    }
+
+
+def _component_last_result(status_components: dict[str, Any], name: str) -> dict[str, Any]:
+    source = status_components.get(name)
+    if not isinstance(source, dict):
+        return {}
+    result = source.get("last_result")
+    return result if isinstance(result, dict) else {}
+
+
+def _cloudflare_summary(status_components: dict[str, Any]) -> dict[str, Any]:
+    snapshot = _component_last_result(status_components, "cloudflare-snapshot-publish")
+    details = _component_last_result(status_components, "cloudflare-market-detail-publish")
+    deploy = _component_last_result(status_components, "cloudflare-pages-deploy")
+    deploy_state = _read_json(PAGES_DEPLOY_STATE_PATH)
+    return {
+        "snapshot": {
+            "status": str(snapshot.get("status") or "unknown"),
+            "bytes": int(snapshot.get("bytes") or 0),
+            "retries": int(snapshot.get("retries") or 0),
+            "markets": int(snapshot.get("markets") or 0),
+            "strategy_lab_experiments": int(snapshot.get("strategy_lab_experiments") or 0),
+            "private_holdings_enabled": bool(snapshot.get("private_holdings_enabled")),
+        },
+        "market_details": {
+            "status": str(details.get("status") or "unknown"),
+            "published": int(details.get("published") or details.get("stored") or 0),
+            "requests": int(details.get("requests") or 0),
+            "bytes": int(details.get("bytes") or details.get("total_bytes") or 0),
+            "retries": int(details.get("retries") or 0),
+        },
+        "pages": {
+            "status": str(deploy.get("status") or deploy_state.get("status") or "unknown"),
+            "head": str(deploy.get("head") or deploy_state.get("deployed_head") or "")[:12],
+            "health_ok": bool(deploy.get("health_ok", deploy_state.get("health_ok", False))),
+            "viewer_url": str(deploy.get("viewer_url") or deploy_state.get("viewer_url") or ""),
+            "changed_files": int(deploy.get("changed_files") or 0),
+            "elapsed_seconds": float(deploy.get("elapsed_seconds") or 0.0),
+        },
+    }
+
+
+def _warehouse_summary(status_components: dict[str, Any]) -> dict[str, Any]:
+    result = _component_last_result(status_components, "warehouse-export")
+    state = _read_json(WAREHOUSE_STATE_PATH)
+    tables = state.get("tables") if isinstance(state.get("tables"), dict) else {}
+    total_rows = 0
+    latest_export = 0.0
+    for value in tables.values():
+        if not isinstance(value, dict):
+            continue
+        total_rows += int(value.get("rows_exported_total") or 0)
+        latest_export = max(latest_export, float(value.get("last_export_at") or 0.0))
+    files = result.get("files") if isinstance(result.get("files"), list) else []
+    return {
+        "status": str(result.get("status") or ("ready" if tables else "waiting")),
+        "tracked_tables": len(tables),
+        "rows_exported_total": total_rows,
+        "last_export_at": latest_export or float(state.get("updated_at") or 0.0),
+        "last_run_rows": int(result.get("exported_rows") or 0),
+        "last_run_files": len(files),
+        "elapsed_seconds": float(result.get("elapsed_seconds") or 0.0),
+        "format": "Parquet/ZSTD",
+        "authoritative_store": "SQLite",
+    }
+
+
+def _telegram_summary(settings: Settings) -> dict[str, Any]:
+    token_configured = bool(settings.telegram_token.strip())
+    chat_configured = bool(settings.telegram_chat_id.strip())
+    return {
+        "enabled": bool(settings.telegram_enabled),
+        "token_configured": token_configured,
+        "chat_configured": chat_configured,
+        "ready": bool(settings.telegram_enabled and token_configured and chat_configured),
+        "secret_values_exposed": False,
+    }
+
+
 def default_control() -> dict[str, Any]:
     return {"version":2,"revision":1,"enabled":True,"updated_at":time.time(),"components":{name:{"enabled":bool(definition.get("default_enabled",True)),"interval_seconds":float(definition["default_interval_seconds"]),"run_nonce":0} for name,definition in COMPONENT_DEFINITIONS.items()}}
 
@@ -108,6 +218,7 @@ def platform_snapshot(*, control_path: Path = CONTROL_PATH, status_path: Path = 
     control = load_control(control_path)
     status = _read_json(status_path)
     reference_state = _read_json(reference_state_path)
+    settings = Settings()
     now = time.time()
     status_updated_at = float(status.get("updated_at") or 0.0)
     supervisor_fresh = bool(status.get("running")) and status_updated_at > 0 and now - status_updated_at <= 15.0
@@ -119,4 +230,10 @@ def platform_snapshot(*, control_path: Path = CONTROL_PATH, status_path: Path = 
         desired = control["components"].get(name) or {}
         runtime = status_components.get(name) if isinstance(status_components.get(name), dict) else {}
         components.append({"name":name,"label":definition["label"],"description":definition["description"],"enabled":bool(desired.get("enabled",definition.get("default_enabled",True))) and bool(control.get("enabled",True)),"interval_seconds":float(desired.get("interval_seconds") or definition["default_interval_seconds"]),"run_nonce":int(desired.get("run_nonce") or 0),"status":runtime.get("status") or ("starting" if supervisor_fresh else "offline"),"last_started_at":float(runtime.get("last_started_at") or 0.0),"last_finished_at":float(runtime.get("last_finished_at") or 0.0),"last_success_at":float(runtime.get("last_success_at") or 0.0),"last_error_at":float(runtime.get("last_error_at") or 0.0),"last_error":str(runtime.get("last_error") or ""),"runs":int(runtime.get("runs") or 0),"last_result":runtime.get("last_result") if isinstance(runtime.get("last_result"),dict) else {}})
-    return {"version":1,"paper_only":True,"supervisor_running":supervisor_fresh,"supervisor_pid":int(status.get("pid") or 0),"supervisor_started_at":float(status.get("started_at") or 0.0),"updated_at":status_updated_at,"control_revision":int(control.get("revision") or 1),"components":components,"references":reference_summary,"safety":{"can_place_orders":False,"can_modify_strategy_profiles":False,"auto_promote_external_code":False}}
+    operations = {
+        "git": _git_summary(settings),
+        "cloudflare": _cloudflare_summary(status_components),
+        "warehouse": _warehouse_summary(status_components),
+        "telegram": _telegram_summary(settings),
+    }
+    return {"version":2,"paper_only":True,"supervisor_running":supervisor_fresh,"supervisor_pid":int(status.get("pid") or 0),"supervisor_started_at":float(status.get("started_at") or 0.0),"updated_at":status_updated_at,"control_revision":int(control.get("revision") or 1),"components":components,"references":reference_summary,"operations":operations,"safety":{"can_place_orders":False,"can_modify_strategy_profiles":False,"auto_promote_external_code":False,"viewer_can_control_pc":False,"secret_values_exposed":False}}
