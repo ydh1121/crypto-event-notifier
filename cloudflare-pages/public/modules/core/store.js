@@ -4,9 +4,10 @@ const defaults={
   researchExchange:'bithumb',paperExchange:'bithumb',strategyExchange:'bithumb',sectorExchange:'bithumb',
   researchMarket:'',assetMarket:'',paperMarket:'',sectorSelected:'',sectorRange:'24h',sectorCoinMarket:'',sectorCoinSort:'turnover_desc',
   researchSearch:'',researchFilter:'all',researchRange:'24h',
-  paperTab:'summary',paperSearch:'',paperFilter:'all',paperSort:'return_desc',paperRange:'24h',
+  paperTab:'summary',paperSearch:'',paperFilter:'all',paperSort:'return_desc',paperRange:'24h',paperPortfolioRange:'24h',
   paperCompareSearch:'',paperCompareSort:'gap_desc',
-  strategyMarket:'',recordsExchange:'bithumb',recordsFilter:'all',recordsPeriod:'all',recordsSearch:''
+  strategyMarket:'',strategyTab:'overview',strategyRange:'24h',strategyCoinMarket:'',strategyCoinSearch:'',
+  recordsExchange:'bithumb',recordsFilter:'all',recordsPeriod:'all',recordsSearch:''
 };
 let saved={};try{saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}')}catch{}
 const state={user:null,snapshot:null,loading:true,error:null,ui:{...defaults,...saved}};
