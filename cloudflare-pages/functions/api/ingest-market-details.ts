@@ -29,7 +29,7 @@ export const onRequestPost: PagesFunction<Env> = async ({request, env}) => {
   if (!details.length) return error(422, 'DETAILS_REQUIRED', '저장할 코인 상세 데이터가 없습니다.');
 
   const now = Math.floor(Date.now() / 1000);
-  const statements = [];
+  let stored = 0;
   for (const item of details) {
     if (!item || typeof item !== 'object' || !item.detail || typeof item.detail !== 'object') continue;
     const exchange = clean(item.exchange, 'bithumb').toLowerCase();
@@ -42,37 +42,28 @@ export const onRequestPost: PagesFunction<Env> = async ({request, env}) => {
     const detailJson = JSON.stringify(item.detail);
     if (detailJson.length > 180_000) continue;
 
-    statements.push(
-      env.DB.prepare(
-        `INSERT INTO market_details(detail_key,exchange,market,strategy,source_ts,received_at,detail_json)
-         VALUES(?,?,?,?,?,?,?)
-         ON CONFLICT(detail_key) DO UPDATE SET
-           exchange=excluded.exchange,
-           market=excluded.market,
-           strategy=excluded.strategy,
-           source_ts=excluded.source_ts,
-           received_at=excluded.received_at,
-           detail_json=excluded.detail_json`,
-      ).bind(
-        key,
-        exchange,
-        market,
-        strategy,
-        Number.isFinite(sourceTs) ? sourceTs : 0,
-        now,
-        detailJson,
-      ),
-    );
+    await env.DB.prepare(
+      `INSERT INTO market_details(detail_key,exchange,market,strategy,source_ts,received_at,detail_json)
+       VALUES(?,?,?,?,?,?,?)
+       ON CONFLICT(detail_key) DO UPDATE SET
+         exchange=excluded.exchange,
+         market=excluded.market,
+         strategy=excluded.strategy,
+         source_ts=excluded.source_ts,
+         received_at=excluded.received_at,
+         detail_json=excluded.detail_json`,
+    ).bind(
+      key,
+      exchange,
+      market,
+      strategy,
+      Number.isFinite(sourceTs) ? sourceTs : 0,
+      now,
+      detailJson,
+    ).run();
+    stored += 1;
   }
 
-  if (!statements.length) return error(422, 'NO_VALID_DETAILS', '유효한 코인 상세 데이터가 없습니다.');
-
-  // D1 batch executes the writes as one bounded operation instead of issuing
-  // one awaited database round-trip per market. This materially shortens the
-  // Pages Function execution window for 1MB+ detail payloads and reduces the
-  // transient 503s observed while the local research node continuously ingests.
-  const results = await env.DB.batch(statements);
-  const stored = results.length;
-
+  if (!stored) return error(422, 'NO_VALID_DETAILS', '유효한 코인 상세 데이터가 없습니다.');
   return json({ok: true, stored, received_at: now});
 };
