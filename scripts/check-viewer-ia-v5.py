@@ -67,26 +67,29 @@ def main() -> None:
     css = IA_CSS_PATH.read_text(encoding="utf-8", errors="replace") if IA_CSS_PATH.exists() else ""
 
     static = {
-        "build_18": 'crypto-viewer-build" content="2026.08.26-18' in index,
-        "ia_js_linked": "viewer-ia-v5.js?v=1" in index,
-        "ia_css_linked": "viewer-ia-v5.css?v=1" in index,
-        "purpose_nav": all(label in index for label in ("대시보드", "성과분석", "거래기록", "시스템")) and "coin:'코인분석'" in js,
-        "exchange_bar_demoted": "#phase3ExchangeBar{display:none!important}" in css,
-        "page_exchange_filter": "ia-exchange-filter" in js and "PAPER 거래소" in js and "거래소'" in js,
-        "compare_results_only": "view==='results'" in js and "거래소 비교" in js,
-        "dashboard_assets_separated": "iaAssetHeading" in js and "iaPaperHeading" in js,
+        "build_19": 'crypto-viewer-build" content="2026.08.26-19' in index,
+        "ia_js_v2_linked": "viewer-ia-v5.js?v=2" in index,
+        "ia_css_v2_linked": "viewer-ia-v5.css?v=2" in index,
+        "canonical_nav": all(f'>{label}</button>' in index for label in ("자산", "리서치", "PAPER", "기록", "시스템")),
+        "canonical_nav_js": all(token in js for token in ("home:'자산'", "coin:'리서치'", "results:'PAPER'", "records:'기록'", "settings:'시스템'")),
+        "exchange_bar_removed": "#phase3ExchangeBar{display:none!important}" in css,
+        "assets_are_real_only": "ia-hide-from-assets" in js and '[data-view-panel="home"] .capital-card{display:none!important}' in css,
+        "paper_receives_capital": "capital.parentElement!==panel" in js and "PAPER 가상계좌 요약" in js,
+        "research_summary": "iaResearchSummary" in js and "ia-research-summary" in css,
+        "research_exchange_filter": "['coin','results','records']" in js,
+        "compare_paper_only": "view==='results'" in js and "data-ia-exchange=\"compare\"" in js,
         "native_datalist_removed": "removeAttribute('list')" in js and "iaCoinSuggestions" in js,
         "coin_suggestions_bounded": ".slice(0,8)" in js,
         "view_scroll_reset": "window.scrollTo({top:0" in js,
-        "strategy_after_results": "layout.insertAdjacentElement('afterend',toggle)" in js,
+        "strategy_secondary": "layout.insertAdjacentElement('afterend',toggle)" in js,
     }
-    print("\n=== INFORMATION ARCHITECTURE CONTRACT ===")
+    print("\n=== USER JOURNEY / IA CONTRACT ===")
     print(json.dumps(static, ensure_ascii=False, indent=2))
 
     errors: list[str] = []
     pending: list[str] = []
     if not all(static.values()):
-        errors.append("viewer IA v5 source contract is incomplete")
+        errors.append("viewer IA source contract is incomplete")
     if not local or not remote or local != remote:
         pending.append("Git local/remote HEAD has not synchronized yet")
 
@@ -108,25 +111,27 @@ def main() -> None:
         "index_status": 0,
         "ia_js_status": 0,
         "ia_css_status": 0,
-        "build_18": False,
+        "build_19": False,
+        "canonical_nav": False,
         "assets_loaded": False,
     }
     if viewer_url:
         nonce = str(time.time_ns())
         i_status, r_index = fetch_text(f"{viewer_url}/?ia_check={nonce}")
-        j_status, r_js = fetch_text(f"{viewer_url}/viewer-ia-v5.js?v=1&ia_check={nonce}")
-        c_status, r_css = fetch_text(f"{viewer_url}/viewer-ia-v5.css?v=1&ia_check={nonce}")
+        j_status, r_js = fetch_text(f"{viewer_url}/viewer-ia-v5.js?v=2&ia_check={nonce}")
+        c_status, r_css = fetch_text(f"{viewer_url}/viewer-ia-v5.css?v=2&ia_check={nonce}")
         remote_contract.update({
             "index_status": i_status,
             "ia_js_status": j_status,
             "ia_css_status": c_status,
-            "build_18": 'crypto-viewer-build" content="2026.08.26-18' in r_index,
-            "assets_loaded": "__viewerIaV5Loaded" in r_js and ".ia-exchange-filter" in r_css,
+            "build_19": 'crypto-viewer-build" content="2026.08.26-19' in r_index,
+            "canonical_nav": all(f'>{label}</button>' in r_index for label in ("자산", "리서치", "PAPER", "기록", "시스템")),
+            "assets_loaded": "__viewerIaV5Loaded" in r_js and ".ia-research-summary" in r_css,
         })
         if any(status != 200 for status in (i_status, j_status, c_status)):
-            pending.append("viewer IA v5 assets are not reachable yet")
-        elif not remote_contract["build_18"] or not remote_contract["assets_loaded"]:
-            pending.append("Pages is still serving the previous viewer build")
+            pending.append("viewer IA assets are not reachable yet")
+        elif not all((remote_contract["build_19"], remote_contract["canonical_nav"], remote_contract["assets_loaded"])):
+            pending.append("Pages is still serving the previous viewer IA")
     else:
         pending.append("viewer URL is not available in deploy state")
 
