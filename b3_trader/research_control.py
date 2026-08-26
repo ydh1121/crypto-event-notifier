@@ -12,68 +12,20 @@ STATUS_PATH = Path("b3_trader/data/research-platform/status.json")
 REFERENCE_STATE_PATH = Path("b3_trader/data/research-platform/reference-components-state.json")
 
 COMPONENT_DEFINITIONS: dict[str, dict[str, Any]] = {
-    "warehouse-export": {
-        "label": "AI 분석 데이터 저장",
-        "description": "가상매매·시장 기억 데이터를 Parquet 분석 창고에 추가 저장합니다.",
-        "default_enabled": True,
-        "default_interval_seconds": 300,
-        "min_interval_seconds": 60,
-    },
-    "reference-version-watch": {
-        "label": "외부 레포 버전 확인",
-        "description": "참고 GitHub 프로젝트의 새 버전만 확인합니다. 코드는 자동 적용하지 않습니다.",
-        "default_enabled": True,
-        "default_interval_seconds": 21600,
-        "min_interval_seconds": 300,
-    },
-    "cloudflare-snapshot-publish": {
-        "label": "웹 상태판 데이터 보내기",
-        "description": "24시간 PC의 가상매매 결과를 Cloudflare Pages 조회용 스냅샷으로 보냅니다.",
-        "default_enabled": False,
-        "default_interval_seconds": 20,
-        "min_interval_seconds": 10,
-    },
-    "cloudflare-market-detail-publish": {
-        "label": "웹 코인 상세 데이터 보내기",
-        "description": "코인별 체결·매매계획·학습·자산곡선을 작게 나눠 Cloudflare 조회판으로 보냅니다.",
-        "default_enabled": True,
-        "default_interval_seconds": 30,
-        "min_interval_seconds": 20,
-    },
-    "upbit-paper-research": {
-        "label": "업비트 전체 PAPER 연구",
-        "description": "업비트 KRW 전체 종목을 독립 1,000만원 PAPER 계좌로 연구합니다. 공개 시세 API만 사용합니다.",
-        "default_enabled": False,
-        "default_interval_seconds": 60,
-        "min_interval_seconds": 30,
-    },
-    "strategy-lab-shadow": {
-        "label": "전략 연구실",
-        "description": "동일한 시장 기억 데이터를 보수적·균형·공격적·분할매수·역추세·스윙 전략이 독립 PAPER 계좌로 비교합니다.",
-        "default_enabled": True,
-        "default_interval_seconds": 60,
-        "min_interval_seconds": 30,
-    },
-    "cloudflare-pages-deploy": {
-        "label": "웹 화면 자동 배포",
-        "description": "GitHub에서 새 웹 화면을 받은 뒤 Pages 코드가 바뀐 경우에만 pages.dev로 자동 배포합니다.",
-        "default_enabled": False,
-        "default_interval_seconds": 30,
-        "min_interval_seconds": 15,
-    },
+    "warehouse-export": {"label":"AI 분석 데이터 저장","description":"가상매매·시장 기억 데이터를 Parquet 분석 창고에 추가 저장합니다.","default_enabled":True,"default_interval_seconds":300,"min_interval_seconds":60},
+    "reference-version-watch": {"label":"외부 레포 버전 확인","description":"참고 GitHub 프로젝트의 새 버전만 확인합니다. 코드는 자동 적용하지 않습니다.","default_enabled":True,"default_interval_seconds":21600,"min_interval_seconds":300},
+    "cloudflare-snapshot-publish": {"label":"웹 상태판 데이터 보내기","description":"24시간 PC의 가상매매 결과를 Cloudflare Pages 조회용 스냅샷으로 보냅니다.","default_enabled":False,"default_interval_seconds":20,"min_interval_seconds":10},
+    "cloudflare-market-detail-publish": {"label":"웹 코인 상세 데이터 보내기","description":"코인별 체결·매매계획·학습·자산곡선을 작게 나눠 Cloudflare 조회판으로 보냅니다.","default_enabled":True,"default_interval_seconds":30,"min_interval_seconds":20},
+    "coin-profile-enrichment": {"label":"전체 코인 사업·섹터 전수조사","description":"빗썸·업비트 KRW 전체 종목을 공식 설명서·홈페이지·백서·Docs/GitHub와 CoinMarketCap·CoinGecko로 교차검증해 사업 설명과 섹터를 누적합니다. 커뮤니티는 보조 근거로만 사용합니다.","default_enabled":True,"default_interval_seconds":90,"min_interval_seconds":60},
+    "upbit-paper-research": {"label":"업비트 전체 PAPER 연구","description":"업비트 KRW 전체 종목을 독립 1,000만원 PAPER 계좌로 연구합니다. 공개 시세 API만 사용합니다.","default_enabled":False,"default_interval_seconds":60,"min_interval_seconds":30},
+    "strategy-lab-shadow": {"label":"전략 연구실","description":"동일한 시장 기억 데이터를 보수적·균형·공격적·분할매수·역추세·스윙 전략이 독립 PAPER 계좌로 비교합니다.","default_enabled":True,"default_interval_seconds":60,"min_interval_seconds":30},
+    "cloudflare-pages-deploy": {"label":"웹 화면 자동 배포","description":"GitHub에서 새 웹 화면을 받은 뒤 Pages 코드가 바뀐 경우에만 pages.dev로 자동 배포합니다.","default_enabled":False,"default_interval_seconds":30,"min_interval_seconds":15},
 }
 
 _LOCK = threading.RLock()
 
 
 def atomic_json(path: Path, payload: dict[str, Any]) -> None:
-    """Atomically replace a JSON file without sharing one fixed Windows temp path.
-
-    Supervisor component threads can write status at nearly the same time, and a
-    process restart can briefly overlap the old and new supervisor. A fixed
-    `status.json.tmp` therefore races on Windows. Give every writer its own temp
-    file and retry only the final replace when Windows reports a transient lock.
-    """
     path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
     text = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
@@ -109,20 +61,7 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 
 def default_control() -> dict[str, Any]:
-    return {
-        "version": 2,
-        "revision": 1,
-        "enabled": True,
-        "updated_at": time.time(),
-        "components": {
-            name: {
-                "enabled": bool(definition.get("default_enabled", True)),
-                "interval_seconds": float(definition["default_interval_seconds"]),
-                "run_nonce": 0,
-            }
-            for name, definition in COMPONENT_DEFINITIONS.items()
-        },
-    }
+    return {"version":2,"revision":1,"enabled":True,"updated_at":time.time(),"components":{name:{"enabled":bool(definition.get("default_enabled",True)),"interval_seconds":float(definition["default_interval_seconds"]),"run_nonce":0} for name,definition in COMPONENT_DEFINITIONS.items()}}
 
 
 def load_control(path: Path = CONTROL_PATH) -> dict[str, Any]:
@@ -140,24 +79,13 @@ def load_control(path: Path = CONTROL_PATH) -> dict[str, Any]:
                 minimum = float(definition["min_interval_seconds"])
                 interval = max(minimum, float(source.get("interval_seconds") or definition["default_interval_seconds"]))
                 default_enabled = bool(definition.get("default_enabled", True))
-                value["components"][name] = {
-                    "enabled": bool(source.get("enabled", default_enabled)),
-                    "interval_seconds": interval,
-                    "run_nonce": max(0, int(source.get("run_nonce") or 0)),
-                }
+                value["components"][name] = {"enabled":bool(source.get("enabled",default_enabled)),"interval_seconds":interval,"run_nonce":max(0,int(source.get("run_nonce") or 0))}
         if not path.exists():
             atomic_json(path, value)
         return value
 
 
-def patch_component(
-    name: str,
-    *,
-    enabled: bool | None = None,
-    interval_seconds: float | None = None,
-    run_now: bool = False,
-    path: Path = CONTROL_PATH,
-) -> dict[str, Any]:
+def patch_component(name: str, *, enabled: bool | None = None, interval_seconds: float | None = None, run_now: bool = False, path: Path = CONTROL_PATH) -> dict[str, Any]:
     if name not in COMPONENT_DEFINITIONS:
         raise KeyError(name)
     with _LOCK:
@@ -176,65 +104,19 @@ def patch_component(
         return control
 
 
-def platform_snapshot(
-    *,
-    control_path: Path = CONTROL_PATH,
-    status_path: Path = STATUS_PATH,
-    reference_state_path: Path = REFERENCE_STATE_PATH,
-) -> dict[str, Any]:
+def platform_snapshot(*, control_path: Path = CONTROL_PATH, status_path: Path = STATUS_PATH, reference_state_path: Path = REFERENCE_STATE_PATH) -> dict[str, Any]:
     control = load_control(control_path)
     status = _read_json(status_path)
     reference_state = _read_json(reference_state_path)
     now = time.time()
     status_updated_at = float(status.get("updated_at") or 0.0)
     supervisor_fresh = bool(status.get("running")) and status_updated_at > 0 and now - status_updated_at <= 15.0
-
     reference_rows = reference_state.get("components") if isinstance(reference_state.get("components"), list) else []
-    reference_summary = {
-        "checked_at": float(reference_state.get("checked_at") or 0.0),
-        "total": len(reference_rows),
-        "updates": sum(1 for row in reference_rows if isinstance(row, dict) and row.get("status") == "update_available"),
-        "failed": sum(1 for row in reference_rows if isinstance(row, dict) and row.get("status") == "check_failed"),
-        "auto_promote": False,
-    }
-
+    reference_summary = {"checked_at":float(reference_state.get("checked_at") or 0.0),"total":len(reference_rows),"updates":sum(1 for row in reference_rows if isinstance(row,dict) and row.get("status")=="update_available"),"failed":sum(1 for row in reference_rows if isinstance(row,dict) and row.get("status")=="check_failed"),"auto_promote":False}
     components: list[dict[str, Any]] = []
     status_components = status.get("components") if isinstance(status.get("components"), dict) else {}
     for name, definition in COMPONENT_DEFINITIONS.items():
         desired = control["components"].get(name) or {}
         runtime = status_components.get(name) if isinstance(status_components.get(name), dict) else {}
-        components.append(
-            {
-                "name": name,
-                "label": definition["label"],
-                "description": definition["description"],
-                "enabled": bool(desired.get("enabled", definition.get("default_enabled", True))) and bool(control.get("enabled", True)),
-                "interval_seconds": float(desired.get("interval_seconds") or definition["default_interval_seconds"]),
-                "run_nonce": int(desired.get("run_nonce") or 0),
-                "status": runtime.get("status") or ("starting" if supervisor_fresh else "offline"),
-                "last_started_at": float(runtime.get("last_started_at") or 0.0),
-                "last_finished_at": float(runtime.get("last_finished_at") or 0.0),
-                "last_success_at": float(runtime.get("last_success_at") or 0.0),
-                "last_error_at": float(runtime.get("last_error_at") or 0.0),
-                "last_error": str(runtime.get("last_error") or ""),
-                "runs": int(runtime.get("runs") or 0),
-                "last_result": runtime.get("last_result") if isinstance(runtime.get("last_result"), dict) else {},
-            }
-        )
-
-    return {
-        "version": 1,
-        "paper_only": True,
-        "supervisor_running": supervisor_fresh,
-        "supervisor_pid": int(status.get("pid") or 0),
-        "supervisor_started_at": float(status.get("started_at") or 0.0),
-        "updated_at": status_updated_at,
-        "control_revision": int(control.get("revision") or 1),
-        "components": components,
-        "references": reference_summary,
-        "safety": {
-            "can_place_orders": False,
-            "can_modify_strategy_profiles": False,
-            "auto_promote_external_code": False,
-        },
-    }
+        components.append({"name":name,"label":definition["label"],"description":definition["description"],"enabled":bool(desired.get("enabled",definition.get("default_enabled",True))) and bool(control.get("enabled",True)),"interval_seconds":float(desired.get("interval_seconds") or definition["default_interval_seconds"]),"run_nonce":int(desired.get("run_nonce") or 0),"status":runtime.get("status") or ("starting" if supervisor_fresh else "offline"),"last_started_at":float(runtime.get("last_started_at") or 0.0),"last_finished_at":float(runtime.get("last_finished_at") or 0.0),"last_success_at":float(runtime.get("last_success_at") or 0.0),"last_error_at":float(runtime.get("last_error_at") or 0.0),"last_error":str(runtime.get("last_error") or ""),"runs":int(runtime.get("runs") or 0),"last_result":runtime.get("last_result") if isinstance(runtime.get("last_result"),dict) else {}})
+    return {"version":1,"paper_only":True,"supervisor_running":supervisor_fresh,"supervisor_pid":int(status.get("pid") or 0),"supervisor_started_at":float(status.get("started_at") or 0.0),"updated_at":status_updated_at,"control_revision":int(control.get("revision") or 1),"components":components,"references":reference_summary,"safety":{"can_place_orders":False,"can_modify_strategy_profiles":False,"auto_promote_external_code":False}}

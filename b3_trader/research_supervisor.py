@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from .cloudflare_market_detail_strategy_lab import CloudflareMarketDetailPublisher
 from .cloudflare_pages_deployer import CloudflarePagesDeployer
 from .cloudflare_snapshot_publisher import CloudflareSnapshotPublisher
+from .coin_profile_enricher import CoinProfileEnricher
 from .reference_components import ReferenceComponentWatcher
 from .research_control import COMPONENT_DEFINITIONS, STATUS_PATH, atomic_json, load_control
 from .research_warehouse import ResearchWarehouse
@@ -66,7 +67,7 @@ class ComponentState:
 
 
 class ResearchSupervisor:
-    """Non-trading sidecar for storage, web snapshots, Pages deployment and version observation."""
+    """Non-trading sidecar for storage, research enrichment, web snapshots and Pages deployment."""
 
     def __init__(self) -> None:
         load_dotenv()
@@ -77,6 +78,7 @@ class ResearchSupervisor:
         self.reference_watcher = ReferenceComponentWatcher()
         self.cloudflare_publisher = CloudflareSnapshotPublisher()
         self.cloudflare_market_detail_publisher = CloudflareMarketDetailPublisher()
+        self.coin_profile_enricher = CoinProfileEnricher()
         self.cloudflare_deployer = CloudflarePagesDeployer()
         self.upbit_paper_runner = UpbitPaperResearchRunner()
         self.strategy_lab_runner = ConfiguredStrategyLabRunner()
@@ -86,6 +88,7 @@ class ResearchSupervisor:
             "reference-version-watch": self.reference_watcher.check_once,
             "cloudflare-snapshot-publish": self.cloudflare_publisher.publish_once,
             "cloudflare-market-detail-publish": self.cloudflare_market_detail_publisher.publish_once,
+            "coin-profile-enrichment": self.coin_profile_enricher.run_once,
             "upbit-paper-research": self.upbit_paper_runner.run_once,
             "strategy-lab-shadow": self.strategy_lab_runner.run_once,
             "cloudflare-pages-deploy": self.cloudflare_deployer.deploy_once,
@@ -106,21 +109,11 @@ class ResearchSupervisor:
             enabled = bool(cfg.get("enabled", default_enabled)) and global_enabled
             minimum = float(definition["min_interval_seconds"])
             interval = max(minimum, float(cfg.get("interval_seconds") or definition["default_interval_seconds"]))
-            self.states[name] = ComponentState(
-                name=name,
-                enabled=enabled,
-                interval_seconds=interval,
-                status="starting" if enabled else "stopped",
-            )
+            self.states[name] = ComponentState(name=name, enabled=enabled, interval_seconds=interval, status="starting" if enabled else "stopped")
             self.wake_events[name] = threading.Event()
             self.force_run[name] = False
             self.last_run_nonce[name] = int(cfg.get("run_nonce") or 0)
-            self.threads[name] = threading.Thread(
-                target=self._component_loop,
-                args=(name, self.runners[name]),
-                name=f"research-{name}",
-                daemon=True,
-            )
+            self.threads[name] = threading.Thread(target=self._component_loop, args=(name, self.runners[name]), name=f"research-{name}", daemon=True)
 
     def _write_status(self) -> None:
         with self._lock:
@@ -138,6 +131,7 @@ class ResearchSupervisor:
                     "can_modify_strategy_profiles": False,
                     "auto_promote_external_code": False,
                     "cloudflare_viewer_read_only": True,
+                    "coin_profile_enrichment_public_sources_only": True,
                 },
             }
         atomic_json(STATUS_PATH, payload)
@@ -164,10 +158,7 @@ class ResearchSupervisor:
                 default_enabled = bool(definition.get("default_enabled", True))
                 minimum = float(definition["min_interval_seconds"])
                 state.enabled = bool(cfg.get("enabled", default_enabled)) and global_enabled
-                state.interval_seconds = max(
-                    minimum,
-                    float(cfg.get("interval_seconds") or definition["default_interval_seconds"]),
-                )
+                state.interval_seconds = max(minimum, float(cfg.get("interval_seconds") or definition["default_interval_seconds"]))
                 nonce = int(cfg.get("run_nonce") or 0)
                 if nonce != self.last_run_nonce.get(name, 0):
                     self.last_run_nonce[name] = nonce
@@ -188,14 +179,12 @@ class ResearchSupervisor:
                 wake.wait(2.0)
                 wake.clear()
                 continue
-
             now = time.time()
             forced = bool(self.force_run.get(name))
             if not forced and next_due > now:
                 wake.wait(min(2.0, max(0.1, next_due - now)))
                 wake.clear()
                 continue
-
             self.force_run[name] = False
             state.status = "running"
             state.last_started_at = time.time()
@@ -247,19 +236,16 @@ class ResearchSupervisor:
 def main() -> None:
     stop_requested = threading.Event()
     holder: dict[str, ResearchSupervisor | None] = {"supervisor": None}
-
     def _signal_handler(_signum, _frame) -> None:
         stop_requested.set()
         supervisor = holder.get("supervisor")
         if supervisor is not None:
             supervisor.stop()
-
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
             signal.signal(sig, _signal_handler)
         except (ValueError, OSError):
             pass
-
     while not stop_requested.is_set():
         supervisor: ResearchSupervisor | None = None
         try:
