@@ -32,12 +32,12 @@ async function exchangeFallback(env:Env,exchange:string,market:string){
 }
 
 async function fromCoinGecko(symbol:string,englishName:string){
-  const searchResponse=await fetch(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(symbol)}`,{headers:{accept:'application/json','user-agent':'crypto-research-viewer/32'}});
+  const searchResponse=await fetch(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(symbol)}`,{headers:{accept:'application/json','user-agent':'crypto-research-viewer/33'}});
   if(!searchResponse.ok)throw new Error(`CoinGecko search ${searchResponse.status}`);const search:any=await searchResponse.json();
   const candidates=Array.isArray(search?.coins)?search.coins.filter((row:any)=>text(row?.symbol).toUpperCase()===symbol.toUpperCase()):[];if(!candidates.length)throw new Error('CoinGecko match not found');
   const wanted=normalized(englishName);candidates.sort((a:any,b:any)=>{const am=wanted&&normalized(text(a?.name))===wanted?1:0,bm=wanted&&normalized(text(b?.name))===wanted?1:0;if(am!==bm)return bm-am;return Number(a?.market_cap_rank||999999)-Number(b?.market_cap_rank||999999)});
   const id=text(candidates[0]?.id);if(!id)throw new Error('CoinGecko id missing');
-  const detailResponse=await fetch(`https://api.coingecko.com/api/v3/coins/${encodeURIComponent(id)}?localization=true&tickers=false&market_data=false&community_data=false&developer_data=false&sparkline=false`,{headers:{accept:'application/json','user-agent':'crypto-research-viewer/32'}});
+  const detailResponse=await fetch(`https://api.coingecko.com/api/v3/coins/${encodeURIComponent(id)}?localization=true&tickers=false&market_data=false&community_data=false&developer_data=false&sparkline=false`,{headers:{accept:'application/json','user-agent':'crypto-research-viewer/33'}});
   if(!detailResponse.ok)throw new Error(`CoinGecko detail ${detailResponse.status}`);const detail:any=await detailResponse.json();
   const links=Array.isArray(detail?.links?.homepage)?detail.links.homepage:[];const repos=detail?.links?.repos_url?.github||[];const communities=[detail?.links?.subreddit_url,detail?.links?.twitter_screen_name?`https://x.com/${detail.links.twitter_screen_name}`:'',detail?.links?.telegram_channel_identifier?`https://t.me/${detail.links.telegram_channel_identifier}`:''].map(safeUrl).filter(Boolean);
   return{provider:'coingecko',provider_id:id,english_name:text(detail?.name)||englishName,korean_name:text(detail?.localization?.ko),description_ko:plain(detail?.description?.ko),description_en:plain(detail?.description?.en),categories:stringArray(detail?.categories),homepage:safeUrl(links.find((item:unknown)=>safeUrl(item))||''),image_url:safeUrl(detail?.image?.small||detail?.image?.thumb||''),source_code:safeUrl(repos[0]||''),community:communities};
@@ -46,7 +46,24 @@ async function fromCoinGecko(symbol:string,englishName:string){
 function payload(row:CachedProfile,symbol:string){
   const categories=stringArray(row.categories_json),tags=stringArray(row.tags_json),evidence=jsonObjects(row.evidence_json),community=stringArray(row.community_json);
   const sector=text(row.canonical_sector)||sectorFor(symbol,[...categories,...tags],`${row.business_summary_ko}\n${row.business_summary_en}\n${row.description_ko}\n${row.description_en}`);
-  return{ok:true,exchange:row.exchange,market:row.market,symbol,korean_name:row.korean_name,english_name:row.english_name,description_ko:row.description_ko,description_en:row.description_en,business_summary_ko:row.business_summary_ko,business_summary_en:row.business_summary_en,categories,tags,homepage:row.homepage,image_url:row.image_url,official_docs:row.official_docs,whitepaper:row.whitepaper,source_code:row.source_code,community,evidence,provider:row.provider,provider_id:row.provider_id,updated_at:Number(row.updated_at||0),last_verified_at:Number(row.last_verified_at||0),research_status:row.research_status||'pending',summary_source:row.summary_source||'',source_count:Number(row.source_count||0),match_confidence:Number(row.match_confidence||0),canonical_sector:sector,sector_info:sectorInfo(sector),taxonomy_note:TAXONOMY_SOURCE_NOTE};
+  const hasKorean=Boolean(text(row.business_summary_ko)||text(row.description_ko));
+  return{
+    ok:true,exchange:row.exchange,market:row.market,symbol,
+    korean_name:row.korean_name,english_name:row.english_name,
+    description_ko:row.description_ko,
+    description_en:hasKorean?row.description_en:'',
+    business_summary_ko:row.business_summary_ko,business_summary_en:hasKorean?row.business_summary_en:'',
+    categories,tags,homepage:row.homepage,image_url:row.image_url,official_docs:row.official_docs,
+    whitepaper:row.whitepaper,source_code:row.source_code,community,evidence,provider:row.provider,
+    provider_id:row.provider_id,updated_at:Number(row.updated_at||0),last_verified_at:Number(row.last_verified_at||0),
+    research_status:row.research_status||'pending',summary_source:row.summary_source||'',source_count:Number(row.source_count||0),
+    match_confidence:Number(row.match_confidence||0),canonical_sector:sector,sector_info:sectorInfo(sector),taxonomy_note:TAXONOMY_SOURCE_NOTE,
+    korean_ready:hasKorean,
+  };
+}
+
+function inheritedPeer(peer:CachedProfile,exchange:string,market:string,fallback:{korean_name:string;english_name:string}):CachedProfile{
+  return{...peer,exchange,market,korean_name:fallback.korean_name||peer.korean_name,english_name:fallback.english_name||peer.english_name};
 }
 
 export const onRequestGet:PagesFunction<Env>=async({request,env})=>{
@@ -55,7 +72,15 @@ export const onRequestGet:PagesFunction<Env>=async({request,env})=>{
   if(!/^(KRW|USDT)-[A-Z0-9._-]{1,32}$/.test(market))return error(400,'INVALID_MARKET','코인 마켓 형식을 확인하세요.');
   const now=Math.floor(Date.now()/1000),fallback=await exchangeFallback(env,exchange,market);
   const cached=await env.DB.prepare('SELECT * FROM coin_profile_cache WHERE exchange=? AND market=?').bind(exchange,market).first<CachedProfile>();
-  if(cached){const verified=Number(cached.last_verified_at||0),enriched=['verified','corroborated','single_source'].includes(cached.research_status||'');if(enriched&&verified&&now-verified<NINETY_DAYS)return json(payload(cached,fallback.symbol));if(cached.provider==='coingecko'&&now-Number(cached.updated_at||0)<THIRTY_DAYS)return json(payload(cached,fallback.symbol));}
+  if(cached){
+    const verified=Number(cached.last_verified_at||0),enriched=['verified','corroborated','single_source'].includes(cached.research_status||'');
+    if(enriched&&verified&&now-verified<NINETY_DAYS&&Boolean(cached.business_summary_ko||cached.description_ko))return json(payload(cached,fallback.symbol));
+    if(cached.provider==='coingecko'&&now-Number(cached.updated_at||0)<THIRTY_DAYS&&Boolean(cached.business_summary_ko||cached.description_ko))return json(payload(cached,fallback.symbol));
+  }
+
+  const peer=await env.DB.prepare(`SELECT * FROM coin_profile_cache WHERE market=? AND exchange<>? AND (business_summary_ko<>'' OR description_ko<>'') ORDER BY source_count DESC,last_verified_at DESC LIMIT 1`).bind(market,exchange).first<CachedProfile>();
+  if(peer)return json(payload(inheritedPeer(peer,exchange,market,fallback),fallback.symbol));
+
   let profile:any=null;try{profile=await fromCoinGecko(fallback.symbol,fallback.english_name)}catch{profile=null}
   const categories=profile?.categories||[],descriptionKo=profile?.description_ko||'',descriptionEn=profile?.description_en||'',businessKo=shortBusiness(descriptionKo),businessEn=shortBusiness(descriptionEn),sector=sectorFor(fallback.symbol,categories,`${descriptionKo}\n${descriptionEn}`),evidence=profile?[{source:'coingecko',url:`https://www.coingecko.com/en/coins/${profile.provider_id}`,label:'CoinGecko metadata',language:'multi',weight:.82}]:[];
   const row:CachedProfile={exchange,market,provider:profile?.provider||'exchange',provider_id:profile?.provider_id||'',korean_name:profile?.korean_name||fallback.korean_name,english_name:profile?.english_name||fallback.english_name,description_ko:descriptionKo,description_en:descriptionEn,categories_json:JSON.stringify(categories),homepage:profile?.homepage||'',image_url:profile?.image_url||'',updated_at:now,business_summary_ko:businessKo,business_summary_en:businessEn,canonical_sector:sector,tags_json:'[]',evidence_json:JSON.stringify(evidence),official_docs:'',whitepaper:'',source_code:profile?.source_code||'',community_json:JSON.stringify(profile?.community||[]),research_status:profile?'single_source':'pending',summary_source:businessKo?'coingecko_ko':businessEn?'coingecko':'',source_count:profile?1:0,match_confidence:profile?.provider_id?.length?0.82:0,last_verified_at:profile?now:0};
