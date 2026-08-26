@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="ko" class="canonical-v1">
+<html lang="ko" class="canonical-v2">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f5f5f7">
-  <meta name="crypto-viewer-build" content="2026.08.26-20">
+  <meta name="crypto-viewer-build" content="2026.08.26-21">
   <meta name="crypto-viewer-mode" content="READ ONLY PAPER">
   <title>Crypto Research</title>
   <link rel="stylesheet" href="/styles.css?v=3">
@@ -14,8 +14,7 @@
   <link rel="stylesheet" href="/records-port.css?v=1">
   <link rel="stylesheet" href="/viewer-shell-v3.css?v=1">
   <link rel="stylesheet" href="/exchange-phase3.css?v=1">
-  <link rel="stylesheet" href="/strategy-lab-v1.css?v=3">
-  <link rel="stylesheet" href="/viewer-canonical-v1.css?v=1">
+  <link rel="stylesheet" href="/viewer-canonical-v2.css?v=1">
 </head>
 <body>
   <header class="top-shell">
@@ -24,7 +23,7 @@
       <div class="top-actions"><span id="freshnessPill" class="pill neutral">연결 확인 중</span><button id="logoutBtn" class="ghost hidden">로그아웃</button></div>
     </div>
     <nav id="viewerNav" class="viewer-nav hidden" aria-label="주요 화면">
-      <div class="viewer-nav-inner" data-canonical="1">
+      <div class="viewer-nav-inner" data-canonical="2">
         <button class="active" type="button" data-view="home">개요</button>
         <button type="button" data-view="assets">자산</button>
         <button type="button" data-view="coin">리서치</button>
@@ -93,12 +92,12 @@
       </section>
 
       <section class="viewer-page" data-view-panel="coin">
-        <div class="section-head page-head"><div><p class="kicker">리서치</p><h2>시장 상태와 코인 판단</h2><p>시장 상황을 먼저 보고, 관심 코인을 찾아 현재 판단을 확인합니다.</p></div><label class="coin-picker">코인<select id="coinSelect"></select></label></div>
+        <div class="section-head page-head"><div><p class="kicker">리서치</p><h2>시장과 코인 판단</h2><p>시장 상태를 먼저 보고, 관찰할 코인을 찾은 뒤 현재 판단과 근거를 확인합니다.</p></div><label class="coin-picker">코인<select id="coinSelect"></select></label></div>
         <section id="coinDetailCard" class="coin-detail-card"><div class="empty">코인을 선택하면 상세 상태가 표시됩니다.</div></section>
       </section>
 
       <section class="viewer-page" data-view-panel="results">
-        <div class="section-head page-head"><div><p class="kicker">PAPER</p><h2>가상매매 검증</h2><p>성과를 먼저 보고, 거래기록·전략·거래소 비교는 필요한 경우에만 전환합니다.</p></div><span id="leaderText" class="leader-text">-</span></div>
+        <div class="section-head page-head"><div><p class="kicker">PAPER</p><h2>가상매매 검증</h2><p>전체 성과를 먼저 보고, 거래기록·전략·거래소 비교는 필요한 경우에만 전환합니다.</p></div><span id="leaderText" class="leader-text">-</span></div>
         <section id="strategyLabCard" class="strategy-lab-card hidden"></section>
         <section class="market-card results-card">
           <div class="market-controls"><input id="searchInput" type="search" placeholder="코인 검색" autocomplete="off"><select id="sortSelect" aria-label="정렬"><option value="return_desc">수익률 높은 순</option><option value="return_asc">수익률 낮은 순</option><option value="position_desc">보유금액 큰 순</option><option value="pnl_desc">미실현손익 큰 순</option><option value="trades_desc">거래횟수 많은 순</option><option value="opportunity_desc">기회점수 높은 순</option></select></div>
@@ -129,7 +128,7 @@
   <script src="/asset-local-port.js?v=1"></script>
   <script src="/records-port.js?v=1"></script>
   <script src="/viewer-shell-v3.js?v=2"></script>
-  <script src="/strategy-lab-v1.js?v=3"></script>
-  <script src="/viewer-canonical-v1.js?v=1"></script>
+  <script src="/strategy-lab-v2.js?v=1"></script>
+  <script src="/viewer-canonical-v2.js?v=1"></script>
 </body>
 </html>
