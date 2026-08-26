@@ -11,7 +11,7 @@ import{createPaperPage}from'./pages/paper.js';
 import{createStrategyPage}from'./pages/strategy.js';
 import{createSectorsPage}from'./pages/sectors.js';
 import{createRecordsPage}from'./pages/records.js';
-import{createSystemPage}from'./pages/system.js';
+import{createSystemPage}from'./pages/system.js?v=34';
 
 const root=document.getElementById('pageRoot'),nav=document.getElementById('mainNav');
 let router=null;
