@@ -5,7 +5,8 @@ const defaults={
   researchMarket:'',assetMarket:'',paperMarket:'',
   researchSearch:'',researchFilter:'all',
   paperTab:'summary',paperSearch:'',paperFilter:'all',paperSort:'return_desc',
-  strategyMarket:'',recordsExchange:'bithumb',recordsFilter:'all'
+  paperCompareSearch:'',paperCompareSort:'gap_desc',
+  strategyMarket:'',recordsExchange:'bithumb',recordsFilter:'all',recordsPeriod:'all',recordsSearch:''
 };
 let saved={};try{saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}')}catch{}
 const state={user:null,snapshot:null,loading:true,error:null,ui:{...defaults,...saved}};
