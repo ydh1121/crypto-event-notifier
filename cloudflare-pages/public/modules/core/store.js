@@ -3,8 +3,8 @@ const defaults={
   route:'dashboard',
   researchExchange:'bithumb',paperExchange:'bithumb',strategyExchange:'bithumb',
   researchMarket:'',assetMarket:'',paperMarket:'',
-  researchSearch:'',researchFilter:'all',
-  paperTab:'summary',paperSearch:'',paperFilter:'all',paperSort:'return_desc',
+  researchSearch:'',researchFilter:'all',researchRange:'24h',
+  paperTab:'summary',paperSearch:'',paperFilter:'all',paperSort:'return_desc',paperRange:'24h',
   paperCompareSearch:'',paperCompareSort:'gap_desc',
   strategyMarket:'',recordsExchange:'bithumb',recordsFilter:'all',recordsPeriod:'all',recordsSearch:''
 };
