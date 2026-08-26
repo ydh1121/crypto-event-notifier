@@ -109,7 +109,7 @@ def main() -> None:
         "coin_profile_enricher": all(token in enricher for token in ("class CoinProfileEnricher","CoinMarketCap","CoinGecko","BITHUMB_MANUAL_URL","completed_cycles")) and "pypdf" in requirements,
         "coin_profile_ingest": all(token in ingest_profiles for token in ("INGEST_TOKEN","coin_profile_cache","business_summary_ko","evidence_json","canonical_sector","env.DB.batch")),
         "coin_profile_multisource": all(token in enricher for token in ("bithumb_manual","coinmarketcap","coingecko","official_site","source_code","community")),
-        "coin_profile_korean_manual": all(token in enricher for token in ("가상자산 소개","가상자산의 이용목적","feed-content.bithumb.com","PdfReader")),
+        "coin_profile_korean_manual": all(token in enricher for token in ("BITHUMB_MANUAL_URL","_read_manual_pdf","description_ko","purpose_ko","PdfReader","feed-content")),
         "coin_profile_supervisor": "CoinProfileEnricher" in supervisor and '"coin-profile-enrichment"' in supervisor and '"coin-profile-enrichment"' in control,
         "coin_profile_no_sector_fallback": "profile.business_summary_ko||profile.description_ko||profile.business_summary_en||profile.description_en" in sectors_js and "chosen?.sector_business||''" not in sectors_js,
         "coin_profile_evidence_ui": all(token in sectors_js for token in ("근거 출처","match_confidence","last_verified_at","coin-profile-community")) and "profile-verification" in build32_css,
