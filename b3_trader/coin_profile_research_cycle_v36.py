@@ -8,7 +8,7 @@ from .coin_profile_research_cycle import CoinProfileResearchCycle
 
 
 class CoinProfileResearchCycleV36(CoinProfileResearchCycle):
-    """Build 36 profile cycle with strict project identity matching and repair."""
+    """Build 36+ profile cycle with strict project identity and content-integrity repair."""
 
     def __init__(self) -> None:
         self.base = IdentitySafeCoinProfileEnricher()
@@ -19,7 +19,7 @@ class CoinProfileResearchCycleV36(CoinProfileResearchCycle):
         if not ingest or not token:
             return "", "", ""
         root = ingest[: -len("/api/ingest-coin-profiles")] if ingest.endswith("/api/ingest-coin-profiles") else ingest.rstrip("/")
-        return root + "/api/ingest-coin-profiles-repair", root + "/api/coin-profile-backlog-v36", token
+        return root + "/api/ingest-coin-profiles-repair", root + "/api/coin-profile-backlog-v37", token
 
     def _deepen_profile(self, row: dict[str, str], profile: dict[str, Any], reasons: list[str]) -> dict[str, Any]:
         profile = super()._deepen_profile(row, profile, reasons)
