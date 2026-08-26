@@ -6,9 +6,11 @@ on:
       - "b3-auto-trader-phase1"
     paths:
       - "b3_trader/coin_profile_identity_safe.py"
+      - "b3_trader/coin_profile_identity_audit.py"
       - "b3_trader/coin_profile_research_cycle_v36.py"
       - "b3_trader/research_supervisor.py"
       - "cloudflare-pages/functions/api/coin-profile-backlog-v36.ts"
+      - "cloudflare-pages/functions/api/coin-profile-identity-audit.ts"
       - "cloudflare-pages/functions/api/ingest-coin-profiles-repair.ts"
       - "cloudflare-pages/public/modules/pages/sectors-v36.js"
       - "cloudflare-pages/public/modules/styles/build36.css"
@@ -31,7 +33,7 @@ jobs:
         with:
           node-version: "22"
       - run: pip install -r b3_trader/requirements.txt
-      - run: python -m py_compile b3_trader/coin_profile_identity_safe.py b3_trader/coin_profile_research_cycle_v36.py b3_trader/research_supervisor.py scripts/check-sector-build36.py
+      - run: python -m py_compile b3_trader/coin_profile_identity_safe.py b3_trader/coin_profile_identity_audit.py b3_trader/coin_profile_research_cycle_v36.py b3_trader/research_supervisor.py scripts/check-sector-build36.py
       - run: node --check cloudflare-pages/public/modules/pages/sectors-v36.js
       - run: python scripts/check-sector-build36.py
       - name: Cloudflare Pages typecheck
@@ -45,9 +47,12 @@ jobs:
           set -euo pipefail
           grep -q 'IdentitySafeCoinProfileEnricher' b3_trader/coin_profile_identity_safe.py
           grep -q 'if not _identity_in_text(row, text)' b3_trader/coin_profile_identity_safe.py
+          grep -q 'coin-profile-identity-audit' b3_trader/coin_profile_identity_audit.py
           grep -q 'CoinProfileResearchCycleV36' b3_trader/research_supervisor.py
           grep -q 'identity_mismatch' cloudflare-pages/functions/api/coin-profile-backlog-v36.ts
           grep -q 'identity_mismatch_by_exchange' cloudflare-pages/functions/api/coin-profile-backlog-v36.ts
+          grep -q 'cached_english_name' cloudflare-pages/functions/api/coin-profile-identity-audit.ts
+          grep -q 'official_english_name' cloudflare-pages/functions/api/coin-profile-identity-audit.ts
           grep -q 'identity_repairs' cloudflare-pages/functions/api/ingest-coin-profiles-repair.ts
           grep -q 'data-sector-search' cloudflare-pages/public/modules/pages/sectors-v36.js
           grep -q 'data-sector-filter' cloudflare-pages/public/modules/pages/sectors-v36.js
