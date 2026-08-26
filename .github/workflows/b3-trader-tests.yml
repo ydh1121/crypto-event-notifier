@@ -91,50 +91,50 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: find public/modules -name '*.js' -print0 | xargs -0 -n1 node --check
-      - name: Validate build 28 source contract
+      - name: Validate build 29 source contract
         shell: bash
         run: |
           set -euo pipefail
           for file in \
             public/index.html public/modules/main.js public/modules/core/store.js \
             public/modules/shared/charts.js public/modules/shared/decision.js public/modules/shared/averaging.js \
-            public/modules/styles/tokens.css public/modules/styles/components.css public/modules/styles/assets.css \
-            public/modules/styles/paper.css public/modules/pages/assets.js public/modules/pages/research.js \
-            public/modules/pages/paper.js public/modules/pages/strategy.js public/modules/pages/records.js \
-            migrations/0001_init.sql; do
+            public/modules/services/sectors.js public/modules/pages/dashboard.js public/modules/pages/assets.js \
+            public/modules/pages/research.js public/modules/pages/paper.js public/modules/pages/strategy.js \
+            public/modules/pages/sectors.js public/modules/pages/records.js public/modules/styles/tokens.css \
+            public/modules/styles/assets.css public/modules/styles/paper.css public/modules/styles/sectors.css \
+            public/modules/styles/build29.css functions/api/sector-summary.ts migrations/0001_init.sql \
+            migrations/0002_market_details.sql migrations/0003_sector_history.sql; do
             test -s "$file"
           done
           grep -q 'READ ONLY' public/index.html
-          grep -q 'crypto-viewer-build" content="2026.08.26-28' public/index.html
-          grep -q 'type="module" src="/modules/main.js?v=5"' public/index.html
-          grep -q '/modules/styles/tokens.css?v=3' public/index.html
-          grep -q '/modules/styles/assets.css?v=5' public/index.html
-          grep -q '/modules/styles/paper.css?v=5' public/index.html
-          grep -q '#f5f5f7' public/modules/styles/tokens.css
-          grep -q '#1d1d1f' public/modules/styles/tokens.css
-          grep -q '#0066cc' public/modules/styles/tokens.css
-          grep -q 'tabular-nums' public/modules/styles/tokens.css
-          grep -q 'white-space:nowrap' public/modules/styles/components.css
-          grep -q '.chip-row button.active' public/modules/styles/components.css
-          grep -q '.asset-research-sides .score-line+.score-line' public/modules/styles/assets.css
-          grep -q '.exchange-paper-grid .kpi b' public/modules/styles/paper.css
-          grep -q '추천 타점 · 즉시 평단' public/modules/pages/assets.js
-          grep -q 'data-direct-buy-price' public/modules/pages/assets.js
-          grep -q '물타기 계산기' public/modules/pages/assets.js
-          grep -q 'data-add-avg-row' public/modules/pages/assets.js
-          grep -q 'calculateDirectAverage' public/modules/shared/averaging.js
-          grep -q 'calculateAveraging' public/modules/shared/averaging.js
-          grep -q 'researchExchange:exchange' public/modules/core/store.js
-          grep -q 'strategyExchange:exchange' public/modules/core/store.js
-          grep -q 'recordsExchange:exchange' public/modules/core/store.js
-          grep -q 'row?.exchange||' public/modules/core/store.js
-          grep -q '../shared/decision.js' public/modules/pages/research.js
-          grep -q 'data-research-range' public/modules/pages/research.js
-          grep -q 'data-paper-range' public/modules/pages/paper.js
-          grep -q 'data-records-period' public/modules/pages/records.js
-          grep -q 'data-records-search' public/modules/pages/records.js
+          grep -q 'crypto-viewer-build" content="2026.08.26-29' public/index.html
+          grep -q 'type="module" src="/modules/main.js?v=6"' public/index.html
+          grep -q 'data-route="sectors"' public/index.html
+          grep -q '/modules/styles/build29.css?v=1' public/index.html
+          grep -q 'createSectorsPage' public/modules/main.js
+          grep -q 'sectorExchange:exchange' public/modules/core/store.js
+          grep -q 'allocation-donut' public/modules/pages/dashboard.js
+          grep -q '거래소별 시장 상태' public/modules/pages/dashboard.js
+          grep -q '전략 유효성' public/modules/pages/dashboard.js
+          grep -q 'watch-list scrollable' public/modules/pages/dashboard.js
+          grep -q 'refreshLive' public/modules/pages/records.js
+          grep -q 'feed.prepend' public/modules/pages/records.js
+          grep -q 'records-insight' public/modules/pages/records.js
+          grep -q '섹터 순위' public/modules/pages/sectors.js
+          grep -q '상승 거래대금 비중' public/modules/pages/sectors.js
+          grep -q 'sector_history' functions/api/sector-summary.ts
+          grep -q '순입출금액이 아니라' functions/api/sector-summary.ts
+          grep -q 'CREATE TABLE IF NOT EXISTS sector_history' migrations/0003_sector_history.sql
+          grep -q '.chip-row button.active' public/modules/styles/build29.css
+          grep -q '.record-type::before' public/modules/styles/build29.css
+          grep -q '.paper-detail-kpis>span:nth-child(3)' public/modules/styles/build29.css
+          grep -q '.trade-plan-panel>div>span:nth-child(6)' public/modules/styles/build29.css
+          grep -q '@keyframes liveRowIn' public/modules/styles/build29.css
+          grep -q 'dashboard/runtime-demo-upbit.json.tmp' ../.gitignore
+          grep -q 'dashboard/runtime-demo\*.tmp' ../scripts/repair-local-sync.ps1
           test -s ../TASTES.md
           test -s ../docs/PRIVATE_PORTFOLIO_STORAGE.md
+          test -s ../docs/VIEWER_BUILD29_PLAN.md
           grep -q 'AES-256-GCM' ../docs/PRIVATE_PORTFOLIO_STORAGE.md
       - name: Ensure retired Pages UI assets are physically absent
         shell: bash

@@ -1,0 +1,124 @@
+/* Build 29: density, hierarchy and live-feed polish without changing the approved IA. */
+
+/* Filter chips: quiet text controls, not colored badges. */
+.chip-row{gap:4px}
+.chip-row button{min-height:32px;padding:6px 9px;border:1px solid transparent;border-radius:8px;background:transparent;box-shadow:none;color:#68686d;font-size:11px;font-weight:620}
+.chip-row button:hover{background:rgba(118,118,128,.075);color:var(--ink)}
+.chip-row button.active{background:#fff;color:var(--ink);border-color:rgba(0,0,0,.085);box-shadow:0 1px 2px rgba(0,0,0,.045)}
+.chip-row button.active::before{content:'';display:inline-block;width:5px;height:5px;margin-right:6px;border-radius:50%;background:var(--accent);vertical-align:1px}
+
+/* PAPER: promote the values the user actually watches. */
+.paper-workspace{max-width:1280px;margin-left:auto;margin-right:auto}
+.paper-detail-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+.paper-detail-kpis>span{order:10;background:var(--surface2);border-color:transparent}
+.paper-detail-kpis>span:nth-child(3){order:1;background:#fff;border-color:var(--line)}
+.paper-detail-kpis>span:nth-child(2){order:2;background:#fff;border-color:var(--line)}
+.paper-detail-kpis>span:nth-child(5){order:3;background:#fff;border-color:var(--line)}
+.paper-detail-kpis>span:nth-child(6){order:4;background:#fff;border-color:var(--line)}
+.paper-detail-kpis>span:nth-child(1){order:5}
+.paper-detail-kpis>span:nth-child(4){order:6}
+.paper-detail-kpis>span:nth-child(2) b,.paper-detail-kpis>span:nth-child(3) b,.paper-detail-kpis>span:nth-child(5) b,.paper-detail-kpis>span:nth-child(6) b{font-size:17px;letter-spacing:-.035em}
+.trade-plan-panel>div{grid-template-columns:repeat(4,minmax(0,1fr))}
+.trade-plan-panel>div>span{order:10;background:rgba(118,118,128,.065)}
+.trade-plan-panel>div>span:nth-child(1){order:1;background:rgba(0,102,204,.075);box-shadow:inset 0 0 0 1px rgba(0,102,204,.07)}
+.trade-plan-panel>div>span:nth-child(2){order:2;background:#fff;box-shadow:inset 0 0 0 1px var(--line)}
+.trade-plan-panel>div>span:nth-child(3){order:3;background:#fff;box-shadow:inset 0 0 0 1px var(--line)}
+.trade-plan-panel>div>span:nth-child(6){order:4;background:#fff;box-shadow:inset 0 0 0 1px var(--line)}
+.trade-plan-panel>div>span:nth-child(4){order:5}
+.trade-plan-panel>div>span:nth-child(5){order:6}
+.trade-plan-panel>div>span:nth-child(1) b,.trade-plan-panel>div>span:nth-child(2) b,.trade-plan-panel>div>span:nth-child(3) b,.trade-plan-panel>div>span:nth-child(6) b{font-size:16px;letter-spacing:-.03em}
+.compare-head,.compare-toolbar,.compare-table{max-width:1120px;margin-left:auto;margin-right:auto}
+.compare-row{grid-template-columns:1.15fr .9fr .9fr .75fr;padding:10px 12px}
+
+/* Dashboard: three decision surfaces first, then watch/sector/strategy. */
+.priority-strip,.dashboard-overview-grid,.dashboard-intel-grid,.dashboard-activity{max-width:1320px;margin-left:auto;margin-right:auto}
+.dashboard-overview-grid{display:grid;grid-template-columns:1fr 1.22fr .9fr;gap:12px;margin-bottom:12px}
+.overview-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
+.overview-card>header{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:14px}
+.overview-card>header span{display:block;color:var(--muted);font-size:11px}
+.overview-card>header h3{margin:5px 0 2px;font-size:21px;line-height:1.1;letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.overview-card>header p{margin:0;color:var(--muted);font-size:11px}
+.overview-card>header button{border:0;background:transparent;color:var(--accent);font-size:11px;font-weight:700;white-space:nowrap}
+.allocation-viz{display:grid;grid-template-columns:144px minmax(0,1fr);gap:14px;align-items:center}
+.allocation-donut{width:138px;height:138px;border-radius:50%;display:grid;place-items:center;position:relative}
+.allocation-donut::after{content:'';position:absolute;inset:19px;background:#fff;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.035)}
+.allocation-donut>div{position:relative;z-index:1;text-align:center;display:grid;gap:0}
+.allocation-donut b{font-size:22px;line-height:1;font-variant-numeric:tabular-nums}
+.allocation-donut span{font-size:10px;color:var(--muted)}
+.allocation-legend{display:grid;gap:7px;min-width:0}
+.allocation-legend>span{display:grid;grid-template-columns:7px minmax(0,1fr) auto;gap:7px;align-items:center;font-size:11px}
+.allocation-legend i{width:7px;height:7px;border-radius:50%}
+.allocation-legend b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.allocation-legend small{color:var(--muted);font-variant-numeric:tabular-nums}
+.market-state-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.market-state-card{background:var(--surface2);border-radius:11px;padding:11px}
+.market-state-card>header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px}
+.market-state-card>header span{font-size:12px;font-weight:700}
+.market-state-card>header b{font-size:20px;font-variant-numeric:tabular-nums}
+.market-state-card>header small{font-size:10px;color:var(--muted);font-weight:500}
+.market-meter{display:grid;grid-template-columns:42px 1fr 28px;gap:7px;align-items:center;margin-top:7px;font-size:10px;color:var(--muted)}
+.market-meter i{height:4px;border-radius:999px;background:#dedfe4;overflow:hidden}
+.market-meter em{display:block;height:100%;border-radius:inherit;background:var(--accent)}
+.market-meter strong{text-align:right;color:var(--ink);font-size:10px;font-variant-numeric:tabular-nums}
+.market-state-card footer{display:grid;grid-template-columns:1fr 1fr;gap:5px 8px;margin-top:10px;padding-top:8px;border-top:1px solid var(--line);font-size:10px;color:var(--muted)}
+.market-state-card footer b{color:var(--ink);font-variant-numeric:tabular-nums}
+.paper-exchange-compact{display:grid;gap:7px}
+.paper-exchange-compact>div{background:var(--surface2);border-radius:10px;padding:11px}
+.paper-exchange-compact span,.paper-exchange-compact small{display:block;color:var(--muted);font-size:10px}
+.paper-exchange-compact b{display:block;margin:4px 0 2px;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.dashboard-intel-grid{display:grid;grid-template-columns:1.05fr .95fr .82fr;gap:12px}
+.section-panel header>div p,.watch-panel header p,.sector-dashboard header p,.strategy-validity header p{margin:3px 0 0;color:var(--muted);font-size:11px}
+.watch-list.scrollable{max-height:330px;overflow:auto;padding-right:3px}
+.watch-list.scrollable>div{padding:9px 0}
+.sector-flow-list{display:grid;max-height:330px;overflow:auto}
+.sector-flow-list>div{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
+.sector-flow-list>div:last-child{border-bottom:0}
+.sector-flow-list span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.sector-flow-list b{font-size:12px}
+.sector-flow-list small{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sector-flow-list strong{font-size:15px;font-variant-numeric:tabular-nums}
+.strategy-validity-hero{background:rgba(0,102,204,.065);border-radius:11px;padding:13px;margin-bottom:10px}
+.strategy-validity-hero span,.strategy-validity-hero small{display:block;color:var(--muted);font-size:10px}
+.strategy-validity-hero b{display:block;margin:4px 0 2px;font-size:24px;letter-spacing:-.04em}
+.strategy-validity>p{margin:0;color:var(--muted);font-size:11px;line-height:1.6}
+.dashboard-activity{max-width:1120px;margin-top:12px}
+.activity-row{grid-template-columns:58px 104px minmax(0,1fr) 136px;padding:10px 0}
+.activity-kind{border-radius:7px;background:var(--surface2);color:#66676d;padding:4px 6px}
+.activity-kind::before{content:'';width:5px;height:5px;border-radius:50%;background:#8e8e93;margin-right:5px;display:inline-block}
+.activity-kind.buy::before{background:var(--accent)}
+.activity-kind.sell::before{background:var(--bad)}
+.activity-kind.learning::before{background:var(--warn)}
+
+/* Records: narrower feed plus a sticky summary rail. */
+.records-kpis,.records-toolbar,.records-filter,.records-content-grid{max-width:1240px;margin-left:auto;margin-right:auto}
+.records-content-grid{display:grid;grid-template-columns:minmax(0,1fr) 278px;gap:12px;align-items:start}
+.records-feed{max-height:calc(100vh - 330px);overflow:auto}
+.record-item{grid-template-columns:58px 94px minmax(0,1fr) 128px;padding:11px 12px;gap:10px}
+.record-type{position:relative;display:inline-flex;align-items:center;justify-content:flex-start;gap:6px;width:max-content;padding:4px 7px;border-radius:7px;background:var(--surface2)!important;color:#62636a!important;font-weight:680}
+.record-type::before{content:'';width:5px;height:5px;border-radius:50%;background:#8e8e93}
+.record-type.buy::before{background:var(--accent)}
+.record-type.sell::before{background:var(--bad)}
+.record-type.learning::before{background:var(--warn)}
+.records-insight{position:sticky;top:82px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px}
+.records-insight>header{display:flex;justify-content:space-between;gap:10px;margin-bottom:12px}
+.records-insight h3{margin:0;font-size:14px}
+.records-insight header p{margin:3px 0 0;color:var(--muted);font-size:10px}
+.records-insight header>span{font-size:10px;color:var(--muted)}
+.records-insight-kpis{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+.records-insight-kpis>span{background:var(--surface2);border-radius:9px;padding:9px}
+.records-insight-kpis small{display:block;color:var(--muted);font-size:9px}
+.records-insight-kpis b{display:block;margin-top:3px;font-size:13px;font-variant-numeric:tabular-nums}
+.records-insight-row{display:grid;grid-template-columns:1fr auto;gap:4px 8px;padding:10px 0;border-bottom:1px solid var(--line);font-size:11px}
+.records-insight-row>span:first-child{display:flex;flex-direction:column;gap:2px}
+.records-insight-row small{color:var(--muted);font-size:9px}
+.records-insight-row>span:nth-child(2){font-weight:650;font-variant-numeric:tabular-nums;text-align:right}
+.records-insight-row time{grid-column:1/-1;color:var(--muted);font-size:9px;text-align:right}
+.records-live-note{display:flex;align-items:center;gap:6px;margin:11px 0 0;color:var(--muted);font-size:9px;line-height:1.4}
+.records-live-note i{width:6px;height:6px;border-radius:50%;background:var(--good);box-shadow:0 0 0 3px rgba(35,134,54,.09)}
+
+@keyframes liveRowIn{from{opacity:0;transform:translateY(-8px);background:rgba(0,102,204,.075)}to{opacity:1;transform:translateY(0);background:transparent}}
+.live-enter{animation:liveRowIn 360ms cubic-bezier(.2,.8,.2,1)}
+
+@media(max-width:1160px){.dashboard-overview-grid{grid-template-columns:1fr 1fr}.paper-overview{grid-column:1/-1}.dashboard-intel-grid{grid-template-columns:1fr 1fr}.strategy-validity{grid-column:1/-1}.paper-detail-kpis,.trade-plan-panel>div{grid-template-columns:1fr 1fr}.records-content-grid{grid-template-columns:1fr}.records-insight{position:static;display:none}}
+@media(max-width:760px){.dashboard-overview-grid,.dashboard-intel-grid{grid-template-columns:1fr}.paper-overview,.strategy-validity{grid-column:auto}.allocation-viz{grid-template-columns:120px 1fr}.allocation-donut{width:116px;height:116px}.market-state-grid{grid-template-columns:1fr}.activity-row{grid-template-columns:54px 90px 1fr}.activity-row time{grid-column:2/-1;text-align:left}.compare-head,.compare-toolbar,.compare-table{max-width:none}.records-feed{max-height:none}.paper-detail-kpis,.trade-plan-panel>div{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.paper-detail-kpis,.trade-plan-panel>div{grid-template-columns:1fr}.allocation-viz{grid-template-columns:1fr}.allocation-donut{margin:auto}.activity-row{grid-template-columns:52px 1fr}.activity-row>span:nth-child(3),.activity-row time{grid-column:1/-1}}

@@ -15,8 +15,10 @@ $safeDirtyExact = @(
   $selfPath +
   "dashboard/runtime-demo.json" +
   "dashboard/runtime-demo.tmp" +
+  "dashboard/runtime-demo.json.tmp" +
   "dashboard/runtime-demo-upbit.json" +
   "dashboard/runtime-demo-upbit.tmp" +
+  "dashboard/runtime-demo-upbit.json.tmp" +
   "dashboard/runtime-build.json" +
   "dashboard/runtime-build.json.tmp"
 )
@@ -28,6 +30,7 @@ $safeDirtyPrefixes = @(
 
 function Test-SafeDirtyPath([string]$Path) {
   if ($Path -in $safeDirtyExact) { return $true }
+  if ($Path -like "dashboard/runtime-demo*.tmp") { return $true }
   foreach ($prefix in $safeDirtyPrefixes) {
     if ($Path.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) { return $true }
   }
