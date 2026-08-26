@@ -77,7 +77,7 @@ def main() -> None:
     index = INDEX_PATH.read_text(encoding="utf-8", errors="replace") if INDEX_PATH.exists() else ""
     perf = PERF_PATH.read_text(encoding="utf-8", errors="replace") if PERF_PATH.exists() else ""
     order = [
-        index.find("viewer-performance-v1.js?v=1"),
+        index.find("viewer-performance-v1.js?v=2"),
         index.find("exchange-phase3.js?v=1"),
         index.find("app.js?v=3"),
     ]
@@ -87,12 +87,14 @@ def main() -> None:
         "keyed_market_rows": "marketRenderSignature" in perf and "existing=new Map" in perf,
         "snapshot_coalescing": "snapshotInFlight" in perf,
         "single_snapshot_parse": "url.pathname==='/api/snapshot')return nativeFetch" in perf,
+        "snapshot_5xx_retry": "snapshotRetries" in perf and "await sleep(300)" in perf,
         "hidden_coin_guard": "activeView()==='coin'" in perf,
         "hidden_records_guard": "activeView()==='records'" in perf,
         "hidden_results_guard": "activeView()==='results'" in perf,
+        "parity_observer_removed": "parityObserverSkips" in perf and "includes('local-parity.js')" in perf,
         "observer_attribute_guard": "target?.id==='marketList'" in perf and "next.attributes=false" in perf,
         "offscreen_row_containment": "content-visibility:auto" in perf,
-        "performance_telemetry": "window.__viewerPerformance=" in perf,
+        "performance_telemetry_v2": "window.__viewerPerformance={version:2" in perf,
     }
     print("\n=== STATIC PERFORMANCE CONTRACT ===")
     print(json.dumps(markers, ensure_ascii=False, indent=2))
@@ -120,27 +122,27 @@ def main() -> None:
     remote_contract = {
         "index_status": 0,
         "performance_js_status": 0,
-        "build_15": False,
+        "build_16": False,
         "performance_asset_linked": False,
         "performance_asset_loaded": False,
     }
     if viewer_url:
         nonce = str(time.time_ns())
         index_status, remote_index = fetch_text(f"{viewer_url}/?performance_check={nonce}")
-        js_status, remote_js = fetch_text(f"{viewer_url}/viewer-performance-v1.js?v=1&performance_check={nonce}")
+        js_status, remote_js = fetch_text(f"{viewer_url}/viewer-performance-v1.js?v=2&performance_check={nonce}")
         remote_contract.update(
             {
                 "index_status": index_status,
                 "performance_js_status": js_status,
-                "build_15": "crypto-viewer-build\" content=\"2026.08.26-15" in remote_index,
-                "performance_asset_linked": "viewer-performance-v1.js?v=1" in remote_index,
-                "performance_asset_loaded": "__viewerPerformanceV1Loaded" in remote_js and "marketRenderSignature" in remote_js,
+                "build_16": "crypto-viewer-build\" content=\"2026.08.26-16" in remote_index,
+                "performance_asset_linked": "viewer-performance-v1.js?v=2" in remote_index,
+                "performance_asset_loaded": "window.__viewerPerformance={version:2" in remote_js and "parityObserverSkips" in remote_js,
             }
         )
         if index_status != 200 or js_status != 200:
             pending.append("deployed viewer assets are not reachable yet")
-        elif not all((remote_contract["build_15"], remote_contract["performance_asset_linked"], remote_contract["performance_asset_loaded"])):
-            pending.append("Pages is still serving the pre-performance viewer build")
+        elif not all((remote_contract["build_16"], remote_contract["performance_asset_linked"], remote_contract["performance_asset_loaded"])):
+            pending.append("Pages is still serving the previous viewer performance build")
     else:
         pending.append("viewer URL is not available in deploy state")
 
