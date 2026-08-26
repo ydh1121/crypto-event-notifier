@@ -12,8 +12,9 @@ import requests
 ROOT = Path(__file__).resolve().parents[1]
 VENV = ROOT / ".venv" / "Scripts" / "python.exe"
 INDEX = ROOT / "cloudflare-pages/public/index.html"
-JS = ROOT / "cloudflare-pages/public/viewer-canonical-v1.js"
-CSS = ROOT / "cloudflare-pages/public/viewer-canonical-v1.css"
+JS = ROOT / "cloudflare-pages/public/viewer-canonical-v2.js"
+CSS = ROOT / "cloudflare-pages/public/viewer-canonical-v2.css"
+STRATEGY = ROOT / "cloudflare-pages/public/strategy-lab-v2.js"
 DEPLOY = ROOT / "b3_trader/data/research-platform/cloudflare-pages-deploy-state.json"
 
 
@@ -62,26 +63,32 @@ def main() -> None:
     index = INDEX.read_text(encoding="utf-8", errors="replace") if INDEX.exists() else ""
     js = JS.read_text(encoding="utf-8", errors="replace") if JS.exists() else ""
     css = CSS.read_text(encoding="utf-8", errors="replace") if CSS.exists() else ""
+    strategy = STRATEGY.read_text(encoding="utf-8", errors="replace") if STRATEGY.exists() else ""
     static = {
-        "build_20": 'crypto-viewer-build" content="2026.08.26-20' in index,
-        "canonical_js": "viewer-canonical-v1.js?v=1" in index,
-        "canonical_css": "viewer-canonical-v1.css?v=1" in index,
-        "legacy_ux_unlinked": "viewer-ux-v4.js" not in index and "viewer-ux-v4.css" not in index,
-        "legacy_ia_unlinked": "viewer-ia-v5.js" not in index and "viewer-ia-v5.css" not in index,
+        "build_21": 'crypto-viewer-build" content="2026.08.26-21' in index,
+        "canonical_v2_js": "viewer-canonical-v2.js?v=1" in index,
+        "canonical_v2_css": "viewer-canonical-v2.css?v=1" in index,
+        "strategy_v2": "strategy-lab-v2.js?v=1" in index,
+        "legacy_canonical_unlinked": "viewer-canonical-v1.js" not in index and "viewer-canonical-v1.css" not in index,
+        "legacy_strategy_unlinked": "strategy-lab-v1.js" not in index and "strategy-lab-v1.css" not in index,
         "four_main_nav": all(f'>{x}</button>' in index for x in ("개요", "자산", "리서치", "PAPER")),
-        "assets_panel": "ensureAssetsPanel" in js,
-        "overview_priority": "먼저 확인할 것" in js and "canonical-alerts" in css,
-        "research_priority": "canonical-market-pulse" in js and "canonical-research-find" in css,
+        "nav_reassertion": "navSignature" in js and "ensureNavigation" in js,
+        "user_chip_preserved": "ensureUserChip" in js and "viewer-intro" not in js.split("ensureUserChip", 1)[0],
+        "loading_state_model": "canonical-state loading" in js and "PAPER 코인 결과를 불러오는 중" in js,
+        "assets_states": "자산정보를 볼 권한이 없습니다" in js and "등록된 보유자산이 없습니다" in js,
+        "research_paper_separation": "paperResearchExtra" in js and "strategyLabMarketCard" in js and "canonical-hidden" in css,
         "paper_subnav": all(x in js for x in ("성과", "거래기록", "전략비교", "거래소비교")),
-        "system_utility": "canonicalSystemBtn" in js,
+        "paper_priority_kpis": all(x in js for x in ("전체 수익률", "최대 낙폭", "완료 거래", "승률")),
+        "strategy_table": "strategy-table-row" in strategy and "strategy-lab-grid" not in strategy,
+        "compare_sticky_header": "phase3-compare-header" in css and "position:sticky" in css,
     }
-    print("\n=== CANONICAL JOURNEY CONTRACT ===")
+    print("\n=== CANONICAL V2 CONTRACT ===")
     print(json.dumps(static, ensure_ascii=False, indent=2))
 
     pending: list[str] = []
     errors: list[str] = []
     if not all(static.values()):
-        errors.append("canonical viewer source contract is incomplete")
+        errors.append("canonical v2 source contract is incomplete")
     if not local or not remote or local != remote:
         pending.append("Git local/remote HEAD has not synchronized yet")
 
@@ -95,23 +102,33 @@ def main() -> None:
     if not deploy.get("health_ok"):
         pending.append("Pages health check is not green")
 
-    remote_contract = {"index_status": 0, "js_status": 0, "css_status": 0, "build_20": False, "canonical_loaded": False, "legacy_layers_absent": False}
+    remote_contract = {
+        "index_status": 0,
+        "js_status": 0,
+        "css_status": 0,
+        "strategy_status": 0,
+        "build_21": False,
+        "canonical_v2_loaded": False,
+        "legacy_v1_absent": False,
+    }
     if url:
         nonce = str(time.time_ns())
         si, ri = fetch(f"{url}/?canonical={nonce}")
-        sj, rj = fetch(f"{url}/viewer-canonical-v1.js?v=1&canonical={nonce}")
-        sc, rc = fetch(f"{url}/viewer-canonical-v1.css?v=1&canonical={nonce}")
+        sj, rj = fetch(f"{url}/viewer-canonical-v2.js?v=1&canonical={nonce}")
+        sc, rc = fetch(f"{url}/viewer-canonical-v2.css?v=1&canonical={nonce}")
+        ss, rs = fetch(f"{url}/strategy-lab-v2.js?v=1&canonical={nonce}")
         remote_contract.update({
             "index_status": si,
             "js_status": sj,
             "css_status": sc,
-            "build_20": 'crypto-viewer-build" content="2026.08.26-20' in ri,
-            "canonical_loaded": "__viewerCanonicalV1Loaded" in rj and ".canonical-overview" in rc,
-            "legacy_layers_absent": "viewer-ux-v4.js" not in ri and "viewer-ia-v5.js" not in ri,
+            "strategy_status": ss,
+            "build_21": 'crypto-viewer-build" content="2026.08.26-21' in ri,
+            "canonical_v2_loaded": "__viewerCanonicalV2Loaded" in rj and ".canonical-overview" in rc and "__strategyLabViewerV2Loaded" in rs,
+            "legacy_v1_absent": "viewer-canonical-v1.js" not in ri and "strategy-lab-v1.js" not in ri,
         })
-        if any(x != 200 for x in (si, sj, sc)):
-            pending.append("canonical viewer assets are not reachable yet")
-        elif not all((remote_contract["build_20"], remote_contract["canonical_loaded"], remote_contract["legacy_layers_absent"])):
+        if any(x != 200 for x in (si, sj, sc, ss)):
+            pending.append("canonical v2 viewer assets are not reachable yet")
+        elif not all((remote_contract["build_21"], remote_contract["canonical_v2_loaded"], remote_contract["legacy_v1_absent"])):
             pending.append("Pages is still serving the previous viewer build")
     else:
         pending.append("viewer URL is not available in deploy state")
@@ -122,14 +139,15 @@ def main() -> None:
     if errors:
         for x in errors:
             print(f"ERROR: {x}")
-        print("VIEWER_CANONICAL=FAIL")
+        print("VIEWER_CANONICAL_V2=FAIL")
         raise SystemExit(1)
     if pending:
         for x in pending:
             print(f"PENDING: {x}")
-        print("VIEWER_CANONICAL=WARMING")
+        print("VIEWER_CANONICAL_V2=WARMING")
         return
-    print("VIEWER_CANONICAL=PASS")
+    print("BROWSER_JOURNEY_QA_REQUIRED=true")
+    print("VIEWER_CANONICAL_V2=PASS")
 
 
 if __name__ == "__main__":
