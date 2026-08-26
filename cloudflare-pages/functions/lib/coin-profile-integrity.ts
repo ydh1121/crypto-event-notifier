@@ -40,12 +40,14 @@ export function evaluateProfileIntegrity(row:ProfileIntegrityRow,official:Exchan
   const reasons:string[]=[];const foreign=new Map<string,{symbol:string;english_name:string;korean_name:string;signals:Set<string>}>();
   const currentSymbol=symbolOf(row.market),officialEn=clean(official?.english_name||row.english_name),officialKo=clean(official?.korean_name||row.korean_name);
   if(official?.english_name&&!sameProjectName(row.english_name,official.english_name))reasons.push('cached_name_mismatch');
-  const lead=clean(row.business_summary_ko||row.description_ko||row.description_en).slice(0,700),leadNorm=normName(lead.slice(0,260));
+  const lead=clean(row.business_summary_ko||row.description_ko||row.description_en).slice(0,700),leadNorm=normName(lead.slice(0,260)),leadStart=normName(lead.slice(0,160));
   const currentAppears=Boolean((normName(officialEn).length>=4&&leadNorm.includes(normName(officialEn)))||(normName(officialKo).length>=2&&leadNorm.includes(normName(officialKo))));
   const evidence=jsonArray(row.evidence_json),homeText=urlText(row.homepage),providerNorm=normName(row.provider_id);
   const add=(project:{symbol:string;english_name:string;korean_name:string},signal:string)=>{const key=`${project.symbol}|${normName(project.english_name)}`;let hit=foreign.get(key);if(!hit){hit={symbol:project.symbol,english_name:project.english_name,korean_name:project.korean_name,signals:new Set()};foreign.set(key,hit)}hit.signals.add(signal)};
-  for(const project of known){if(project.symbol===currentSymbol&&sameProjectName(project.english_name,officialEn))continue;const foreignEn=normName(project.english_name);if(foreignEn.length<5)continue;
-    const foreignLead=leadNorm.includes(foreignEn);if(!currentAppears&&foreignLead&&tickerHit(lead.slice(0,520),project.symbol))add(project,'content_foreign_identity');
+  for(const project of known){if(project.symbol===currentSymbol&&sameProjectName(project.english_name,officialEn))continue;const foreignEn=normName(project.english_name),foreignKo=normName(project.korean_name);if(foreignEn.length<5)continue;
+    const foreignLead=leadNorm.includes(foreignEn)||(foreignKo.length>=2&&leadNorm.includes(foreignKo));
+    const foreignLeadStart=leadStart.startsWith(foreignEn)||(foreignKo.length>=2&&leadStart.startsWith(foreignKo));
+    if(!currentAppears&&foreignLead&&(foreignLeadStart||tickerHit(lead.slice(0,520),project.symbol)))add(project,'content_foreign_identity');
     if(providerNorm&&providerNorm.length>=4&&(providerNorm===foreignEn||providerNorm.includes(foreignEn)||foreignEn.includes(providerNorm))&&!sameProjectName(project.english_name,officialEn))add(project,'provider_foreign_identity');
     if(homeText&&homeText.replace(/[^a-z0-9]+/g,'').includes(foreignEn)&&!sameProjectName(project.english_name,officialEn))add(project,'homepage_foreign_identity');
     for(const item of evidence){if(!item||typeof item!=='object')continue;const source=clean(item.source),label=clean(item.label),url=urlText(item.url);if(source==='official_site'&&label&&sameProjectName(label,project.english_name)&&!sameProjectName(label,officialEn))add(project,'evidence_foreign_identity');if((source==='coinmarketcap'||source==='coingecko'||source==='official_site')&&url&&url.replace(/[^a-z0-9]+/g,'').includes(foreignEn)&&!sameProjectName(project.english_name,officialEn))add(project,'evidence_url_foreign_identity')}
