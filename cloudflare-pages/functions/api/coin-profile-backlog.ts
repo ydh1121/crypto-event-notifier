@@ -42,18 +42,20 @@ export const onRequestGet: PagesFunction<Env> = async ({request, env}) => {
   const fastCutoff = now - 15 * 60;
   const sectorCutoff = now - 60 * 60;
   const qualityCutoff = now - 6 * 60 * 60;
+  const perExchange = Math.max(1, Math.ceil(requested / 2));
 
-  const result = await env.DB.prepare(
+  const queryExchange = (exchange: 'bithumb' | 'upbit') => env.DB.prepare(
     `SELECT exchange,market,korean_name,english_name,research_status,canonical_sector,
             source_count,match_confidence,updated_at,last_verified_at,
             CASE WHEN business_summary_ko<>'' OR description_ko<>'' THEN 1 ELSE 0 END AS has_korean
        FROM coin_profile_cache
-      WHERE
+      WHERE exchange=? AND (
         ((business_summary_ko='' AND description_ko='') AND updated_at<=?)
         OR (research_status IN ('pending','unresolved') AND updated_at<=?)
         OR ((canonical_sector='' OR canonical_sector='미분류 검토') AND updated_at<=?)
         OR (source_count<2 AND updated_at<=?)
         OR (match_confidence<0.8 AND updated_at<=?)
+      )
       ORDER BY
         CASE
           WHEN business_summary_ko='' AND description_ko='' THEN 500
@@ -64,12 +66,32 @@ export const onRequestGet: PagesFunction<Env> = async ({request, env}) => {
           ELSE 0
         END DESC,
         updated_at ASC,
-        exchange ASC,
         market ASC
       LIMIT ?`,
-  ).bind(fastCutoff, fastCutoff, sectorCutoff, qualityCutoff, qualityCutoff, requested).all<BacklogRow>();
+  ).bind(exchange, fastCutoff, fastCutoff, sectorCutoff, qualityCutoff, qualityCutoff, perExchange).all<BacklogRow>();
 
-  const rows = (result.results || []).map(row => ({
+  const [bithumbResult, upbitResult] = await Promise.all([
+    queryExchange('bithumb'),
+    queryExchange('upbit'),
+  ]);
+
+  // Preserve exchange fairness before applying the caller's total limit. A single
+  // exchange with an older/larger backlog must never starve precision research on
+  // the other exchange (the previous global LIMIT 48 could return 48/0).
+  const queues = [bithumbResult.results || [], upbitResult.results || []];
+  const balanced: BacklogRow[] = [];
+  for (let offset = 0; balanced.length < requested; offset += 1) {
+    let added = false;
+    for (const queue of queues) {
+      const row = queue[offset];
+      if (!row || balanced.length >= requested) continue;
+      balanced.push(row);
+      added = true;
+    }
+    if (!added) break;
+  }
+
+  const rows = balanced.map(row => ({
     exchange: clean(row.exchange) === 'upbit' ? 'upbit' : 'bithumb',
     market: clean(row.market).toUpperCase(),
     korean_name: clean(row.korean_name),
