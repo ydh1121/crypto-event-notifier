@@ -4,7 +4,7 @@ import{simpleLineChart,rangeControl}from'../shared/charts.js';
 import{getSectorSummary}from'../services/sectors.js';
 import{getCoinProfile}from'../services/coin-profile.js';
 
-const rangeToChart={"1h":"1h","6h":"6h","24h":"24h","7d":"7d"};
+const rangeToChart={'1h':'1h','6h':'6h','24h':'24h','7d':'7d'};
 function turnover(v){const x=n(v);if(x>=1e12)return`${(x/1e12).toFixed(2)}조원`;if(x>=1e8)return`${(x/1e8).toFixed(1)}억원`;if(x>=1e4)return`${(x/1e4).toFixed(0)}만원`;return`${Math.round(x).toLocaleString('ko-KR')}원`}
 function flowLabel(v){const x=n(v);if(x>=35)return'강한 상승 집중';if(x>=12)return'상승 우위';if(x<=-35)return'강한 하락 집중';if(x<=-12)return'하락 우위';return'중립'}
 function flowTone(v){return n(v)>10?'positive':n(v)<-10?'negative':''}
