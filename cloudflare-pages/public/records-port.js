@@ -4,7 +4,7 @@
 
   const q=(selector,root=document)=>root.querySelector(selector);
   const n=value=>Number(value||0);
-  const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[ch]));
   const won=value=>`${Math.round(n(value)).toLocaleString('ko-KR')}원`;
   const pct=(value,d=2)=>`${n(value)>=0?'+':''}${n(value).toFixed(d)}%`;
   const tone=value=>n(value)>0?'positive':n(value)<0?'negative':'';
@@ -34,23 +34,18 @@
     const symbol=String(row.symbol||row.market||'').replace(/^KRW-/,'');
     if(row.kind==='learning'){
       const c=row.profile_change||{};
-      return `<article class="record-row" data-record-market="${esc(row.market||'')}"><div class="record-kind learning"><i></i><b>학습</b></div><div class="record-market"><b>${esc(symbol)}</b><small>${esc(row.market||'')}</small></div><div class="record-main"><b>완료 거래를 반영해 기준값을 조정했습니다.</b><p>시장 ${n(c.regime_before).toFixed(1)} → ${n(c.regime_after).toFixed(1)} · 진입 ${n(c.entry_before).toFixed(1)} → ${n(c.entry_after).toFixed(1)} · 기본비중 ${n(c.weight_before).toFixed(1)}% → ${n(c.weight_after).toFixed(1)}%</p></div><div class="record-side"><b class="${tone(row.outcome_return_pct)}">${pct(row.outcome_return_pct)}</b><small>${dt(row.ts)}</small></div></article>`;
+      return `<article class="record-row"><div class="record-kind learning"><i></i><b>학습</b></div><div class="record-market"><b>${esc(symbol)}</b><small>${esc(row.market||'')}</small></div><div class="record-main"><b>완료 거래를 반영해 기준값을 조정했습니다.</b><p>시장 ${n(c.regime_before).toFixed(1)} → ${n(c.regime_after).toFixed(1)} · 진입 ${n(c.entry_before).toFixed(1)} → ${n(c.entry_after).toFixed(1)} · 기본비중 ${n(c.weight_before).toFixed(1)}% → ${n(c.weight_after).toFixed(1)}%</p></div><div class="record-side"><b class="${tone(row.outcome_return_pct)}">${pct(row.outcome_return_pct)}</b><small>${dt(row.ts)}</small></div></article>`;
     }
     const isSell=row.kind==='sell';
     const amount=isSell?n(row.realized_pnl):n(row.krw);
-    return `<article class="record-row" data-record-market="${esc(row.market||'')}"><div class="record-kind ${row.kind}"><i></i><b>${isSell?'매도':'매수'}</b></div><div class="record-market"><b>${esc(symbol)}</b><small>${esc(row.market||'')}</small></div><div class="record-main"><b>${isSell?'가상계좌 매도 체결':'가상계좌 매수 체결'} · ${n(row.price).toLocaleString('ko-KR',{maximumFractionDigits:8})}원</b><p>${isSell?`실현 수익률 ${pct(row.return_pct)}`:`매수금액 ${won(row.krw)}`}</p></div><div class="record-side"><b class="${isSell?tone(amount):''}">${isSell?`${amount>=0?'+':''}${won(amount)}`:won(amount)}</b><small>${dt(row.ts)}</small></div></article>`;
+    return `<article class="record-row"><div class="record-kind ${row.kind}"><i></i><b>${isSell?'매도':'매수'}</b></div><div class="record-market"><b>${esc(symbol)}</b><small>${esc(row.market||'')}</small></div><div class="record-main"><b>${isSell?'가상계좌 매도 체결':'가상계좌 매수 체결'} · ${n(row.price).toLocaleString('ko-KR',{maximumFractionDigits:8})}원</b><p>${isSell?`실현 수익률 ${pct(row.return_pct)}`:`매수금액 ${won(row.krw)}`}</p></div><div class="record-side"><b class="${isSell?tone(amount):''}">${isSell?`${amount>=0?'+':''}${won(amount)}`:won(amount)}</b><small>${dt(row.ts)}</small></div></article>`;
   }
   function render(){
     const root=ensureRoot();if(!root)return;
     const data=records(),all=itemsFrom(data);
     const filtered=filter==='all'?all:all.filter(row=>row.kind===filter);
-    root.innerHTML=`${summary(data,all)}<div class="records-toolbar"><div class="records-filters"><button class="${filter==='all'?'is-active':''}" data-record-filter="all">전체</button><button class="${filter==='buy'?'is-active':''}" data-record-filter="buy">매수</button><button class="${filter==='sell'?'is-active':''}" data-record-filter="sell">매도</button><button class="${filter==='learning'?'is-active':''}" data-record-filter="learning">학습</button></div><span class="records-age">최근 데이터 ${age(data.updated_at)}</span></div><div class="records-feed">${filtered.length?filtered.slice(0,100).map(rowHtml).join(''):'<div class="records-empty">표시할 기록이 아직 없습니다.</div>'}</div>`;
+    root.innerHTML=`${summary(data,all)}<div class="records-toolbar"><div class="records-filters"><button class="${filter==='all'?'is-active':''}" data-record-filter="all">전체 ${all.length}</button><button class="${filter==='buy'?'is-active':''}" data-record-filter="buy">매수 ${all.filter(x=>x.kind==='buy').length}</button><button class="${filter==='sell'?'is-active':''}" data-record-filter="sell">매도 ${all.filter(x=>x.kind==='sell').length}</button><button class="${filter==='learning'?'is-active':''}" data-record-filter="learning">학습 ${all.filter(x=>x.kind==='learning').length}</button></div><span class="records-age">최근 데이터 ${age(data.updated_at)}</span></div><div class="records-feed">${filtered.length?filtered.slice(0,100).map(rowHtml).join(''):'<div class="records-empty">표시할 기록이 아직 없습니다.</div>'}</div>`;
     root.querySelectorAll('[data-record-filter]').forEach(button=>button.onclick=()=>{filter=button.dataset.recordFilter||'all';render()});
-    root.querySelectorAll('[data-record-market]').forEach(row=>row.onclick=()=>{
-      const market=row.dataset.recordMarket;if(!market)return;
-      const select=q('#coinSelect');if(select){select.value=market;select.dispatchEvent(new Event('change',{bubbles:true}))}
-      if(typeof switchView==='function')switchView('coin');
-    });
   }
   function install(){render();setInterval(()=>{if(!document.hidden&&stateRef()?.user)render()},15000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()})}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
