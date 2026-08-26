@@ -7,7 +7,7 @@
 - 백엔드에만 존재하거나 이전 UI에만 있으면 `[ ]`.
 - 페이지 간 자동 이동으로 상세를 대신하지 않는다.
 - 한 기능의 DOM은 한 페이지 모듈만 소유한다.
-- 공통 상태/HTTP/라우팅/포맷은 `public/modules/core|shared|services`만 소유한다.
+- 공통 상태/HTTP/라우팅/포맷/차트는 `public/modules/core|shared|services`만 소유한다.
 - 외부 공개 트레이딩 UI 레퍼런스는 `docs/TRADING_UI_REFERENCE.md`를 기준으로 하되 우리 권한/데이터 모델에 맞게 적용한다.
 
 ## 0. 모듈 아키텍처
@@ -19,9 +19,11 @@
 - [x] shared/format: 원화/퍼센트/가격/판단문구
 - [x] shared/selectors: 거래소 projection, 보유자산, PAPER, 전략, 기록 selector
 - [x] shared/components: KPI/점수/로딩/빈상태/거래소 segment
+- [x] shared/charts: 기간 필터/가격+체결/3선 점수/equity 공통 차트
 - [x] services/market-detail: 코인 상세 API + 짧은 캐시
 - [x] pages/*: 페이지별 DOM 소유권 분리
 - [x] 거래소 UI 상태를 research/paper/strategy/records 별도로 분리
+- [x] 차트 기간 상태를 research/paper 별도로 분리
 - [x] 기존 app.js/canonical/exchange/records/strategy DOM 후처리 스크립트 미로딩
 - [x] 외부 공개 트레이딩 UI 레퍼런스/채택 원칙 문서화
 
@@ -41,6 +43,7 @@
 - [x] 시장/진입/후보 요약
 - [x] 티커/코인명 검색
 - [x] 전체/매수후보/눌림대기/관찰/매수금지/PAPER보유 필터
+- [x] 검색/필터 결과 0건이면 우측의 이전 코인 상세을 제거
 - [x] 우선 후보 목록
 - [x] 코인 클릭 시 같은 화면 우측 상세 갱신
 - [x] 현재 판단을 가격보다 우선 표시
@@ -49,20 +52,21 @@
 - [x] 해당 코인 PAPER 평가액/보유/수익률/거래/승률
 - [x] 다음 진입/추가매수, 목표, 손절, 분할 계획
 - [x] 되돌림/변동성/호가/BTC 흐름 진단
-- [x] PAPER equity mini chart
-- [x] 기회점수 history mini chart
+- [x] PAPER equity chart
+- [x] 가격 history + buy/sell marker
+- [x] 시장/진입/기회 3선 history chart
+- [x] 1H/6H/24H/7D/전체 range selector
+- [x] ETH/BTC 별도 시장참고 블록
 - [x] 최근 체결
 - [x] 최근 학습
-- [ ] 가격 history + buy/sell marker
-- [ ] 시장/진입/기회 3선 history chart
-- [ ] 1H/6H/24H/7D range selector
-- [ ] ETH/BTC 별도 시장참고 블록
 - [ ] Phase 5 온체인/뉴스/커뮤니티/거시
 - [ ] Phase 6 AI 종합 해석
 
 ## 3. 자산
 - [x] 현재 평가액/투입원금/손익/수익률/종목수
+- [x] 평가손익을 별도 상단 KPI로 표시
 - [x] 외부 조회용 자산 배분 시각화
+- [x] PC 자산배분을 좌측 master 안으로 이동해 우측 상세를 첫 화면에서 노출
 - [x] PC 좌측 보유종목 목록
 - [x] PC 우측 선택 종목 상세
 - [x] 보유종목 클릭 시 탭 이동 금지
@@ -89,12 +93,14 @@
 - [x] 독립 계좌 평가액/현금/보유/평단/미실현/실현/거래/승률
 - [x] 현재 진입/추가매수/목표/손절/분할 계획
 - [x] 최근 체결/학습
+- [x] 선택 코인 price + buy/sell fill chart
+- [x] 선택 코인 equity chart
+- [x] 선택 코인 1H/6H/24H/7D/전체 range selector
 - [x] 빗썸↔업비트 공통 코인 비교표
 - [x] 거래소 비교 검색/정렬/전체 보기
 - [x] 비교표 sticky header
 - [ ] 전체 PAPER equity curve
 - [ ] 전체 drawdown curve
-- [ ] 선택 코인 price + fill chart
 
 ## 5. 전략 연구
 - [x] 최상위 독립 화면
@@ -147,7 +153,7 @@
 - [x] 사용자 조합 전략 생성/일시정지/재개는 로컬
 - [x] Cloudflare Pages는 읽기 전용
 
-## 9. 구현 순서
+## 9. 구현 순서 / QA
 - [x] V6 모듈 경계 정의
 - [x] 대시보드 모듈
 - [x] 리서치 master-detail 모듈
@@ -159,10 +165,11 @@
 - [x] V6 static/remote 배포 checker 구현
 - [x] 최신 기능 HEAD GitHub Actions PASS - Python / Dashboard / Cloudflare / modular viewer
 - [x] Windows/Pages 실제 배포 PASS - VIEWER_MODULAR_V6=PASS
-- [ ] PC 브라우저 영상 QA
+- [x] PC 브라우저 영상 QA 1차 - 2026-08-26 18:35, 전체 IA/master-detail 방향 개선 확인
+- [ ] build 26 집중 QA - 리서치 0건 상태/기간차트/자산 첫화면/PAPER 체결차트
 - [ ] 모바일 390/430 QA
 - [ ] 남은 `[ ]` 기능을 우선순위대로 복구/구현
 
 ## 10. Dead UI asset 정리
-- [ ] V6 CI + 실제 Pages PASS 후 기존 `app.js` / canonical / exchange-phase3 / local-parity / asset-local-port / records-port / strategy-lab-v2 dead UI asset 삭제 - 브라우저 QA 직전까지 보류
+- [ ] build 26 CI + Windows/Pages PASS 후 기존 `app.js` / canonical / exchange-phase3 / local-parity / asset-local-port / records-port / strategy-lab-v2 dead UI asset 삭제
 - [ ] 삭제 후 Cloudflare Pages typecheck/배포 재검증
