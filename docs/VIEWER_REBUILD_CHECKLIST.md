@@ -158,11 +158,11 @@
 - [x] 시스템 모듈
 - [x] V6 static/remote 배포 checker 구현
 - [x] 최신 기능 HEAD GitHub Actions PASS - Python / Dashboard / Cloudflare / modular viewer
-- [ ] Windows/Pages 실제 배포 PASS
+- [x] Windows/Pages 실제 배포 PASS - VIEWER_MODULAR_V6=PASS
 - [ ] PC 브라우저 영상 QA
 - [ ] 모바일 390/430 QA
 - [ ] 남은 `[ ]` 기능을 우선순위대로 복구/구현
 
 ## 10. Dead UI asset 정리
-- [ ] V6 CI + 실제 Pages PASS 후 기존 `app.js` / canonical / exchange-phase3 / local-parity / asset-local-port / records-port / strategy-lab-v2 dead UI asset 삭제
+- [ ] V6 CI + 실제 Pages PASS 후 기존 `app.js` / canonical / exchange-phase3 / local-parity / asset-local-port / records-port / strategy-lab-v2 dead UI asset 삭제 - 브라우저 QA 직전까지 보류
 - [ ] 삭제 후 Cloudflare Pages typecheck/배포 재검증
