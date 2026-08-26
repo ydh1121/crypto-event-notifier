@@ -10,7 +10,10 @@ from .auto_demo_v2 import DB_PATH, START_KRW
 
 HISTORY_BUCKET_SECONDS = 300
 HISTORY_DAYS = 14
-MAX_HISTORY_POINTS = 2016  # 7 days at five-minute resolution
+MAX_HISTORY_POINTS = 2016  # seven days at five-minute local resolution
+RECENT_FULL_RESOLUTION_POINTS = 288  # latest 24 hours
+OLDER_SAMPLE_STEP = 6  # thirty-minute points before the latest 24 hours
+MAX_PUBLISHED_HISTORY_POINTS = 576
 
 
 def _num(value: Any, default: float = 0.0) -> float:
@@ -169,6 +172,17 @@ def _trim(conn: sqlite3.Connection, now: float) -> None:
     conn.execute("DELETE FROM paper_portfolio_history WHERE ts<?", (cutoff,))
 
 
+def _compress_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep 5-minute points for the latest day and 30-minute points before it."""
+    if len(rows) <= RECENT_FULL_RESOLUTION_POINTS:
+        return rows
+    recent = rows[-RECENT_FULL_RESOLUTION_POINTS:]
+    older = rows[:-RECENT_FULL_RESOLUTION_POINTS]
+    sampled = older[::OLDER_SAMPLE_STEP]
+    room = max(0, MAX_PUBLISHED_HISTORY_POINTS - len(recent))
+    return sampled[-room:] + recent if room else recent
+
+
 def _history_by_experiment(conn: sqlite3.Connection) -> dict[str, list[list[float]]]:
     experiments = [
         str(row[0])
@@ -182,10 +196,11 @@ def _history_by_experiment(conn: sqlite3.Connection) -> dict[str, list[list[floa
                 WHERE experiment_id=? ORDER BY ts DESC LIMIT ?""",
             (exp, MAX_HISTORY_POINTS),
         ).fetchall()
-        if rows:
+        ordered = _compress_rows([dict(row) for row in reversed(rows)])
+        if ordered:
             out[exp] = [
                 [round(_num(row["ts"]), 3), round(_num(row["equity_krw"]), 2), round(_num(row["return_pct"]), 5), round(_num(row["drawdown_pct"]), 5), round(_num(row["realized_pnl"]), 2)]
-                for row in reversed(rows)
+                for row in ordered
             ]
     return out
 
@@ -238,7 +253,7 @@ def _coin_matrix(conn: sqlite3.Connection) -> dict[str, list[dict[str, Any]]]:
 
 def _paper_history(conn: sqlite3.Connection) -> dict[str, list[list[float]]]:
     out: dict[str, list[list[float]]] = {"bithumb": [], "upbit": [], "combined": []}
-    per_exchange: dict[str, list[dict[str, float]]] = {}
+    per_exchange: dict[str, list[dict[str, Any]]] = {}
     for exchange in ("bithumb", "upbit"):
         rows = conn.execute(
             """SELECT ts,equity_krw,start_krw,pnl_krw,return_pct,drawdown_pct,active_positions
@@ -246,17 +261,18 @@ def _paper_history(conn: sqlite3.Connection) -> dict[str, list[list[float]]]:
                 WHERE exchange=? AND strategy='adaptive' ORDER BY ts DESC LIMIT ?""",
             (exchange, MAX_HISTORY_POINTS),
         ).fetchall()
-        ordered = [dict(row) for row in reversed(rows)]
+        ordered = _compress_rows([dict(row) for row in reversed(rows)])
         per_exchange[exchange] = ordered
         out[exchange] = [
             [round(_num(row.get("ts")), 3), round(_num(row.get("equity_krw")), 2), round(_num(row.get("pnl_krw")), 2), round(_num(row.get("return_pct")), 5), round(_num(row.get("drawdown_pct")), 5), int(row.get("active_positions") or 0)]
             for row in ordered
         ]
-    by_ts: dict[float, dict[str, dict[str, float]]] = {}
+    by_ts: dict[float, dict[str, dict[str, Any]]] = {}
     for exchange, rows in per_exchange.items():
         for row in rows:
             by_ts.setdefault(_num(row.get("ts")), {})[exchange] = row
     peak = 0.0
+    combined: list[list[float]] = []
     for ts in sorted(by_ts):
         pair = by_ts[ts]
         if not pair:
@@ -268,8 +284,8 @@ def _paper_history(conn: sqlite3.Connection) -> dict[str, list[list[float]]]:
         peak = max(peak, start, equity)
         dd = _drawdown(equity, peak)
         active = sum(int(row.get("active_positions") or 0) for row in pair.values())
-        out["combined"].append([round(ts, 3), round(equity, 2), round(pnl, 2), round(ret, 5), round(dd, 5), active])
-    out["combined"] = out["combined"][-MAX_HISTORY_POINTS:]
+        combined.append([round(ts, 3), round(equity, 2), round(pnl, 2), round(ret, 5), round(dd, 5), active])
+    out["combined"] = combined[-MAX_PUBLISHED_HISTORY_POINTS:]
     return out
 
 
