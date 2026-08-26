@@ -112,6 +112,7 @@ jobs:
           node-version: "22"
       - run: npm install
       - run: npm run typecheck
+      - run: find public/modules -name '*.js' -print0 | xargs -0 -n1 node --check
       - run: test -s public/index.html
       - run: test -s public/modules/main.js
       - run: test -s public/modules/core/store.js
@@ -122,8 +123,8 @@ jobs:
       - run: test -s public/modules/pages/records.js
       - run: test -s migrations/0001_init.sql
       - run: grep -q 'READ ONLY' public/index.html
-      - run: grep -q 'crypto-viewer-build" content="2026.08.26-24' public/index.html
-      - run: grep -q 'type="module" src="/modules/main.js?v=1"' public/index.html
+      - run: grep -q 'crypto-viewer-build" content="2026.08.26-25' public/index.html
+      - run: grep -q 'type="module" src="/modules/main.js?v=2"' public/index.html
       - run: grep -q 'data-route="dashboard"' public/index.html
       - run: grep -q 'data-route="research"' public/index.html
       - run: grep -q 'data-route="assets"' public/index.html
@@ -131,7 +132,13 @@ jobs:
       - run: grep -q 'data-route="strategy"' public/index.html
       - run: grep -q 'data-route="records"' public/index.html
       - run: grep -q 'asset-workspace' public/modules/pages/assets.js
+      - run: grep -q 'allocation-panel' public/modules/pages/assets.js
       - run: grep -q 'research-workspace' public/modules/pages/research.js
+      - run: grep -q '최근 중요 변화' public/modules/pages/dashboard.js
+      - run: grep -q 'data-records-period' public/modules/pages/records.js
+      - run: grep -q 'data-records-search' public/modules/pages/records.js
+      - run: grep -q 'data-compare-search' public/modules/pages/paper.js
+      - run: grep -q 'data-compare-sort' public/modules/pages/paper.js
       - run: grep -q '전체 PAPER 증감' public/modules/pages/dashboard.js
       - run: if grep -q '/app.js' public/index.html; then exit 1; fi
       - run: if grep -q 'viewer-canonical-' public/index.html; then exit 1; fi
@@ -139,4 +146,7 @@ jobs:
       - run: if grep -q 'records-port.js' public/index.html; then exit 1; fi
       - run: if grep -q 'strategy-lab-v2.js' public/index.html; then exit 1; fi
       - run: grep -q '\[x\] PC 우측 선택 종목 상세' ../docs/VIEWER_REBUILD_CHECKLIST.md
+      - run: grep -q 'freqtrade/frequi' ../docs/TRADING_UI_REFERENCE.md
+      - run: grep -q 'hummingbot/dashboard' ../docs/TRADING_UI_REFERENCE.md
+      - run: grep -q 'marketcalls/openalgo' ../docs/TRADING_UI_REFERENCE.md
       - run: grep -q 'setup-cloudflare-pages-viewer.ps1' README.md
