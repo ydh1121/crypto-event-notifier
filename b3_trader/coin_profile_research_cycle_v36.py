@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from .coin_profile_identity_safe import IdentitySafeCoinProfileEnricher
@@ -11,6 +12,7 @@ class CoinProfileResearchCycleV36(CoinProfileResearchCycle):
     """Build 36+ profile cycle with strict project identity and content-integrity repair."""
 
     def __init__(self) -> None:
+        logging.getLogger("pypdf").setLevel(logging.ERROR)
         self.base = IdentitySafeCoinProfileEnricher()
         self.session = self.base.session
 
