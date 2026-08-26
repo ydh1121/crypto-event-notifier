@@ -1,4 +1,5 @@
 import{n}from'./format.js';
+import{decisionCounts}from'./decision.js';
 export const snapshot=state=>state?.snapshot||null;
 export const fullPublic=state=>snapshot(state)?.public||{};
 export function exchangePublic(state,exchange='bithumb'){
@@ -25,4 +26,9 @@ export function strategyLab(state){return fullPublic(state).strategy_lab||{}}
 export function strategyRows(state,exchange){const all=Array.isArray(strategyLab(state).experiments)?strategyLab(state).experiments:[];return all.filter(r=>r.exchange===exchange)}
 export function recordsData(state,exchange){const pub=fullPublic(state);return pub.exchange_records?.[exchange]||exchangePublic(state,exchange).recent_records||{fills:[],feedback:[],fill_count:0,feedback_count:0,updated_at:0}}
 export function commonExchangeRows(state){const b=rowsFor(state,'bithumb'),u=rowsFor(state,'upbit'),um=new Map(u.map(r=>[r.market,r]));return b.map(br=>({market:br.market,b:br,u:um.get(br.market)})).filter(x=>x.u)}
-export function marketSummary(state,exchange){const rows=rowsFor(state,exchange);if(!rows.length)return{avgRegime:0,avgEntry:0,candidates:0,up:0,down:0};return{avgRegime:rows.reduce((s,r)=>s+n(r.regime_score),0)/rows.length,avgEntry:rows.reduce((s,r)=>s+n(r.entry_score),0)/rows.length,candidates:rows.filter(r=>n(r.opportunity_score)>=65).length,up:rows.filter(r=>n(r.return_pct)>0).length,down:rows.filter(r=>n(r.return_pct)<0).length}}
+export function marketSummary(state,exchange){
+  const rows=rowsFor(state,exchange),decisions=decisionCounts(rows);
+  if(!rows.length)return{avgRegime:0,avgEntry:0,candidates:0,buyCandidates:0,opportunityCandidates:0,decisionCounts:decisions,up:0,down:0};
+  const opportunityCandidates=rows.filter(r=>n(r.opportunity_score)>=65).length;
+  return{avgRegime:rows.reduce((s,r)=>s+n(r.regime_score),0)/rows.length,avgEntry:rows.reduce((s,r)=>s+n(r.entry_score),0)/rows.length,candidates:decisions.buy,buyCandidates:decisions.buy,opportunityCandidates,decisionCounts:decisions,up:rows.filter(r=>n(r.return_pct)>0).length,down:rows.filter(r=>n(r.return_pct)<0).length};
+}
