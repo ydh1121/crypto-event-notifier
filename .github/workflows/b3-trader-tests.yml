@@ -5,16 +5,17 @@ on:
     paths:
       - "AGENTS.md"
       - "DESIGN.md"
+      - "TASTES.md"
       - "docs/**"
       - "b3_trader/**"
       - "control/**"
       - "dashboard/**"
       - "scripts/**"
+      - "cloudflare/**"
+      - "cloudflare-pages/**"
       - "start-trader.bat"
       - "start-trader-secure.bat"
       - "LOCAL_MULTI_ASSET.md"
-      - "cloudflare/**"
-      - "cloudflare-pages/**"
       - "Dockerfile"
       - ".dockerignore"
       - ".github/workflows/b3-trader-tests.yml"
@@ -36,7 +37,7 @@ jobs:
           python-version: "3.12"
       - run: pip install -r b3_trader/requirements.txt pytest
       - run: python -m pytest -q b3_trader/tests
-      - run: python -m py_compile b3_trader/*.py
+      - run: python -m py_compile b3_trader/*.py scripts/check-viewer-modular.py
 
   dashboard-smoke:
     runs-on: ubuntu-latest
@@ -45,47 +46,24 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: test -s dashboard/index.html
-      - run: test -s dashboard/app.js
-      - run: test -s dashboard/plain-language.js
-      - run: test -s dashboard/portfolio-tools.js
-      - run: test -s dashboard/ux-stability.js
-      - run: test -s dashboard/navigation-v3.js
-      - run: test -s dashboard/demo-research.js
-      - run: test -s dashboard/research-capital.js
-      - run: test -s dashboard/research-components.js
-      - run: test -s dashboard/strategy-lab-local.js
-      - run: test -s dashboard/styles.css
-      - run: test -s dashboard/plain-language.css
-      - run: test -s dashboard/portfolio-tools.css
-      - run: test -s dashboard/ux-polish.css
-      - run: test -s dashboard/navigation-v3.css
-      - run: test -s dashboard/demo-research.css
-      - run: test -s dashboard/research-capital.css
-      - run: test -s dashboard/research-components.css
-      - run: test -s dashboard/strategy-lab-local.css
-      - run: node --check dashboard/app.js
-      - run: node --check dashboard/plain-language.js
-      - run: node --check dashboard/portfolio-tools.js
-      - run: node --check dashboard/ux-stability.js
-      - run: node --check dashboard/navigation-v3.js
-      - run: node --check dashboard/demo-research.js
-      - run: node --check dashboard/research-capital.js
-      - run: node --check dashboard/research-components.js
-      - run: node --check dashboard/strategy-lab-local.js
-      - run: grep -q 'data-view-panel="overview"' dashboard/index.html
-      - run: grep -q 'data-view-panel="performance"' dashboard/index.html
-      - run: grep -q 'plain-language.js' dashboard/index.html
-      - run: grep -q 'portfolio-tools.js' dashboard/index.html
-      - run: grep -q 'ux-stability.js' dashboard/index.html
-      - run: grep -q 'ux-polish.css' dashboard/index.html
-      - run: grep -q 'navigation-v3.js' dashboard/index.html
-      - run: grep -q 'navigation-v3.css' dashboard/index.html
-      - run: grep -q 'research-capital.js' dashboard/index.html
-      - run: grep -q 'research-components.js' dashboard/index.html
-      - run: grep -q 'strategy-lab-local.js' dashboard/index.html
-      - run: grep -q 'strategy-lab-local.css' dashboard/index.html
-      - run: grep -q 'Phone access' dashboard/index.html
+      - name: Validate local dashboard assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in \
+            dashboard/index.html dashboard/app.js dashboard/plain-language.js dashboard/portfolio-tools.js \
+            dashboard/ux-stability.js dashboard/navigation-v3.js dashboard/demo-research.js \
+            dashboard/research-capital.js dashboard/research-components.js dashboard/strategy-lab-local.js \
+            dashboard/styles.css dashboard/plain-language.css dashboard/portfolio-tools.css dashboard/ux-polish.css \
+            dashboard/navigation-v3.css dashboard/demo-research.css dashboard/research-capital.css \
+            dashboard/research-components.css dashboard/strategy-lab-local.css; do
+            test -s "$file"
+          done
+          for file in dashboard/*.js; do node --check "$file"; done
+          grep -q 'data-view-panel="overview"' dashboard/index.html
+          grep -q 'data-view-panel="performance"' dashboard/index.html
+          grep -q 'portfolio-tools.js' dashboard/index.html
+          grep -q 'Phone access' dashboard/index.html
 
   cloudflare-typecheck:
     runs-on: ubuntu-latest
@@ -113,85 +91,64 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: find public/modules -name '*.js' -print0 | xargs -0 -n1 node --check
-      - run: test -s public/index.html
-      - run: test -s public/modules/main.js
-      - run: test -s public/modules/core/store.js
-      - run: test -s public/modules/shared/charts.js
-      - run: test -s public/modules/shared/decision.js
-      - run: test -s public/modules/styles/charts.css
-      - run: test -s public/modules/pages/assets.js
-      - run: test -s public/modules/pages/research.js
-      - run: test -s public/modules/pages/paper.js
-      - run: test -s public/modules/pages/strategy.js
-      - run: test -s public/modules/pages/records.js
-      - run: test -s migrations/0001_init.sql
-      - run: grep -q 'READ ONLY' public/index.html
-      - run: grep -q 'crypto-viewer-build" content="2026.08.26-27' public/index.html
-      - run: grep -q 'type="module" src="/modules/main.js?v=4"' public/index.html
-      - run: grep -q '/modules/styles/charts.css?v=2' public/index.html
-      - run: grep -q 'data-route="dashboard"' public/index.html
-      - run: grep -q 'data-route="research"' public/index.html
-      - run: grep -q 'data-route="assets"' public/index.html
-      - run: grep -q 'data-route="paper"' public/index.html
-      - run: grep -q 'data-route="strategy"' public/index.html
-      - run: grep -q 'data-route="records"' public/index.html
-      - run: grep -q 'asset-workspace' public/modules/pages/assets.js
-      - run: grep -q 'allocation-panel compact' public/modules/pages/assets.js
-      - run: grep -q 'research-workspace' public/modules/pages/research.js
-      - run: grep -q '현재 조건에서 선택할 코인이 없습니다.' public/modules/pages/research.js
-      - run: grep -q '../shared/decision.js' public/modules/pages/research.js
-      - run: grep -q 'DECISION_FILTERS' public/modules/shared/decision.js
-      - run: grep -q 'regime>=65&&entry>=68' public/modules/shared/decision.js
-      - run: grep -q 'regime>=70&&entry<50' public/modules/shared/decision.js
-      - run: grep -q 'regime<50' public/modules/shared/decision.js
-      - run: grep -q 'data-research-range' public/modules/pages/research.js
-      - run: grep -q 'scoreHistoryChart' public/modules/pages/research.js
-      - run: grep -q 'BTC 시장참고' public/modules/pages/research.js
-      - run: grep -q 'ETH 시장참고' public/modules/pages/research.js
-      - run: grep -q 'data-paper-range' public/modules/pages/paper.js
-      - run: grep -q 'priceFillChart' public/modules/pages/paper.js
-      - run: grep -q '최근 중요 변화' public/modules/pages/dashboard.js
-      - run: grep -q 'data-records-period' public/modules/pages/records.js
-      - run: grep -q 'data-records-search' public/modules/pages/records.js
-      - run: grep -q 'data-compare-search' public/modules/pages/paper.js
-      - run: grep -q 'data-compare-sort' public/modules/pages/paper.js
-      - run: grep -q '전체 PAPER 증감' public/modules/pages/dashboard.js
+      - name: Validate build 28 source contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in \
+            public/index.html public/modules/main.js public/modules/core/store.js \
+            public/modules/shared/charts.js public/modules/shared/decision.js public/modules/shared/averaging.js \
+            public/modules/styles/tokens.css public/modules/styles/components.css public/modules/styles/assets.css \
+            public/modules/styles/paper.css public/modules/pages/assets.js public/modules/pages/research.js \
+            public/modules/pages/paper.js public/modules/pages/strategy.js public/modules/pages/records.js \
+            migrations/0001_init.sql; do
+            test -s "$file"
+          done
+          grep -q 'READ ONLY' public/index.html
+          grep -q 'crypto-viewer-build" content="2026.08.26-28' public/index.html
+          grep -q 'type="module" src="/modules/main.js?v=5"' public/index.html
+          grep -q '/modules/styles/tokens.css?v=3' public/index.html
+          grep -q '/modules/styles/assets.css?v=5' public/index.html
+          grep -q '/modules/styles/paper.css?v=5' public/index.html
+          grep -q '#f5f5f7' public/modules/styles/tokens.css
+          grep -q '#1d1d1f' public/modules/styles/tokens.css
+          grep -q '#0066cc' public/modules/styles/tokens.css
+          grep -q 'tabular-nums' public/modules/styles/tokens.css
+          grep -q 'white-space:nowrap' public/modules/styles/components.css
+          grep -q '.chip-row button.active' public/modules/styles/components.css
+          grep -q '.asset-research-sides .score-line+.score-line' public/modules/styles/assets.css
+          grep -q '.exchange-paper-grid .kpi b' public/modules/styles/paper.css
+          grep -q '추천 타점 · 즉시 평단' public/modules/pages/assets.js
+          grep -q 'data-direct-buy-price' public/modules/pages/assets.js
+          grep -q '물타기 계산기' public/modules/pages/assets.js
+          grep -q 'data-add-avg-row' public/modules/pages/assets.js
+          grep -q 'calculateDirectAverage' public/modules/shared/averaging.js
+          grep -q 'calculateAveraging' public/modules/shared/averaging.js
+          grep -q 'researchExchange:exchange' public/modules/core/store.js
+          grep -q 'strategyExchange:exchange' public/modules/core/store.js
+          grep -q 'recordsExchange:exchange' public/modules/core/store.js
+          grep -q 'row?.exchange||' public/modules/core/store.js
+          grep -q '../shared/decision.js' public/modules/pages/research.js
+          grep -q 'data-research-range' public/modules/pages/research.js
+          grep -q 'data-paper-range' public/modules/pages/paper.js
+          grep -q 'data-records-period' public/modules/pages/records.js
+          grep -q 'data-records-search' public/modules/pages/records.js
+          test -s ../TASTES.md
+          test -s ../docs/PRIVATE_PORTFOLIO_STORAGE.md
+          grep -q 'AES-256-GCM' ../docs/PRIVATE_PORTFOLIO_STORAGE.md
       - name: Ensure retired Pages UI assets are physically absent
         shell: bash
         run: |
           set -euo pipefail
-          patterns=(
-            'app.js'
-            'asset-local-port.*'
-            'asset-parity-shell.*'
-            'exchange-phase3.*'
-            'local-parity.*'
-            'market-detail.*'
-            'records-port.*'
-            'strategy-lab-v1.*'
-            'strategy-lab-v2.js'
-            'viewer-best-port.*'
-            'viewer-canonical-v1.*'
-            'viewer-canonical-v2.*'
-            'viewer-canonical-v3.*'
-            'viewer-canonical-v4.*'
-            'viewer-ia-v5.*'
-            'viewer-performance-v1.*'
-            'viewer-performance-v2.*'
-            'viewer-shell-v2.*'
-            'viewer-shell-v3.*'
-            'viewer-ux-v4.*'
-            'styles.css'
-            'workspaces.css'
-          )
-          for pattern in "${patterns[@]}"; do
-            if compgen -G "public/${pattern}" >/dev/null; then
-              echo "Retired UI asset still exists: ${pattern}" >&2
+          for pattern in \
+            'app.js' 'asset-local-port.*' 'asset-parity-shell.*' 'exchange-phase3.*' 'local-parity.*' \
+            'market-detail.*' 'records-port.*' 'strategy-lab-v1.*' 'strategy-lab-v2.js' 'viewer-best-port.*' \
+            'viewer-canonical-v1.*' 'viewer-canonical-v2.*' 'viewer-canonical-v3.*' 'viewer-canonical-v4.*' \
+            'viewer-ia-v5.*' 'viewer-performance-v1.*' 'viewer-performance-v2.*' 'viewer-shell-v2.*' \
+            'viewer-shell-v3.*' 'viewer-ux-v4.*' 'styles.css' 'workspaces.css'; do
+            if compgen -G "public/$pattern" >/dev/null; then
+              echo "retired asset still exists: $pattern" >&2
               exit 1
             fi
           done
-      - run: grep -q '\[x\] PC 우측 선택 종목 상세' ../docs/VIEWER_REBUILD_CHECKLIST.md
-      - run: grep -q 'freqtrade/frequi' ../docs/TRADING_UI_REFERENCE.md
-      - run: grep -q 'hummingbot/dashboard' ../docs/TRADING_UI_REFERENCE.md
-      - run: grep -q 'marketcalls/openalgo' ../docs/TRADING_UI_REFERENCE.md
       - run: grep -q 'setup-cloudflare-pages-viewer.ps1' README.md

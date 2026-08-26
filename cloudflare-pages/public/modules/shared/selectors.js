@@ -5,7 +5,7 @@ export const fullPublic=state=>snapshot(state)?.public||{};
 export function exchangePublic(state,exchange='bithumb'){
   const pub=fullPublic(state),selected=pub.exchanges?.[exchange];
   if(!selected)return pub;
-  return {...pub,...selected,exchange,exchanges:pub.exchanges,exchange_records:pub.exchange_records||{},recent_records:pub.exchange_records?.[exchange]||pub.recent_records,research_node:pub.research_node,strategy_lab:pub.strategy_lab,published_at:pub.published_at,multi_exchange_updated_at:pub.multi_exchange_updated_at};
+  return{...pub,...selected,exchange,exchanges:pub.exchanges,exchange_records:pub.exchange_records||{},recent_records:pub.exchange_records?.[exchange]||pub.recent_records,research_node:pub.research_node,strategy_lab:pub.strategy_lab,published_at:pub.published_at,multi_exchange_updated_at:pub.multi_exchange_updated_at};
 }
 export const rowsFor=(state,exchange='bithumb')=>Array.isArray(exchangePublic(state,exchange).leaderboard)?exchangePublic(state,exchange).leaderboard:[];
 export function combinedPaper(state){
@@ -19,9 +19,12 @@ export function paperStats(state,exchange='bithumb'){
 }
 export function holdings(state){const s=snapshot(state);if(!s?.private_visible)return[];return Array.isArray(s.private?.manual_holdings?.holdings)?s.private.manual_holdings.holdings.filter(x=>n(x.volume)>0):[]}
 export function holdingsSummary(state){const s=snapshot(state);return s?.private_visible?s.private?.manual_holdings:null}
+export function averagingPlans(state){const s=snapshot(state);if(!s?.private_visible)return{plans:[],storage:{}};const value=s.private?.manual_averaging_plans;return value&&typeof value==='object'?value:{plans:[],storage:{}}}
+export function averagingPlan(state,market){const source=averagingPlans(state),plans=Array.isArray(source.plans)?source.plans:[];return plans.find(row=>row.market===market)||{market,rows:[],updated_ts:null}}
+export function preferredExchangeFromHoldings(state){const list=holdings(state);if(!list.length)return'bithumb';const totals={bithumb:0,upbit:0};for(const item of list){const exchange=String(item.exchange||'bithumb').toLowerCase();if(exchange in totals)totals[exchange]+=Math.max(0,n(item.value_krw)||n(item.invested_krw))}return totals.upbit>totals.bithumb?'upbit':'bithumb'}
 export function findMarket(state,exchange,market){return rowsFor(state,exchange).find(r=>r.market===market)||null}
 export function findHolding(state,market){return holdings(state).find(r=>r.market===market)||null}
-export function allCandidateRows(state){const out=[];for(const ex of ['bithumb','upbit'])for(const row of rowsFor(state,ex))out.push({...row,__exchange:ex});return out}
+export function allCandidateRows(state){const out=[];for(const ex of['bithumb','upbit'])for(const row of rowsFor(state,ex))out.push({...row,__exchange:ex});return out}
 export function strategyLab(state){return fullPublic(state).strategy_lab||{}}
 export function strategyRows(state,exchange){const all=Array.isArray(strategyLab(state).experiments)?strategyLab(state).experiments:[];return all.filter(r=>r.exchange===exchange)}
 export function recordsData(state,exchange){const pub=fullPublic(state);return pub.exchange_records?.[exchange]||exchangePublic(state,exchange).recent_records||{fills:[],feedback:[],fill_count:0,feedback_count:0,updated_at:0}}

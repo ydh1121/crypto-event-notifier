@@ -11,15 +11,18 @@ const defaults={
 let saved={};try{saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}')}catch{}
 const state={user:null,snapshot:null,loading:true,error:null,ui:{...defaults,...saved}};
 const listeners=new Set();
+let exchangeDefaultApplied=false;
 function persist(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state.ui))}catch{}}
 function emit(meta={}){for(const fn of listeners){try{fn(state,meta)}catch(err){console.error('store listener',err)}}}
+function defaultExchange(snapshot){const list=Array.isArray(snapshot?.private?.manual_holdings?.holdings)?snapshot.private.manual_holdings.holdings:[];if(!snapshot?.private_visible||!list.length)return'bithumb';const totals={bithumb:0,upbit:0};for(const row of list){const ex=String(row?.exchange||'bithumb').toLowerCase();if(!(ex in totals))continue;const value=Math.max(0,Number(row?.value_krw||row?.invested_krw||0));totals[ex]+=Number.isFinite(value)?value:0}return totals.upbit>totals.bithumb?'upbit':'bithumb'}
+function applyExchangeDefault(snapshot){if(exchangeDefaultApplied)return;exchangeDefaultApplied=true;const exchange=defaultExchange(snapshot);Object.assign(state.ui,{researchExchange:exchange,strategyExchange:exchange,recordsExchange:exchange});persist()}
 export const store={
   get:()=>state,
   subscribe(fn){listeners.add(fn);return()=>listeners.delete(fn)},
   set(patch,meta={}){Object.assign(state,patch);emit(meta)},
   setUser(user){state.user=user||null;emit({type:'user'})},
-  setSnapshot(snapshot,user){state.snapshot=snapshot||null;if(user)state.user=user;state.loading=false;state.error=null;emit({type:'snapshot'})},
+  setSnapshot(snapshot,user){state.snapshot=snapshot||null;if(user)state.user=user;state.loading=false;state.error=null;if(snapshot)applyExchangeDefault(snapshot);emit({type:'snapshot'})},
   setError(error){state.error=error||null;state.loading=false;emit({type:'error'})},
   setUi(patch,meta={}){Object.assign(state.ui,patch);persist();emit({type:'ui',...meta})},
-  resetSession(){state.user=null;state.snapshot=null;state.loading=false;state.error=null;emit({type:'session-reset'})}
+  resetSession(){state.user=null;state.snapshot=null;state.loading=false;state.error=null;exchangeDefaultApplied=false;emit({type:'session-reset'})}
 };
