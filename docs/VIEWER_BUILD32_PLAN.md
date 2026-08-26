@@ -13,6 +13,14 @@
 
 커뮤니티 게시물 하나만으로 사업 내용이나 대표 섹터를 확정하지 않는다. 동일 ticker가 여러 프로젝트에서 사용될 수 있으므로 영문명 일치와 공급자 식별자를 함께 확인하고 match confidence를 저장한다.
 
+### 출처 신뢰도
+
+- 1차 공식: 거래소 가상자산 설명서, 프로젝트 홈페이지, whitepaper, Docs, 공식 GitHub
+- 2차 구조화: CoinMarketCap, CoinGecko의 project metadata와 category/tag
+- 3차 보조: 프로젝트가 공식 연결한 X, Telegram, Reddit, forum/community
+
+1차 공식 자료가 있으면 한국어 사업 요약의 우선 소스로 사용한다. 2차 자료는 ticker·프로젝트 매칭과 category 교차검증에 사용한다. 3차 커뮤니티는 공식 발표·현재 활동 여부를 확인하는 보조 링크로만 저장하며 단독으로 대표 섹터를 바꾸지 않는다.
+
 ## 전수조사 방식
 
 `coin-profile-enrichment` supervisor component가 90초 간격으로 현재 빗썸·업비트 KRW market catalog를 다시 읽고 순환한다. 한 번 실행할 때 bounded batch만 조사해 외부 API rate limit을 피하고, cursor가 전체 market을 끝까지 돌면 다음 cycle을 시작한다. 신규상장·리브랜딩·사업 변경에 대응할 수 있도록 반복 검증한다.
