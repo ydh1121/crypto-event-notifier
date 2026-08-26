@@ -116,6 +116,8 @@ jobs:
       - run: test -s public/index.html
       - run: test -s public/modules/main.js
       - run: test -s public/modules/core/store.js
+      - run: test -s public/modules/shared/charts.js
+      - run: test -s public/modules/styles/charts.css
       - run: test -s public/modules/pages/assets.js
       - run: test -s public/modules/pages/research.js
       - run: test -s public/modules/pages/paper.js
@@ -123,8 +125,9 @@ jobs:
       - run: test -s public/modules/pages/records.js
       - run: test -s migrations/0001_init.sql
       - run: grep -q 'READ ONLY' public/index.html
-      - run: grep -q 'crypto-viewer-build" content="2026.08.26-25' public/index.html
-      - run: grep -q 'type="module" src="/modules/main.js?v=2"' public/index.html
+      - run: grep -q 'crypto-viewer-build" content="2026.08.26-26' public/index.html
+      - run: grep -q 'type="module" src="/modules/main.js?v=3"' public/index.html
+      - run: grep -q '/modules/styles/charts.css?v=1' public/index.html
       - run: grep -q 'data-route="dashboard"' public/index.html
       - run: grep -q 'data-route="research"' public/index.html
       - run: grep -q 'data-route="assets"' public/index.html
@@ -132,8 +135,15 @@ jobs:
       - run: grep -q 'data-route="strategy"' public/index.html
       - run: grep -q 'data-route="records"' public/index.html
       - run: grep -q 'asset-workspace' public/modules/pages/assets.js
-      - run: grep -q 'allocation-panel' public/modules/pages/assets.js
+      - run: grep -q 'allocation-panel compact' public/modules/pages/assets.js
       - run: grep -q 'research-workspace' public/modules/pages/research.js
+      - run: grep -q '현재 조건에서 선택할 코인이 없습니다.' public/modules/pages/research.js
+      - run: grep -q 'data-research-range' public/modules/pages/research.js
+      - run: grep -q 'scoreHistoryChart' public/modules/pages/research.js
+      - run: grep -q 'BTC 시장참고' public/modules/pages/research.js
+      - run: grep -q 'ETH 시장참고' public/modules/pages/research.js
+      - run: grep -q 'data-paper-range' public/modules/pages/paper.js
+      - run: grep -q 'priceFillChart' public/modules/pages/paper.js
       - run: grep -q '최근 중요 변화' public/modules/pages/dashboard.js
       - run: grep -q 'data-records-period' public/modules/pages/records.js
       - run: grep -q 'data-records-search' public/modules/pages/records.js
