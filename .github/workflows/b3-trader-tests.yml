@@ -41,7 +41,7 @@ jobs:
       - run: pip install -r b3_trader/requirements.txt pytest
       - run: python -m pytest -q b3_trader/tests
       - run: python -m py_compile b3_trader/*.py scripts/check-viewer-modular.py
-      - name: Validate research, performance and operations contracts
+      - name: Validate research performance and operations contracts
         shell: bash
         run: |
           set -euo pipefail
@@ -49,12 +49,7 @@ jobs:
           grep -q 'BITHUMB_MANUAL_URL' b3_trader/coin_profile_enricher.py
           grep -q 'class CoinProfileResearchCycle' b3_trader/coin_profile_research_cycle.py
           grep -q 'PRECISION_PER_EXCHANGE = 3' b3_trader/coin_profile_research_cycle.py
-          grep -q 'coin-profile-backlog' b3_trader/coin_profile_research_cycle.py
-          grep -q 'precision_official' b3_trader/coin_profile_research_cycle.py
           grep -q 'CoinProfileResearchCycle' b3_trader/research_supervisor.py
-          grep -q 'coin-profile-enrichment' b3_trader/research_supervisor.py
-          grep -q '전체 코인 사업·섹터 전수조사' b3_trader/research_control.py
-          grep -q 'pypdf' b3_trader/requirements.txt
           grep -q 'strategy_lab_equity_history' b3_trader/performance_analytics.py
           grep -q 'paper_portfolio_history' b3_trader/performance_analytics.py
           grep -q 'coin_matrix' b3_trader/performance_analytics.py
@@ -63,8 +58,13 @@ jobs:
           grep -q '_git_summary' b3_trader/research_control.py
           grep -q '_cloudflare_summary' b3_trader/research_control.py
           grep -q '_warehouse_summary' b3_trader/research_control.py
+          grep -q '_backup_summary' b3_trader/research_control.py
           grep -q '_telegram_summary' b3_trader/research_control.py
-          grep -q 'secret_values_exposed' b3_trader/research_control.py
+          grep -q '_remote_access_summary' b3_trader/research_control.py
+          grep -q 'address_values_exposed' b3_trader/research_control.py
+          grep -q 'remote_path_exposed' b3_trader/research_control.py
+          grep -q 'buy_candidate_sent_count' b3_trader/telegram_notify.py
+          grep -q 'last_buy_candidate_sent_at' b3_trader/telegram_notify.py
 
   dashboard-smoke:
     runs-on: ubuntu-latest
@@ -118,7 +118,7 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: find public/modules -name '*.js' -print0 | xargs -0 -n1 node --check
-      - name: Validate build 34 source contract
+      - name: Validate build 35 source contract
         shell: bash
         run: |
           set -euo pipefail
@@ -135,9 +135,10 @@ jobs:
             migrations/0004_coin_profile_cache.sql migrations/0005_coin_profile_evidence.sql; do
             test -s "$file"
           done
-          grep -q 'crypto-viewer-build" content="2026.08.27-34' public/index.html
-          grep -q 'type="module" src="/modules/main.js?v=11"' public/index.html
-          grep -q '/modules/styles/records-system.css?v=4' public/index.html
+          grep -q 'crypto-viewer-build" content="2026.08.27-35' public/index.html
+          grep -q 'type="module" src="/modules/main.js?v=12"' public/index.html
+          grep -q '/modules/styles/records-system.css?v=5' public/index.html
+          grep -q 'system.js?v=35' public/modules/main.js
           grep -q '프로젝트별 설명 수집 중' public/modules/pages/sectors.js
           grep -q 'profile.business_summary_ko' public/modules/pages/sectors.js
           ! grep -q "chosen?.sector_business||''" public/modules/pages/sectors.js
@@ -162,10 +163,9 @@ jobs:
           grep -q '코인별 성과' public/modules/pages/strategy.js
           grep -q '코인 × 전략' public/modules/pages/strategy.js
           grep -q '전체 PAPER equity / drawdown' public/modules/pages/strategy.js
-          grep -q '코드 동기화' public/modules/pages/system.js
-          grep -q 'Pages · 데이터 전송' public/modules/pages/system.js
-          grep -q 'Parquet 분석 창고' public/modules/pages/system.js
-          grep -q '알림 준비 상태' public/modules/pages/system.js
+          grep -q 'SQLite · Drive 백업' public/modules/pages/system.js
+          grep -q 'BUY_CANDIDATE 알림' public/modules/pages/system.js
+          grep -q '휴대폰 · 원격 접속' public/modules/pages/system.js
           grep -q 'componentDiagnostics' public/modules/pages/system.js
           grep -q 'operations-grid' public/modules/styles/records-system.css
           grep -q 'component-diagnostic' public/modules/styles/records-system.css
@@ -174,9 +174,14 @@ jobs:
           test -s ../docs/VIEWER_BUILD32_PLAN.md
           test -s ../docs/VIEWER_BUILD33_PLAN.md
           test -s ../docs/VIEWER_BUILD34_PLAN.md
+          test -s ../docs/VIEWER_BUILD35_PLAN.md
+          test -s ../docs/VIEWER_REBUILD_CHECKLIST.md
           grep -q '전체 코인 사업·섹터 전수조사' ../docs/VIEWER_BUILD32_PLAN.md
           grep -q 'Strategy / PAPER Performance Analytics' ../docs/VIEWER_BUILD33_PLAN.md
           grep -q 'Operations Visibility' ../docs/VIEWER_BUILD34_PLAN.md
+          grep -q 'Operations Completion' ../docs/VIEWER_BUILD35_PLAN.md
+          grep -q '\[x\] SQLite/Drive backup 상세' ../docs/VIEWER_REBUILD_CHECKLIST.md
+          grep -q '\[ \] GitHub Actions CI 상태를 Viewer에서 직접 표시' ../docs/VIEWER_REBUILD_CHECKLIST.md
       - name: Ensure retired Pages UI assets are physically absent
         shell: bash
         run: |
