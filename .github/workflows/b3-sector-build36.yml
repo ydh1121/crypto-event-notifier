@@ -1,0 +1,55 @@
+name: B3 sector Build 36
+
+on:
+  push:
+    branches:
+      - "b3-auto-trader-phase1"
+    paths:
+      - "b3_trader/coin_profile_identity_safe.py"
+      - "b3_trader/coin_profile_research_cycle_v36.py"
+      - "b3_trader/research_supervisor.py"
+      - "cloudflare-pages/functions/api/coin-profile-backlog-v36.ts"
+      - "cloudflare-pages/functions/api/ingest-coin-profiles-repair.ts"
+      - "cloudflare-pages/public/modules/pages/sectors-v36.js"
+      - "cloudflare-pages/public/modules/styles/build36.css"
+      - "cloudflare-pages/public/modules/main.js"
+      - "cloudflare-pages/public/index.html"
+      - "scripts/check-sector-build36.py"
+      - "docs/VIEWER_BUILD36_PLAN.md"
+      - ".github/workflows/b3-sector-build36.yml"
+  workflow_dispatch:
+
+jobs:
+  build36:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: pip install -r b3_trader/requirements.txt
+      - run: python -m py_compile b3_trader/coin_profile_identity_safe.py b3_trader/coin_profile_research_cycle_v36.py b3_trader/research_supervisor.py scripts/check-sector-build36.py
+      - run: node --check cloudflare-pages/public/modules/pages/sectors-v36.js
+      - run: python scripts/check-sector-build36.py
+      - name: Cloudflare Pages typecheck
+        working-directory: cloudflare-pages
+        run: |
+          npm install
+          npm run typecheck
+      - name: Validate identity audit contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'IdentitySafeCoinProfileEnricher' b3_trader/coin_profile_identity_safe.py
+          grep -q 'if not _identity_in_text(row, text)' b3_trader/coin_profile_identity_safe.py
+          grep -q 'CoinProfileResearchCycleV36' b3_trader/research_supervisor.py
+          grep -q 'identity_mismatch' cloudflare-pages/functions/api/coin-profile-backlog-v36.ts
+          grep -q 'identity_mismatch_by_exchange' cloudflare-pages/functions/api/coin-profile-backlog-v36.ts
+          grep -q 'identity_repairs' cloudflare-pages/functions/api/ingest-coin-profiles-repair.ts
+          grep -q 'data-sector-search' cloudflare-pages/public/modules/pages/sectors-v36.js
+          grep -q 'data-sector-filter' cloudflare-pages/public/modules/pages/sectors-v36.js
+          grep -q 'grid-template-columns:repeat(3,minmax(0,1fr))' cloudflare-pages/public/modules/styles/build36.css
+          ! grep -q 'min-width:650px' cloudflare-pages/public/modules/styles/build36.css
