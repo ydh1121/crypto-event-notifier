@@ -15,6 +15,8 @@ type BacklogRow = {
   has_korean: number;
 };
 
+type CountRow = {count?: number};
+
 const clean = (value: unknown) => String(value ?? '').trim();
 const num = (value: unknown) => {
   const out = Number(value || 0);
@@ -70,14 +72,29 @@ export const onRequestGet: PagesFunction<Env> = async ({request, env}) => {
       LIMIT ?`,
   ).bind(exchange, fastCutoff, fastCutoff, sectorCutoff, qualityCutoff, qualityCutoff, perExchange).all<BacklogRow>();
 
-  const [bithumbResult, upbitResult] = await Promise.all([
+  const countQuality = (exchange: 'bithumb' | 'upbit') => env.DB.prepare(
+    `SELECT COUNT(*) AS count
+       FROM coin_profile_cache
+      WHERE exchange=? AND (
+        (business_summary_ko='' AND description_ko='')
+        OR research_status IN ('pending','unresolved')
+        OR canonical_sector='' OR canonical_sector='미분류 검토'
+        OR source_count<2
+        OR match_confidence<0.8
+      )`,
+  ).bind(exchange).first<CountRow>();
+
+  const [bithumbResult, upbitResult, bithumbQuality, upbitQuality] = await Promise.all([
     queryExchange('bithumb'),
     queryExchange('upbit'),
+    countQuality('bithumb'),
+    countQuality('upbit'),
   ]);
 
-  // Preserve exchange fairness before applying the caller's total limit. A single
-  // exchange with an older/larger backlog must never starve precision research on
-  // the other exchange (the previous global LIMIT 48 could return 48/0).
+  // Preserve exchange fairness with a round-robin merge before applying the
+  // caller's total limit. A single exchange with an older/larger backlog must
+  // never starve precision research on the other exchange (the old global LIMIT
+  // could return 48/0 even when both exchanges had eligible work).
   const queues = [bithumbResult.results || [], upbitResult.results || []];
   const balanced: BacklogRow[] = [];
   for (let offset = 0; balanced.length < requested; offset += 1) {
@@ -109,10 +126,32 @@ export const onRequestGet: PagesFunction<Env> = async ({request, env}) => {
     bithumb: rows.filter(row => row.exchange === 'bithumb').length,
     upbit: rows.filter(row => row.exchange === 'upbit').length,
   };
+  const eligibleByExchange = {
+    bithumb: (bithumbResult.results || []).length,
+    upbit: (upbitResult.results || []).length,
+  };
+  const qualityPendingByExchange = {
+    bithumb: Math.max(0, Math.round(num(bithumbQuality?.count))),
+    upbit: Math.max(0, Math.round(num(upbitQuality?.count))),
+  };
+  const cooldownByExchange = {
+    bithumb: Math.max(0, qualityPendingByExchange.bithumb - eligibleByExchange.bithumb),
+    upbit: Math.max(0, qualityPendingByExchange.upbit - eligibleByExchange.upbit),
+  };
+
   const reasonCounts: Record<string, number> = {};
   for (const row of rows) {
     for (const reason of row.reasons) reasonCounts[reason] = (reasonCounts[reason] || 0) + 1;
   }
 
-  return json({ok: true, generated_at: now, rows, by_exchange: byExchange, reasons: reasonCounts});
+  return json({
+    ok: true,
+    generated_at: now,
+    rows,
+    by_exchange: byExchange,
+    eligible_by_exchange: eligibleByExchange,
+    quality_pending_by_exchange: qualityPendingByExchange,
+    cooldown_by_exchange: cooldownByExchange,
+    reasons: reasonCounts,
+  });
 };
