@@ -20,13 +20,14 @@ BUILD29_PLAN = ROOT / "docs/VIEWER_BUILD29_PLAN.md"
 BUILD30_PLAN = ROOT / "docs/VIEWER_BUILD30_PLAN.md"
 BUILD31_PLAN = ROOT / "docs/VIEWER_BUILD31_PLAN.md"
 BUILD32_PLAN = ROOT / "docs/VIEWER_BUILD32_PLAN.md"
+BUILD33_PLAN = ROOT / "docs/VIEWER_BUILD33_PLAN.md"
 REQUIRED = [
     "modules/core/http.js", "modules/core/store.js", "modules/core/router.js", "modules/core/auth.js", "modules/core/snapshot.js",
     "modules/shared/format.js", "modules/shared/selectors.js", "modules/shared/components.js", "modules/shared/charts.js",
     "modules/shared/decision.js", "modules/shared/averaging.js", "modules/services/market-detail.js", "modules/services/sectors.js",
     "modules/services/coin-profile.js", "modules/pages/dashboard.js", "modules/pages/research.js", "modules/pages/assets.js",
     "modules/pages/paper.js", "modules/pages/strategy.js", "modules/pages/sectors.js", "modules/pages/records.js", "modules/pages/system.js",
-    "modules/main.js", "modules/styles/charts.css", "modules/styles/sectors.css", "modules/styles/build29.css",
+    "modules/main.js", "modules/styles/charts.css", "modules/styles/strategy.css", "modules/styles/sectors.css", "modules/styles/build29.css",
     "modules/styles/exchange-ui.css", "modules/styles/build32.css",
 ]
 LEGACY_ROOT_PATTERNS = (
@@ -69,21 +70,24 @@ def main() -> None:
     print(f"python={sys.executable}")
     print(f"git_local={local or '-'}")
     print(f"git_remote={remote or '-'}")
+
     index=text(INDEX); main_js=text(PUBLIC/"modules/main.js"); router_js=text(PUBLIC/"modules/core/router.js"); store_js=text(PUBLIC/"modules/core/store.js")
-    dashboard_js=text(PUBLIC/"modules/pages/dashboard.js"); research_js=text(PUBLIC/"modules/pages/research.js"); assets_js=text(PUBLIC/"modules/pages/assets.js")
-    paper_js=text(PUBLIC/"modules/pages/paper.js"); records_js=text(PUBLIC/"modules/pages/records.js"); sectors_js=text(PUBLIC/"modules/pages/sectors.js")
-    coin_profile_service=text(PUBLIC/"modules/services/coin-profile.js"); sector_service=text(PUBLIC/"modules/services/sectors.js")
-    build29_css=text(PUBLIC/"modules/styles/build29.css"); exchange_css=text(PUBLIC/"modules/styles/exchange-ui.css"); build32_css=text(PUBLIC/"modules/styles/build32.css")
+    selectors_js=text(PUBLIC/"modules/shared/selectors.js"); dashboard_js=text(PUBLIC/"modules/pages/dashboard.js"); research_js=text(PUBLIC/"modules/pages/research.js")
+    assets_js=text(PUBLIC/"modules/pages/assets.js"); paper_js=text(PUBLIC/"modules/pages/paper.js"); strategy_js=text(PUBLIC/"modules/pages/strategy.js")
+    records_js=text(PUBLIC/"modules/pages/records.js"); sectors_js=text(PUBLIC/"modules/pages/sectors.js"); build29_css=text(PUBLIC/"modules/styles/build29.css")
+    exchange_css=text(PUBLIC/"modules/styles/exchange-ui.css"); build32_css=text(PUBLIC/"modules/styles/build32.css"); strategy_css=text(PUBLIC/"modules/styles/strategy.css")
     tokens_css=text(PUBLIC/"modules/styles/tokens.css"); paper_css=text(PUBLIC/"modules/styles/paper.css")
-    sector_api=text(ROOT/"cloudflare-pages/functions/api/sector-summary.ts"); profile_api=text(ROOT/"cloudflare-pages/functions/api/coin-profile.ts")
-    ingest_profiles=text(ROOT/"cloudflare-pages/functions/api/ingest-coin-profiles.ts"); backlog_api=text(ROOT/"cloudflare-pages/functions/api/coin-profile-backlog.ts"); taxonomy=text(ROOT/"cloudflare-pages/functions/lib/coin-taxonomy.ts")
+    sector_api=text(ROOT/"cloudflare-pages/functions/api/sector-summary.ts"); ingest_profiles=text(ROOT/"cloudflare-pages/functions/api/ingest-coin-profiles.ts")
+    backlog_api=text(ROOT/"cloudflare-pages/functions/api/coin-profile-backlog.ts"); taxonomy=text(ROOT/"cloudflare-pages/functions/lib/coin-taxonomy.ts")
     migration4=text(ROOT/"cloudflare-pages/migrations/0004_coin_profile_cache.sql"); migration5=text(ROOT/"cloudflare-pages/migrations/0005_coin_profile_evidence.sql")
-    enricher=text(ROOT/"b3_trader/coin_profile_enricher.py"); precision_cycle=text(ROOT/"b3_trader/coin_profile_research_cycle.py"); supervisor=text(ROOT/"b3_trader/research_supervisor.py"); control=text(ROOT/"b3_trader/research_control.py")
+    enricher=text(ROOT/"b3_trader/coin_profile_enricher.py"); precision_cycle=text(ROOT/"b3_trader/coin_profile_research_cycle.py")
+    supervisor=text(ROOT/"b3_trader/research_supervisor.py"); control=text(ROOT/"b3_trader/research_control.py")
+    performance_analytics=text(ROOT/"b3_trader/performance_analytics.py"); strategy_snapshot=text(ROOT/"b3_trader/strategy_lab_snapshot.py")
     requirements=text(ROOT/"b3_trader/requirements.txt"); repair=text(ROOT/"scripts/repair-local-sync.ps1"); gitignore=text(ROOT/".gitignore")
 
     static = {
-        "build_32": 'crypto-viewer-build" content="2026.08.26-32' in index,
-        "module_entry_v9": 'type="module" src="/modules/main.js?v=9"' in index,
+        "build_33": 'crypto-viewer-build" content="2026.08.27-33' in index,
+        "module_entry_v10": 'type="module" src="/modules/main.js?v=10"' in index,
         "all_required_modules": all((PUBLIC/path).exists() for path in REQUIRED),
         "apple_finance_tokens": all(token in tokens_css for token in ("#f5f5f7","#1d1d1f","#0066cc","tabular-nums")),
         "quiet_filter_chips": ".chip-row button.active" in build29_css,
@@ -112,12 +116,19 @@ def main() -> None:
         "coin_profile_korean_manual": all(token in enricher for token in ("BITHUMB_MANUAL_URL","_read_manual_pdf","description_ko","purpose_ko","PdfReader","feed-content")),
         "coin_profile_supervisor": "CoinProfileResearchCycle" in supervisor and '"coin-profile-enrichment"' in supervisor and '"coin-profile-enrichment"' in control,
         "coin_profile_precision_cycle": all(token in precision_cycle for token in ("class CoinProfileResearchCycle","PRECISION_PER_EXCHANGE","coin-profile-backlog","_precision_once","general = self.base.run_once()")),
-        "coin_profile_balanced_backlog": all(token in backlog_api for token in ("queryExchange('bithumb')","queryExchange('upbit')","round-robin","perExchange")),
+        "coin_profile_balanced_backlog": all(token in backlog_api for token in ("queryExchange('bithumb')","queryExchange('upbit')","round-robin","perExchange","eligible_by_exchange","quality_pending_by_exchange","cooldown_by_exchange")),
         "coin_profile_no_sector_fallback": "profile.business_summary_ko||profile.description_ko||profile.business_summary_en||profile.description_en" in sectors_js and "chosen?.sector_business||''" not in sectors_js,
         "coin_profile_evidence_ui": all(token in sectors_js for token in ("근거 출처","match_confidence","last_verified_at","coin-profile-community")) and "profile-verification" in build32_css,
         "sector_enriched_classification": all(token in sector_api for token in ("canonical_sector","research_status","business_summary_ko","researched_count","unresolved_count")) and "evidenceText" in sector_api,
         "taxonomy_evidence_classification": "evidenceText" in taxonomy and "matches(haystack" in taxonomy and "미분류 검토" in taxonomy,
         "project_research_progress": "프로젝트 조사" in sectors_js and "researched_count" in sectors_js,
+        "performance_analytics_module": all(token in performance_analytics for token in ("strategy_lab_equity_history","paper_portfolio_history","coin_matrix","HISTORY_BUCKET_SECONDS = 300","MAX_HISTORY_POINTS = 2016")),
+        "strategy_snapshot_v3": all(token in strategy_snapshot for token in ('"version": 3','read_performance_analytics','strategy_equity_history','coin_matrix','paper_history')),
+        "strategy_equity_curve": all(token in strategy_js for token in ("전략 equity curve","strategyEquityHistory","drawdown_pct","data-strategy-range")) and "strategy-history-panel" in strategy_css,
+        "strategy_coin_performance": all(token in strategy_js for token in ("코인별 성과","coinPerformance","실현손익","미실현")) and "strategyCoinMatrix" in selectors_js,
+        "strategy_coin_matrix": all(token in strategy_js for token in ("코인 × 전략","strategyCoinRows","strategy-matrix-workspace")) and "strategyCoinRows" in selectors_js,
+        "paper_portfolio_equity_drawdown": all(token in strategy_js for token in ("전체 PAPER equity / drawdown","paperPortfolioHistory","전체 PAPER 자산곡선","전체 PAPER Drawdown")) and "paperPortfolioHistory" in selectors_js,
+        "strategy_analytics_state": all(token in store_js for token in ("strategyTab:'overview'","strategyRange:'24h'","strategyCoinMarket:''")),
         "runtime_tmp_safe": "dashboard/runtime-demo-upbit.json.tmp" in gitignore and "dashboard/runtime-demo*.tmp" in repair,
         "privacy_contract": "AES-256-GCM" in text(PRIVATE_STORAGE),
         "taste_contract": "Do not change the approved information architecture" in text(TASTES),
@@ -125,25 +136,42 @@ def main() -> None:
         "build30_plan": "in-place" in text(BUILD30_PLAN),
         "build31_plan": "14-coin cap" in text(BUILD31_PLAN),
         "build32_plan": all(token in text(BUILD32_PLAN) for token in ("전체 코인 사업·섹터 전수조사","community","strategy equity curve")),
+        "build33_plan": all(token in text(BUILD33_PLAN) for token in ("Strategy / PAPER Performance Analytics","Strategy equity curve","Coin × strategy comparison","Overall adaptive PAPER equity / drawdown")),
     }
     print("\n=== MODULAR VIEWER V6 CONTRACT ===")
     print(json.dumps(static, ensure_ascii=False, indent=2))
     errors=[]; pending=[]
-    if not all(static.values()): errors.append("build 32 source contract is incomplete")
+    if not all(static.values()): errors.append("build 33 source contract is incomplete")
     if not local or not remote or local != remote: pending.append("Git local/remote HEAD has not synchronized yet")
+
     deploy=read_json(DEPLOY); url=str(deploy.get("viewer_url") or "").rstrip("/"); head=str(deploy.get("deployed_head") or "")
     print("\n=== LOCAL DEPLOY STATE ===");print(json.dumps({"deployed_head":head[:7],"health_ok":bool(deploy.get("health_ok")),"viewer_url":url},ensure_ascii=False,indent=2))
     if not head or (local and not head.startswith(local)): pending.append("Pages has not deployed the current Git HEAD")
     if not deploy.get("health_ok"): pending.append("Pages health check is not green")
-    remote_contract={"index_status":0,"main_status":0,"sectors_status":0,"coin_profile_service_status":0,"build32_css_status":0,"build_32":False,"module_entry_v9":False,"legacy_files_absent":False,"coin_profile_no_sector_fallback":False,"coin_profile_evidence_ui":False,"project_research_progress":False}
+
+    remote_contract={"index_status":0,"main_status":0,"strategy_status":0,"strategy_css_status":0,"sectors_status":0,"build_33":False,"module_entry_v10":False,"legacy_files_absent":False,"strategy_analytics_ui":False,"coin_profile_ui":False}
     if url:
-        nonce=str(time.time_ns());si,ri=fetch(f"{url}/?modular={nonce}");sm,rm=fetch(f"{url}/modules/main.js?v=9&modular={nonce}");ss,rs=fetch(f"{url}/modules/pages/sectors.js?modular={nonce}");sp,rp=fetch(f"{url}/modules/services/coin-profile.js?modular={nonce}");sc,rc=fetch(f"{url}/modules/styles/build32.css?v=1&modular={nonce}")
+        nonce=str(time.time_ns())
+        si,ri=fetch(f"{url}/?modular={nonce}")
+        sm,rm=fetch(f"{url}/modules/main.js?v=10&modular={nonce}")
+        st,rst=fetch(f"{url}/modules/pages/strategy.js?modular={nonce}")
+        sc,rsc=fetch(f"{url}/modules/styles/strategy.css?v=3&modular={nonce}")
+        ss,rs=fetch(f"{url}/modules/pages/sectors.js?modular={nonce}")
         legacy_statuses={path:fetch(f"{url}/{path}?retired={nonce}")[0] for path in REMOTE_LEGACY_PATHS}
-        remote_contract.update({"index_status":si,"main_status":sm,"sectors_status":ss,"coin_profile_service_status":sp,"build32_css_status":sc,"build_32":'crypto-viewer-build" content="2026.08.26-32' in ri,"module_entry_v9":'type="module" src="/modules/main.js?v=9"' in ri and "createSectorsPage" in rm,"legacy_files_absent":all(status==404 for status in legacy_statuses.values()),"coin_profile_no_sector_fallback":"프로젝트별 설명 수집 중" in rs and "profile.business_summary_ko" in rs,"coin_profile_evidence_ui":"근거 출처" in rs and "profile-verification" in rc,"project_research_progress":"프로젝트 조사" in rs})
+        remote_contract.update({
+            "index_status":si,"main_status":sm,"strategy_status":st,"strategy_css_status":sc,"sectors_status":ss,
+            "build_33":'crypto-viewer-build" content="2026.08.27-33' in ri,
+            "module_entry_v10":'type="module" src="/modules/main.js?v=10"' in ri and "createSectorsPage" in rm,
+            "legacy_files_absent":all(status==404 for status in legacy_statuses.values()),
+            "strategy_analytics_ui":all(token in rst for token in ("전략 equity curve","코인별 성과","코인 × 전략","전체 PAPER equity / drawdown")) and "strategy-paper-charts" in rsc,
+            "coin_profile_ui":"프로젝트별 설명 수집 중" in rs and "profile.business_summary_ko" in rs,
+        })
         print("remote_legacy_statuses="+json.dumps(legacy_statuses,ensure_ascii=False,sort_keys=True))
-        if any(code!=200 for code in (si,sm,ss,sp,sc)): pending.append("build 32 viewer assets are not reachable yet")
+        if any(code!=200 for code in (si,sm,st,sc,ss)): pending.append("build 33 viewer assets are not reachable yet")
         elif not all(value for key,value in remote_contract.items() if not key.endswith("_status")): pending.append("Pages is still serving the previous viewer build")
-    else: pending.append("viewer URL is not available in deploy state")
+    else:
+        pending.append("viewer URL is not available in deploy state")
+
     print("\n=== REMOTE VIEWER CONTRACT ===");print(json.dumps(remote_contract,ensure_ascii=False,indent=2));print("\n=== RESULT ===")
     if errors:
         for item in errors: print(f"ERROR: {item}")
