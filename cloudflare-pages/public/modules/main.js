@@ -4,6 +4,8 @@ import{createAuth}from'./core/auth.js';
 import{createSnapshotPoller}from'./core/snapshot.js';
 import{fullPublic}from'./shared/selectors.js';
 import{age,esc}from'./shared/format.js';
+import{installSectorImeGuard}from'./shared/sector-ime-guard.js?v=37';
+import{installTableSortEnhancer}from'./shared/table-sort-enhancer.js?v=37';
 import{createDashboardPage}from'./pages/dashboard.js';
 import{createResearchPage}from'./pages/research.js';
 import{createAssetsPage}from'./pages/assets.js';
@@ -13,6 +15,8 @@ import{createSectorsPage}from'./pages/sectors-v36.js?v=36';
 import{createRecordsPage}from'./pages/records.js';
 import{createSystemPage}from'./pages/system.js?v=35';
 
+installSectorImeGuard();
+installTableSortEnhancer();
 const root=document.getElementById('pageRoot'),nav=document.getElementById('mainNav');
 let router=null;
 const pages={
