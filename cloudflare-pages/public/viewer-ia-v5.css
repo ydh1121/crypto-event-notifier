@@ -1,6 +1,7 @@
 /* Viewer IA v5: user-journey-first information architecture. */
 :root{--ia-line:rgba(15,23,42,.08);--ia-soft:#f5f6f8;--ia-card:#fff;--ia-ink:#15171b;--ia-muted:#717784;--ia-blue:#4477df}
 html.ia-v5 #phase3ExchangeBar{display:none!important}
+html.ia-v5 #leaderText{display:none!important}
 html.ia-v5 .top-shell{border-bottom:1px solid rgba(15,23,42,.055)!important}
 html.ia-v5 .top-inner{max-width:1280px!important;padding-left:22px!important;padding-right:22px!important}
 html.ia-v5 .viewer-nav{padding:0 16px 10px!important}
