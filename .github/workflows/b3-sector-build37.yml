@@ -1,0 +1,58 @@
+name: B3 sector Build 37
+
+on:
+  push:
+    branches:
+      - "b3-auto-trader-phase1"
+    paths:
+      - "b3_trader/coin_profile_integrity_audit.py"
+      - "b3_trader/coin_profile_research_cycle_v36.py"
+      - "cloudflare-pages/functions/lib/coin-profile-integrity.ts"
+      - "cloudflare-pages/functions/api/coin-profile-integrity-audit.ts"
+      - "cloudflare-pages/functions/api/coin-profile-integrity.ts"
+      - "cloudflare-pages/functions/api/coin-profile-backlog-v37.ts"
+      - "cloudflare-pages/public/modules/services/coin-profile.js"
+      - "cloudflare-pages/public/modules/shared/sector-ime-guard.js"
+      - "cloudflare-pages/public/modules/shared/table-sort-enhancer.js"
+      - "cloudflare-pages/public/modules/styles/build37.css"
+      - "cloudflare-pages/public/modules/main.js"
+      - "cloudflare-pages/public/index.html"
+      - "scripts/check-sector-build36.py"
+      - "scripts/check-sector-build37.py"
+      - "docs/VIEWER_BUILD37_PLAN.md"
+      - "docs/VIEWER_TABLE_SORT_AUDIT_BUILD37.md"
+      - ".github/workflows/b3-sector-build37.yml"
+  workflow_dispatch:
+
+jobs:
+  build37:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: pip install -r b3_trader/requirements.txt
+      - run: python -m py_compile b3_trader/coin_profile_integrity_audit.py b3_trader/coin_profile_research_cycle_v36.py scripts/check-sector-build36.py scripts/check-sector-build37.py
+      - run: node --check cloudflare-pages/public/modules/shared/sector-ime-guard.js
+      - run: node --check cloudflare-pages/public/modules/shared/table-sort-enhancer.js
+      - run: node --check cloudflare-pages/public/modules/main.js
+      - run: python scripts/check-sector-build37.py
+      - name: Cloudflare Pages typecheck
+        working-directory: cloudflare-pages
+        run: |
+          npm install
+          npm run typecheck
+      - name: Validate Build 37 contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'content_lead_name_mismatch' cloudflare-pages/functions/lib/coin-profile-integrity.ts
+          grep -q 'coin-profile-backlog-v37' b3_trader/coin_profile_research_cycle_v36.py
+          grep -q 'compositionend' cloudflare-pages/public/modules/shared/sector-ime-guard.js
+          grep -q 'strategy-overview' cloudflare-pages/public/modules/shared/table-sort-enhancer.js
+          grep -q 'paper-compare' cloudflare-pages/public/modules/shared/table-sort-enhancer.js
+          grep -q '의도적으로 정렬 UI를 추가하지 않음' docs/VIEWER_TABLE_SORT_AUDIT_BUILD37.md
