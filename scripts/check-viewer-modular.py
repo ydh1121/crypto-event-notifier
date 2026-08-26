@@ -15,6 +15,7 @@ PUBLIC = ROOT / "cloudflare-pages/public"
 INDEX = PUBLIC / "index.html"
 MAIN = PUBLIC / "modules/main.js"
 CHECKLIST = ROOT / "docs/VIEWER_REBUILD_CHECKLIST.md"
+REFERENCE = ROOT / "docs/TRADING_UI_REFERENCE.md"
 DEPLOY = ROOT / "b3_trader/data/research-platform/cloudflare-pages-deploy-state.json"
 REQUIRED = [
     "modules/core/http.js", "modules/core/store.js", "modules/core/router.js", "modules/core/auth.js",
@@ -44,6 +45,10 @@ def git(*args: str) -> str:
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
+def text(path: Path) -> str:
+    return path.read_text(encoding="utf-8", errors="replace") if path.exists() else ""
+
+
 def read_json(path: Path) -> dict:
     try:
         x = json.loads(path.read_text(encoding="utf-8"))
@@ -66,12 +71,20 @@ def main() -> None:
     print(f"python={sys.executable}")
     print(f"git_local={local or '-'}")
     print(f"git_remote={remote or '-'}")
-    index = INDEX.read_text(encoding="utf-8", errors="replace") if INDEX.exists() else ""
-    main_js = MAIN.read_text(encoding="utf-8", errors="replace") if MAIN.exists() else ""
-    checklist = CHECKLIST.read_text(encoding="utf-8", errors="replace") if CHECKLIST.exists() else ""
+
+    index = text(INDEX)
+    main_js = text(MAIN)
+    checklist = text(CHECKLIST)
+    reference = text(REFERENCE)
+    dashboard_js = text(PUBLIC / "modules/pages/dashboard.js")
+    assets_js = text(PUBLIC / "modules/pages/assets.js")
+    paper_js = text(PUBLIC / "modules/pages/paper.js")
+    records_js = text(PUBLIC / "modules/pages/records.js")
+    store_js = text(PUBLIC / "modules/core/store.js")
+
     static = {
-        "build_24": 'crypto-viewer-build" content="2026.08.26-24' in index,
-        "module_entry": 'type="module" src="/modules/main.js?v=1"' in index,
+        "build_25": 'crypto-viewer-build" content="2026.08.26-25' in index,
+        "module_entry_v2": 'type="module" src="/modules/main.js?v=2"' in index,
         "all_required_modules": all((PUBLIC / path).exists() for path in REQUIRED),
         "legacy_app_unlinked": '/app.js' not in index,
         "legacy_canonical_unlinked": 'viewer-canonical-' not in index,
@@ -82,10 +95,16 @@ def main() -> None:
         "system_utility": 'id="systemStatusBtn"' in index,
         "single_store": "from'./core/store.js'" in main_js,
         "page_modules": all(f"create{x}Page" in main_js for x in ("Dashboard", "Research", "Assets", "Paper", "Strategy", "Records", "System")),
-        "asset_same_page_detail": "asset-workspace" in (PUBLIC / "modules/styles/assets.css").read_text(encoding="utf-8", errors="replace") and "data-asset-market" in (PUBLIC / "modules/pages/assets.js").read_text(encoding="utf-8", errors="replace"),
+        "asset_same_page_detail": "data-asset-market" in assets_js and "asset-workspace" in assets_js,
+        "asset_allocation": "allocation-panel" in assets_js and "자산 배분" in assets_js,
+        "dashboard_recent_activity": "최근 중요 변화" in dashboard_js and "recordsData" in dashboard_js,
+        "records_period_coin_filters": "data-records-period" in records_js and "data-records-search" in records_js,
+        "paper_compare_search_sort": "data-compare-search" in paper_js and "data-compare-sort" in paper_js,
+        "independent_filter_state": all(x in store_js for x in ("researchExchange", "paperExchange", "strategyExchange", "recordsExchange")),
         "checklist_present": "## 0. 모듈 아키텍처" in checklist and "[x] PC 우측 선택 종목 상세" in checklist,
+        "reference_contract": all(x in reference for x in ("freqtrade/frequi", "hummingbot/dashboard", "marketcalls/openalgo", "OpenBB-finance/OpenBB")),
     }
-    print("\n=== MODULAR VIEWER CONTRACT ===")
+    print("\n=== MODULAR VIEWER V6 CONTRACT ===")
     print(json.dumps(static, ensure_ascii=False, indent=2))
     errors: list[str] = []
     pending: list[str] = []
@@ -104,21 +123,36 @@ def main() -> None:
     if not deploy.get("health_ok"):
         pending.append("Pages health check is not green")
 
-    remote_contract = {"index_status": 0, "main_status": 0, "build_24": False, "module_entry": False, "legacy_absent": False}
+    remote_contract = {
+        "index_status": 0, "main_status": 0, "assets_status": 0, "records_status": 0, "paper_status": 0,
+        "build_25": False, "module_entry_v2": False, "legacy_absent": False,
+        "asset_master_detail": False, "asset_allocation": False, "records_filters": False,
+        "paper_compare_controls": False,
+    }
     if url:
         nonce = str(time.time_ns())
         si, ri = fetch(f"{url}/?modular={nonce}")
-        sm, rm = fetch(f"{url}/modules/main.js?v=1&modular={nonce}")
+        sm, rm = fetch(f"{url}/modules/main.js?v=2&modular={nonce}")
+        sa, ra = fetch(f"{url}/modules/pages/assets.js?modular={nonce}")
+        sr, rr = fetch(f"{url}/modules/pages/records.js?modular={nonce}")
+        sp, rp = fetch(f"{url}/modules/pages/paper.js?modular={nonce}")
         remote_contract.update({
             "index_status": si,
             "main_status": sm,
-            "build_24": 'crypto-viewer-build" content="2026.08.26-24' in ri,
-            "module_entry": 'type="module" src="/modules/main.js?v=1"' in ri and "createAssetsPage" in rm,
+            "assets_status": sa,
+            "records_status": sr,
+            "paper_status": sp,
+            "build_25": 'crypto-viewer-build" content="2026.08.26-25' in ri,
+            "module_entry_v2": 'type="module" src="/modules/main.js?v=2"' in ri and "createAssetsPage" in rm,
             "legacy_absent": all(x not in ri for x in ("/app.js", "viewer-canonical-", "exchange-phase3.js", "records-port.js", "strategy-lab-v2.js")),
+            "asset_master_detail": "asset-workspace" in ra and "data-asset-market" in ra,
+            "asset_allocation": "allocation-panel" in ra,
+            "records_filters": "data-records-period" in rr and "data-records-search" in rr,
+            "paper_compare_controls": "data-compare-search" in rp and "data-compare-sort" in rp,
         })
-        if si != 200 or sm != 200:
+        if any(code != 200 for code in (si, sm, sa, sr, sp)):
             pending.append("modular viewer assets are not reachable yet")
-        elif not all((remote_contract["build_24"], remote_contract["module_entry"], remote_contract["legacy_absent"])):
+        elif not all((remote_contract["build_25"], remote_contract["module_entry_v2"], remote_contract["legacy_absent"], remote_contract["asset_master_detail"], remote_contract["asset_allocation"], remote_contract["records_filters"], remote_contract["paper_compare_controls"])):
             pending.append("Pages is still serving the previous viewer build")
     else:
         pending.append("viewer URL is not available in deploy state")
