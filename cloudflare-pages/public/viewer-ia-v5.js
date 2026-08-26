@@ -17,14 +17,14 @@
 
   const NAV={
     home:'대시보드',
-    coin:'시장분석',
+    coin:'코인분석',
     results:'성과분석',
     records:'거래기록',
     settings:'시스템',
   };
   const PAGE_COPY={
     home:{kicker:'대시보드',title:'내 자산과 PAPER 연구 상태',desc:'실제 보유자산과 연구용 가상계좌를 구분해서 한눈에 확인합니다.'},
-    coin:{kicker:'시장분석',title:'코인을 찾아 현재 판단 확인',desc:'원하는 코인을 검색하고 가격·보유상태·진입 판단을 확인합니다.'},
+    coin:{kicker:'코인분석',title:'코인을 찾아 현재 판단 확인',desc:'원하는 코인을 검색하고 가격·보유상태·진입 판단을 확인합니다.'},
     results:{kicker:'성과분석',title:'PAPER 성과와 전략 검증',desc:'코인별 가상계좌 성과를 먼저 보고, 필요할 때 전략별 결과를 비교합니다.'},
     records:{kicker:'거래기록',title:'체결과 학습 기록',desc:'가상 체결과 학습 변화가 언제 어떻게 발생했는지 시간순으로 확인합니다.'},
     settings:{kicker:'시스템',title:'연구 노드와 접근 권한',desc:'연구 서버 상태와 계정 권한을 확인합니다. 외부 웹에서는 매매를 제어하지 않습니다.'},
@@ -84,7 +84,7 @@
     const mode=exchangeMode();
     const b=exchangeData('bithumb'),u=exchangeData('upbit');
     const bc=n(b?.market_count)||n(b?.leaderboard?.length),uc=n(u?.market_count)||n(u?.leaderboard?.length);
-    host.innerHTML=`<div class="ia-exchange-filter"><span>${view==='home'?'PAPER 데이터':'데이터 기준'}</span><div><button type="button" data-ia-exchange="bithumb" class="${mode==='bithumb'?'active':''}">빗썸${bc?` <small>${bc}</small>`:''}</button><button type="button" data-ia-exchange="upbit" class="${mode==='upbit'?'active':''}">업비트${uc?` <small>${uc}</small>`:''}</button>${view==='results'?`<button type="button" data-ia-exchange="compare" class="compare ${mode==='compare'?'active':''}">거래소 비교</button>`:''}</div></div>`;
+    host.innerHTML=`<div class="ia-exchange-filter"><span>${view==='home'?'PAPER 거래소':'거래소'}</span><div><button type="button" data-ia-exchange="bithumb" class="${mode==='bithumb'?'active':''}">빗썸${bc?` <small>${bc}</small>`:''}</button><button type="button" data-ia-exchange="upbit" class="${mode==='upbit'?'active':''}">업비트${uc?` <small>${uc}</small>`:''}</button>${view==='results'?`<button type="button" data-ia-exchange="compare" class="compare ${mode==='compare'?'active':''}">거래소 비교</button>`:''}</div></div>`;
   }
 
   function renderAllContexts(){['home','coin','results','records'].forEach(renderContext)}
