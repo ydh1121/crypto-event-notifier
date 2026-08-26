@@ -113,18 +113,20 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: node --check public/app.js
-      - run: node --check public/viewer-canonical-v2.js
+      - run: node --check public/viewer-canonical-v3.js
       - run: node --check public/strategy-lab-v2.js
       - run: test -s public/index.html
       - run: test -s public/styles.css
-      - run: test -s public/viewer-canonical-v2.css
+      - run: test -s public/viewer-canonical-v3.css
       - run: test -s public/strategy-lab-v2.js
       - run: test -s migrations/0001_init.sql
       - run: grep -q 'READ ONLY' public/index.html
-      - run: grep -q 'crypto-viewer-build" content="2026.08.26-21' public/index.html
-      - run: grep -q 'viewer-canonical-v2.js?v=1' public/index.html
-      - run: grep -q 'viewer-canonical-v2.css?v=1' public/index.html
+      - run: grep -q 'crypto-viewer-build" content="2026.08.26-22' public/index.html
+      - run: grep -q 'viewer-canonical-v3.js?v=1' public/index.html
+      - run: grep -q 'viewer-canonical-v3.css?v=1' public/index.html
       - run: grep -q 'strategy-lab-v2.js?v=1' public/index.html
-      - run: if grep -q 'viewer-canonical-v1.js' public/index.html; then exit 1; fi
-      - run: if grep -q 'strategy-lab-v1.js' public/index.html; then exit 1; fi
+      - run: if grep -q 'viewer-canonical-v2.js' public/index.html; then exit 1; fi
+      - run: if grep -q 'viewer-shell-v3.js' public/index.html; then exit 1; fi
+      - run: grep -q '전체 PAPER 증감' public/viewer-canonical-v3.js
+      - run: grep -q '전체 보기' public/viewer-canonical-v3.js
       - run: grep -q 'setup-cloudflare-pages-viewer.ps1' README.md
