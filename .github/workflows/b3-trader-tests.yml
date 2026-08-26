@@ -117,6 +117,7 @@ jobs:
       - run: test -s public/modules/main.js
       - run: test -s public/modules/core/store.js
       - run: test -s public/modules/shared/charts.js
+      - run: test -s public/modules/shared/decision.js
       - run: test -s public/modules/styles/charts.css
       - run: test -s public/modules/pages/assets.js
       - run: test -s public/modules/pages/research.js
@@ -125,9 +126,9 @@ jobs:
       - run: test -s public/modules/pages/records.js
       - run: test -s migrations/0001_init.sql
       - run: grep -q 'READ ONLY' public/index.html
-      - run: grep -q 'crypto-viewer-build" content="2026.08.26-26' public/index.html
-      - run: grep -q 'type="module" src="/modules/main.js?v=3"' public/index.html
-      - run: grep -q '/modules/styles/charts.css?v=1' public/index.html
+      - run: grep -q 'crypto-viewer-build" content="2026.08.26-27' public/index.html
+      - run: grep -q 'type="module" src="/modules/main.js?v=4"' public/index.html
+      - run: grep -q '/modules/styles/charts.css?v=2' public/index.html
       - run: grep -q 'data-route="dashboard"' public/index.html
       - run: grep -q 'data-route="research"' public/index.html
       - run: grep -q 'data-route="assets"' public/index.html
@@ -138,6 +139,11 @@ jobs:
       - run: grep -q 'allocation-panel compact' public/modules/pages/assets.js
       - run: grep -q 'research-workspace' public/modules/pages/research.js
       - run: grep -q '현재 조건에서 선택할 코인이 없습니다.' public/modules/pages/research.js
+      - run: grep -q '../shared/decision.js' public/modules/pages/research.js
+      - run: grep -q 'DECISION_FILTERS' public/modules/shared/decision.js
+      - run: grep -q 'regime>=65&&entry>=68' public/modules/shared/decision.js
+      - run: grep -q 'regime>=70&&entry<50' public/modules/shared/decision.js
+      - run: grep -q 'regime<50' public/modules/shared/decision.js
       - run: grep -q 'data-research-range' public/modules/pages/research.js
       - run: grep -q 'scoreHistoryChart' public/modules/pages/research.js
       - run: grep -q 'BTC 시장참고' public/modules/pages/research.js
@@ -150,11 +156,40 @@ jobs:
       - run: grep -q 'data-compare-search' public/modules/pages/paper.js
       - run: grep -q 'data-compare-sort' public/modules/pages/paper.js
       - run: grep -q '전체 PAPER 증감' public/modules/pages/dashboard.js
-      - run: if grep -q '/app.js' public/index.html; then exit 1; fi
-      - run: if grep -q 'viewer-canonical-' public/index.html; then exit 1; fi
-      - run: if grep -q 'exchange-phase3.js' public/index.html; then exit 1; fi
-      - run: if grep -q 'records-port.js' public/index.html; then exit 1; fi
-      - run: if grep -q 'strategy-lab-v2.js' public/index.html; then exit 1; fi
+      - name: Ensure retired Pages UI assets are physically absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          patterns=(
+            'app.js'
+            'asset-local-port.*'
+            'asset-parity-shell.*'
+            'exchange-phase3.*'
+            'local-parity.*'
+            'market-detail.*'
+            'records-port.*'
+            'strategy-lab-v1.*'
+            'strategy-lab-v2.js'
+            'viewer-best-port.*'
+            'viewer-canonical-v1.*'
+            'viewer-canonical-v2.*'
+            'viewer-canonical-v3.*'
+            'viewer-canonical-v4.*'
+            'viewer-ia-v5.*'
+            'viewer-performance-v1.*'
+            'viewer-performance-v2.*'
+            'viewer-shell-v2.*'
+            'viewer-shell-v3.*'
+            'viewer-ux-v4.*'
+            'styles.css'
+            'workspaces.css'
+          )
+          for pattern in "${patterns[@]}"; do
+            if compgen -G "public/${pattern}" >/dev/null; then
+              echo "Retired UI asset still exists: ${pattern}" >&2
+              exit 1
+            fi
+          done
       - run: grep -q '\[x\] PC 우측 선택 종목 상세' ../docs/VIEWER_REBUILD_CHECKLIST.md
       - run: grep -q 'freqtrade/frequi' ../docs/TRADING_UI_REFERENCE.md
       - run: grep -q 'hummingbot/dashboard' ../docs/TRADING_UI_REFERENCE.md
