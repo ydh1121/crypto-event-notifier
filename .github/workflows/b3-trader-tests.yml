@@ -1,6 +1,9 @@
 name: B3 trader tests
 
 on:
+  push:
+    branches:
+      - "b3-auto-trader-phase1"
   pull_request:
     paths:
       - "AGENTS.md"
