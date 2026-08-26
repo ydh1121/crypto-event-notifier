@@ -22,6 +22,11 @@ class TelegramNotifier:
         self.session = requests.Session()
         self._lock = threading.RLock()
         self._last_sent: dict[str, float] = {}
+        self._sent_count = 0
+        self._buy_candidate_sent_count = 0
+        self._last_buy_candidate_sent_at = 0.0
+        self._last_send_error_at = 0.0
+        self._last_send_error = ""
         self.token = ""
         self.chat_id = ""
         self.enabled = False
@@ -39,8 +44,15 @@ class TelegramNotifier:
                 "enabled": self.enabled,
                 "configured": bool(self.token and self.chat_id),
                 "token_configured": bool(self.token),
+                "chat_configured": bool(self.chat_id),
+                # Local dashboard only. The Cloudflare public snapshot sanitizes this field.
                 "chat_id": self.chat_id,
                 "automatic_alerts": "buy_candidate_only",
+                "sent_count": self._sent_count,
+                "buy_candidate_sent_count": self._buy_candidate_sent_count,
+                "last_buy_candidate_sent_at": self._last_buy_candidate_sent_at,
+                "last_send_error_at": self._last_send_error_at,
+                "last_send_error": self._last_send_error,
             }
 
     def send(
@@ -83,13 +95,21 @@ class TelegramNotifier:
                 description = str(response.json().get("description") or description)
             except Exception:
                 pass
-            raise RuntimeError(
-                f"Telegram API error {response.status_code}: {description}"
-            )
-
-        if event_key:
+            message = f"Telegram API error {response.status_code}: {description}"
             with self._lock:
-                self._last_sent[event_key] = now
+                self._last_send_error_at = time.time()
+                self._last_send_error = message[:300]
+            raise RuntimeError(message)
+
+        sent_at = time.time()
+        with self._lock:
+            self._sent_count += 1
+            self._last_send_error = ""
+            if event_key:
+                self._last_sent[event_key] = sent_at
+            if event_key.startswith("action-") and event_key.endswith("-BUY_CANDIDATE"):
+                self._buy_candidate_sent_count += 1
+                self._last_buy_candidate_sent_at = sent_at
         return True
 
     def safe_send(self, text: str, **kwargs: Any) -> bool:
