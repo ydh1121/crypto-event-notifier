@@ -1,0 +1,88 @@
+/* Phase 4 usability pass: reduce chrome, shorten long views, make primary actions obvious. */
+:root{--ux-border:rgba(15,23,42,.08);--ux-soft:#f5f6f8;--ux-ink:#17191d;--ux-muted:#727987}
+html.ux-v4 body{background:#f6f7f9}
+html.ux-v4 .top-shell{position:sticky;top:0;z-index:80;background:rgba(248,249,251,.92);-webkit-backdrop-filter:blur(18px) saturate(130%);backdrop-filter:blur(18px) saturate(130%);border-bottom:1px solid rgba(15,23,42,.06)}
+html.ux-v4 .top-inner{padding-top:12px!important;padding-bottom:7px!important}
+html.ux-v4 .top-inner small{font-size:10px!important;letter-spacing:.08em}
+html.ux-v4 .top-inner h1{margin-top:2px!important;font-size:23px!important}
+html.ux-v4 .viewer-nav{padding-bottom:6px!important}
+html.ux-v4 .viewer-nav-inner{box-shadow:0 4px 14px rgba(35,52,82,.06)!important}
+html.ux-v4 #phase3ExchangeBar{margin-top:0!important;border-top:0!important;background:transparent!important}
+html.ux-v4 .phase3-exchange-inner{min-height:42px!important;padding-top:3px!important;padding-bottom:7px!important}
+html.ux-v4 main{padding-top:16px!important}
+html.ux-v4 .viewer-page{max-width:1440px;margin-left:auto;margin-right:auto}
+html.ux-v4 .page-head{margin-bottom:10px!important}
+html.ux-v4 .page-head h2{font-size:27px!important;letter-spacing:-.035em}
+html.ux-v4 .page-head p:not(.kicker){margin-top:5px!important;font-size:12px!important}
+
+/* Coin workspace: replace the 477-chip rail with search + a short useful rail. */
+html.ux-v4 [data-view-panel="coin"] .coin-picker{display:none!important}
+html.ux-v4 [data-view-panel="coin"] .asset-chip-shell{display:none!important}
+.ux-coin-finder{display:grid;grid-template-columns:minmax(260px,360px) minmax(0,1fr);gap:10px;align-items:end;margin:2px 0 14px}
+.ux-coin-finder>label{display:grid;gap:5px}.ux-coin-finder>label>span{color:var(--ux-muted);font-size:10px;font-weight:750}
+.ux-coin-finder input{width:100%;height:44px;border:1px solid var(--ux-border);border-radius:13px;background:#fff;padding:0 14px;font:inherit;font-size:13px;outline:none;box-shadow:0 3px 10px rgba(15,23,42,.025)}
+.ux-coin-finder input:focus{border-color:rgba(65,110,225,.36);box-shadow:0 0 0 3px rgba(65,110,225,.08)}
+.ux-coin-quick{display:flex;gap:6px;min-width:0;overflow-x:auto;padding:2px 1px 3px;scrollbar-width:none}.ux-coin-quick::-webkit-scrollbar{display:none}
+.ux-coin-quick button{display:flex;align-items:center;gap:7px;flex:0 0 auto;height:42px;padding:0 12px;border:1px solid var(--ux-border);border-radius:13px;background:#fff;color:var(--ux-ink);font:inherit;cursor:pointer}.ux-coin-quick button b{font-size:12px}.ux-coin-quick button span{color:var(--ux-muted);font-size:9px}.ux-coin-quick button.active{border-color:rgba(65,110,225,.28);background:#edf3ff;color:#2755b2}.ux-coin-quick button.active span{color:#5575b6}
+html.ux-v4 .asset-workspace{gap:10px!important}
+html.ux-v4 .asset-detail-panel,html.ux-v4 .context-panel{border-radius:18px!important}
+
+/* Strategy Lab is useful, but it should not block access to actual coin results. */
+.ux-strategy-toggle{display:flex;justify-content:space-between;align-items:center;width:100%;height:44px;margin:0 0 8px;padding:0 14px;border:1px solid var(--ux-border);border-radius:14px;background:#fff;color:var(--ux-ink);font:inherit;cursor:pointer}.ux-strategy-toggle span{font-size:12px;font-weight:780}.ux-strategy-toggle b{color:#436bd0;font-size:11px}
+html.ux-v4 .strategy-lab-card{margin-bottom:10px!important;padding:14px!important;border-radius:18px!important}
+html.ux-v4 .strategy-lab-card.ux-collapsed .strategy-lab-grid,html.ux-v4 .strategy-lab-card.ux-collapsed .strategy-lab-candidate-note{display:none!important}
+html.ux-v4 .strategy-lab-card.ux-collapsed .strategy-lab-head{margin-bottom:8px!important}
+html.ux-v4 .strategy-lab-card.ux-collapsed .strategy-lab-head p:not(.kicker){display:none!important}
+html.ux-v4 .strategy-lab-card.ux-collapsed .strategy-lab-summary{margin-bottom:0!important}
+html.ux-v4 .strategy-lab-summary>div{padding:9px 11px!important}
+
+/* Results becomes a real workspace: persistent list on the left, detail on the right. */
+html.ux-v4 .parity-research-layout{grid-template-columns:minmax(360px,40%) minmax(0,1fr)!important;gap:10px!important}
+html.ux-v4 .parity-leaderboard{top:154px!important;padding:10px!important;border:1px solid var(--ux-border)!important;background:#f0f2f5!important}
+html.ux-v4 .parity-leaderboard .market-controls{position:sticky;top:0;z-index:5;grid-template-columns:minmax(0,1fr) 145px!important;padding-bottom:7px;background:#f0f2f5}
+html.ux-v4 .parity-leaderboard .filter-row{position:sticky;top:49px;z-index:5;margin-bottom:7px!important;padding-bottom:6px;background:#f0f2f5}
+html.ux-v4 .parity-leaderboard .market-list{max-height:calc(100vh - 300px)!important;gap:5px!important}
+html.ux-v4 .parity-leaderboard .market-row{min-height:68px!important;border:1px solid rgba(15,23,42,.045)!important}
+html.ux-v4 .parity-result-detail{border:1px solid var(--ux-border);background:#f1f3f6!important}
+.ux-results-hint{margin:2px 0 7px;color:var(--ux-muted);font-size:9.5px;line-height:1.4}
+.viewer-result-more{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 8px 4px;color:var(--ux-muted);font-size:10px}.viewer-result-more button{min-height:34px;padding:0 12px;border:0;border-radius:10px;background:#e7ecf7;color:#345aa9;font:inherit;font-size:10px;font-weight:760;cursor:pointer}
+
+/* Compare inside its own scroll area instead of turning the whole page into a 286-row sheet. */
+html.ux-v4 .phase3-compare-workspace{max-height:calc(100vh - 190px);overflow:auto;border:1px solid var(--ux-border);border-radius:18px;background:#fff;scrollbar-gutter:stable}
+html.ux-v4 .phase3-compare-head{position:sticky;top:0;z-index:6;margin:0!important;padding:14px 14px 8px;background:rgba(255,255,255,.96);backdrop-filter:blur(12px)}
+html.ux-v4 .phase3-compare-controls{position:sticky;top:92px;z-index:6;margin:0!important;padding:7px 14px 10px;background:rgba(255,255,255,.96);backdrop-filter:blur(12px)}
+html.ux-v4 .phase3-compare-table{padding:0 10px 12px}
+html.ux-v4 .phase3-compare-header{position:sticky;top:148px;z-index:5;background:#f6f7f9!important}
+html.ux-v4 .phase3-compare-detail{margin:8px 10px 12px!important}
+
+/* Settings: show the status summary first; diagnostics are opt-in. */
+.ux-components-toggle{width:100%;min-height:40px;margin:10px 0 2px;border:1px solid var(--ux-border);border-radius:12px;background:#fff;color:#526174;font:inherit;font-size:11px;font-weight:760;cursor:pointer}
+html.ux-v4 #v3ResearchSettings:not(.ux-components-expanded) .v3-components{display:none!important}
+html.ux-v4 #v3ResearchSettings{padding:16px!important;border-radius:18px!important}
+html.ux-v4 .v3-settings-kpis{gap:7px!important}
+html.ux-v4 .v3-settings-kpis>div{padding:11px!important}
+html.ux-v4 #ownerPanel{margin-top:10px!important;border-radius:18px!important}
+
+@media(max-width:1050px){
+  .ux-coin-finder{grid-template-columns:1fr}
+  html.ux-v4 .parity-research-layout{grid-template-columns:minmax(330px,42%) minmax(0,1fr)!important}
+  html.ux-v4 .strategy-lab-summary{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+@media(max-width:900px){
+  html.ux-v4 .top-shell{position:relative}
+  html.ux-v4 .parity-research-layout{grid-template-columns:1fr!important}
+  html.ux-v4 .parity-leaderboard{position:static!important}
+  html.ux-v4 .parity-leaderboard .market-list{max-height:52vh!important}
+  html.ux-v4 .phase3-compare-workspace{max-height:none;overflow:visible}
+  html.ux-v4 .phase3-compare-head,html.ux-v4 .phase3-compare-controls,html.ux-v4 .phase3-compare-header{position:static}
+}
+@media(max-width:760px){
+  html.ux-v4 main{padding-top:10px!important}
+  html.ux-v4 .page-head h2{font-size:23px!important}
+  .ux-coin-finder{margin-bottom:10px}.ux-coin-finder input{height:46px}
+  .ux-coin-quick button{height:40px;padding:0 11px}
+  .ux-strategy-toggle{height:42px;margin-bottom:7px}
+  html.ux-v4 .strategy-lab-card.ux-collapsed .strategy-lab-summary{grid-template-columns:1fr 1fr!important}
+  html.ux-v4 .parity-leaderboard .market-controls{position:static}.parity-leaderboard .filter-row{position:static!important}
+  .viewer-result-more{position:sticky;bottom:0;background:rgba(240,242,245,.96);padding:7px 4px}
+}
