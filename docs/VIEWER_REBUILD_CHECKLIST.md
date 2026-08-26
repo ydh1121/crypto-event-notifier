@@ -157,7 +157,7 @@
 - [x] 기록 모듈
 - [x] 시스템 모듈
 - [x] V6 static/remote 배포 checker 구현
-- [ ] 최신 HEAD GitHub Actions PASS
+- [x] 최신 기능 HEAD GitHub Actions PASS - Python / Dashboard / Cloudflare / modular viewer
 - [ ] Windows/Pages 실제 배포 PASS
 - [ ] PC 브라우저 영상 QA
 - [ ] 모바일 390/430 QA
