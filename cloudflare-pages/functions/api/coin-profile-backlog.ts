@@ -46,18 +46,28 @@ export const onRequestGet: PagesFunction<Env> = async ({request, env}) => {
   const qualityCutoff = now - 6 * 60 * 60;
   const perExchange = Math.max(1, Math.ceil(requested / 2));
 
-  const queryExchange = (exchange: 'bithumb' | 'upbit') => env.DB.prepare(
-    `SELECT exchange,market,korean_name,english_name,research_status,canonical_sector,
-            source_count,match_confidence,updated_at,last_verified_at,
-            CASE WHEN business_summary_ko<>'' OR description_ko<>'' THEN 1 ELSE 0 END AS has_korean
-       FROM coin_profile_cache
-      WHERE exchange=? AND (
+  const eligibleWhere = `(
         ((business_summary_ko='' AND description_ko='') AND updated_at<=?)
         OR (research_status IN ('pending','unresolved') AND updated_at<=?)
         OR ((canonical_sector='' OR canonical_sector='미분류 검토') AND updated_at<=?)
         OR (source_count<2 AND updated_at<=?)
         OR (match_confidence<0.8 AND updated_at<=?)
-      )
+      )`;
+
+  const qualityWhere = `(
+        (business_summary_ko='' AND description_ko='')
+        OR research_status IN ('pending','unresolved')
+        OR canonical_sector='' OR canonical_sector='미분류 검토'
+        OR source_count<2
+        OR match_confidence<0.8
+      )`;
+
+  const queryExchange = (exchange: 'bithumb' | 'upbit') => env.DB.prepare(
+    `SELECT exchange,market,korean_name,english_name,research_status,canonical_sector,
+            source_count,match_confidence,updated_at,last_verified_at,
+            CASE WHEN business_summary_ko<>'' OR description_ko<>'' THEN 1 ELSE 0 END AS has_korean
+       FROM coin_profile_cache
+      WHERE exchange=? AND ${eligibleWhere}
       ORDER BY
         CASE
           WHEN business_summary_ko='' AND description_ko='' THEN 500
@@ -72,21 +82,26 @@ export const onRequestGet: PagesFunction<Env> = async ({request, env}) => {
       LIMIT ?`,
   ).bind(exchange, fastCutoff, fastCutoff, sectorCutoff, qualityCutoff, qualityCutoff, perExchange).all<BacklogRow>();
 
+  const countEligible = (exchange: 'bithumb' | 'upbit') => env.DB.prepare(
+    `SELECT COUNT(*) AS count FROM coin_profile_cache WHERE exchange=? AND ${eligibleWhere}`,
+  ).bind(exchange, fastCutoff, fastCutoff, sectorCutoff, qualityCutoff, qualityCutoff).first<CountRow>();
+
   const countQuality = (exchange: 'bithumb' | 'upbit') => env.DB.prepare(
-    `SELECT COUNT(*) AS count
-       FROM coin_profile_cache
-      WHERE exchange=? AND (
-        (business_summary_ko='' AND description_ko='')
-        OR research_status IN ('pending','unresolved')
-        OR canonical_sector='' OR canonical_sector='미분류 검토'
-        OR source_count<2
-        OR match_confidence<0.8
-      )`,
+    `SELECT COUNT(*) AS count FROM coin_profile_cache WHERE exchange=? AND ${qualityWhere}`,
   ).bind(exchange).first<CountRow>();
 
-  const [bithumbResult, upbitResult, bithumbQuality, upbitQuality] = await Promise.all([
+  const [
+    bithumbResult,
+    upbitResult,
+    bithumbEligible,
+    upbitEligible,
+    bithumbQuality,
+    upbitQuality,
+  ] = await Promise.all([
     queryExchange('bithumb'),
     queryExchange('upbit'),
+    countEligible('bithumb'),
+    countEligible('upbit'),
     countQuality('bithumb'),
     countQuality('upbit'),
   ]);
@@ -122,13 +137,13 @@ export const onRequestGet: PagesFunction<Env> = async ({request, env}) => {
     reasons: reasons(row),
   })).filter(row => /^(KRW|USDT)-[A-Z0-9._-]{1,32}$/.test(row.market));
 
-  const byExchange = {
+  const returnedByExchange = {
     bithumb: rows.filter(row => row.exchange === 'bithumb').length,
     upbit: rows.filter(row => row.exchange === 'upbit').length,
   };
   const eligibleByExchange = {
-    bithumb: (bithumbResult.results || []).length,
-    upbit: (upbitResult.results || []).length,
+    bithumb: Math.max(0, Math.round(num(bithumbEligible?.count))),
+    upbit: Math.max(0, Math.round(num(upbitEligible?.count))),
   };
   const qualityPendingByExchange = {
     bithumb: Math.max(0, Math.round(num(bithumbQuality?.count))),
@@ -148,7 +163,8 @@ export const onRequestGet: PagesFunction<Env> = async ({request, env}) => {
     ok: true,
     generated_at: now,
     rows,
-    by_exchange: byExchange,
+    by_exchange: returnedByExchange,
+    returned_by_exchange: returnedByExchange,
     eligible_by_exchange: eligibleByExchange,
     quality_pending_by_exchange: qualityPendingByExchange,
     cooldown_by_exchange: cooldownByExchange,
