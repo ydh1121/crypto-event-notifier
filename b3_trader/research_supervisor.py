@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from .cloudflare_market_detail_strategy_lab import CloudflareMarketDetailPublisher
 from .cloudflare_pages_deployer import CloudflarePagesDeployer
 from .cloudflare_snapshot_publisher import CloudflareSnapshotPublisher
-from .coin_profile_research_cycle import CoinProfileResearchCycle
+from .coin_profile_research_cycle_v36 import CoinProfileResearchCycleV36
 from .reference_components import ReferenceComponentWatcher
 from .research_control import COMPONENT_DEFINITIONS, STATUS_PATH, atomic_json, load_control
 from .research_warehouse import ResearchWarehouse
@@ -78,7 +78,7 @@ class ResearchSupervisor:
         self.reference_watcher = ReferenceComponentWatcher()
         self.cloudflare_publisher = CloudflareSnapshotPublisher()
         self.cloudflare_market_detail_publisher = CloudflareMarketDetailPublisher()
-        self.coin_profile_research = CoinProfileResearchCycle()
+        self.coin_profile_research = CoinProfileResearchCycleV36()
         self.cloudflare_deployer = CloudflarePagesDeployer()
         self.upbit_paper_runner = UpbitPaperResearchRunner()
         self.strategy_lab_runner = ConfiguredStrategyLabRunner()
@@ -118,7 +118,7 @@ class ResearchSupervisor:
     def _write_status(self) -> None:
         with self._lock:
             payload = {
-                "version": 2,
+                "version": 3,
                 "pid": os.getpid(),
                 "running": not self.stop_event.is_set(),
                 "paper_only": True,
@@ -132,6 +132,7 @@ class ResearchSupervisor:
                     "auto_promote_external_code": False,
                     "cloudflare_viewer_read_only": True,
                     "coin_profile_enrichment_public_sources_only": True,
+                    "coin_profile_identity_guard": True,
                 },
             }
         atomic_json(STATUS_PATH, payload)
@@ -236,11 +237,13 @@ class ResearchSupervisor:
 def main() -> None:
     stop_requested = threading.Event()
     holder: dict[str, ResearchSupervisor | None] = {"supervisor": None}
+
     def _signal_handler(_signum, _frame) -> None:
         stop_requested.set()
         supervisor = holder.get("supervisor")
         if supervisor is not None:
             supervisor.stop()
+
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
             signal.signal(sig, _signal_handler)
