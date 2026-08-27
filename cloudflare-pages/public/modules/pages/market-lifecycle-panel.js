@@ -1,4 +1,4 @@
-import{age,esc,n}from'../shared/format.js';
+import{age,dt,esc,n}from'../shared/format.js';
 import{lifecycleMeta}from'../shared/market-lifecycle.js';
 
 const EXCHANGE_LABEL={bithumb:'빗썸',upbit:'업비트'};
@@ -15,9 +15,21 @@ function sourceLabel(value){
   return value?'공식 공지':'자동 감지';
 }
 
+function scheduleText(row,state){
+  if(['LISTING_ANNOUNCED','NEW_LISTING'].includes(state)){
+    if(Number(row?.trade_open_at||0)>0)return`거래 시작 ${dt(row.trade_open_at)}`;
+    if(Number(row?.deposit_at||0)>0)return`입금 시작 ${dt(row.deposit_at)}`;
+  }
+  if(['TERMINATION_SCHEDULED','TERMINATED'].includes(state)&&Number(row?.termination_at||0)>0){
+    return`거래 종료 ${dt(row.termination_at)}`;
+  }
+  const announced=Number(row?.announcement_at||row?.effective_at||0);
+  return announced>0?`공지 ${dt(announced)}`:'';
+}
+
 function lifecycleRow(row){
-  const meta=lifecycleMeta(row?.state),market=String(row?.market||''),symbol=market.replace(/^KRW-/,'')||'-',title=String(row?.title||''),url=safeUrl(row?.url),effective=Number(row?.effective_at||0);
-  return`<article class="market-lifecycle-row ${meta.className}"><div class="market-lifecycle-identity"><b>${esc(symbol)}</b><span>${esc(market)}</span></div><div class="market-lifecycle-event"><strong>${esc(meta.label||'상태 변경')}</strong><small>${title?esc(title):esc(sourceLabel(row?.source))}</small></div><div class="market-lifecycle-meta"><span>${effective?age(effective):'시각 확인 중'}</span>${url?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">공식 공지</a>`:''}</div></article>`;
+  const meta=lifecycleMeta(row?.state),market=String(row?.market||''),symbol=market.replace(/^KRW-/,'')||'-',title=String(row?.title||''),url=safeUrl(row?.url),effective=Number(row?.effective_at||0),schedule=scheduleText(row,meta.state);
+  return`<article class="market-lifecycle-row ${meta.className}"><div class="market-lifecycle-identity"><b>${esc(symbol)}</b><span>${esc(market)}</span></div><div class="market-lifecycle-event"><strong>${esc(meta.label||'상태 변경')}</strong><small>${title?esc(title):esc(sourceLabel(row?.source))}</small>${schedule?`<em>${esc(schedule)}</em>`:''}</div><div class="market-lifecycle-meta"><span>${effective?age(effective):'시각 확인 중'}</span>${url?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">공식 공지</a>`:''}</div></article>`;
 }
 
 export function renderMarketLifecyclePanel(lifecycle,{exchange='bithumb',limit=8}={}){
