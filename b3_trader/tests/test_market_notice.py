@@ -25,6 +25,11 @@ def test_notice_title_classification() -> None:
     assert classify_notice_title("서비스 점검 안내") == OTHER
 
 
+def test_promotional_listing_event_is_not_a_listing_notice() -> None:
+    assert classify_notice_title("블록스트리트(BSB) 원화마켓 추가 기념 에어드랍 이벤트") == OTHER
+    assert classify_notice_title("ABC(ABC) 신규 거래지원 기념 이벤트") == OTHER
+
+
 def test_notice_symbol_extraction_supports_multiple_assets() -> None:
     assert extract_notice_symbols("알파(AAA), 베타(BBB) 거래유의종목 지정") == ("AAA", "BBB")
     assert extract_notice_symbols("중복(AAA) 및 다시(AAA) 안내") == ("AAA",)
