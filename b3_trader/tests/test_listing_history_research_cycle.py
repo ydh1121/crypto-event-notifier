@@ -161,3 +161,31 @@ def test_cycle_refreshes_legacy_verified_identity_when_coingecko_identity_is_ava
     assert collector.cases[0].identity.provider == "coingecko"
     assert collector.cases[0].identity.provider_id == "alpha-beta-coin"
     assert store.upserts[0]["identity"].provider == "coingecko"
+
+
+def test_cycle_does_not_claim_refresh_when_new_identity_is_still_not_venue_capable(tmp_path: Path, monkeypatch) -> None:
+    old_identity = legacy_identity()
+    still_legacy = ListingIdentity(
+        symbol="ABC",
+        english_name="Alpha Beta Coin",
+        provider="multi-source",
+        provider_id="5678",
+        official_domains=("example.org",),
+        match_confidence=0.99,
+    )
+    store = FakeStore([row(verified=True, identity=old_identity, open_at=100, open_price=0)])
+    resolver = FakeIdentityResolver({"status": "verified", "verified": True, "identity": still_legacy})
+    collector = FakeCollector("venue_verification_waiting")
+    monkeypatch.setattr("b3_trader.listing_history_research_cycle.time.time", lambda: 200.0)
+    cycle = ListingHistoryResearchCycle(
+        planner=FakePlanner(),
+        store=store,
+        identity_resolver=resolver,
+        price_resolver=FakePriceResolver(250),
+        collector=collector,
+        state_path=tmp_path / "state.json",
+    )
+    result = cycle.run_once()
+    assert result["results"][0]["identity"]["status"] == "stored_verified_legacy"
+    assert collector.cases[0].identity.provider_id == "1234"
+    assert store.upserts[0]["identity"].provider_id == "1234"
