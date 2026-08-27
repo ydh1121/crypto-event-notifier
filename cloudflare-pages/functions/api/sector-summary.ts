@@ -7,13 +7,16 @@ import type {Env} from '../lib/types';
 type SectorRow = {
   exchange:string; market:string; symbol:string; name_ko:string; name_en:string;
   source_ts:number; received_at:number; turnover_24h:number; change_24h_pct:number;
+  d1_pct:number|null; d2_pct:number|null; d3_pct:number|null; d4_pct:number|null; d5_pct:number|null;
+  lifecycle_state:string;
   opportunity_score:number; position_value_krw:number; categories:string[]; tags:string[];
   canonical_sector:string; research_status:string; business_summary_ko:string; business_summary_en:string;
   description_ko:string; description_en:string;
 };
 type SectorCoin = {
   market:string; symbol:string; name_ko:string; name_en:string; turnover_24h:number;
-  change_24h_pct:number; opportunity_score:number; profile_cached:boolean; research_status:string;
+  change_24h_pct:number; d1_pct:number|null; d2_pct:number|null; d3_pct:number|null; d4_pct:number|null; d5_pct:number|null;
+  lifecycle_state:string; opportunity_score:number; profile_cached:boolean; research_status:string;
 };
 type SectorAggregate = {
   sector:string; market_count:number; turnover_24h:number; positive_turnover:number;
@@ -22,6 +25,7 @@ type SectorAggregate = {
 
 const RANGES:Record<string,number>={h1:3600,h6:21600,h24:86400,d7:604800};
 const num=(value:unknown)=>{const out=Number(value||0);return Number.isFinite(out)?out:0};
+const nullableNum=(value:unknown):number|null=>{if(value===null||value===undefined||value==='')return null;const out=Number(value);return Number.isFinite(out)?out:null};
 const symbolOf=(market:string)=>String(market||'').toUpperCase().replace(/^KRW-/,'').replace(/^USDT-/,'');
 const clamp=(value:number,min:number,max:number)=>Math.max(min,Math.min(max,value));
 const round=(value:number,digits=2)=>{const p=10**digits;return Math.round(value*p)/p};
@@ -41,6 +45,12 @@ export const onRequestGet:PagesFunction<Env>=async({request,env})=>{
       json_extract(md.detail_json,'$.summary.symbol') AS detail_symbol,
       CAST(COALESCE(json_extract(md.detail_json,'$.signal.turnover_24h'),0) AS REAL) AS turnover_24h,
       CAST(COALESCE(json_extract(md.detail_json,'$.signal.change_24h_pct'),0) AS REAL) AS change_24h_pct,
+      json_extract(md.detail_json,'$.return_windows.d1_pct') AS d1_pct,
+      json_extract(md.detail_json,'$.return_windows.d2_pct') AS d2_pct,
+      json_extract(md.detail_json,'$.return_windows.d3_pct') AS d3_pct,
+      json_extract(md.detail_json,'$.return_windows.d4_pct') AS d4_pct,
+      json_extract(md.detail_json,'$.return_windows.d5_pct') AS d5_pct,
+      COALESCE(NULLIF(json_extract(md.detail_json,'$.lifecycle_state'),''),'NORMAL') AS lifecycle_state,
       CAST(COALESCE(json_extract(md.detail_json,'$.signal.opportunity_score'),json_extract(md.detail_json,'$.summary.opportunity_score'),0) AS REAL) AS opportunity_score,
       CAST(COALESCE(json_extract(md.detail_json,'$.summary.position_value_krw'),0) AS REAL) AS position_value_krw,
       COALESCE(NULLIF(cp.korean_name,''),NULLIF(peer.korean_name,''),'') AS cached_korean_name,
@@ -75,6 +85,9 @@ export const onRequestGet:PagesFunction<Env>=async({request,env})=>{
       name_en:String(official?.english_name||row.cached_english_name||symbol).trim(),
       source_ts:num(row.source_ts),received_at:num(row.received_at),
       turnover_24h:Math.max(0,num(row.turnover_24h)),change_24h_pct:num(row.change_24h_pct),
+      d1_pct:nullableNum(row.d1_pct),d2_pct:nullableNum(row.d2_pct),d3_pct:nullableNum(row.d3_pct),
+      d4_pct:nullableNum(row.d4_pct),d5_pct:nullableNum(row.d5_pct),
+      lifecycle_state:String(row.lifecycle_state||'NORMAL').trim().toUpperCase(),
       opportunity_score:num(row.opportunity_score),position_value_krw:Math.max(0,num(row.position_value_krw)),
       categories:parseList(row.categories_json),tags:parseList(row.tags_json),
       canonical_sector:String(row.canonical_sector||'').trim(),research_status:String(row.research_status||'pending'),
@@ -97,7 +110,9 @@ export const onRequestGet:PagesFunction<Env>=async({request,env})=>{
     const koreanReady=Boolean(row.business_summary_ko||row.description_ko);
     current.coins.push({
       market:row.market,symbol:row.symbol,name_ko:row.name_ko,name_en:row.name_en,
-      turnover_24h:row.turnover_24h,change_24h_pct:row.change_24h_pct,opportunity_score:row.opportunity_score,
+      turnover_24h:row.turnover_24h,change_24h_pct:row.change_24h_pct,
+      d1_pct:row.d1_pct,d2_pct:row.d2_pct,d3_pct:row.d3_pct,d4_pct:row.d4_pct,d5_pct:row.d5_pct,
+      lifecycle_state:row.lifecycle_state,opportunity_score:row.opportunity_score,
       profile_cached:koreanReady,research_status:row.research_status,
     });
     aggregates.set(sector,current);
@@ -125,6 +140,7 @@ export const onRequestGet:PagesFunction<Env>=async({request,env})=>{
   const unresolved=Math.max(0,rows.length-researched);
   const koreanMissing=Math.max(0,rows.length-koreanReady);
   const verificationPending=Math.max(0,koreanReady-researched);
+  const lifecycleCounts=rows.reduce<Record<string,number>>((out,row)=>{out[row.lifecycle_state]=(out[row.lifecycle_state]||0)+1;return out},{});
 
   if(sectors.length){
     const latest=await env.DB.prepare('SELECT MAX(ts) AS ts FROM sector_history WHERE exchange=?').bind(exchange).first<{ts:number}>();
@@ -153,6 +169,7 @@ export const onRequestGet:PagesFunction<Env>=async({request,env})=>{
       positive_turnover_share_pct:round(totalTurnover>0?positiveTurnover/totalTurnover*100:0,2),
       researched_count:researched,korean_ready_count:koreanReady,unresolved_count:unresolved,
       korean_missing_count:koreanMissing,verification_pending_count:verificationPending,
+      lifecycle_counts:lifecycleCounts,
     },
     sectors,history,taxonomy_source:TAXONOMY_SOURCE_NOTE,
     methodology:'24시간 거래대금 중 상승 코인에 집중된 비율과 거래대금 가중 등락률을 대표 섹터별로 집계합니다. 프로젝트 프로필은 거래소와 무관한 자산 정보이므로 동일 KRW 종목의 빗썸·업비트 조사 결과를 교차 재사용하며, 한국어 사업 설명이 준비되고 검증 상태가 완료된 종목만 조사 완료 수치에 반영합니다.',
