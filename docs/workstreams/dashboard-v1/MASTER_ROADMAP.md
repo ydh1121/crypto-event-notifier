@@ -31,7 +31,8 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] 섹터 history D1 누적
 - [x] 코인 프로필 전수조사 + identity integrity/backlog
 - [x] Cloudflare snapshot/detail 전송 및 bounded retention
-- [x] Build 38 lifecycle/notice/return-window 모듈 기반 + 전용 CI
+- [x] Build 38 lifecycle/notice/return-window 모듈 + PAPER self-heal + D1 write-budget 및 Windows runtime 검증
+- [x] Build 39 pre-KRW CEX listing-history 모듈/전용 CI 기반. 실데이터 품질 검증과 Viewer 투영은 진행 중
 
 ## 2. 기존 Viewer 잔여 작업 — 먼저 닫을 것
 
@@ -52,7 +53,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] 거래소 공식 공지 collector/DB/overlay 및 `announcement_at`, `deposit_at`, `trade_open_at`, `termination_at` 구조화 parser/store/Viewer projection 구현
 - [x] 공지 timing은 정확한 날짜+시각이 있는 경우만 저장하고 날짜만 있는 경우 임의 `00:00`을 만들지 않는 fail-closed 규칙 적용
 - [x] compact `market_notice_audit` CLI로 거래소별 notice/event/timing coverage를 확인 가능하게 함
-- [-] 실제 Windows runtime에서 빗썸/업비트 공식 공지 source와 timing coverage 실데이터 검증 대기
+- [x] Windows runtime에서 빗썸/업비트 공식 공지 source/timing, lifecycle gate, PAPER self-heal, Cloudflare snapshot/detail health 실데이터 검증
 - [x] 상태 모델: `NORMAL`, `LISTING_ANNOUNCED`, `NEW_LISTING`, `CAUTION`, `TERMINATION_SCHEDULED`, `TERMINATED`
 - [x] `유의 촉구`와 `유의`를 Viewer에서 동일 CAUTION 계층으로 취급
 - [x] 티커/상태 표시: CAUTION=주황, 거래종료 예정/종료=빨강, 신규/상장예정=별도 label. 색만 의존하지 않고 텍스트 병기
@@ -62,11 +63,22 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] `TERMINATION_SCHEDULED`/`TERMINATED`는 신규 PAPER 진입·추가매수를 차단하고 기존 포지션의 매도/정리와 과거 성과/history는 보존. CAUTION/NEW_LISTING은 현재 adaptive에서는 아직 shadow
 
 ### 3.2 국내 상장 전 가격 추적
-- [ ] identity를 먼저 contract/chain/provider id로 확정 후 해외 CEX/DEX market을 연결
-- [ ] 국내 상장 전 해외 CEX 가격 snapshot: T-7d, T-5d, T-3d, T-1d, T-6h, T-1h, 국내 open
-- [ ] 국내 상장가 대비 해외 기준 premium/discount 및 직전 1/3/5/7일 상승률 계산
-- [ ] 해외 CEX 최초 상장일/첫 가격/국내 상장 전 ATH/ATL 저장
-- [ ] 국내 상장 후 5m/1h/6h/24h/3d/7d 반응을 누적해 신규상장 패턴 DB 구축
+- [x] 해외 CEX 연결 전 identity gate 구현: 기존 verified/corroborated profile을 재사용하고 ticker-only 매칭 금지
+- [x] CoinGecko coin-id × 해외 거래소 식별자 × base/quote exact pair를 교차검증한 경우에만 CEX 가격 source를 허용
+- [x] Binance/OKX/Bybit public source adapter를 공통 `ListingCandle` 형식으로 모듈화
+- [x] 공식 KRW listing 공지만 stable notice-id case로 seed하고 Upbit USDT-only 공지는 KRW case에서 fail-closed 제외
+- [x] 실제 국내 open은 현재가가 아니라 `trade_open_at` 주변 빗썸/업비트 공개 1분봉 opening price로 해석
+- [x] additive local SQLite: `listing_history_cases`, `listing_history_sources`, `listing_history_candles`, `listing_history_features`
+- [-] 국내 상장 전 해외 CEX 가격 snapshot: T-7d, T-5d, T-3d, T-1d, T-6h, T-1h, 국내 open 계산 구현 완료. Windows 실데이터 coverage/정확도 QA 대기
+- [-] 국내 상장가 대비 해외 기준 premium/discount 및 T-window 상승폭 feature 구현 완료. 실제 최근 상장 표본 QA와 Viewer 표현 대기
+- [-] 해외 CEX 최초 상장일/첫 가격/국내 상장 전 ATH/ATL 저장 기반 구현. 최초시각/가격을 증명할 수 없는 거래소는 null 유지하며 실데이터 coverage QA 대기
+- [x] bounded T-8d 연구 window 첫 봉을 해외 최초상장가로 오인하지 않는 provenance fail-closed 규칙 및 테스트
+- [-] 국내 상장 후 5m/1h/6h/24h/3d/7d 반응 누적 로직 구현. 7일이 지나기 전에는 `tracking_postlisting`으로 유지하며 실제 시간 누적 대기
+- [x] `listing-history-research`를 PAPER와 독립된 15분 sidecar로 등록하고 회당 최대 3 case로 제한
+- [x] `listing_history_audit` read-only CLI + Build 39 modular contract + dedicated CI
+- [-] `scripts/verify-build39-runtime.ps1`로 Pages identity bridge 배포 → bounded live cycle → audit → supervisor health 실환경 검증 대기
+- [ ] compact listing-history feature를 Cloudflare Viewer에 투영. raw candle은 D1로 보내지 않는다.
+- [ ] DEX용 identity는 chain/contract 기반으로 별도 확장. CEX provider-id를 DEX identity로 재사용하지 않는다.
 
 ### 3.3 DEX 출발 코인
 - [ ] contract 기반 DEX pool/최초 유동성 생성 시점 확인
