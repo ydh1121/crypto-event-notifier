@@ -33,6 +33,7 @@ def main() -> None:
     notice_sources = text(ROOT / "b3_trader" / "market_notice_sources.py")
     notice_store = text(ROOT / "b3_trader" / "market_notice_store.py")
     notice_collector = text(ROOT / "b3_trader" / "market_notice_collector.py")
+    notice_audit = text(ROOT / "b3_trader" / "market_notice_audit.py")
     control = text(ROOT / "b3_trader" / "research_control.py")
     supervisor = text(ROOT / "b3_trader" / "research_supervisor.py")
     market_features = text(ROOT / "b3_trader" / "market_feature_store.py")
@@ -64,7 +65,7 @@ def main() -> None:
         "return_window_domain": all(token in returns for token in ("PRIOR_DAY_COUNT = 5", "prior_daily_returns", 'result[f"d{day}_pct"]', "range(1, PRIOR_DAY_COUNT + 1)")),
         "return_window_store_reuses_memory": "research_market_memory_mx" in market_features and "return_windows" in market_features,
         "detail_projection_thin": "return_windows" in detail_projection and "lifecycle_state" in detail_projection,
-        "lifecycle_domain_separate": "decide_lifecycle_state" in lifecycle_domain and "merge_lifecycle_state" in lifecycle_domain,
+        "lifecycle_domain_separate": all(token in lifecycle_domain for token in ("decide_lifecycle_state", "merge_lifecycle_state", "lifecycle_entry_policy", "LifecycleEntryPolicy")),
         "lifecycle_store_separate": "MarketLifecycleStore" in lifecycle_store and "market_lifecycle_events" in lifecycle_store,
         "lifecycle_partial_api_fail_closed": "MIN_EXISTING_COVERAGE_RATIO" in lifecycle_store and "observation_rejected" in lifecycle_store,
         "lifecycle_notice_projection": all(token in lifecycle_projection for token in ("notice_only", "notice_state_count", "notice_overlay")),
@@ -76,13 +77,15 @@ def main() -> None:
         "notice_store_separate": "MarketNoticeStore" in notice_store and "market_lifecycle_notice_state" in notice_store,
         "notice_store_additive_timing": "_ensure_notice_timing_columns" in notice_store and all(token in notice_store for token in timing_fields),
         "notice_unknown_timestamp_fail_closed": "never allowed to become a current lifecycle override" in notice_store and "effective_at <= 0" in notice_store,
+        "notice_audit_compact": all(token in notice_audit for token in ("TIMING_FIELDS", "structured_sample", "latest_sample", "--rows")),
         "lifecycle_service_composes_notice": "MarketLifecycleService" in lifecycle_service and "merge_lifecycle_state" in lifecycle_service and "notice_only" in lifecycle_service,
         "lifecycle_service_projects_timing": "NOTICE_DETAIL_FIELDS" in lifecycle_service and all(token in lifecycle_service for token in timing_fields),
+        "lifecycle_service_owns_entry_policy": "def entry_policy" in lifecycle_service and "lifecycle_entry_policy" in lifecycle_service,
         "notice_collector_order_independent": "MarketNoticeCollector" in notice_collector and "sources_failed" in notice_collector and "can_place_orders" in notice_collector,
         "notice_supervisor_component": '"market-notice-watch"' in control and '"market-notice-watch": self.market_notice_collector.run_once' in supervisor,
         "paper_consumes_lifecycle_service": "MarketLifecycleService" in paper and "MarketLifecycleStore" not in paper,
         "paper_does_not_parse_notices": "BithumbNoticeSource" not in paper and "UpbitNoticeSource" not in paper and "classify_notice_title" not in paper,
-        "paper_lifecycle_stays_shadow": '"shadow_only": True' in paper and '"market_lifecycle_shadow_only": True' in paper,
+        "paper_termination_gate_only": all(token in paper for token in ("self.lifecycle.entry_policy", "lifecycle_block", '"paper_gate": "termination_only"', '"market_lifecycle_mode": "termination_gate_only"', '"caution_remains_shadow_for_current_adaptive": True')),
         "paper_enriches_detail_via_feature_store": "MarketFeatureStore" in paper and "enrich_market_detail" in paper,
         "architecture_rule_present": all(token in architecture for token in ("collector", "store", "feature", "score", "Viewer", "PAPER")),
     }
