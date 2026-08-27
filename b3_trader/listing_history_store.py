@@ -82,7 +82,7 @@ class ListingHistoryStore:
               volume REAL NOT NULL DEFAULT 0,
               quote_volume REAL NOT NULL DEFAULT 0,
               confirmed INTEGER NOT NULL DEFAULT 1,
-              PRIMARY KEY(case_key, source_exchange, source_market, candle_ts, interval_seconds),
+              PRIMARY KEY(case_key, source_exchange, source_market,candle_ts,interval_seconds),
               FOREIGN KEY(case_key) REFERENCES listing_history_cases(case_key) ON DELETE CASCADE
             );
 
@@ -343,14 +343,30 @@ class ListingHistoryStore:
         )
         self.conn.commit()
 
-    def pending_cases(self, limit: int = 50) -> list[dict[str, Any]]:
+    def pending_cases(self, limit: int = 50, *, required_feature_version: int = 0) -> list[dict[str, Any]]:
+        version = max(0, int(required_feature_version))
         rows = self.conn.execute(
             """
             SELECT * FROM listing_history_cases
-            WHERE status NOT IN ('complete','rejected_identity','rejected_notice')
+            WHERE status NOT IN ('rejected_identity','rejected_notice')
+              AND (
+                status <> 'complete'
+                OR (
+                  ? > 0 AND EXISTS (
+                    SELECT 1
+                    FROM listing_history_sources s
+                    LEFT JOIN listing_history_features f
+                      ON f.case_key=s.case_key
+                     AND f.source_exchange=s.source_exchange
+                     AND f.source_market=s.source_market
+                    WHERE s.case_key=listing_history_cases.case_key
+                      AND COALESCE(f.feature_version,0) < ?
+                  )
+                )
+              )
             ORDER BY updated_at ASC LIMIT ?
             """,
-            (max(1, min(500, int(limit))),),
+            (version, version, max(1, min(500, int(limit)))),
         ).fetchall()
         result: list[dict[str, Any]] = []
         for row in rows:
