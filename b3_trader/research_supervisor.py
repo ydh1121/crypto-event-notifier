@@ -14,6 +14,7 @@ from .cloudflare_market_detail_strategy_lab import CloudflareMarketDetailPublish
 from .cloudflare_pages_deployer import CloudflarePagesDeployer
 from .cloudflare_snapshot_lifecycle import CloudflareSnapshotPublisher
 from .coin_profile_research_cycle_v36 import CoinProfileResearchCycleV36
+from .listing_history_research_cycle import ListingHistoryResearchCycle
 from .market_notice_collector import MarketNoticeCollector
 from .reference_components import ReferenceComponentWatcher
 from .research_control import COMPONENT_DEFINITIONS, STATUS_PATH, atomic_json, load_control
@@ -81,6 +82,7 @@ class ResearchSupervisor:
         self.cloudflare_market_detail_publisher = CloudflareMarketDetailPublisher()
         self.coin_profile_research = CoinProfileResearchCycleV36()
         self.market_notice_collector = MarketNoticeCollector()
+        self.listing_history_research = ListingHistoryResearchCycle()
         self.cloudflare_deployer = CloudflarePagesDeployer()
         self.upbit_paper_runner = UpbitPaperResearchRunner()
         self.strategy_lab_runner = ConfiguredStrategyLabRunner()
@@ -92,6 +94,7 @@ class ResearchSupervisor:
             "cloudflare-market-detail-publish": self.cloudflare_market_detail_publisher.publish_once,
             "coin-profile-enrichment": self.coin_profile_research.run_once,
             "market-notice-watch": self.market_notice_collector.run_once,
+            "listing-history-research": self.listing_history_research.run_once,
             "upbit-paper-research": self.upbit_paper_runner.run_once,
             "strategy-lab-shadow": self.strategy_lab_runner.run_once,
             "cloudflare-pages-deploy": self.cloudflare_deployer.deploy_once,
@@ -138,6 +141,8 @@ class ResearchSupervisor:
                     "coin_profile_identity_guard": True,
                     "market_notice_public_sources_only": True,
                     "market_lifecycle_shadow_only": True,
+                    "listing_history_public_sources_only": True,
+                    "listing_history_shadow_only": True,
                 },
             }
         atomic_json(STATUS_PATH, payload)
@@ -231,6 +236,7 @@ class ResearchSupervisor:
         for thread in self.threads.values():
             thread.join(timeout=5.0)
         self.market_notice_collector.close()
+        self.listing_history_research.close()
         self._safe_write_status()
         _log("research supervisor stopped")
 
