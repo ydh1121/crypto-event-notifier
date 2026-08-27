@@ -7,7 +7,7 @@ from typing import Any
 
 from .auto_demo_v2 import DB_PATH
 from .domestic_listing_price import DomesticListingPriceResolver
-from .listing_history_collector import DomesticListingCase, ListingHistoryCollector
+from .listing_history_collector import FEATURE_VERSION, DomesticListingCase, ListingHistoryCollector
 from .listing_history_planner import ListingHistoryPlanner
 from .listing_history_store import ListingHistoryStore
 from .listing_identity import ListingIdentity, listing_identity_gate
@@ -129,9 +129,6 @@ class ListingHistoryResearchCycle:
                     "previous_provider": stored.provider,
                     "previous_provider_id": stored.provider_id,
                 }
-            # A refreshed but still non-CoinGecko identity is not venue-capable.
-            # Preserve the already-verified stored identity without claiming that
-            # exact foreign venue verification has been upgraded.
             return stored, {
                 "status": "stored_verified_legacy",
                 "verified": True,
@@ -148,27 +145,42 @@ class ListingHistoryResearchCycle:
             }
         return None, result if isinstance(result, dict) else {"status": "invalid_response", "verified": False}
 
-    def _resolve_open_price(self, row: dict[str, Any], now: float) -> tuple[float, dict[str, Any]]:
-        current = _num(row.get("domestic_open_price"))
-        if current > 0:
-            return current, {"status": "stored", "found": True, "price": current}
+    def _resolve_domestic_open(self, row: dict[str, Any], now: float) -> tuple[float, float, dict[str, Any]]:
+        current_price = _num(row.get("domestic_open_price"))
         open_at = _num(row.get("domestic_open_at"))
+        exchange = str(row.get("domestic_exchange") or "")
+        market = str(row.get("domestic_market") or "")
+
         if open_at <= 0:
-            return 0.0, {"status": "open_time_missing", "found": False, "price": 0.0}
+            resolver = getattr(self.price_resolver, "resolve_first_trade", None)
+            if callable(resolver):
+                try:
+                    inferred = resolver(exchange, market, now=now)
+                except Exception as exc:
+                    inferred = {
+                        "status": "first_trade_resolver_error",
+                        "found": False,
+                        "open_at": 0.0,
+                        "price": 0.0,
+                        "error": f"{type(exc).__name__}: {exc}"[:300],
+                    }
+                if inferred.get("found"):
+                    return _num(inferred.get("open_at")), _num(inferred.get("price")), inferred
+                return 0.0, 0.0, inferred
+            return 0.0, 0.0, {"status": "open_time_missing", "found": False, "price": 0.0}
+
+        if current_price > 0:
+            return open_at, current_price, {"status": "stored", "found": True, "price": current_price, "open_at": open_at}
         if now + 60 < open_at:
-            return 0.0, {"status": "waiting_for_open", "found": False, "price": 0.0}
-        result = self.price_resolver.resolve(
-            str(row.get("domestic_exchange") or ""),
-            str(row.get("domestic_market") or ""),
-            open_at,
-        )
-        return (_num(result.get("price")) if result.get("found") else 0.0), result
+            return open_at, 0.0, {"status": "waiting_for_open", "found": False, "price": 0.0, "open_at": open_at}
+        result = self.price_resolver.resolve(exchange, market, open_at)
+        return open_at, (_num(result.get("price")) if result.get("found") else 0.0), result
 
     def run_once(self) -> dict[str, Any]:
         started = time.time()
         now = time.time()
         seed = self.planner.seed_once(per_exchange_limit=SEED_NOTICE_LIMIT_PER_EXCHANGE)
-        pending = self.store.pending_cases(limit=500)
+        pending = self.store.pending_cases(limit=500, required_feature_version=FEATURE_VERSION)
         state = _read_state(self.state_path)
         picked, next_cursor = _rotate_cases(
             pending,
@@ -193,8 +205,7 @@ class ListingHistoryResearchCycle:
                 })
                 continue
 
-            open_price, price_result = self._resolve_open_price(row, now)
-            open_at = _num(row.get("domestic_open_at"))
+            open_at, open_price, price_result = self._resolve_domestic_open(row, now)
             self.store.upsert_case(
                 domestic_exchange=str(row.get("domestic_exchange") or ""),
                 domestic_market=str(row.get("domestic_market") or ""),
@@ -245,6 +256,7 @@ class ListingHistoryResearchCycle:
             "status": "researched" if picked else "waiting_for_cases",
             "paper_only": True,
             "can_place_orders": False,
+            "feature_version": FEATURE_VERSION,
             "seed": seed,
             "pending_cases": len(pending),
             "processed": len(picked),
