@@ -120,21 +120,22 @@ Viewer omission contract: `docs/VIEWER_REBUILD_CHECKLIST.md`
 - [x] Add new listing/pre-listing CEX/DEX history, caution/delist lifecycle, D-5 price columns, scroll-position preservation, geography/facet taxonomy, news/macro/human/onchain intelligence, order-flow/CVD, technical structure engine and PAPER v2 sequence
 - [x] Implement lifecycle domain + additive local SQLite registry with baseline-safe NEW_LISTING detection, CAUTION mapping, 3-observation termination confirmation and partial-market-response rejection
 - [x] Add official Bithumb/Upbit notice adapters, notice DB, lifecycle notice overlay and independent `market-notice-watch` supervisor sidecar
-- [x] Attach lifecycle state to local PAPER leaderboard/status as `shadow_only`; current PAPER entry/exit logic is unchanged
+- [x] Structure official notice timing into `announcement_at`, `deposit_at`, `trade_open_at`, `termination_at` with fail-closed date-only handling and compact `market_notice_audit`
 - [x] Publish lifecycle/notice-only state to Cloudflare Viewer and add modular 상장예정/유의/거래종료 panel + ticker state styling
 - [x] Add D-5 return-window feature from existing shared `research_market_memory_mx`; no separate exchange call per UI feature
-- [-] Verify Build 38 on local runtime/Pages and current phone/desktop browser after sync/restart
-- [ ] Structure official notice timestamps into announcement/deposit/trade-open/termination fields
-- [ ] Execute the remaining work in `MASTER_ROADMAP.md` dependency order; do not jump directly to PAPER v2 before feature collection/shadow validation
+- [x] Add termination-only PAPER safety gate: `TERMINATION_SCHEDULED`/`TERMINATED` blocks new/additional PAPER buys while existing position exits/history stay available; CAUTION/NEW_LISTING remain shadow in current adaptive
+- [-] Existing all-KRW account/profile seeding + market-memory/profile backlog provide automatic new-market bootstrap; verify full profile/sector/facet path on an actual new listing
+- [-] Verify Build 38 on local runtime/Pages and current phone/desktop browser after sync/restart, including live official notice source/timing coverage
+- [ ] Execute the remaining work in `MASTER_ROADMAP.md` dependency order; next major data work is pre-KRW CEX/DEX listing history, then flow/CVD and multi-facet taxonomy
 
 ## Validation status
 
 - [x] Current adaptive research implementation passed Python tests + module compile
 - [x] Current Liquid/research dashboard implementation passed Node dashboard smoke checks
 - [x] Current branch passed Cloudflare typecheck
-- [x] Build 38 lifecycle/notice/return-window unit tests pass in GitHub Actions
+- [x] Build 38 lifecycle/notice/return-window/timing/entry-policy unit tests pass in GitHub Actions
 - [x] Build 38 dedicated CI passes including Pages typecheck and modular source contract
-- [x] Full B3 trader CI passes on the Build 38 completion HEAD
+- [x] Full B3 trader CI passes after legacy trade-plan compatibility regression was fixed
 - [x] Cloudflare Pages JS syntax/typecheck passes with shared continuity/lifecycle modules
 - [x] PR #1 remains Draft and unmerged
 
