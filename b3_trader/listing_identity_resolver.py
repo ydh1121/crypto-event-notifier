@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
@@ -10,6 +12,24 @@ from .listing_identity import ListingIdentity, listing_identity_gate
 
 
 USER_AGENT = "crypto-research-listing-identity/1.0"
+
+
+def _coingecko_id_from_evidence(values: Any) -> str:
+    rows = values if isinstance(values, list) else []
+    for row in rows:
+        if not isinstance(row, dict) or str(row.get("source") or "").lower() != "coingecko":
+            continue
+        raw = str(row.get("url") or "").strip()
+        if not raw:
+            continue
+        try:
+            path = urlparse(raw).path
+        except ValueError:
+            continue
+        match = re.search(r"/coins/([^/?#]+)", path, re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+    return ""
 
 
 class ListingIdentityResolver:
@@ -55,9 +75,21 @@ class ListingIdentityResolver:
         if not payload.get("found"):
             return {"status": "profile_missing", "verified": False, "identity": None, "retries": retries}
         source = payload.get("identity") if isinstance(payload.get("identity"), dict) else {}
+        evidence = source.get("evidence") if isinstance(source.get("evidence"), list) else []
+        coingecko_id = _coingecko_id_from_evidence(evidence)
+        provider = str(source.get("provider") or "").strip().lower()
+        provider_id = str(source.get("provider_id") or "").strip()
+        # Multi-source profiles can store a CMC numeric id in provider_id. If a
+        # CoinGecko evidence URL is already part of the verified profile, prefer
+        # that stable coin id because it can also verify exact CEX tickers.
+        if coingecko_id:
+            provider = "coingecko"
+            provider_id = coingecko_id
         identity = ListingIdentity.from_dict(
             {
                 **source,
+                "provider": provider,
+                "provider_id": provider_id,
                 "official_domains": [source.get("homepage") or ""],
                 "verified_at": source.get("last_verified_at") or 0,
             }
@@ -70,6 +102,7 @@ class ListingIdentityResolver:
             "verified": verified,
             "identity": identity if verified else None,
             "identity_payload": identity.to_dict(),
+            "coingecko_venue_id": coingecko_id,
             "local_gate": local_gate,
             "remote_gate": payload.get("gate") if isinstance(payload.get("gate"), dict) else {},
             "retries": retries,
