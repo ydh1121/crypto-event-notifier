@@ -11,6 +11,7 @@ The program-level source of truth is now:
 - `docs/workstreams/dashboard-v1/MASTER_ROADMAP.md`
 - Viewer omission/regression checklist: `docs/VIEWER_REBUILD_CHECKLIST.md`
 - Existing dashboard-v1 continuity checklist: `docs/workstreams/dashboard-v1/TASKS.md`
+- Permanent modular dependency rules: `docs/MODULAR_ARCHITECTURE.md`
 
 The master roadmap merges the already-completed strategy analytics work with the remaining real-holdings history / records / CI / Phase 5~8 / mobile QA work and adds the new market-intelligence program: automatic listing/delisting lifecycle, pre-KRW CEX/DEX history, D-5 returns, multi-facet sector/geography, flow/CVD, technical structure, news/macro/human/onchain intelligence, unified score v2, AI interpretation, PAPER v2, walk-forward and candidate promotion.
 
@@ -18,21 +19,49 @@ Do not jump directly from raw new features into the current PAPER strategy. Requ
 
 `collect → persist → quality/reaction validation → shadow score → parallel PAPER A/B → walk-forward → candidate`.
 
-Immediate new-program execution order after the currently running cleanup/QA is:
+## Modular architecture — permanent rule
 
-1. close small Viewer debt and scroll-position reset
-2. market lifecycle/listing identity foundation
-3. D-5/history + flow/CVD feature store
-4. multi-facet sector/geography
-5. technical structure engine + external reference-repo validation
-6. Phase 5 event/news/macro/human/onchain
-7. score v2 + coin-specific reaction memory
-8. Intelligence Viewer
-9. Phase 6 AI shadow interpretation
-10. parallel `adaptive_intelligence_v2` PAPER forward test
-11. Phase 7 walk-forward
-12. Phase 8 candidate promotion
-13. final 390/430 mobile QA
+Dependency direction:
+
+`collector/source → store/repository → feature/domain → score/decision → service/API → page/view`
+
+Do not put reusable calculation, exchange fetch, SQL, scoring formula or long-lived cache into `pages/*`.
+Do not put indicator/event/lifecycle formulas into supervisors. Supervisors only orchestrate modules.
+If equivalent logic is needed twice, extract the shared owner before continuing.
+
+UI continuity is owned by:
+- `cloudflare-pages/public/modules/shared/ui-continuity.js`
+
+No page-specific `scrollTop` copy/paste and no broad DOM `MutationObserver` continuity workaround.
+
+## Current market-intelligence implementation status
+
+Completed foundation:
+- shared same-page UI continuity guard is installed at the Viewer app root
+- same-route router rerenders preserve scroll/focus state through the shared owner
+- `b3_trader/market_lifecycle.py` owns pure lifecycle classification
+- `b3_trader/market_lifecycle_store.py` owns additive lifecycle SQLite tables/events
+- first lifecycle observation is treated as baseline so all existing markets are not mislabeled as new listings
+- a market appearing after baseline becomes `NEW_LISTING`
+- exchange warning/caution maps to `CAUTION`
+- market disappearance requires 3 accepted observations before `TERMINATED`
+- a severely incomplete/empty market-list response is rejected before it can increment missing counters
+- lifecycle state is attached to local PAPER leaderboard/status as shadow data
+- lifecycle does **not** alter current PAPER buy/sell decisions yet
+
+Validation:
+- full Python tests PASS including lifecycle tests
+- Python compile PASS
+- Cloudflare typecheck PASS
+- Pages typecheck + JS syntax PASS
+- dashboard smoke PASS
+
+Immediate next action:
+1. publish lifecycle state through the bounded Cloudflare projection without duplicating lifecycle logic
+2. display lifecycle status on ticker/name surfaces: CAUTION orange text/label, termination red text/label, NEW_LISTING neutral/new label
+3. add official exchange notice collector so `LISTING_ANNOUNCED` and `TERMINATION_SCHEDULED` come from official notices rather than market-list inference
+4. build D-5 return-window feature from the existing shared `research_market_memory_mx` history, not new per-widget exchange calls
+5. then continue multi-facet taxonomy and order-flow/CVD in master-roadmap order
 
 ## Hard boundary
 
