@@ -119,7 +119,9 @@ class ListingHistoryResearchCycle:
 
         identity = result.get("identity") if isinstance(result, dict) else None
         if isinstance(identity, ListingIdentity) and result.get("verified"):
-            if stored is not None:
+            if stored is None:
+                return identity, result
+            if _venue_capable_identity(identity):
                 return identity, {
                     **result,
                     "status": "stored_refreshed",
@@ -127,7 +129,16 @@ class ListingHistoryResearchCycle:
                     "previous_provider": stored.provider,
                     "previous_provider_id": stored.provider_id,
                 }
-            return identity, result
+            # A refreshed but still non-CoinGecko identity is not venue-capable.
+            # Preserve the already-verified stored identity without claiming that
+            # exact foreign venue verification has been upgraded.
+            return stored, {
+                "status": "stored_verified_legacy",
+                "verified": True,
+                "refresh_status": result.get("status"),
+                "refresh_provider": identity.provider,
+                "refresh_provider_id": identity.provider_id,
+            }
 
         if stored is not None:
             return stored, {
@@ -184,8 +195,6 @@ class ListingHistoryResearchCycle:
 
             open_price, price_result = self._resolve_open_price(row, now)
             open_at = _num(row.get("domestic_open_at"))
-            # Persist verified identity immediately so future cycles do not need
-            # another profile-cache read once a venue-capable identity is stored.
             self.store.upsert_case(
                 domestic_exchange=str(row.get("domestic_exchange") or ""),
                 domestic_market=str(row.get("domestic_market") or ""),
