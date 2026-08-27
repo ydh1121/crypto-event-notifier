@@ -19,6 +19,39 @@ def _retry_delay(response: requests.Response | None, attempt: int) -> float:
     return min(8.0, 0.75 * (2 ** attempt))
 
 
+def get_with_retry(
+    url: str,
+    *,
+    headers: dict[str, str] | None = None,
+    params: dict[str, Any] | None = None,
+    timeout: float = 12.0,
+    attempts: int = 3,
+) -> tuple[requests.Response, int]:
+    """GET with bounded retry for transient public-source/network failures."""
+    last_error: Exception | None = None
+    max_attempts = max(1, int(attempts))
+    for attempt in range(max_attempts):
+        response: requests.Response | None = None
+        try:
+            response = requests.get(url, headers=headers or {}, params=params, timeout=timeout)
+            if response.status_code not in RETRYABLE_STATUS_CODES:
+                response.raise_for_status()
+                return response, attempt
+            last_error = requests.HTTPError(
+                f"{response.status_code} Server Error for url: {response.url}", response=response
+            )
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            last_error = exc
+        except requests.HTTPError:
+            raise
+        if attempt >= max_attempts - 1:
+            break
+        time.sleep(_retry_delay(response, attempt))
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("HTTP GET failed without a response")
+
+
 def post_with_retry(
     url: str,
     *,
