@@ -22,6 +22,7 @@ on:
       - "b3_trader/tests/test_domestic_listing_price.py"
       - "cloudflare-pages/functions/api/coin-profile-identity.ts"
       - "scripts/check-listing-build39.py"
+      - "scripts/verify-build39-runtime.ps1"
       - ".github/workflows/b3-listing-build39.yml"
   workflow_dispatch:
 
