@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any, Iterable, Protocol
 
-from .listing_history import postlisting_features, prelisting_features
+from .listing_history import prelisting_features, price_at_or_before, reaction_features
 from .listing_history_sources import BinanceSpotSource, CexSpotMarket, SpotListingSource, default_cex_sources
 from .listing_history_store import ListingHistoryStore
 from .listing_identity import ListingIdentity, listing_identity_gate
+from .listing_quote_rate import ListingQuoteRateResolver
 from .listing_venue_verifier import ListingVenueVerifier
 
 
@@ -15,6 +16,10 @@ PRE_WINDOW_SECONDS = 8 * 24 * 3600
 POST_WINDOW_SECONDS = 8 * 24 * 3600
 POST_COMPLETE_SECONDS = 7 * 24 * 3600
 QUOTE_PRIORITY = {"USDT": 0, "USDC": 1, "USD": 2, "FDUSD": 3, "BTC": 4}
+
+
+class QuoteRateResolver(Protocol):
+    def resolve(self, quote_asset: str, target_ts: float) -> dict[str, Any]: ...
 
 
 @dataclass(frozen=True)
@@ -30,11 +35,12 @@ class DomesticListingCase:
 
 
 class ListingHistoryCollector:
-    """Collect public pre/post domestic-listing history after identity verification.
+    """Collect verified foreign CEX history without mixing quote currencies.
 
     This module does not discover identity and does not alter PAPER scores. It
-    only consumes a verified identity, provider-verifies an exact foreign CEX
-    pair, normalizes public candles and persists features for later validation.
+    consumes verified identity, provider-verifies an exact foreign CEX pair,
+    normalizes public candles, resolves quote→KRW only when public evidence is
+    available, and persists features for later validation.
     """
 
     def __init__(
@@ -43,10 +49,12 @@ class ListingHistoryCollector:
         store: ListingHistoryStore | None = None,
         sources: Iterable[SpotListingSource] | None = None,
         venue_verifier: ListingVenueVerifier | None = None,
+        quote_rate_resolver: QuoteRateResolver | None = None,
     ) -> None:
         self.store = store or ListingHistoryStore()
         self.sources = tuple(sources or default_cex_sources())
         self.venue_verifier = venue_verifier or ListingVenueVerifier()
+        self.quote_rate_resolver = quote_rate_resolver or ListingQuoteRateResolver()
 
     def close(self) -> None:
         self.store.close()
@@ -154,6 +162,7 @@ class ListingHistoryCollector:
 
         source_results: dict[str, Any] = {}
         successful = 0
+        quote_rate_cache: dict[str, dict[str, Any]] = {}
         for source in self.sources:
             try:
                 discovered = source.discover(case.identity)
@@ -218,8 +227,24 @@ class ListingHistoryCollector:
                 candles=candles,
             )
 
+            quote = market.quote_asset.upper()
+            if quote not in quote_rate_cache:
+                try:
+                    quote_rate_cache[quote] = self.quote_rate_resolver.resolve(quote, case.open_at)
+                except Exception as exc:
+                    quote_rate_cache[quote] = {
+                        "status": "resolver_error",
+                        "found": False,
+                        "rate": 0.0,
+                        "error": f"{type(exc).__name__}: {exc}"[:300],
+                    }
+            quote_rate = quote_rate_cache[quote]
+            quote_to_krw = float(quote_rate.get("rate") or 0.0) if quote_rate.get("found") else 0.0
+            foreign_open = price_at_or_before(candles, case.open_at)
+            foreign_open_price = float(foreign_open.get("price") or 0.0) if foreign_open else 0.0
+
             features: dict[str, Any] = {
-                "version": 1,
+                "version": 2,
                 "identity_gate": gate,
                 "venue_verification": venue_result,
                 "domestic": {
@@ -228,7 +253,7 @@ class ListingHistoryCollector:
                     "notice_id": case.notice_id,
                     "announcement_at": case.announcement_at,
                     "open_at": case.open_at,
-                    "open_price": case.open_price if case.open_price > 0 else None,
+                    "open_price_krw": case.open_price if case.open_price > 0 else None,
                 },
                 "foreign": {
                     "exchange": market.exchange,
@@ -236,32 +261,40 @@ class ListingHistoryCollector:
                     "quote_asset": market.quote_asset,
                     "listing_at": listing_at if listing_at > 0 else None,
                     "first_price": first_price if first_price > 0 else None,
+                    "price_at_domestic_open": foreign_open,
                     "match_confidence": market.match_confidence,
                     "match_basis": market.match_basis or {},
                 },
+                "quote_to_krw": quote_rate,
             }
             if case.open_price > 0:
                 features["prelisting"] = prelisting_features(
                     candles,
                     domestic_open_at=case.open_at,
                     domestic_open_price=case.open_price,
+                    quote_asset=market.quote_asset,
+                    quote_to_krw_at_open=quote_to_krw,
                     foreign_listing_at=listing_at,
                     foreign_first_price=first_price,
                 )
-                features["postlisting"] = postlisting_features(
-                    candles,
-                    domestic_open_at=case.open_at,
-                    domestic_open_price=case.open_price,
+                features["foreign_postlisting"] = (
+                    reaction_features(
+                        candles,
+                        anchor_at=case.open_at,
+                        anchor_price=foreign_open_price,
+                    )
+                    if foreign_open_price > 0
+                    else {"status": "foreign_open_price_missing"}
                 )
             else:
                 features["prelisting"] = {"status": "waiting_for_domestic_open_price"}
-                features["postlisting"] = {"status": "waiting_for_domestic_open_price"}
+                features["foreign_postlisting"] = {"status": "waiting_for_domestic_open_price"}
             self.store.upsert_features(
                 case_key=case_key,
                 source_exchange=market.exchange,
                 source_market=market.market,
                 features=features,
-                feature_version=1,
+                feature_version=2,
             )
             successful += 1
             source_results[source.exchange] = {
@@ -271,6 +304,12 @@ class ListingHistoryCollector:
                 "first_price": first_price,
                 "candles": len(candles),
                 "stored": stored,
+                "quote_to_krw": quote_rate,
+                "domestic_listing_premium_pct": (
+                    features.get("prelisting", {}).get("domestic_listing_premium_pct")
+                    if isinstance(features.get("prelisting"), dict)
+                    else None
+                ),
                 "venue_verification": venue_result,
             }
 
