@@ -37,6 +37,9 @@ def apply_lifecycle_projection(payload: dict[str, Any], demo: dict[str, Any]) ->
         "market_count": int(lifecycle.get("market_count") or 0),
         "counts": lifecycle.get("counts") if isinstance(lifecycle.get("counts"), dict) else {},
         "attention": lifecycle.get("attention") if isinstance(lifecycle.get("attention"), list) else [],
+        "notice_only": lifecycle.get("notice_only") if isinstance(lifecycle.get("notice_only"), list) else [],
+        "notice_state_count": int(lifecycle.get("notice_state_count") or 0),
+        "notice_overlay": bool(lifecycle.get("notice_overlay")),
         "transitions": lifecycle.get("transitions") if isinstance(lifecycle.get("transitions"), list) else [],
         "shadow_only": True,
     }
