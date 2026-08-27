@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Local multi-asset PAPER monitor + beginner-facing dashboard + secure Cloudflare phone access + adaptive Bithumb-wide per-coin PAPER research.
+Local multi-asset PAPER monitor + beginner-facing dashboard + secure Cloudflare phone access + adaptive Bithumb-wide per-coin PAPER research + Build 38 market lifecycle/notice/return-window foundation.
 
 ## Program roadmap
 
@@ -13,7 +13,7 @@ The program-level source of truth is now:
 - Existing dashboard-v1 continuity checklist: `docs/workstreams/dashboard-v1/TASKS.md`
 - Permanent modular dependency rules: `docs/MODULAR_ARCHITECTURE.md`
 
-The master roadmap merges the already-completed strategy analytics work with the remaining real-holdings history / records / CI / Phase 5~8 / mobile QA work and adds the new market-intelligence program: automatic listing/delisting lifecycle, pre-KRW CEX/DEX history, D-5 returns, multi-facet sector/geography, flow/CVD, technical structure, news/macro/human/onchain intelligence, unified score v2, AI interpretation, PAPER v2, walk-forward and candidate promotion.
+The master roadmap merges the already-completed strategy analytics work with the remaining real-holdings history / records / CI / Phase 5~8 / mobile QA work and adds the market-intelligence program: automatic listing/delisting lifecycle, pre-KRW CEX/DEX history, D-5 returns, multi-facet sector/geography, flow/CVD, technical structure, news/macro/human/onchain intelligence, unified score v2, AI interpretation, PAPER v2, walk-forward and candidate promotion.
 
 Do not jump directly from raw new features into the current PAPER strategy. Required promotion path is:
 
@@ -36,7 +36,7 @@ No page-specific `scrollTop` copy/paste and no broad DOM `MutationObserver` cont
 
 ## Current market-intelligence implementation status
 
-Completed foundation:
+Build 38 completed in source/CI:
 - shared same-page UI continuity guard is installed at the Viewer app root
 - same-route router rerenders preserve scroll/focus state through the shared owner
 - `b3_trader/market_lifecycle.py` owns pure lifecycle classification
@@ -46,22 +46,31 @@ Completed foundation:
 - exchange warning/caution maps to `CAUTION`
 - market disappearance requires 3 accepted observations before `TERMINATED`
 - a severely incomplete/empty market-list response is rejected before it can increment missing counters
-- lifecycle state is attached to local PAPER leaderboard/status as shadow data
-- lifecycle does **not** alter current PAPER buy/sell decisions yet
+- `b3_trader/market_notice_sources.py` owns Bithumb/Upbit official notice adapters
+- `b3_trader/market_notice_store.py` owns notice/event state persistence
+- `b3_trader/market_lifecycle_service.py` composes market-list state with official notice state
+- `market-notice-watch` runs as a separate supervisor sidecar and cannot place orders
+- lifecycle state and `notice_only` announced listings are projected through the bounded Cloudflare snapshot
+- the sector Viewer renders a modular lifecycle panel for listing-announced/new/caution/termination states
+- lifecycle panel refreshes only its own DOM on snapshot polling; it does not rerender the whole page
+- D-5..D-1 completed prior-day return windows reuse `research_market_memory_mx`; no duplicate per-widget exchange calls
+- lifecycle data remains `shadow_only` and does **not** alter current PAPER buy/sell decisions
 
 Validation:
-- full Python tests PASS including lifecycle tests
+- Build 38 lifecycle/notice/return-window tests PASS
+- dedicated Build 38 CI PASS
+- full B3 trader CI PASS on the Build 38 completion source
 - Python compile PASS
 - Cloudflare typecheck PASS
 - Pages typecheck + JS syntax PASS
 - dashboard smoke PASS
 
 Immediate next action:
-1. publish lifecycle state through the bounded Cloudflare projection without duplicating lifecycle logic
-2. display lifecycle status on ticker/name surfaces: CAUTION orange text/label, termination red text/label, NEW_LISTING neutral/new label
-3. add official exchange notice collector so `LISTING_ANNOUNCED` and `TERMINATION_SCHEDULED` come from official notices rather than market-list inference
-4. build D-5 return-window feature from the existing shared `research_market_memory_mx` history, not new per-widget exchange calls
-5. then continue multi-facet taxonomy and order-flow/CVD in master-roadmap order
+1. sync/deploy/restart the Build 38 source on the Windows runtime and verify the official notice collector against live Bithumb/Upbit responses
+2. verify sector scroll continuity, D-5..24H columns and lifecycle panel on desktop + phone; only then mark the active QA items complete
+3. structure official notice timing into `announcement_at`, `deposit_at`, `trade_open_at`, `termination_at` without mixing parsing into PAPER or Viewer code
+4. bootstrap newly listed markets into profile research / facet classification / PAPER history owners and block new PAPER entries for terminated markets while preserving history
+5. start pre-KRW CEX/DEX listing-history collector/store/feature work
 
 ## Hard boundary
 
@@ -172,6 +181,7 @@ Generated data remains local/ignored:
 - Cloudflare snapshot/detail publisher recovered after D1 retention pressure.
 - Snapshot retention is bounded and health exposes snapshot age/count.
 - Viewer project-research completion count uses the same definition for numerator and unresolved count.
+- Build 38 source/CI is complete; local runtime/Pages verification is the next operational step.
 - Current work must preserve PAPER scanning and publisher health while adding new features.
 
 ## Safety constraints
