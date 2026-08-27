@@ -69,6 +69,19 @@ def main() -> None:
             "BinanceSpotSource", "OkxSpotSource", "BybitSpotSource",
             "CexSpotMarket", "ListingCandle", "default_cex_sources",
         )),
+        "build39_exact_p5m_minute_reaction": (
+            all(token in sources for token in (
+                "def minute_candles", 'interval="1m"', 'bar="1m"', 'interval="1"',
+            ))
+            and all(token in domain for token in (
+                "fine_candles", 'key == "p5m"', "max_lead_seconds=120",
+                "p5m_source_interval_seconds",
+            ))
+            and all(token in collector for token in (
+                "FEATURE_VERSION = 3", "FINE_POST_WINDOW_SECONDS", "minute_candles",
+                "fine_reaction_source", "fine_candles=minute_rows",
+            ))
+        ),
         "build39_history_domain_windows": all(token in domain for token in (*pre_windows, *post_windows, "PRE_LISTING_WINDOWS", "POST_LISTING_WINDOWS", "prelisting_features", "reaction_features")),
         "build39_history_store_separate": all(token in store for token in (
             "ListingHistoryStore", "listing_history_cases", "listing_history_sources",
@@ -76,6 +89,11 @@ def main() -> None:
         )),
         "build39_case_key_stable_notice": "notice:" in store and "domestic_notice_id" in store,
         "build39_reseed_preserves_progress": "excluded.status='pending_identity'" in store and "listing_history_cases.status<>'pending_identity'" in store,
+        "build39_complete_v2_requeues_for_v3": all(token in store for token in (
+            "required_feature_version", "status <> 'complete'", "COALESCE(f.feature_version,0) < ?",
+        )) and all(token in cycle for token in (
+            "required_feature_version=FEATURE_VERSION", '"feature_version": FEATURE_VERSION',
+        )),
         "build39_planner_krw_fail_closed": all(token in planner for token in (
             "ListingHistoryPlanner", "event_kind", "LISTING", "KRW", "pending_identity",
         )),
@@ -112,6 +130,13 @@ def main() -> None:
             "parse_candle_ts", "candle_date_time_kst", "opening_price_at_or_after",
             "first_opening_price_at_or_after_trade_open",
         )),
+        "build39_missing_open_first_trade_fail_closed": all(token in domestic_price for token in (
+            "resolve_first_trade", "unit=240", "len(rows) < 200", "history_window_exhausted",
+            "unit=60", "unit=1", "first_public_trade_candle",
+        )) and all(token in cycle for token in (
+            "_resolve_domestic_open", "resolve_first_trade", "domestic_open_at=open_at",
+            "domestic_open_price=open_price",
+        )),
         "build39_domestic_candle_exchange_timezone": all(token in domestic_price for token in (
             "candle_query_to", "KST", "Bithumb documents `to` as a KST clock time",
             "Upbit accepts ISO-8601 UTC Zulu time",
@@ -144,6 +169,10 @@ def main() -> None:
             and "first_ts = foreign_listing_at or (rows[0].ts" not in domain
         ),
         "build39_postlisting_tracks_7d": "tracking_postlisting" in collector and "POST_COMPLETE_SECONDS = 7 * 24 * 3600" in collector,
+        "build39_audit_reads_foreign_postlisting": all(token in audit for token in (
+            'payload.get("foreign_postlisting")', "p5m", "p1h", "p6h", "p24h", "p3d", "p7d",
+            "p5m_source_interval_seconds", "fine_reaction_status",
+        )),
         "build39_cycle_bounded": all(token in cycle for token in (
             "ListingHistoryResearchCycle", "MAX_CASES_PER_RUN = 3",
             "SEED_NOTICE_LIMIT_PER_EXCHANGE", "paper_only", "can_place_orders",
