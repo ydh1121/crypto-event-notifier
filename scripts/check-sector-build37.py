@@ -36,6 +36,8 @@ def main() -> None:
     backlog = text(ROOT / "cloudflare-pages" / "functions" / "api" / "coin-profile-backlog-v37.ts")
     service = text(PUBLIC / "modules" / "services" / "coin-profile.js")
     cycle = text(ROOT / "b3_trader" / "coin_profile_research_cycle_v36.py")
+    identity_safe = text(ROOT / "b3_trader" / "coin_profile_identity_safe.py")
+    identity_tests = text(ROOT / "b3_trader" / "tests" / "test_coin_profile_identity_safe.py")
     audit_client = text(ROOT / "b3_trader" / "coin_profile_integrity_audit.py")
     plan = text(ROOT / "docs" / "VIEWER_BUILD37_PLAN.md")
     sort_audit = text(ROOT / "docs" / "VIEWER_TABLE_SORT_AUDIT_BUILD37.md")
@@ -50,12 +52,15 @@ def main() -> None:
         "table_sort_bidirectional": "current.dir==='desc'?'asc':'desc'" in sorter and "aria-sort" in sorter,
         "table_sort_layout_safe": "smart-sort-arrow" in build37_css and "min-width:" not in build37_css and "grid-template-columns:repeat(" not in build37_css,
         "content_integrity_library": all(token in integrity for token in ("evaluateProfileIntegrity", "content_foreign_identity", "provider_foreign_identity", "homepage_foreign_identity", "content_lead_name_mismatch", "compactLead", "projectsInUrl")),
+        "content_current_lead_guard": "exactLeadIsCurrent" in integrity and "leadIsCurrent" in integrity,
         "full_content_audit_api": all(token in integrity_api for token in ("evaluateProfileIntegrity", "market_scope", "cached_scope", "profile_missing", "korean_missing", "rows_truncated")),
         "profile_audit_krw_only": "market LIKE 'KRW-%'" in integrity_api and "scope:'krw_only'" in integrity_api and "startsWith('KRW-')" in integrity_api,
         "per_market_integrity_guard": "status:finding.reasons.length?'mismatch':'ok'" in per_market_integrity,
         "viewer_hides_bad_profile": "coin-profile-integrity" in service and "integrity?.status==='mismatch'" in service,
         "integrity_backlog_v37": all(token in backlog for token in ("evaluateProfileIntegrity", "identity_mismatch", "profile_missing", "missing_profile_by_exchange", "balanced")),
         "profile_backlog_krw_only": "market LIKE 'KRW-%'" in backlog and "scope:'krw_only'" in backlog and "startsWith('KRW-')" in backlog,
+        "strict_manual_header_guard": all(token in identity_safe for token in ("_manual_header", "_manual_identity_matches", "strict_header", "symbol_hit", "korean_hit", "english_hit")),
+        "strict_manual_collision_tests": all(token in identity_tests for token in ("body_only_bitcoin_mentions", "prefix_name_collision", "symbol_embedded_in_other_symbol")),
         "supervisor_uses_v37_backlog": "coin-profile-backlog-v37" in cycle,
         "integrity_audit_command": "coin-profile-integrity-audit" in audit_client and "sample_rows" in audit_client and "--full" in audit_client,
         "pypdf_warning_guard": 'logging.getLogger("pypdf").setLevel(logging.ERROR)' in cycle,
