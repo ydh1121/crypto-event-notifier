@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+
+MARKET_PATTERN = re.compile(r"^KRW-[A-Z0-9]+$")
 
 
 def normalize_market(value: str) -> str:
@@ -14,10 +17,21 @@ def normalize_market(value: str) -> str:
         raise ValueError("ticker/market is required")
     if "-" not in market:
         market = f"KRW-{market}"
-    quote, symbol = market.split("-", 1)
-    if quote != "KRW" or not symbol:
-        raise ValueError("only Bithumb KRW markets are supported for now")
-    return f"KRW-{symbol}"
+    if not MARKET_PATTERN.fullmatch(market):
+        raise ValueError("only plain Bithumb KRW market codes such as KRW-BTC are supported")
+    return market
+
+
+def _valid_related_markets(values: Any) -> tuple[str, ...]:
+    related: list[str] = []
+    for value in values or []:
+        if not str(value).strip():
+            continue
+        try:
+            related.append(normalize_market(str(value)))
+        except ValueError:
+            continue
+    return tuple(related)
 
 
 @dataclass(frozen=True)
@@ -38,11 +52,7 @@ class AssetProfile:
     def from_dict(cls, raw: dict[str, Any]) -> "AssetProfile":
         market = normalize_market(str(raw.get("market") or raw.get("ticker") or ""))
         symbol = market.split("-", 1)[1]
-        related = tuple(
-            normalize_market(str(value))
-            for value in (raw.get("related_markets") or [])
-            if str(value).strip()
-        )
+        related = _valid_related_markets(raw.get("related_markets"))
         return cls(
             market=market,
             symbol=str(raw.get("symbol") or symbol).upper(),
@@ -105,7 +115,13 @@ class AssetRegistry:
                 return False
             raw = json.loads(self.path.read_text(encoding="utf-8"))
             rows = raw.get("assets", raw if isinstance(raw, list) else [])
-            assets = {profile.market: profile for profile in (AssetProfile.from_dict(row) for row in rows)}
+            assets: dict[str, AssetProfile] = {}
+            for row in rows:
+                try:
+                    profile = AssetProfile.from_dict(row)
+                except (TypeError, ValueError):
+                    continue
+                assets[profile.market] = profile
             if not assets:
                 assets["KRW-B3"] = default_profile("B3")
             self._assets = assets
