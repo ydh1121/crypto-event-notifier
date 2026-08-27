@@ -18,6 +18,17 @@ class MarketNoticeStore:
         self.conn = conn
         self._init_schema()
 
+    def _columns(self, table: str) -> set[str]:
+        return {str(row[1]) for row in self.conn.execute(f"PRAGMA table_info({table})").fetchall()}
+
+    def _ensure_notice_timing_columns(self) -> None:
+        existing = self._columns("market_notices")
+        for name in ("announcement_at", "deposit_at", "trade_open_at", "termination_at"):
+            if name not in existing:
+                self.conn.execute(
+                    f"ALTER TABLE market_notices ADD COLUMN {name} REAL NOT NULL DEFAULT 0"
+                )
+
     def _init_schema(self) -> None:
         self.conn.executescript(
             """
@@ -32,6 +43,10 @@ class MarketNoticeStore:
                 source TEXT NOT NULL,
                 first_seen_at REAL NOT NULL,
                 updated_at REAL NOT NULL,
+                announcement_at REAL NOT NULL DEFAULT 0,
+                deposit_at REAL NOT NULL DEFAULT 0,
+                trade_open_at REAL NOT NULL DEFAULT 0,
+                termination_at REAL NOT NULL DEFAULT 0,
                 PRIMARY KEY(exchange, notice_id)
             );
             CREATE INDEX IF NOT EXISTS idx_market_notices_exchange_published
@@ -53,13 +68,14 @@ class MarketNoticeStore:
                 ON market_lifecycle_notice_state(exchange, state, market);
             """
         )
+        self._ensure_notice_timing_columns()
         self.conn.commit()
 
     @staticmethod
     def _effective_at(notice: MarketNotice) -> float:
         # Historical notices without an official publication timestamp are kept
         # for audit, but never allowed to become a current lifecycle override.
-        return max(0.0, float(notice.published_at or 0.0))
+        return max(0.0, float(notice.announcement_at or notice.published_at or 0.0))
 
     def _apply_notice_state(self, notice: MarketNotice, *, seen_at: float) -> int:
         state = lifecycle_state_for_notice(notice.event_kind)
@@ -118,12 +134,15 @@ class MarketNoticeStore:
             ).fetchone()
             self.conn.execute(
                 """INSERT INTO market_notices(
-                    exchange,notice_id,title,url,published_at,event_kind,symbols_json,source,first_seen_at,updated_at)
-                    VALUES(?,?,?,?,?,?,?,?,?,?)
+                    exchange,notice_id,title,url,published_at,event_kind,symbols_json,source,
+                    first_seen_at,updated_at,announcement_at,deposit_at,trade_open_at,termination_at)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(exchange,notice_id) DO UPDATE SET
                       title=excluded.title,url=excluded.url,published_at=excluded.published_at,
                       event_kind=excluded.event_kind,symbols_json=excluded.symbols_json,
-                      source=excluded.source,updated_at=excluded.updated_at""",
+                      source=excluded.source,updated_at=excluded.updated_at,
+                      announcement_at=excluded.announcement_at,deposit_at=excluded.deposit_at,
+                      trade_open_at=excluded.trade_open_at,termination_at=excluded.termination_at""",
                 (
                     notice.exchange,
                     notice.notice_id,
@@ -135,6 +154,10 @@ class MarketNoticeStore:
                     notice.source,
                     now,
                     now,
+                    float(notice.announcement_at or 0.0),
+                    float(notice.deposit_at or 0.0),
+                    float(notice.trade_open_at or 0.0),
+                    float(notice.termination_at or 0.0),
                 ),
             )
             if not existing:
@@ -157,8 +180,16 @@ class MarketNoticeStore:
     def state_snapshot(self, exchange: str) -> dict[str, Any]:
         exchange = str(exchange or "").strip().lower()
         rows = [dict(row) for row in self.conn.execute(
-            """SELECT exchange,market,state,notice_id,title,url,source,effective_at,updated_at
-               FROM market_lifecycle_notice_state WHERE exchange=? ORDER BY market""",
+            """SELECT s.exchange,s.market,s.state,s.notice_id,s.title,s.url,s.source,
+                      s.effective_at,s.updated_at,
+                      COALESCE(n.announcement_at,0) AS announcement_at,
+                      COALESCE(n.deposit_at,0) AS deposit_at,
+                      COALESCE(n.trade_open_at,0) AS trade_open_at,
+                      COALESCE(n.termination_at,0) AS termination_at
+               FROM market_lifecycle_notice_state s
+               LEFT JOIN market_notices n
+                 ON n.exchange=s.exchange AND n.notice_id=s.notice_id
+               WHERE s.exchange=? ORDER BY s.market""",
             (exchange,),
         ).fetchall()]
         return {
@@ -170,7 +201,8 @@ class MarketNoticeStore:
 
     def recent(self, exchange: str, limit: int = 80) -> list[dict[str, Any]]:
         rows = self.conn.execute(
-            """SELECT exchange,notice_id,title,url,published_at,event_kind,symbols_json,source,first_seen_at,updated_at
+            """SELECT exchange,notice_id,title,url,published_at,event_kind,symbols_json,source,
+                      first_seen_at,updated_at,announcement_at,deposit_at,trade_open_at,termination_at
                FROM market_notices WHERE exchange=?
                ORDER BY CASE WHEN published_at>0 THEN published_at ELSE first_seen_at END DESC
                LIMIT ?""",
