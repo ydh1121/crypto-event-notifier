@@ -14,16 +14,20 @@ def text(path: Path) -> str:
 def main() -> None:
     index = text(PUBLIC / "index.html")
     main_js = text(PUBLIC / "modules" / "main.js")
+    selectors = text(PUBLIC / "modules" / "shared" / "selectors.js")
     sector_page = text(PUBLIC / "modules" / "pages" / "sectors-v36.js")
     sector_table = text(PUBLIC / "modules" / "pages" / "sector-coin-table.js")
+    lifecycle_panel = text(PUBLIC / "modules" / "pages" / "market-lifecycle-panel.js")
     continuity = text(PUBLIC / "modules" / "shared" / "ui-continuity.js")
     lifecycle_js = text(PUBLIC / "modules" / "shared" / "market-lifecycle.js")
     lifecycle_css = text(PUBLIC / "modules" / "styles" / "market-lifecycle.css")
+    lifecycle_panel_css = text(PUBLIC / "modules" / "styles" / "market-lifecycle-panel.css")
     sector_market_css = text(PUBLIC / "modules" / "styles" / "sector-market-data.css")
     sector_api = text(ROOT / "cloudflare-pages" / "functions" / "api" / "sector-summary.ts")
     lifecycle_domain = text(ROOT / "b3_trader" / "market_lifecycle.py")
     lifecycle_store = text(ROOT / "b3_trader" / "market_lifecycle_store.py")
     lifecycle_service = text(ROOT / "b3_trader" / "market_lifecycle_service.py")
+    lifecycle_projection = text(ROOT / "b3_trader" / "cloudflare_snapshot_lifecycle.py")
     notice_domain = text(ROOT / "b3_trader" / "market_notice.py")
     notice_sources = text(ROOT / "b3_trader" / "market_notice_sources.py")
     notice_store = text(ROOT / "b3_trader" / "market_notice_store.py")
@@ -45,8 +49,12 @@ def main() -> None:
         "sector_table_modular": "renderSectorCoinTable" in sector_page and "sector-coin-row columns" not in sector_page,
         "sector_table_history": all(token in sector_table for token in ("d5_pct", "D-5", "d1_pct", "D-1", "change_24h_pct", "24H")),
         "sector_table_uses_lifecycle_helper": "lifecycleMeta" in sector_table and "market-lifecycle.js" in sector_table,
-        "lifecycle_shared_mapping": all(token in lifecycle_js for token in ("NEW_LISTING", "CAUTION", "TERMINATION_SCHEDULED", "TERMINATED")),
+        "lifecycle_shared_mapping": all(token in lifecycle_js for token in ("LISTING_ANNOUNCED", "NEW_LISTING", "CAUTION", "TERMINATION_SCHEDULED", "TERMINATED")),
         "lifecycle_color_contract": "market-lifecycle-caution" in lifecycle_css and "market-lifecycle-terminated" in lifecycle_css,
+        "lifecycle_selector_shared": "marketLifecycle" in selectors and "notice_only" in selectors,
+        "lifecycle_panel_modular": all(token in lifecycle_panel for token in ("renderMarketLifecyclePanel", "refreshMarketLifecyclePanel", "notice_only", "LISTING_ANNOUNCED", "data-market-lifecycle-panel")),
+        "lifecycle_panel_live_refresh": "refreshMarketLifecyclePanel" in sector_page and "m.type==='snapshot'" in sector_page,
+        "lifecycle_panel_responsive": "market-lifecycle-row" in lifecycle_panel_css and "@media(max-width:700px)" in lifecycle_panel_css,
         "sector_history_responsive": "sector-return-strip" in sector_market_css and "repeat(6" in sector_market_css,
         "sector_api_projects_returns": all(token in sector_api for token in ("$.return_windows.d1_pct", "$.return_windows.d2_pct", "$.return_windows.d3_pct", "$.return_windows.d4_pct", "$.return_windows.d5_pct")),
         "sector_api_projects_lifecycle": "$.lifecycle_state" in sector_api and "lifecycle_counts" in sector_api,
@@ -56,6 +64,7 @@ def main() -> None:
         "lifecycle_domain_separate": "decide_lifecycle_state" in lifecycle_domain and "merge_lifecycle_state" in lifecycle_domain,
         "lifecycle_store_separate": "MarketLifecycleStore" in lifecycle_store and "market_lifecycle_events" in lifecycle_store,
         "lifecycle_partial_api_fail_closed": "MIN_EXISTING_COVERAGE_RATIO" in lifecycle_store and "observation_rejected" in lifecycle_store,
+        "lifecycle_notice_projection": all(token in lifecycle_projection for token in ("notice_only", "notice_state_count", "notice_overlay")),
         "notice_domain_separate": all(token in notice_domain for token in ("MarketNotice", "classify_notice_title", "extract_notice_symbols", "lifecycle_state_for_notice")),
         "notice_sources_separate": "BithumbNoticeSource" in notice_sources and "UpbitNoticeSource" in notice_sources and "get_with_retry" in notice_sources,
         "notice_store_separate": "MarketNoticeStore" in notice_store and "market_lifecycle_notice_state" in notice_store,
