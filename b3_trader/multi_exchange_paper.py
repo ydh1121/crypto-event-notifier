@@ -21,6 +21,8 @@ from .auto_demo_v2 import (
     _num,
 )
 from .exchange_public import PublicExchangeAdapter, PublicMarket, public_exchange
+from .market_lifecycle import NORMAL
+from .market_lifecycle_store import MarketLifecycleStore
 from .scoped_paper_store import ScopedPaperStore
 
 MARKET_MEMORY_RETENTION_DAYS = 45
@@ -46,6 +48,8 @@ class MultiExchangePaperDemo(AutoPaperDemo):
         self.client: PublicExchangeAdapter = public_exchange(self.exchange)
         self.strategy = AssetStrategy()
         self.store = ScopedPaperStore(self.exchange, self.strategy_name)
+        self.lifecycle = MarketLifecycleStore(self.store.conn)
+        self.lifecycle_snapshot = self.lifecycle.snapshot(self.exchange)
         self.prices: dict[str, float] = {}
         self.names: dict[str, str] = {}
         self.market_meta: dict[str, PublicMarket] = {}
@@ -57,6 +61,7 @@ class MultiExchangePaperDemo(AutoPaperDemo):
 
     def _all_tickers(self) -> tuple[list[dict[str, Any]], dict[str, str]]:
         markets = self.client.krw_markets()
+        self.lifecycle_snapshot = self.lifecycle.observe_markets(self.exchange, markets)
         self.market_meta = {row.market: row for row in markets}
         names = {row.market: row.name for row in markets}
         # Seed every KRW market immediately so each exchange/market/strategy owns
@@ -78,12 +83,24 @@ class MultiExchangePaperDemo(AutoPaperDemo):
             _atomic_json(self.detail_dir / f"{market.replace('/', '_')}.json", detail)
 
     def _write_status(self, *, scanned: int, total: int, error: str = "") -> None:
-        leaderboard = self.store.leaderboard(5000)
+        lifecycle = self.lifecycle_snapshot if isinstance(self.lifecycle_snapshot, dict) else {}
+        lifecycle_states = lifecycle.get("states") if isinstance(lifecycle.get("states"), dict) else {}
+        leaderboard = [
+            {**row, "lifecycle_state": str(lifecycle_states.get(str(row.get("market") or "")) or NORMAL)}
+            for row in self.store.leaderboard(5000)
+        ]
         active_positions = sum(1 for row in leaderboard if row["has_position"])
         total_equity = sum(_num(row.get("equity_krw")) for row in leaderboard)
         total_cash = sum(_num(row.get("cash_krw")) for row in leaderboard)
         best = leaderboard[0] if leaderboard else None
         warning_count = sum(1 for row in self.market_meta.values() if row.warning)
+        lifecycle_summary = {
+            "market_count": int(lifecycle.get("market_count") or 0),
+            "counts": lifecycle.get("counts") if isinstance(lifecycle.get("counts"), dict) else {},
+            "attention": (lifecycle.get("attention") if isinstance(lifecycle.get("attention"), list) else [])[:80],
+            "transitions": (lifecycle.get("transitions") if isinstance(lifecycle.get("transitions"), list) else [])[:40],
+            "shadow_only": True,
+        }
         payload = {
             "running": not bool(error),
             "paper_only": True,
@@ -100,6 +117,7 @@ class MultiExchangePaperDemo(AutoPaperDemo):
             "scan_total": total,
             "active_positions": active_positions,
             "warning_markets": warning_count,
+            "market_lifecycle": lifecycle_summary,
             "aggregate_virtual_capital_krw": START_KRW * len(leaderboard),
             "equity_krw": round(total_equity, 2),
             "cash_krw": round(total_cash, 2),
@@ -126,6 +144,7 @@ class MultiExchangePaperDemo(AutoPaperDemo):
                 "max_slippage_bps": MAX_SLIPPAGE_BPS,
                 "public_market_data_only": True,
                 "market_memory_retention_days": MARKET_MEMORY_RETENTION_DAYS,
+                "market_lifecycle_shadow_only": True,
             },
         }
         _atomic_json(self.status_path, payload)
