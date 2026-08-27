@@ -85,7 +85,7 @@ def main() -> None:
         "notice_supervisor_component": '"market-notice-watch"' in control and '"market-notice-watch": self.market_notice_collector.run_once' in supervisor,
         "paper_consumes_lifecycle_service": "MarketLifecycleService" in paper and "MarketLifecycleStore" not in paper,
         "paper_does_not_parse_notices": "BithumbNoticeSource" not in paper and "UpbitNoticeSource" not in paper and "classify_notice_title" not in paper,
-        "paper_termination_gate_only": all(token in paper for token in ("self.lifecycle.entry_policy", "lifecycle_block", '"paper_gate": "termination_only"', '"market_lifecycle_mode": "termination_gate_only"', '"caution_remains_shadow_for_current_adaptive": True')),
+        "paper_termination_gate_only": all(token in paper for token in ("def _entry_policy", "lifecycle.entry_policy", "lifecycle_entry_policy(NORMAL", "lifecycle_block", '"paper_gate": "termination_only"', '"market_lifecycle_mode": "termination_gate_only"', '"caution_remains_shadow_for_current_adaptive": True')),
         "paper_enriches_detail_via_feature_store": "MarketFeatureStore" in paper and "enrich_market_detail" in paper,
         "architecture_rule_present": all(token in architecture for token in ("collector", "store", "feature", "score", "Viewer", "PAPER")),
     }
