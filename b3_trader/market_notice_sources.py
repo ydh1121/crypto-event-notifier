@@ -4,7 +4,7 @@ import html
 import re
 from datetime import datetime, timezone, timedelta
 from html.parser import HTMLParser
-from typing import Any, Iterable
+from typing import Any
 from urllib.parse import urljoin
 
 import requests
@@ -94,6 +94,36 @@ def _upbit_rows(payload: Any) -> list[dict[str, Any]]:
     return []
 
 
+def _upbit_detail_text(payload: Any) -> str:
+    if isinstance(payload, str):
+        return payload.strip()
+    if not isinstance(payload, dict):
+        return ""
+    for key in ("body", "content", "contents", "description", "text", "html"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    for key in ("data", "notice", "announcement"):
+        nested = _upbit_detail_text(payload.get(key))
+        if nested:
+            return nested
+    return ""
+
+
+def _upbit_detail_timestamp(payload: Any) -> float:
+    if not isinstance(payload, dict):
+        return 0.0
+    for key in ("created_at", "createdAt", "published_at", "publishedAt", "date"):
+        parsed = _timestamp(payload.get(key))
+        if parsed > 0:
+            return parsed
+    for key in ("data", "notice", "announcement"):
+        nested = _upbit_detail_timestamp(payload.get(key))
+        if nested > 0:
+            return nested
+    return 0.0
+
+
 class BithumbNoticeSource:
     exchange = "bithumb"
     source = "bithumb_official_feed"
@@ -133,12 +163,14 @@ class BithumbNoticeSource:
         output: list[MarketNotice] = []
         for notice in candidates.values():
             published = notice.published_at
-            if published <= 0:
-                try:
-                    detail, _ = get_with_retry(notice.url, headers=headers, timeout=10, attempts=2)
-                    published = _bithumb_detail_timestamp(detail.text)
-                except requests.RequestException:
-                    published = 0.0
+            detail_text = ""
+            try:
+                detail, _ = get_with_retry(notice.url, headers=headers, timeout=10, attempts=2)
+                detail_text = detail.text or ""
+                if published <= 0:
+                    published = _bithumb_detail_timestamp(detail_text)
+            except requests.RequestException:
+                pass
             output.append(
                 normalize_notice(
                     exchange=notice.exchange,
@@ -147,6 +179,7 @@ class BithumbNoticeSource:
                     url=notice.url,
                     published_at=published,
                     source=notice.source,
+                    detail_text=detail_text,
                 )
             )
         return output
@@ -182,6 +215,21 @@ class UpbitNoticeSource:
             )
             return _upbit_rows(response.json())
 
+    def _detail(self, notice_id: str) -> tuple[str, float]:
+        headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
+        try:
+            response, _ = get_with_retry(
+                f"{self.current_url}/{notice_id}",
+                params={"os": "web"},
+                headers=headers,
+                timeout=10,
+                attempts=2,
+            )
+            payload = response.json()
+            return _upbit_detail_text(payload), _upbit_detail_timestamp(payload)
+        except (requests.RequestException, ValueError):
+            return "", 0.0
+
     def fetch(self) -> list[MarketNotice]:
         output: list[MarketNotice] = []
         for row in self._request_rows():
@@ -192,7 +240,7 @@ class UpbitNoticeSource:
             published = _timestamp(
                 row.get("created_at") or row.get("createdAt") or row.get("published_at") or row.get("date")
             )
-            notice = normalize_notice(
+            preliminary = normalize_notice(
                 exchange=self.exchange,
                 notice_id=notice_id,
                 title=title,
@@ -200,8 +248,20 @@ class UpbitNoticeSource:
                 published_at=published,
                 source=self.source,
             )
-            if notice.event_kind != OTHER:
-                output.append(notice)
+            if preliminary.event_kind == OTHER:
+                continue
+            detail_text, detail_published = self._detail(notice_id)
+            output.append(
+                normalize_notice(
+                    exchange=self.exchange,
+                    notice_id=notice_id,
+                    title=title,
+                    url=preliminary.url,
+                    published_at=published or detail_published,
+                    source=self.source,
+                    detail_text=detail_text,
+                )
+            )
         return output
 
 
