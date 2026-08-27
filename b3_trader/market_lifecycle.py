@@ -28,6 +28,32 @@ class LifecycleDecision:
     reason: str
 
 
+def normalize_lifecycle_state(value: str, default: str = NORMAL) -> str:
+    state = str(value or "").strip().upper()
+    return state if state in ALL_STATES else default
+
+
+def merge_lifecycle_state(*, base_state: str, notice_state: str = "", market_present: bool) -> LifecycleDecision:
+    """Compose market-list inference with normalized official notice state.
+
+    Market availability remains authoritative for completed termination. Official
+    notices may raise attention before the market-list API changes. A caution
+    release never suppresses an API warning because the base state wins again.
+    """
+    base = normalize_lifecycle_state(base_state)
+    notice = normalize_lifecycle_state(notice_state, default="") if notice_state else ""
+
+    if base == TERMINATED:
+        return LifecycleDecision(TERMINATED, "market_absence_confirmed")
+    if notice in {TERMINATION_SCHEDULED, TERMINATED}:
+        return LifecycleDecision(notice, "official_notice")
+    if notice == CAUTION:
+        return LifecycleDecision(CAUTION, "official_notice")
+    if notice == LISTING_ANNOUNCED and not market_present:
+        return LifecycleDecision(LISTING_ANNOUNCED, "official_notice")
+    return LifecycleDecision(base, "market_state")
+
+
 def decide_lifecycle_state(
     *,
     previous_state: str = "",
