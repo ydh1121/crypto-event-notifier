@@ -133,16 +133,15 @@ def _first_datetime(value: str, *, base_ts: float) -> float:
 
 
 def _revised_datetime(value: str, *, base_ts: float) -> float:
-    """Pick the final clock time when one notice line contains explicit revisions.
+    """Pick the final clock time when a bounded notice segment has revisions.
 
-    Domestic exchanges often preserve the original date once and strike/arrow
-    through earlier clock times, for example `2026.08.11 오후 2:00 -> 오후 4:00
-    -> 오후 5:00`. The final active time is the last clock value on that line.
+    Exchanges may split the original and revised clocks across HTML line breaks,
+    so the entire bounded segment must be considered rather than only line one.
     """
     if not any(marker in value for marker in _REVISION_MARKERS):
         return 0.0
-    line = value.split("\n", 1)[0]
-    date_match = _DATE_ONLY_RE.search(line)
+    segment = value[:360]
+    date_match = _DATE_ONLY_RE.search(segment)
     if date_match is None:
         return 0.0
     groups = date_match.groupdict()
@@ -155,7 +154,7 @@ def _revised_datetime(value: str, *, base_ts: float) -> float:
         return 0.0
     month = int(groups["month"])
     day = int(groups["day"])
-    clocks = list(_TIME_ONLY_RE.finditer(line[date_match.end() :]))
+    clocks = list(_TIME_ONLY_RE.finditer(segment[date_match.end() :]))
     if not clocks:
         return 0.0
     clock = clocks[-1].groupdict()
@@ -174,7 +173,7 @@ def _revised_datetime(value: str, *, base_ts: float) -> float:
     return _roll_year_if_needed(value_ts, explicit_year=bool(year_text), base_ts=base_ts)
 
 
-def _after_labels(text: str, labels: Iterable[str], *, base_ts: float, window: int = 220) -> float:
+def _after_labels(text: str, labels: Iterable[str], *, base_ts: float, window: int = 360) -> float:
     best_position: int | None = None
     best_value = 0.0
     for label in labels:
@@ -183,7 +182,7 @@ def _after_labels(text: str, labels: Iterable[str], *, base_ts: float, window: i
             position = text.find(label, start)
             if position < 0:
                 break
-            segment = text[position : position + max(80, int(window))]
+            segment = text[position : position + max(120, int(window))]
             parsed = _revised_datetime(segment, base_ts=base_ts) or _first_datetime(segment, base_ts=base_ts)
             if parsed > 0 and (best_position is None or position < best_position):
                 best_position = position
@@ -198,8 +197,8 @@ def parse_notice_timing(detail_text: str, *, published_at: float = 0.0) -> Notic
     Publication time is the announcement timestamp. Other fields are populated
     only when an explicit date *and clock time* appears near the matching label.
     Date-only wording is intentionally left unresolved rather than inventing a
-    midnight timestamp. When the same line explicitly revises a clock time, the
-    final clock value is treated as the active schedule.
+    midnight timestamp. Explicit revision arrows/wording use the final clock in
+    the bounded schedule segment, including revisions split across line breaks.
     """
     announcement_at = max(0.0, float(published_at or 0.0))
     text = _plain_text(detail_text)
