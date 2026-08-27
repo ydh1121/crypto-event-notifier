@@ -90,7 +90,8 @@ def audit_listing_history(path: Path = DB_PATH, *, rows: int = 6) -> dict[str, A
         for row in feature_rows[: max(1, min(20, int(rows)))]:
             payload = _json(row["feature_json"], {})
             pre = payload.get("prelisting") if isinstance(payload, dict) and isinstance(payload.get("prelisting"), dict) else {}
-            post = payload.get("postlisting") if isinstance(payload, dict) and isinstance(payload.get("postlisting"), dict) else {}
+            post = payload.get("foreign_postlisting") if isinstance(payload, dict) and isinstance(payload.get("foreign_postlisting"), dict) else {}
+            fine = payload.get("fine_reaction_source") if isinstance(payload, dict) and isinstance(payload.get("fine_reaction_source"), dict) else {}
             windows = pre.get("windows") if isinstance(pre.get("windows"), dict) else {}
             post_windows = post.get("windows") if isinstance(post.get("windows"), dict) else {}
             feature_samples.append(
@@ -108,9 +109,12 @@ def audit_listing_history(path: Path = DB_PATH, *, rows: int = 6) -> dict[str, A
                     "postlisting_status": post.get("status") or "",
                     "postlisting_windows": {
                         name: post_windows.get(name)
-                        for name in ("m5", "h1", "h6", "h24", "d3", "d7")
+                        for name in ("p5m", "p1h", "p6h", "p24h", "p3d", "p7d")
                         if name in post_windows
                     },
+                    "p5m_source_interval_seconds": post.get("p5m_source_interval_seconds"),
+                    "fine_reaction_status": fine.get("status") or "",
+                    "fine_reaction_candles": int(fine.get("candles") or 0),
                 }
             )
 
