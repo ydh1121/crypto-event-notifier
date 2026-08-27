@@ -11,6 +11,10 @@ $env:AUTO_GIT_SYNC = "true"
 $env:AUTO_GIT_PUSH_CONTROL = "true"
 $env:GIT_SYNC_INTERVAL_SECONDS = "15"
 
+# The normal launcher gives Bithumb PAPER one dedicated restart-safe process owner.
+# local_app keeps its legacy in-process worker only as a direct-run fallback.
+$env:AUTO_DEMO_ENABLED = "false"
+
 # Windows PowerShell 5.1 can surface stderr from a successful native command
 # (for example Git's normal "From https://..." fetch progress) as an ErrorRecord.
 # Capture native Git output and decide success from the exit code.
@@ -191,9 +195,20 @@ function Start-ResearchSupervisor {
   return $process
 }
 
+function Start-PaperRuntimeSupervisor {
+  param([string]$PythonPath)
+  $statusPath = Join-Path $repo "b3_trader\data\paper-runtime-supervisor.json"
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $statusPath) | Out-Null
+  $process = Start-Process -FilePath $PythonPath -ArgumentList @("-m", "b3_trader.paper_runtime_supervisor") -PassThru -WindowStyle Hidden
+  Write-Host "Bithumb PAPER supervisor: ON (restart-safe, PAPER-only)" -ForegroundColor Green
+  return $process
+}
+
 $researchSupervisor = $null
+$paperSupervisor = $null
 try {
   $researchSupervisor = Start-ResearchSupervisor -PythonPath $python
+  $paperSupervisor = Start-PaperRuntimeSupervisor -PythonPath $python
   Write-Host "Starting Crypto Auto Trader..."
   Write-Host "Dashboard will be available at http://127.0.0.1:8765"
   while ($true) {
@@ -201,12 +216,16 @@ try {
     $code = $LASTEXITCODE
     if ($code -eq 0) { break }
     if ($code -eq 75) {
-      Write-Host "GitHub runtime update applied. Restarting trader and research supervisor automatically..."
+      Write-Host "GitHub runtime update applied. Restarting trader and PAPER/research supervisors automatically..."
       if ($researchSupervisor -and -not $researchSupervisor.HasExited) {
         Stop-Process -Id $researchSupervisor.Id -Force -ErrorAction SilentlyContinue
       }
+      if ($paperSupervisor -and -not $paperSupervisor.HasExited) {
+        Stop-Process -Id $paperSupervisor.Id -Force -ErrorAction SilentlyContinue
+      }
       Start-Sleep -Seconds 2
       $researchSupervisor = Start-ResearchSupervisor -PythonPath $python
+      $paperSupervisor = Start-PaperRuntimeSupervisor -PythonPath $python
       continue
     }
     Write-Host "Trader stopped with exit code $code. Restarting in 5 seconds..."
@@ -215,5 +234,8 @@ try {
 } finally {
   if ($researchSupervisor -and -not $researchSupervisor.HasExited) {
     Stop-Process -Id $researchSupervisor.Id -Force -ErrorAction SilentlyContinue
+  }
+  if ($paperSupervisor -and -not $paperSupervisor.HasExited) {
+    Stop-Process -Id $paperSupervisor.Id -Force -ErrorAction SilentlyContinue
   }
 }
