@@ -26,14 +26,7 @@ class CoinProfileResearchCycleV36(CoinProfileResearchCycle):
 
     @staticmethod
     def _repair_profile_matches_current(row: dict[str, str], profile: dict[str, Any]) -> bool:
-        """A repair may overwrite quarantined data only with a current-asset lead.
-
-        External metadata can still be internally inconsistent. For an identity
-        repair, a Korean business/description lead must begin with the exchange
-        asset. If Korean text is unavailable, the English description must begin
-        with the exchange English name. Empty profiles are not considered a safe
-        replacement; they are explicitly quarantined instead.
-        """
+        """A repair may overwrite quarantined data only with a current-asset lead."""
 
         for key in ("business_summary_ko", "description_ko"):
             value = _text(profile.get(key))
@@ -88,6 +81,40 @@ class CoinProfileResearchCycleV36(CoinProfileResearchCycle):
             profile["identity_repair"] = True
             profile["identity_quarantined"] = False
         return profile
+
+    def run_once(self) -> dict[str, Any]:
+        """General research and precision repair are failure-isolated.
+
+        A transient D1/general ingest failure must never block identity mismatch
+        quarantine and repair, because stale cross-contaminated descriptions are
+        more harmful than temporarily missing general enrichment.
+        """
+
+        try:
+            general = self.base.run_once()
+        except Exception as exc:
+            general = {
+                "status": "general_error",
+                "configured": True,
+                "processed": 0,
+                "stored": 0,
+                "failed": 1,
+                "failures": [f"{type(exc).__name__}: {str(exc)[:500]}"],
+            }
+        ingest, backlog_url, token = self._urls()
+        if not ingest or not backlog_url or not token:
+            return {**general, "precision": {"status": "not_configured", "processed": 0}}
+        try:
+            precision = self._precision_once(ingest, backlog_url, token)
+        except Exception as exc:
+            precision = {
+                "status": "precision_error",
+                "processed": 0,
+                "stored": 0,
+                "failed": 1,
+                "failures": [f"{type(exc).__name__}: {str(exc)[:500]}"],
+            }
+        return {**general, "precision": precision}
 
 
 def main() -> None:
