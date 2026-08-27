@@ -61,6 +61,10 @@ def main() -> None:
             "ListingVenueVerifier", "COINGECKO_TICKERS_URL", "exchange_ids",
             "provider_pair_verified", "provider_pair_not_found", "is_anomaly",
         )),
+        "build39_transient_venue_not_market_absence": all(token in collector for token in (
+            "venue_verification_waiting", "foreign_source_waiting", "no_foreign_market_found",
+            'if "venue_unverified" in source_statuses',
+        )),
         "build39_cex_sources_modular": all(token in sources for token in (
             "BinanceSpotSource", "OkxSpotSource", "BybitSpotSource",
             "CexSpotMarket", "ListingCandle", "default_cex_sources",
