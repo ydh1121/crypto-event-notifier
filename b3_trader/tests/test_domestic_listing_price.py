@@ -64,3 +64,71 @@ def test_resolver_uses_bounded_public_minute_window() -> None:
     assert result["response_count"] == 1
     assert fake.calls[0][0:3] == ("KRW-ABC", 1, 30)
     assert fake.calls[0][3] == "2026-08-28 17:20:00"
+
+
+class FirstTradeClient:
+    def __init__(self) -> None:
+        self.calls = []
+
+    def candles_minutes(self, market: str, unit: int = 5, count: int = 120, to: str | None = None):
+        self.calls.append((market, unit, count, to))
+        if unit == 240:
+            # Fewer than a full 200-row page proves this is the beginning of
+            # public history; the oldest coarse bucket starts at 12:00 KST.
+            return [
+                {"candle_date_time_kst": "2026-08-23T16:00:00", "opening_price": 120},
+                {"candle_date_time_kst": "2026-08-23T12:00:00", "opening_price": 100},
+            ]
+        if unit == 60:
+            return [
+                {"candle_date_time_kst": "2026-08-23T13:00:00", "opening_price": 110},
+                {"candle_date_time_kst": "2026-08-23T12:00:00", "opening_price": 100},
+            ]
+        if unit == 1:
+            return [
+                {"candle_date_time_kst": "2026-08-23T12:31:00", "opening_price": 101},
+                {"candle_date_time_kst": "2026-08-23T12:30:00", "opening_price": 99},
+            ]
+        return []
+
+
+def test_missing_notice_open_is_recovered_from_exact_first_public_trade() -> None:
+    fake = FirstTradeClient()
+    resolver = DomesticListingPriceResolver(bithumb=fake, upbit=fake)
+    result = resolver.resolve_first_trade(
+        "upbit",
+        "KRW-FOLD",
+        now=datetime(2026, 8, 28, 5, 0, tzinfo=KST).timestamp(),
+    )
+    expected = datetime(2026, 8, 23, 12, 30, tzinfo=KST).timestamp()
+    assert result["status"] == "resolved_first_trade"
+    assert result["found"] is True
+    assert result["open_at"] == expected
+    assert result["price"] == 99
+    assert result["price_basis"] == "first_public_trade_candle"
+    assert [call[1] for call in fake.calls] == [240, 60, 1]
+
+
+class FullPageOnlyClient:
+    def candles_minutes(self, market: str, unit: int = 5, count: int = 120, to: str | None = None):
+        if unit != 240:
+            raise AssertionError("narrowing must not run without proof of history start")
+        return [
+            {
+                "candle_date_time_utc": (
+                    datetime(2026, 8, 1, tzinfo=timezone.utc) + timedelta(hours=4 * index)
+                ).strftime("%Y-%m-%dT%H:%M:%S"),
+                "opening_price": 1,
+            }
+            for index in range(200)
+        ]
+
+
+def test_first_trade_backfill_fails_closed_when_history_start_is_not_proven() -> None:
+    fake = FullPageOnlyClient()
+    resolver = DomesticListingPriceResolver(bithumb=fake, upbit=fake)
+    result = resolver.resolve_first_trade("upbit", "KRW-OLD", now=2_000_000_000, max_coarse_pages=1)
+    assert result["status"] == "history_window_exhausted"
+    assert result["found"] is False
+    assert result["open_at"] == 0.0
+    assert result["price"] == 0.0
