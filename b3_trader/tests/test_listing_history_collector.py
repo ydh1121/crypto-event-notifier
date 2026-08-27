@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from b3_trader.listing_history import ListingCandle
@@ -99,6 +100,24 @@ class FakeVenueVerifier:
         }
 
 
+class FakeQuoteRateResolver:
+    def __init__(self, rate: float = 1.0, found: bool = True) -> None:
+        self.rate = rate
+        self.found = found
+        self.calls = []
+
+    def resolve(self, quote_asset: str, target_ts: float):
+        self.calls.append((quote_asset, target_ts))
+        return {
+            "status": "resolved" if self.found else "rate_not_found",
+            "found": self.found,
+            "rate": self.rate if self.found else 0.0,
+            "quote_asset": quote_asset,
+            "source_exchange": "fake-domestic",
+            "source_market": f"KRW-{quote_asset}",
+        }
+
+
 def verified_identity() -> ListingIdentity:
     return ListingIdentity(
         symbol="ABC",
@@ -123,11 +142,21 @@ def _case() -> DomesticListingCase:
     )
 
 
-def test_collector_persists_provider_verified_case(tmp_path: Path) -> None:
+def _collector(store: ListingHistoryStore, source, verifier=None, quote=None) -> ListingHistoryCollector:
+    return ListingHistoryCollector(
+        store=store,
+        sources=(source,),
+        venue_verifier=verifier or FakeVenueVerifier(),
+        quote_rate_resolver=quote or FakeQuoteRateResolver(),
+    )
+
+
+def test_collector_persists_provider_verified_case_and_quote_rate(tmp_path: Path) -> None:
     source = FakeSource()
     verifier = FakeVenueVerifier()
+    quote = FakeQuoteRateResolver(rate=1.0)
     store = ListingHistoryStore(tmp_path / "listing.sqlite3")
-    collector = ListingHistoryCollector(store=store, sources=(source,), venue_verifier=verifier)
+    collector = _collector(store, source, verifier, quote)
     try:
         result = collector.collect_case(_case())
         assert result["status"] == "complete"
@@ -135,7 +164,35 @@ def test_collector_persists_provider_verified_case(tmp_path: Path) -> None:
         assert source.discover_calls == 1
         assert source.candle_calls == 1
         assert verifier.calls == [("alpha-beta-coin", "ABCUSDT")]
+        assert quote.calls == [("USDT", _case().open_at)]
+        feature_row = store.conn.execute(
+            "SELECT feature_version,feature_json FROM listing_history_features WHERE source_exchange='fake'"
+        ).fetchone()
+        assert feature_row is not None
+        assert int(feature_row["feature_version"]) == 2
+        payload = json.loads(feature_row["feature_json"])
+        assert payload["prelisting"]["currency_safe"] is True
+        assert payload["prelisting"]["quote_asset"] == "USDT"
+        assert payload["foreign_postlisting"]["anchor_price"] == 16
         assert store.pending_cases() == []
+    finally:
+        collector.close()
+
+
+def test_collector_keeps_domestic_premium_null_without_quote_rate(tmp_path: Path) -> None:
+    source = FakeSource()
+    store = ListingHistoryStore(tmp_path / "listing.sqlite3")
+    collector = _collector(store, source, quote=FakeQuoteRateResolver(found=False))
+    try:
+        result = collector.collect_case(_case())
+        assert result["sources_ok"] == 1
+        assert result["sources"]["fake"]["domestic_listing_premium_pct"] is None
+        row = store.conn.execute(
+            "SELECT feature_json FROM listing_history_features WHERE source_exchange='fake'"
+        ).fetchone()
+        payload = json.loads(row["feature_json"])
+        assert payload["prelisting"]["quote_to_krw_at_open"] is None
+        assert payload["prelisting"]["domestic_listing_premium_pct"] is None
     finally:
         collector.close()
 
@@ -143,11 +200,7 @@ def test_collector_persists_provider_verified_case(tmp_path: Path) -> None:
 def test_collector_rejects_unverified_foreign_pair(tmp_path: Path) -> None:
     source = FakeSource()
     store = ListingHistoryStore(tmp_path / "listing.sqlite3")
-    collector = ListingHistoryCollector(
-        store=store,
-        sources=(source,),
-        venue_verifier=FakeVenueVerifier(False),
-    )
+    collector = _collector(store, source, verifier=FakeVenueVerifier(False))
     try:
         result = collector.collect_case(_case())
         assert result["status"] == "no_foreign_market_found"
@@ -161,7 +214,7 @@ def test_collector_rejects_unverified_foreign_pair(tmp_path: Path) -> None:
 def test_collector_rejects_weak_identity_without_network(tmp_path: Path) -> None:
     source = FakeSource()
     store = ListingHistoryStore(tmp_path / "listing.sqlite3")
-    collector = ListingHistoryCollector(store=store, sources=(source,), venue_verifier=FakeVenueVerifier())
+    collector = _collector(store, source)
     try:
         result = collector.collect_case(
             DomesticListingCase(
@@ -184,7 +237,7 @@ def test_collector_rejects_weak_identity_without_network(tmp_path: Path) -> None
 def test_unknown_foreign_launch_is_not_inferred_from_prelisting_window(tmp_path: Path) -> None:
     source = FakeUnknownLaunchSource()
     store = ListingHistoryStore(tmp_path / "listing.sqlite3")
-    collector = ListingHistoryCollector(store=store, sources=(source,), venue_verifier=FakeVenueVerifier())
+    collector = _collector(store, source)
     try:
         result = collector.collect_case(_case())
         assert result["sources_ok"] == 1
@@ -201,7 +254,7 @@ def test_unknown_foreign_launch_is_not_inferred_from_prelisting_window(tmp_path:
 def test_known_foreign_launch_fetches_price_from_launch_window(tmp_path: Path) -> None:
     source = FakeKnownLaunchSource()
     store = ListingHistoryStore(tmp_path / "listing.sqlite3")
-    collector = ListingHistoryCollector(store=store, sources=(source,), venue_verifier=FakeVenueVerifier())
+    collector = _collector(store, source)
     try:
         result = collector.collect_case(_case())
         assert result["sources_ok"] == 1
