@@ -149,8 +149,9 @@ def prelisting_features(
 ) -> dict[str, Any]:
     """Build pre-KRW price windows from normalized confirmed candles.
 
-    The feature domain never fetches an exchange and never guesses identity.
-    Missing windows remain null instead of becoming zero-return observations.
+    The feature domain never fetches an exchange and never guesses identity or
+    launch provenance. Missing windows and unknown historical launch data remain
+    null instead of becoming zero-return observations or T-8d pseudo-launches.
     """
 
     rows = _valid_candles(candles)
@@ -166,16 +167,14 @@ def prelisting_features(
 
     pre_high = max((row.high for row in before_open), default=0.0)
     pre_low = min((row.low for row in before_open), default=0.0)
-    first = foreign_first_price
-    if first <= 0 and rows:
-        first = rows[0].open
-    first_ts = foreign_listing_at or (rows[0].ts if rows else 0.0)
+    first = float(foreign_first_price or 0.0)
+    first_ts = float(foreign_listing_at or 0.0)
 
     return {
         "domestic_open_at": float(domestic_open_at),
         "domestic_open_price": float(domestic_open_price),
-        "foreign_listing_at": float(first_ts),
-        "foreign_first_price": float(first) if first > 0 else None,
+        "foreign_listing_at": first_ts if first_ts > 0 else None,
+        "foreign_first_price": first if first > 0 else None,
         "foreign_first_to_domestic_pct": _pct(domestic_open_price, first),
         "pre_domestic_ath": pre_high or None,
         "pre_domestic_atl": pre_low or None,
