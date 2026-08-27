@@ -12,7 +12,15 @@ interface DetailItem {
 interface Payload {details?: DetailItem[]}
 
 const MAX_DETAILS = 40;
+const EMERGENCY_SNAPSHOT_KEEP = 12;
 const clean = (value: unknown, fallback = '') => String(value ?? fallback).trim();
+
+async function relieveSnapshotPressure(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `DELETE FROM snapshots
+     WHERE id NOT IN (SELECT id FROM snapshots ORDER BY id DESC LIMIT ?)`,
+  ).bind(EMERGENCY_SNAPSHOT_KEEP).run();
+}
 
 export const onRequestPost: PagesFunction<Env> = async ({request, env}) => {
   if (!env.INGEST_TOKEN || bearer(request) !== env.INGEST_TOKEN) {
@@ -30,6 +38,7 @@ export const onRequestPost: PagesFunction<Env> = async ({request, env}) => {
 
   const now = Math.floor(Date.now() / 1000);
   let stored = 0;
+  let pressureRelieved = false;
   for (const item of details) {
     if (!item || typeof item !== 'object' || !item.detail || typeof item.detail !== 'object') continue;
     const exchange = clean(item.exchange, 'bithumb').toLowerCase();
@@ -42,7 +51,7 @@ export const onRequestPost: PagesFunction<Env> = async ({request, env}) => {
     const detailJson = JSON.stringify(item.detail);
     if (detailJson.length > 180_000) continue;
 
-    await env.DB.prepare(
+    const statement = () => env.DB.prepare(
       `INSERT INTO market_details(detail_key,exchange,market,strategy,source_ts,received_at,detail_json)
        VALUES(?,?,?,?,?,?,?)
        ON CONFLICT(detail_key) DO UPDATE SET
@@ -60,10 +69,19 @@ export const onRequestPost: PagesFunction<Env> = async ({request, env}) => {
       Number.isFinite(sourceTs) ? sourceTs : 0,
       now,
       detailJson,
-    ).run();
+    );
+
+    try {
+      await statement().run();
+    } catch (firstError) {
+      if (pressureRelieved) throw firstError;
+      await relieveSnapshotPressure(env);
+      pressureRelieved = true;
+      await statement().run();
+    }
     stored += 1;
   }
 
   if (!stored) return error(422, 'NO_VALID_DETAILS', '유효한 코인 상세 데이터가 없습니다.');
-  return json({ok: true, stored, received_at: now});
+  return json({ok: true, stored, received_at: now, pressure_recovery: pressureRelieved});
 };
