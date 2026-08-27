@@ -1,0 +1,65 @@
+name: B3 listing Build 39
+
+on:
+  push:
+    branches:
+      - "b3-auto-trader-phase1"
+    paths:
+      - "b3_trader/listing_identity.py"
+      - "b3_trader/listing_identity_resolver.py"
+      - "b3_trader/listing_venue_verifier.py"
+      - "b3_trader/listing_history.py"
+      - "b3_trader/listing_history_store.py"
+      - "b3_trader/listing_history_sources.py"
+      - "b3_trader/listing_history_planner.py"
+      - "b3_trader/listing_history_collector.py"
+      - "b3_trader/listing_history_research_cycle.py"
+      - "b3_trader/listing_history_audit.py"
+      - "b3_trader/domestic_listing_price.py"
+      - "b3_trader/research_control.py"
+      - "b3_trader/research_supervisor.py"
+      - "b3_trader/tests/test_listing_*.py"
+      - "b3_trader/tests/test_domestic_listing_price.py"
+      - "cloudflare-pages/functions/api/coin-profile-identity.ts"
+      - "scripts/check-listing-build39.py"
+      - ".github/workflows/b3-listing-build39.yml"
+  workflow_dispatch:
+
+jobs:
+  build39:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: pip install -r b3_trader/requirements.txt pytest
+      - name: Compile listing-history modules
+        run: >-
+          python -m py_compile
+          b3_trader/listing_identity.py
+          b3_trader/listing_identity_resolver.py
+          b3_trader/listing_venue_verifier.py
+          b3_trader/listing_history.py
+          b3_trader/listing_history_store.py
+          b3_trader/listing_history_sources.py
+          b3_trader/listing_history_planner.py
+          b3_trader/listing_history_collector.py
+          b3_trader/listing_history_research_cycle.py
+          b3_trader/listing_history_audit.py
+          b3_trader/domestic_listing_price.py
+          b3_trader/research_control.py
+          b3_trader/research_supervisor.py
+          scripts/check-listing-build39.py
+      - name: Listing-history tests
+        run: python -m pytest -q b3_trader/tests/test_listing_*.py b3_trader/tests/test_domestic_listing_price.py
+      - name: Build 39 modular contract
+        run: python scripts/check-listing-build39.py
+      - name: Cloudflare Pages typecheck
+        working-directory: cloudflare-pages
+        run: |
+          npm install
+          npm run typecheck
