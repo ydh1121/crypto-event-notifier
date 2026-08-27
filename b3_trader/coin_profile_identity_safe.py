@@ -25,10 +25,8 @@ _GENERIC_NAME_WORDS = {
 }
 _MANUAL_HEADER_LIMIT = 5000
 _MANUAL_HEADER_MARKERS = (
-    "가상자산 소개",
-    "가상자산소개",
-    "가상자산 기본 정보",
-    "가상자산기본정보",
+    r"가\s*상\s*자\s*산\s*소\s*개",
+    r"가\s*상\s*자\s*산\s*기\s*본\s*정\s*보",
 )
 
 
@@ -58,12 +56,23 @@ def row_matches_candidate(row: dict[str, str], candidate_name: Any) -> bool:
 
 
 def _manual_header(text: str) -> str:
+    """Return only the identity/header area before the manual description.
+
+    pypdf frequently inserts line breaks between Korean labels, e.g.
+    ``가상자산\n소개``. Literal ``str.find`` therefore treated the whole first
+    page as a header and allowed body mentions such as Bitcoin/BTC to validate a
+    PUMPBTC PDF. Marker detection is whitespace-tolerant and fail-closed now.
+    """
+
     visible = text[:_MANUAL_HEADER_LIMIT]
-    positions = [visible.find(marker) for marker in _MANUAL_HEADER_MARKERS]
-    positions = [position for position in positions if position > 0]
-    if positions:
-        visible = visible[: min(positions)]
-    return visible[:_MANUAL_HEADER_LIMIT]
+    positions: list[int] = []
+    for pattern in _MANUAL_HEADER_MARKERS:
+        match = re.search(pattern, visible, re.I)
+        if match and match.start() > 0:
+            positions.append(match.start())
+    if not positions:
+        return ""
+    return visible[: min(positions)]
 
 
 def _identity_pattern(value: Any) -> str:
@@ -88,16 +97,11 @@ def _identity_phrase_in_text(text: str, value: Any) -> bool:
 
 
 def _manual_identity_matches(row: dict[str, str], text: str) -> bool:
-    """Require project identity in the PDF header, not merely a body mention.
-
-    Crypto manuals routinely mention BTC, ETH, parent chains, partner protocols,
-    and similarly named projects in the body. A body-wide substring check can
-    therefore attach a perfectly valid PDF to the wrong asset. The manual is
-    accepted only when the exchange identity is corroborated in the document
-    header by two independent fields.
-    """
+    """Require project identity in the PDF header, not merely a body mention."""
 
     header = _manual_header(text)
+    if not header:
+        return False
     korean_name = _text(row.get("korean_name"))
     english_name = _text(row.get("english_name"))
     symbol = _text(row.get("symbol")).upper()
@@ -114,14 +118,31 @@ def _manual_identity_matches(row: dict[str, str], text: str) -> bool:
     return False
 
 
-class IdentitySafeCoinProfileEnricher(CoinProfileEnricher):
-    """Coin profiler that refuses same-ticker / different-project matches.
+def _manual_intro_identity_matches(row: dict[str, str], intro: str) -> bool:
+    """Require the description itself to start with the current exchange asset.
 
-    Tickers are not unique across crypto history. External provider metadata and
-    Bithumb manual PDFs are accepted only when the exchange's official project
-    name is corroborated. It is better to leave a profile unresolved than attach
-    a high-confidence description from another project.
+    This second guard catches malformed/exotic PDFs whose header happens to
+    contain a referenced asset. Bithumb manual introductions normally begin with
+    the project identity, so failing closed is preferable to cross-contamination.
     """
+
+    probe = _normalize(_clean_html(intro, 320))
+    if not probe:
+        return False
+    korean = _normalize(row.get("korean_name"))
+    english = _normalize(row.get("english_name"))
+    symbol = _text(row.get("symbol")).lower()
+    if korean and probe.startswith(korean):
+        return True
+    if english and probe.startswith(english):
+        return True
+    if len(symbol) >= 2 and probe.startswith(symbol):
+        return True
+    return False
+
+
+class IdentitySafeCoinProfileEnricher(CoinProfileEnricher):
+    """Coin profiler that refuses same-ticker / different-project matches."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -193,16 +214,19 @@ class IdentitySafeCoinProfileEnricher(CoinProfileEnricher):
         if not _manual_identity_matches(row, text):
             return {}
         text = re.sub(r"[ \t]+", " ", text)
-        intro = re.search(r"가상자산\s*소개\s*(.*?)\s*가상자산\s*기본\s*정보", text, re.S)
-        purpose = re.search(r"가상자산의\s*이용목적\s*(.*?)\s*가상자산\s*백서", text, re.S)
-        homepage = re.search(r"가상자산\s*홈페이지\s*(https?://\S+)", text, re.S)
-        whitepaper = re.search(r"가상자산\s*백서\s*(https?://\S+)", text, re.S)
+        intro = re.search(r"가\s*상\s*자\s*산\s*소\s*개\s*(.*?)\s*가\s*상\s*자\s*산\s*기\s*본\s*정\s*보", text, re.S)
+        purpose = re.search(r"가\s*상\s*자\s*산\s*의\s*이\s*용\s*목\s*적\s*(.*?)\s*가\s*상\s*자\s*산\s*백\s*서", text, re.S)
+        homepage = re.search(r"가\s*상\s*자\s*산\s*홈\s*페\s*이\s*지\s*(https?://\S+)", text, re.S)
+        whitepaper = re.search(r"가\s*상\s*자\s*산\s*백\s*서\s*(https?://\S+)", text, re.S)
+        intro_text = _clean_html(intro.group(1) if intro else "", 1800)
+        if not intro_text or not _manual_intro_identity_matches(row, intro_text):
+            return {}
         return {
-            "description_ko": _clean_html(intro.group(1) if intro else "", 1800),
+            "description_ko": intro_text,
             "purpose_ko": _clean_html(purpose.group(1) if purpose else "", 500),
             "homepage": _safe_url((homepage.group(1) if homepage else "").rstrip(".,)")),
             "whitepaper": _safe_url((whitepaper.group(1) if whitepaper else "").rstrip(".,)")),
-            "identity_verified": "strict_header",
+            "identity_verified": "strict_header_and_intro",
         }
 
     def _bithumb_manual(self, row: dict[str, str]) -> dict[str, str]:
@@ -248,8 +272,6 @@ class IdentitySafeCoinProfileEnricher(CoinProfileEnricher):
     def _build_profile(self, row: dict[str, str], cmc_raw: Any, *, upbit_available: bool) -> dict[str, Any]:
         safe_upbit = bool(upbit_available and self._upbit_project_matches(row))
         profile = super()._build_profile(row, cmc_raw, upbit_available=safe_upbit)
-        # The displayed identity always comes from the exchange catalog. Provider
-        # names may be aliases, but must never overwrite the exchange identity.
         profile["english_name"] = row.get("english_name") or profile.get("english_name")
         profile["korean_name"] = row.get("korean_name") or profile.get("korean_name")
         profile["identity_guard"] = "exchange_name_verified"
