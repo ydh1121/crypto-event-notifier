@@ -15,6 +15,8 @@ from .listing_venue_verifier import ListingVenueVerifier
 PRE_WINDOW_SECONDS = 8 * 24 * 3600
 POST_WINDOW_SECONDS = 8 * 24 * 3600
 POST_COMPLETE_SECONDS = 7 * 24 * 3600
+FINE_POST_WINDOW_SECONDS = 15 * 60
+FEATURE_VERSION = 3
 QUOTE_PRIORITY = {"USDT": 0, "USDC": 1, "USD": 2, "FDUSD": 3, "BTC": 4}
 
 
@@ -162,6 +164,7 @@ class ListingHistoryCollector:
 
         source_results: dict[str, Any] = {}
         successful = 0
+        fine_source_errors = 0
         quote_rate_cache: dict[str, dict[str, Any]] = {}
         for source in self.sources:
             try:
@@ -209,6 +212,27 @@ class ListingHistoryCollector:
                 }
                 continue
 
+            minute_rows = []
+            fine_status = "not_due"
+            fine_error = ""
+            fine_fetch = getattr(source, "minute_candles", None)
+            if now >= case.open_at + 5 * 60:
+                if callable(fine_fetch):
+                    try:
+                        minute_rows = fine_fetch(
+                            market.market,
+                            start_ts=case.open_at,
+                            end_ts=min(now, case.open_at + FINE_POST_WINDOW_SECONDS),
+                        )
+                        fine_status = "collected" if minute_rows else "no_trade_candles"
+                    except Exception as exc:
+                        fine_source_errors += 1
+                        fine_status = "source_error"
+                        fine_error = f"{type(exc).__name__}: {exc}"[:300]
+                else:
+                    fine_source_errors += 1
+                    fine_status = "unsupported"
+
             self.store.upsert_source(
                 case_key=case_key,
                 source_exchange=market.exchange,
@@ -225,6 +249,12 @@ class ListingHistoryCollector:
                 source_exchange=market.exchange,
                 source_market=market.market,
                 candles=candles,
+            )
+            fine_stored = self.store.upsert_candles(
+                case_key=case_key,
+                source_exchange=market.exchange,
+                source_market=market.market,
+                candles=minute_rows,
             )
 
             quote = market.quote_asset.upper()
@@ -244,7 +274,7 @@ class ListingHistoryCollector:
             foreign_open_price = float(foreign_open.get("price") or 0.0) if foreign_open else 0.0
 
             features: dict[str, Any] = {
-                "version": 2,
+                "version": FEATURE_VERSION,
                 "identity_gate": gate,
                 "venue_verification": venue_result,
                 "domestic": {
@@ -266,6 +296,12 @@ class ListingHistoryCollector:
                     "match_basis": market.match_basis or {},
                 },
                 "quote_to_krw": quote_rate,
+                "fine_reaction_source": {
+                    "status": fine_status,
+                    "error": fine_error,
+                    "interval_seconds": 60 if minute_rows else None,
+                    "candles": len(minute_rows),
+                },
             }
             if case.open_price > 0:
                 features["prelisting"] = prelisting_features(
@@ -282,6 +318,7 @@ class ListingHistoryCollector:
                         candles,
                         anchor_at=case.open_at,
                         anchor_price=foreign_open_price,
+                        fine_candles=minute_rows,
                     )
                     if foreign_open_price > 0
                     else {"status": "foreign_open_price_missing"}
@@ -294,7 +331,7 @@ class ListingHistoryCollector:
                 source_exchange=market.exchange,
                 source_market=market.market,
                 features=features,
-                feature_version=2,
+                feature_version=FEATURE_VERSION,
             )
             successful += 1
             source_results[source.exchange] = {
@@ -304,6 +341,10 @@ class ListingHistoryCollector:
                 "first_price": first_price,
                 "candles": len(candles),
                 "stored": stored,
+                "minute_candles": len(minute_rows),
+                "minute_stored": fine_stored,
+                "fine_reaction_status": fine_status,
+                "fine_reaction_error": fine_error,
                 "quote_to_krw": quote_rate,
                 "domestic_listing_premium_pct": (
                     features.get("prelisting", {}).get("domestic_listing_premium_pct")
@@ -316,6 +357,8 @@ class ListingHistoryCollector:
         if successful:
             if case.open_price <= 0:
                 status = "waiting_for_domestic_open_price"
+            elif fine_source_errors:
+                status = "foreign_source_waiting"
             elif now < case.open_at + POST_COMPLETE_SECONDS:
                 status = "tracking_postlisting"
             else:
