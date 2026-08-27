@@ -83,7 +83,7 @@ class MultiExchangePaperDemo(AutoPaperDemo):
         detail = self.store.market_detail(market)
         if detail:
             states = self.lifecycle_snapshot.get("states") if isinstance(self.lifecycle_snapshot, dict) else {}
-            detail["lifecycle_state"] = str(states.get(market) if isinstance(states, dict) else "" or NORMAL)
+            detail["lifecycle_state"] = str((states.get(market) if isinstance(states, dict) else "") or NORMAL)
             detail = self.market_features.enrich_market_detail(
                 detail,
                 exchange=self.exchange,
