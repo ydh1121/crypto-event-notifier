@@ -138,11 +138,14 @@ class MarketNoticeStore:
                     first_seen_at,updated_at,announcement_at,deposit_at,trade_open_at,termination_at)
                     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(exchange,notice_id) DO UPDATE SET
-                      title=excluded.title,url=excluded.url,published_at=excluded.published_at,
+                      title=excluded.title,url=excluded.url,
+                      published_at=CASE WHEN excluded.published_at>0 THEN excluded.published_at ELSE market_notices.published_at END,
                       event_kind=excluded.event_kind,symbols_json=excluded.symbols_json,
                       source=excluded.source,updated_at=excluded.updated_at,
-                      announcement_at=excluded.announcement_at,deposit_at=excluded.deposit_at,
-                      trade_open_at=excluded.trade_open_at,termination_at=excluded.termination_at""",
+                      announcement_at=CASE WHEN excluded.announcement_at>0 THEN excluded.announcement_at ELSE market_notices.announcement_at END,
+                      deposit_at=CASE WHEN excluded.deposit_at>0 THEN excluded.deposit_at ELSE market_notices.deposit_at END,
+                      trade_open_at=CASE WHEN excluded.trade_open_at>0 THEN excluded.trade_open_at ELSE market_notices.trade_open_at END,
+                      termination_at=CASE WHEN excluded.termination_at>0 THEN excluded.termination_at ELSE market_notices.termination_at END""",
                 (
                     notice.exchange,
                     notice.notice_id,
