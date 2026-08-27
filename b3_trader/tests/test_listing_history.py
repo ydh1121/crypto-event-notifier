@@ -56,6 +56,32 @@ def test_prelisting_windows_keep_missing_values_null() -> None:
     assert round(windows["t1h_to_domestic_pct"], 4) == 20.0
     assert features["pre_domestic_ath"] == 155
     assert features["pre_domestic_atl"] == 90
+    assert features["foreign_listing_at"] is None
+    assert features["foreign_first_price"] is None
+    assert features["foreign_first_to_domestic_pct"] is None
+
+
+def test_known_foreign_launch_provenance_is_used() -> None:
+    domestic_open = 10 * 24 * 3600.0
+    candles = [
+        ListingCandle(
+            ts=domestic_open - 24 * 3600,
+            open=100,
+            high=110,
+            low=90,
+            close=105,
+        )
+    ]
+    features = prelisting_features(
+        candles,
+        domestic_open_at=domestic_open,
+        domestic_open_price=180,
+        foreign_listing_at=10_000,
+        foreign_first_price=20,
+    )
+    assert features["foreign_listing_at"] == 10_000
+    assert features["foreign_first_price"] == 20
+    assert round(features["foreign_first_to_domestic_pct"], 4) == 800.0
 
 
 def test_unconfirmed_candle_is_not_used() -> None:
