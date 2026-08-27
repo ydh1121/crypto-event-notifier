@@ -24,6 +24,7 @@ class DomesticListingCase:
     open_at: float
     open_price: float
     identity: ListingIdentity
+    notice_id: str = ""
 
 
 class ListingHistoryCollector:
@@ -72,6 +73,7 @@ class ListingHistoryCollector:
         case_key = self.store.upsert_case(
             domestic_exchange=case.exchange,
             domestic_market=case.market,
+            domestic_notice_id=case.notice_id,
             symbol=case.symbol,
             announcement_at=case.announcement_at,
             domestic_open_at=case.open_at,
@@ -162,6 +164,7 @@ class ListingHistoryCollector:
                 "domestic": {
                     "exchange": case.exchange,
                     "market": case.market,
+                    "notice_id": case.notice_id,
                     "announcement_at": case.announcement_at,
                     "open_at": case.open_at,
                     "open_price": case.open_price if case.open_price > 0 else None,
