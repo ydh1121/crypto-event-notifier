@@ -29,6 +29,8 @@ def main() -> None:
     paper = text(ROOT / "b3_trader" / "multi_exchange_paper.py")
     notice_domain = text(ROOT / "b3_trader" / "market_notice.py")
     notice_store = text(ROOT / "b3_trader" / "market_notice_store.py")
+    notice_timing = text(ROOT / "b3_trader" / "market_notice_timing.py")
+    notice_sources = text(ROOT / "b3_trader" / "market_notice_sources.py")
     runtime_verify = text(ROOT / "scripts" / "verify-build39-runtime.ps1")
     profile_identity_api = text(ROOT / "cloudflare-pages" / "functions" / "api" / "coin-profile-identity.ts")
     architecture = text(ROOT / "docs" / "MODULAR_ARCHITECTURE.md")
@@ -50,6 +52,10 @@ def main() -> None:
         "build39_identity_reuses_profile_cache": all(token in identity_resolver for token in (
             "/api/coin-profile-identity", "profile_not_verified", "coingecko_venue_id",
             "listing_identity_gate",
+        )),
+        "build39_legacy_identity_refresh": all(token in cycle for token in (
+            "_venue_capable_identity", "stored_refreshed", "stored_verified_legacy",
+            "previous_provider", "coingecko",
         )),
         "build39_venue_provider_pair_verification": all(token in venue for token in (
             "ListingVenueVerifier", "COINGECKO_TICKERS_URL", "exchange_ids",
@@ -80,6 +86,14 @@ def main() -> None:
             "CASE WHEN excluded.announcement_at>0 THEN excluded.announcement_at ELSE market_notices.announcement_at END",
             "CASE WHEN excluded.trade_open_at>0 THEN excluded.trade_open_at ELSE market_notices.trade_open_at END",
         )),
+        "build39_notice_revision_uses_final_time": all(token in notice_timing for token in (
+            "_REVISION_MARKERS", "_revised_datetime", "clocks[-1]",
+            "final clock value",
+        )),
+        "build39_upbit_detail_endpoint_fallback": all(token in notice_sources for token in (
+            "current_url", "legacy_url", "candidates = (",
+            "self.legacy_url}/{notice_id}",
+        )),
         "build39_runtime_refreshes_notices_first": (
             notice_refresh_at >= 0 and listing_cycle_at >= 0 and notice_refresh_at < listing_cycle_at
         ),
@@ -88,6 +102,10 @@ def main() -> None:
             "nearest_opening_price",
         )) and all(token in domestic_utils for token in (
             "parse_candle_ts", "nearest_opening_price", "opening_price",
+        )),
+        "build39_domestic_candle_exchange_timezone": all(token in domestic_price for token in (
+            "candle_query_to", "KST", "Bithumb documents `to` as a KST clock time",
+            "Upbit accepts an ISO-8601 UTC Zulu timestamp",
         )),
         "build39_quote_to_krw_separate": all(token in quote_rate for token in (
             "ListingQuoteRateResolver", "KRW-USDT", "KRW-USDC", "KRW-BTC",
