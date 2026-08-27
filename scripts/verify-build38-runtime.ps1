@@ -37,7 +37,7 @@ if (-not $StatusOnly) {
     & $python -X utf8 -m b3_trader.cloudflare_pages_deployer --force
     if ($LASTEXITCODE -ne 0) { throw "Cloudflare Pages deploy failed." }
 
-    Write-Host "`nPython runtime files changed in Build 38. Restart start-trader-secure.bat once, wait about 40 seconds, then run:"
+    Write-Host "`nPython runtime/launcher files changed. Restart start-trader-secure.bat once, wait about 40 seconds, then run:"
     Write-Host ".\scripts\verify-build38-runtime.ps1 -StatusOnly"
     exit 0
 }
@@ -64,18 +64,50 @@ foreach ($name in @("market-notice-watch", "cloudflare-snapshot-publish", "cloud
     } | Format-List
 }
 
+Write-Host "`n=== PAPER RUNTIME SUPERVISOR ==="
+$paperSupervisorPath = Join-Path $root "b3_trader\data\paper-runtime-supervisor.json"
+if (Test-Path $paperSupervisorPath) {
+    try {
+        $paperSupervisor = Get-Content $paperSupervisorPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $pidAlive = $false
+        if ($paperSupervisor.pid) {
+            $pidAlive = $null -ne (Get-Process -Id ([int]$paperSupervisor.pid) -ErrorAction SilentlyContinue)
+        }
+        [PSCustomObject]@{
+            running         = $paperSupervisor.running
+            pid             = $paperSupervisor.pid
+            pid_alive       = $pidAlive
+            updated_at      = Show-Time $paperSupervisor.updated_at
+            attempts        = $paperSupervisor.attempts
+            restarts        = $paperSupervisor.restarts
+            last_error      = $paperSupervisor.last_error
+            can_real_orders = $paperSupervisor.can_place_real_orders
+        } | Format-List
+    }
+    catch {
+        Write-Host "PAPER SUPERVISOR STATUS ERROR: $($_.Exception.Message)"
+    }
+}
+else {
+    Write-Host "paper-runtime-supervisor.json : missing"
+}
+
 Write-Host "`n=== LOCAL PAPER LIFECYCLE ==="
 try {
     $demo = Invoke-RestMethod "http://127.0.0.1:8765/api/demo" -TimeoutSec 10
     $lifecycle = $demo.market_lifecycle
     [PSCustomObject]@{
-        running               = $demo.running
-        updated_at            = Show-Time $demo.updated_at
-        last_scan_completed   = Show-Time $demo.last_scan_completed
-        lifecycle_market_count= $lifecycle.market_count
-        notice_state_count    = $lifecycle.notice_state_count
-        entry_blocked_markets = $lifecycle.entry_blocked_markets
-        paper_gate            = $lifecycle.paper_gate
+        running                = $demo.running
+        fresh                  = $demo.fresh
+        state                  = $demo.state
+        pid                    = $demo.pid
+        updated_at             = Show-Time $demo.updated_at
+        last_scan_completed    = Show-Time $demo.last_scan_completed
+        lifecycle_market_count = $lifecycle.market_count
+        notice_state_count     = $lifecycle.notice_state_count
+        entry_blocked_markets  = $lifecycle.entry_blocked_markets
+        paper_gate             = $lifecycle.paper_gate
+        error                  = $demo.error
     } | Format-List
 }
 catch {
