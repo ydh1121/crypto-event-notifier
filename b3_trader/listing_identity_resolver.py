@@ -76,12 +76,12 @@ class ListingIdentityResolver:
             return {"status": "profile_missing", "verified": False, "identity": None, "retries": retries}
         source = payload.get("identity") if isinstance(payload.get("identity"), dict) else {}
         evidence = source.get("evidence") if isinstance(source.get("evidence"), list) else []
-        coingecko_id = _coingecko_id_from_evidence(evidence)
+        coingecko_id = str(source.get("coingecko_id") or "").strip() or _coingecko_id_from_evidence(evidence)
         provider = str(source.get("provider") or "").strip().lower()
         provider_id = str(source.get("provider_id") or "").strip()
         # Multi-source profiles can store a CMC numeric id in provider_id. If a
-        # CoinGecko evidence URL is already part of the verified profile, prefer
-        # that stable coin id because it can also verify exact CEX tickers.
+        # CoinGecko id is already part of the verified profile evidence, prefer
+        # that stable id because it can cross-check exact CEX venue tickers.
         if coingecko_id:
             provider = "coingecko"
             provider_id = coingecko_id
