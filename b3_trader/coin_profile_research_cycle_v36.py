@@ -4,7 +4,8 @@ import json
 import logging
 from typing import Any
 
-from .coin_profile_identity_safe import IdentitySafeCoinProfileEnricher
+from .coin_profile_enricher import _normalize, _text
+from .coin_profile_identity_safe import IdentitySafeCoinProfileEnricher, _manual_intro_identity_matches
 from .coin_profile_research_cycle import CoinProfileResearchCycle
 
 
@@ -23,11 +24,69 @@ class CoinProfileResearchCycleV36(CoinProfileResearchCycle):
         root = ingest[: -len("/api/ingest-coin-profiles")] if ingest.endswith("/api/ingest-coin-profiles") else ingest.rstrip("/")
         return root + "/api/ingest-coin-profiles-repair", root + "/api/coin-profile-backlog-v37", token
 
+    @staticmethod
+    def _repair_profile_matches_current(row: dict[str, str], profile: dict[str, Any]) -> bool:
+        """A repair may overwrite quarantined data only with a current-asset lead.
+
+        External metadata can still be internally inconsistent. For an identity
+        repair, a Korean business/description lead must begin with the exchange
+        asset. If Korean text is unavailable, the English description must begin
+        with the exchange English name. Empty profiles are not considered a safe
+        replacement; they are explicitly quarantined instead.
+        """
+
+        for key in ("business_summary_ko", "description_ko"):
+            value = _text(profile.get(key))
+            if value and _manual_intro_identity_matches(row, value):
+                return True
+        english = _normalize(profile.get("description_en"))
+        expected = _normalize(row.get("english_name"))
+        return bool(english and expected and english.startswith(expected))
+
+    @staticmethod
+    def _quarantine_profile(row: dict[str, str], profile: dict[str, Any]) -> dict[str, Any]:
+        """Replace known cross-contamination with an exchange-only safe shell."""
+
+        safe = dict(profile)
+        safe.update({
+            "exchange": row["exchange"],
+            "market": row["market"],
+            "symbol": row["symbol"],
+            "korean_name": row.get("korean_name") or row["symbol"],
+            "english_name": row.get("english_name") or row["symbol"],
+            "provider": "exchange",
+            "provider_id": "",
+            "description_ko": "",
+            "description_en": "",
+            "business_summary_ko": "",
+            "business_summary_en": "",
+            "categories": [],
+            "tags": [],
+            "homepage": "",
+            "image_url": "",
+            "official_docs": "",
+            "whitepaper": "",
+            "source_code": "",
+            "community": [],
+            "evidence": [],
+            "research_status": "unresolved",
+            "summary_source": "",
+            "source_count": 0,
+            "match_confidence": 0.0,
+            "replace_existing": True,
+            "identity_repair": True,
+            "identity_quarantined": True,
+        })
+        return safe
+
     def _deepen_profile(self, row: dict[str, str], profile: dict[str, Any], reasons: list[str]) -> dict[str, Any]:
         profile = super()._deepen_profile(row, profile, reasons)
         if "identity_mismatch" in reasons:
+            if not self._repair_profile_matches_current(row, profile):
+                return self._quarantine_profile(row, profile)
             profile["replace_existing"] = True
             profile["identity_repair"] = True
+            profile["identity_quarantined"] = False
         return profile
 
 
