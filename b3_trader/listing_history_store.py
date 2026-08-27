@@ -334,8 +334,8 @@ class ListingHistoryStore:
             """,
             (
                 case_key,
-                str(source_exchange).lower(),
-                str(source_market).upper(),
+                str(source_exchange or "").lower(),
+                str(source_market or "").upper(),
                 int(feature_version),
                 time.time(),
                 json.dumps(features, ensure_ascii=False, separators=(",", ":")),
@@ -347,7 +347,7 @@ class ListingHistoryStore:
         rows = self.conn.execute(
             """
             SELECT * FROM listing_history_cases
-            WHERE status NOT IN ('complete','rejected_identity')
+            WHERE status NOT IN ('complete','rejected_identity','rejected_notice')
             ORDER BY updated_at ASC LIMIT ?
             """,
             (max(1, min(500, int(limit))),),
