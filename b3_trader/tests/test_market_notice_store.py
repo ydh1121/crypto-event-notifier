@@ -58,3 +58,35 @@ def test_store_persists_and_projects_structured_listing_times() -> None:
     detail = state["details"]["KRW-NEW"]
     assert detail["announcement_at"] == published
     assert detail["trade_open_at"] == _ts(2026, 8, 27, 17)
+
+
+def test_store_does_not_erase_known_timing_on_partial_refresh() -> None:
+    conn = _conn()
+    store = MarketNoticeStore(conn)
+    published = _ts(2026, 8, 27, 9)
+    first = normalize_notice(
+        exchange="bithumb",
+        notice_id="101",
+        title="뉴코인(NEW) 원화 마켓 추가",
+        url="https://feed.bithumb.com/notice/101",
+        published_at=published,
+        source="test",
+        detail_text="거래 개시 시점 : 2026.08.27(목) 오후 5:00 예정",
+    )
+    store.ingest([first], seen_at=published + 1)
+
+    partial = normalize_notice(
+        exchange="bithumb",
+        notice_id="101",
+        title="뉴코인(NEW) 원화 마켓 추가",
+        url="https://feed.bithumb.com/notice/101",
+        published_at=0,
+        source="test",
+        detail_text="",
+    )
+    store.ingest([partial], seen_at=published + 60)
+
+    recent = store.recent("bithumb", 1)[0]
+    assert recent["published_at"] == published
+    assert recent["announcement_at"] == published
+    assert recent["trade_open_at"] == _ts(2026, 8, 27, 17)
