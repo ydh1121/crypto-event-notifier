@@ -10,6 +10,17 @@ def verified_identity() -> ListingIdentity:
     return ListingIdentity(
         symbol="ABC",
         english_name="Alpha Beta Coin",
+        provider="coingecko",
+        provider_id="alpha-beta-coin",
+        official_domains=("example.org",),
+        match_confidence=0.95,
+    )
+
+
+def legacy_identity() -> ListingIdentity:
+    return ListingIdentity(
+        symbol="ABC",
+        english_name="Alpha Beta Coin",
         provider="multi-source",
         provider_id="1234",
         official_domains=("example.org",),
@@ -106,7 +117,7 @@ def test_cycle_keeps_unverified_profile_out_of_foreign_sources(tmp_path: Path) -
     assert store.upserts == []
 
 
-def test_cycle_reuses_verified_identity_and_resolves_domestic_open(tmp_path: Path, monkeypatch) -> None:
+def test_cycle_reuses_venue_capable_verified_identity_and_resolves_domestic_open(tmp_path: Path, monkeypatch) -> None:
     identity = verified_identity()
     store = FakeStore([row(verified=True, identity=identity, open_at=100, open_price=0)])
     resolver = FakeIdentityResolver({"status": "should_not_run", "verified": False, "identity": None})
@@ -127,3 +138,26 @@ def test_cycle_reuses_verified_identity_and_resolves_domestic_open(tmp_path: Pat
     assert collector.cases[0].open_price == 250
     assert result["collected"] == 1
     assert store.upserts[0]["identity_verified"] is True
+
+
+def test_cycle_refreshes_legacy_verified_identity_when_coingecko_identity_is_available(tmp_path: Path, monkeypatch) -> None:
+    old_identity = legacy_identity()
+    refreshed = verified_identity()
+    store = FakeStore([row(verified=True, identity=old_identity, open_at=100, open_price=0)])
+    resolver = FakeIdentityResolver({"status": "verified", "verified": True, "identity": refreshed})
+    collector = FakeCollector("tracking_postlisting")
+    monkeypatch.setattr("b3_trader.listing_history_research_cycle.time.time", lambda: 200.0)
+    cycle = ListingHistoryResearchCycle(
+        planner=FakePlanner(),
+        store=store,
+        identity_resolver=resolver,
+        price_resolver=FakePriceResolver(250),
+        collector=collector,
+        state_path=tmp_path / "state.json",
+    )
+    result = cycle.run_once()
+    assert resolver.calls == [("bithumb", "KRW-ABC")]
+    assert result["results"][0]["identity"]["status"] == "stored_refreshed"
+    assert collector.cases[0].identity.provider == "coingecko"
+    assert collector.cases[0].identity.provider_id == "alpha-beta-coin"
+    assert store.upserts[0]["identity"].provider == "coingecko"
