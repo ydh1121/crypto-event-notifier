@@ -53,6 +53,15 @@ def classify_notice_title(title: str) -> str:
         return CAUTION_RELEASE
     if any(token in compact for token in ("거래유의종목지정", "유의종목지정", "유의촉구")):
         return CAUTION_NOTICE
+
+    # Promotional notices often repeat phrases such as "원화마켓 추가" or
+    # "신규 거래지원" in an airdrop/reward event title. Those are not listing
+    # lifecycle events and must never seed listing-history research cases.
+    if "이벤트" in compact and any(
+        token in compact for token in ("원화마켓추가", "KRW마켓추가", "신규거래지원", "거래지원개시")
+    ):
+        return OTHER
+
     if any(token in compact for token in ("원화마켓추가", "KRW마켓추가", "신규거래지원", "거래지원개시")):
         return LISTING
     return OTHER
