@@ -1,8 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from b3_trader.domestic_listing_price import DomesticListingPriceResolver, listing_open_from_candles
+from b3_trader.domestic_listing_price import (
+    DomesticListingPriceResolver,
+    candle_query_to,
+    listing_open_from_candles,
+)
+
+KST = timezone(timedelta(hours=9))
 
 
 def test_listing_open_picks_nearest_candle() -> None:
@@ -16,6 +22,16 @@ def test_listing_open_picks_nearest_candle() -> None:
     assert result["found"] is True
     assert result["price"] == 101
     assert result["distance_seconds"] == 0
+
+
+def test_bithumb_query_to_uses_kst_clock_without_z_suffix() -> None:
+    target = datetime(2026, 8, 7, 15, 5, tzinfo=KST).timestamp()
+    assert candle_query_to("bithumb", target) == "2026-08-07T15:05:00"
+
+
+def test_upbit_query_to_uses_utc_zulu_clock() -> None:
+    target = datetime(2026, 8, 7, 15, 5, tzinfo=KST).timestamp()
+    assert candle_query_to("upbit", target) == "2026-08-07T06:05:00Z"
 
 
 class FakeClient:
@@ -38,3 +54,4 @@ def test_resolver_uses_public_minute_candle_shape() -> None:
     assert result["status"] == "resolved"
     assert result["price"] == 123.45
     assert fake.calls[0][0:3] == ("KRW-ABC", 1, 8)
+    assert fake.calls[0][3] == "2026-08-28T17:05:00"
