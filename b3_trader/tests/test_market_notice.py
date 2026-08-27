@@ -10,6 +10,7 @@ from b3_trader.market_notice import (
     extract_notice_symbols,
 )
 from b3_trader.market_notice_sources import (
+    UpbitNoticeSource,
     _BithumbLinkParser,
     _upbit_detail_text,
     _upbit_detail_timestamp,
@@ -68,3 +69,36 @@ def test_upbit_detail_extractors_are_shape_tolerant() -> None:
     }
     assert "거래지원 개시" in _upbit_detail_text(payload)
     assert _upbit_detail_timestamp(payload) > 0
+
+
+def test_upbit_detail_falls_back_to_legacy_endpoint(monkeypatch) -> None:
+    calls: list[str] = []
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def json(self):
+            return self.payload
+
+    def fake_get(url, **kwargs):
+        calls.append(url)
+        if "/announcements/" in url:
+            return FakeResponse({"data": {}}), 0
+        return FakeResponse(
+            {
+                "data": {
+                    "body": "<p>거래지원 개시: 2026-08-23 12:30</p>",
+                    "created_at": "2026-08-23T10:14:11+09:00",
+                }
+            }
+        ), 0
+
+    monkeypatch.setattr("b3_trader.market_notice_sources.get_with_retry", fake_get)
+    text, published = UpbitNoticeSource()._detail("6503")
+    assert "12:30" in text
+    assert published > 0
+    assert calls == [
+        "https://api-manager.upbit.com/api/v1/announcements/6503",
+        "https://api-manager.upbit.com/api/v1/notices/6503",
+    ]
