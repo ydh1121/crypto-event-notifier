@@ -44,6 +44,8 @@ class SpotListingSource(Protocol):
 
     def hourly_candles(self, market: str, *, start_ts: float, end_ts: float) -> list[ListingCandle]: ...
 
+    def minute_candles(self, market: str, *, start_ts: float, end_ts: float) -> list[ListingCandle]: ...
+
 
 def _require_verified(identity: ListingIdentity) -> dict[str, Any]:
     gate = listing_identity_gate(identity)
@@ -112,12 +114,12 @@ class BinanceSpotSource:
             )
         return result
 
-    def hourly_candles(self, market: str, *, start_ts: float, end_ts: float) -> list[ListingCandle]:
+    def _candles(self, market: str, *, start_ts: float, end_ts: float, interval: str, interval_seconds: int) -> list[ListingCandle]:
         start_ms = max(0, int(start_ts * 1000))
         end_ms = max(start_ms, int(end_ts * 1000))
         payload = self._get(
             "/api/v3/klines",
-            {"symbol": market.upper(), "interval": "1h", "startTime": start_ms, "endTime": end_ms, "limit": 1000},
+            {"symbol": market.upper(), "interval": interval, "startTime": start_ms, "endTime": end_ms, "limit": 1000},
         )
         result: list[ListingCandle] = []
         for row in payload if isinstance(payload, list) else []:
@@ -127,10 +129,16 @@ class BinanceSpotSource:
                 ListingCandle(
                     ts=_ms_to_s(row[0]),
                     open=_num(row[1]), high=_num(row[2]), low=_num(row[3]), close=_num(row[4]),
-                    volume=_num(row[5]), quote_volume=_num(row[7]), interval_seconds=3600, confirmed=True,
+                    volume=_num(row[5]), quote_volume=_num(row[7]), interval_seconds=interval_seconds, confirmed=True,
                 )
             )
         return sorted(result, key=lambda row: row.ts)
+
+    def hourly_candles(self, market: str, *, start_ts: float, end_ts: float) -> list[ListingCandle]:
+        return self._candles(market, start_ts=start_ts, end_ts=end_ts, interval="1h", interval_seconds=3600)
+
+    def minute_candles(self, market: str, *, start_ts: float, end_ts: float) -> list[ListingCandle]:
+        return self._candles(market, start_ts=start_ts, end_ts=end_ts, interval="1m", interval_seconds=60)
 
     def first_candle(self, market: str) -> ListingCandle | None:
         payload = self._get(
@@ -199,12 +207,10 @@ class OkxSpotSource:
             )
         return result
 
-    def hourly_candles(self, market: str, *, start_ts: float, end_ts: float) -> list[ListingCandle]:
-        # OKX returns newest first. Passing `after=end` pages toward older data;
-        # one 300-row hourly page covers the requested domestic-listing window.
+    def _candles(self, market: str, *, start_ts: float, end_ts: float, bar: str, interval_seconds: int, limit: int) -> list[ListingCandle]:
         payload = self._get(
             "/api/v5/market/history-candles",
-            {"instId": market.upper(), "bar": "1H", "after": str(int(end_ts * 1000) + 1), "limit": "300"},
+            {"instId": market.upper(), "bar": bar, "after": str(int(end_ts * 1000) + 1), "limit": str(limit)},
         )
         result: list[ListingCandle] = []
         for row in payload.get("data") or []:
@@ -217,11 +223,17 @@ class OkxSpotSource:
                 ListingCandle(
                     ts=ts,
                     open=_num(row[1]), high=_num(row[2]), low=_num(row[3]), close=_num(row[4]),
-                    volume=_num(row[5]), quote_volume=_num(row[7]), interval_seconds=3600,
+                    volume=_num(row[5]), quote_volume=_num(row[7]), interval_seconds=interval_seconds,
                     confirmed=str(row[8]) == "1",
                 )
             )
         return sorted(result, key=lambda row: row.ts)
+
+    def hourly_candles(self, market: str, *, start_ts: float, end_ts: float) -> list[ListingCandle]:
+        return self._candles(market, start_ts=start_ts, end_ts=end_ts, bar="1H", interval_seconds=3600, limit=300)
+
+    def minute_candles(self, market: str, *, start_ts: float, end_ts: float) -> list[ListingCandle]:
+        return self._candles(market, start_ts=start_ts, end_ts=end_ts, bar="1m", interval_seconds=60, limit=100)
 
 
 class BybitSpotSource:
@@ -276,13 +288,13 @@ class BybitSpotSource:
             )
         return result
 
-    def hourly_candles(self, market: str, *, start_ts: float, end_ts: float) -> list[ListingCandle]:
+    def _candles(self, market: str, *, start_ts: float, end_ts: float, interval: str, interval_seconds: int) -> list[ListingCandle]:
         payload = self._get(
             "/v5/market/kline",
             {
                 "category": "spot",
                 "symbol": market.upper(),
-                "interval": "60",
+                "interval": interval,
                 "start": int(start_ts * 1000),
                 "end": int(end_ts * 1000),
                 "limit": 1000,
@@ -297,10 +309,16 @@ class BybitSpotSource:
                 ListingCandle(
                     ts=_ms_to_s(row[0]),
                     open=_num(row[1]), high=_num(row[2]), low=_num(row[3]), close=_num(row[4]),
-                    volume=_num(row[5]), quote_volume=_num(row[6]), interval_seconds=3600, confirmed=True,
+                    volume=_num(row[5]), quote_volume=_num(row[6]), interval_seconds=interval_seconds, confirmed=True,
                 )
             )
         return sorted(result, key=lambda row: row.ts)
+
+    def hourly_candles(self, market: str, *, start_ts: float, end_ts: float) -> list[ListingCandle]:
+        return self._candles(market, start_ts=start_ts, end_ts=end_ts, interval="60", interval_seconds=3600)
+
+    def minute_candles(self, market: str, *, start_ts: float, end_ts: float) -> list[ListingCandle]:
+        return self._candles(market, start_ts=start_ts, end_ts=end_ts, interval="1", interval_seconds=60)
 
 
 def default_cex_sources() -> tuple[SpotListingSource, ...]:
