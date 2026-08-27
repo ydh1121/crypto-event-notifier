@@ -42,6 +42,7 @@ Viewer omission contract: `docs/VIEWER_REBUILD_CHECKLIST.md`
 - [x] Per-ticker averaging-down plans up to 20 rounds
 - [x] Suggested entry amount and account percentage on BUY_CANDIDATE
 - [x] Telegram automatic alerts reduced to fresh BUY_CANDIDATE only
+- [x] Reject malformed configured markets such as `KRW-ETH/BTC` at registry/API boundaries while preserving valid configured assets
 
 ## D. Adaptive all-market PAPER research
 
@@ -55,6 +56,9 @@ Viewer omission contract: `docs/VIEWER_REBUILD_CHECKLIST.md`
 - [x] Add hard stop, take-profit, trailing giveback, market-weakness and time/opportunity exits
 - [x] Persist independent cash, position, realized P/L, drawdown and equity history
 - [x] Rank markets by current PAPER return and expose current best performer
+- [x] Add dedicated restart-safe `paper_runtime_supervisor` as the normal launcher owner; constructor errors, runtime exceptions and unexpected clean returns all retry without taking down the dashboard/research sidecar
+- [x] Centralize PAPER freshness/PID liveness so stale or reused PIDs cannot suppress recovery; direct `local_app` runs retain the embedded-worker fallback
+- [-] Verify the new PAPER self-heal owner on the Windows runtime after one full launcher restart
 - [-] Leave engine running long enough to collect meaningful trade-frequency / P&L / drawdown / win-rate evidence
 
 ## E. Per-coin feedback DB / bounded learning
@@ -124,8 +128,9 @@ Viewer omission contract: `docs/VIEWER_REBUILD_CHECKLIST.md`
 - [x] Publish lifecycle/notice-only state to Cloudflare Viewer and add modular 상장예정/유의/거래종료 panel + ticker state styling
 - [x] Add D-5 return-window feature from existing shared `research_market_memory_mx`; no separate exchange call per UI feature
 - [x] Add termination-only PAPER safety gate: `TERMINATION_SCHEDULED`/`TERMINATED` blocks new/additional PAPER buys while existing position exits/history stay available; CAUTION/NEW_LISTING remain shadow in current adaptive
+- [x] Add dedicated PAPER runtime self-heal ownership and shared liveness policy after live QA exposed a stale/dead PID + stopped worker condition
 - [-] Existing all-KRW account/profile seeding + market-memory/profile backlog provide automatic new-market bootstrap; verify full profile/sector/facet path on an actual new listing
-- [-] Verify Build 38 on local runtime/Pages and current phone/desktop browser after sync/restart, including live official notice source/timing coverage
+- [-] Verify Build 38 on local runtime/Pages and current phone/desktop browser after sync/restart, including live official notice source/timing coverage and PAPER self-heal status
 - [ ] Execute the remaining work in `MASTER_ROADMAP.md` dependency order; next major data work is pre-KRW CEX/DEX listing history, then flow/CVD and multi-facet taxonomy
 
 ## Validation status
@@ -133,9 +138,9 @@ Viewer omission contract: `docs/VIEWER_REBUILD_CHECKLIST.md`
 - [x] Current adaptive research implementation passed Python tests + module compile
 - [x] Current Liquid/research dashboard implementation passed Node dashboard smoke checks
 - [x] Current branch passed Cloudflare typecheck
-- [x] Build 38 lifecycle/notice/return-window/timing/entry-policy unit tests pass in GitHub Actions
+- [x] Build 38 lifecycle/notice/return-window/timing/entry-policy/PAPER-liveness unit tests pass in GitHub Actions
 - [x] Build 38 dedicated CI passes including Pages typecheck and modular source contract
-- [x] Full B3 trader CI passes after legacy trade-plan compatibility regression was fixed
+- [x] Full B3 trader CI passes after PAPER self-heal and malformed-asset fail-closed fixes
 - [x] Cloudflare Pages JS syntax/typecheck passes with shared continuity/lifecycle modules
 - [x] PR #1 remains Draft and unmerged
 
