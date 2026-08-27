@@ -15,5 +15,6 @@ def apply_market_feature_projection(source: dict[str, Any], result: dict[str, An
         "d4_pct": returns.get("d4_pct"),
         "d5_pct": returns.get("d5_pct"),
     }
+    result["lifecycle_state"] = str(source.get("lifecycle_state") or "NORMAL")
     result["version"] = max(4, int(result.get("version") or 0))
     return result
