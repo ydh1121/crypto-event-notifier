@@ -15,7 +15,7 @@ def test_audit_missing_database_is_safe(tmp_path: Path) -> None:
     assert result["case_count"] == 0
 
 
-def test_audit_summarizes_cases_sources_and_features(tmp_path: Path) -> None:
+def test_audit_summarizes_cases_sources_and_foreign_postlisting_features(tmp_path: Path) -> None:
     path = tmp_path / "listing.sqlite3"
     store = ListingHistoryStore(path)
     try:
@@ -54,9 +54,18 @@ def test_audit_summarizes_cases_sources_and_features(tmp_path: Path) -> None:
             case_key=key,
             source_exchange="binance",
             source_market="ABCUSDT",
+            feature_version=3,
             features={
                 "prelisting": {"status": "ready", "windows": {"t1d": {"price": 10}}},
-                "postlisting": {"status": "tracking", "windows": {"h1": {"return_pct": 5}}},
+                "foreign_postlisting": {
+                    "status": "tracking",
+                    "windows": {
+                        "p5m": {"return_pct": 2, "interval_seconds": 60},
+                        "p1h": {"return_pct": 5, "interval_seconds": 3600},
+                    },
+                    "p5m_source_interval_seconds": 60,
+                },
+                "fine_reaction_source": {"status": "collected", "candles": 15, "interval_seconds": 60},
             },
         )
     finally:
@@ -72,5 +81,63 @@ def test_audit_summarizes_cases_sources_and_features(tmp_path: Path) -> None:
     assert result["sources_by_exchange"] == {"binance": 1}
     assert result["feature_count"] == 1
     assert result["latest_cases"][0]["market"] == "KRW-ABC"
-    assert result["feature_samples"][0]["prelisting_windows"]["t1d"]["price"] == 10
+    sample = result["feature_samples"][0]
+    assert sample["feature_version"] == 3
+    assert sample["prelisting_windows"]["t1d"]["price"] == 10
+    assert sample["postlisting_windows"]["p5m"]["return_pct"] == 2
+    assert sample["postlisting_windows"]["p1h"]["return_pct"] == 5
+    assert sample["p5m_source_interval_seconds"] == 60
+    assert sample["fine_reaction_status"] == "collected"
+    assert sample["fine_reaction_candles"] == 15
     assert json.dumps(result, ensure_ascii=False)
+
+
+def test_complete_v2_case_is_requeued_once_for_v3_feature_backfill(tmp_path: Path) -> None:
+    path = tmp_path / "listing.sqlite3"
+    store = ListingHistoryStore(path)
+    try:
+        identity = ListingIdentity(
+            symbol="ABC",
+            english_name="Alpha Beta Coin",
+            provider="coingecko",
+            provider_id="alpha-beta-coin",
+            official_domains=("example.org",),
+            match_confidence=0.95,
+        )
+        key = store.upsert_case(
+            domestic_exchange="bithumb",
+            domestic_market="KRW-ABC",
+            domestic_notice_id="notice-1",
+            symbol="ABC",
+            announcement_at=100,
+            domestic_open_at=200,
+            domestic_open_price=20,
+            identity=identity,
+            identity_verified=True,
+            status="complete",
+        )
+        store.upsert_source(
+            case_key=key,
+            source_exchange="binance",
+            source_market="ABCUSDT",
+            base_asset="ABC",
+            quote_asset="USDT",
+        )
+        store.upsert_features(
+            case_key=key,
+            source_exchange="binance",
+            source_market="ABCUSDT",
+            feature_version=2,
+            features={"version": 2},
+        )
+        assert [row["case_key"] for row in store.pending_cases(required_feature_version=3)] == [key]
+        store.upsert_features(
+            case_key=key,
+            source_exchange="binance",
+            source_market="ABCUSDT",
+            feature_version=3,
+            features={"version": 3},
+        )
+        assert store.pending_cases(required_feature_version=3) == []
+    finally:
+        store.close()
