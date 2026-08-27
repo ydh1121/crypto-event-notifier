@@ -10,6 +10,8 @@ from .market_lifecycle import (
     NORMAL,
     TERMINATED,
     TERMINATION_SCHEDULED,
+    LifecycleEntryPolicy,
+    lifecycle_entry_policy,
     merge_lifecycle_state,
 )
 from .market_lifecycle_store import MarketLifecycleStore
@@ -45,6 +47,19 @@ class MarketLifecycleService:
         if not isinstance(source, dict):
             return {}
         return {key: value for key, value in source.items() if key in NOTICE_DETAIL_FIELDS}
+
+    def entry_policy(
+        self,
+        exchange: str,
+        market: str,
+        *,
+        has_position: bool = False,
+        snapshot: dict[str, Any] | None = None,
+    ) -> LifecycleEntryPolicy:
+        composed = snapshot if isinstance(snapshot, dict) else self.snapshot(exchange)
+        states = composed.get("states") if isinstance(composed.get("states"), dict) else {}
+        state = str(states.get(str(market or "").upper()) or NORMAL)
+        return lifecycle_entry_policy(state, has_position=has_position)
 
     def _compose(self, exchange: str, base: dict[str, Any], active_markets: set[str]) -> dict[str, Any]:
         notice = self.notice_store.state_snapshot(exchange)
