@@ -8,7 +8,7 @@ import{installSectorImeGuard}from'./shared/sector-ime-guard.js?v=37';
 import{installTableSortEnhancer}from'./shared/table-sort-enhancer.js?v=37';
 import{installSamePageInteractionContinuity}from'./shared/ui-continuity.js?v=38';
 import{createDashboardPage}from'./pages/dashboard.js';
-import{createResearchPage}from'./pages/research.js';
+import{createResearchPage}from'./pages/research.js?v=40';
 import{createAssetsPage}from'./pages/assets.js';
 import{createPaperPage}from'./pages/paper.js';
 import{createStrategyPage}from'./pages/strategy.js';
