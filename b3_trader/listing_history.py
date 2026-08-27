@@ -90,6 +90,20 @@ def _valid_candles(candles: Iterable[ListingCandle]) -> list[ListingCandle]:
     )
 
 
+def _candle_price_without_lookahead(row: ListingCandle, target_ts: float) -> tuple[float, float]:
+    """Return a price known by target_ts and the timestamp that price represents.
+
+    CEX kline timestamps are normally candle-open timestamps. A candle close is
+    only safe once the whole interval has completed. While target_ts is inside
+    a candle, use that candle's opening price instead of its future close/high.
+    """
+
+    candle_end = row.ts + max(60, int(row.interval_seconds))
+    if candle_end <= target_ts:
+        return float(row.close), float(candle_end)
+    return float(row.open), float(row.ts)
+
+
 def price_at_or_before(
     candles: Iterable[ListingCandle],
     target_ts: float,
@@ -104,15 +118,18 @@ def price_at_or_before(
         candidate = row
     if candidate is None:
         return None
-    lag = max(0.0, target_ts - candidate.ts)
+    price, observed_at = _candle_price_without_lookahead(candidate, target_ts)
+    lag = max(0.0, target_ts - observed_at)
     if lag > max(60, int(max_lag_seconds)):
         return None
     return {
         "target_ts": float(target_ts),
         "candle_ts": candidate.ts,
-        "price": candidate.close,
+        "observed_at": observed_at,
+        "price": price,
         "lag_seconds": lag,
         "interval_seconds": candidate.interval_seconds,
+        "price_basis": "close" if observed_at > candidate.ts else "open",
     }
 
 
@@ -135,6 +152,7 @@ def price_at_or_after(
             "price": row.open,
             "lead_seconds": lead,
             "interval_seconds": row.interval_seconds,
+            "price_basis": "open",
         }
     return None
 
@@ -144,45 +162,90 @@ def prelisting_features(
     *,
     domestic_open_at: float,
     domestic_open_price: float,
+    quote_asset: str = "",
+    quote_to_krw_at_open: float = 0.0,
     foreign_listing_at: float = 0.0,
     foreign_first_price: float = 0.0,
 ) -> dict[str, Any]:
-    """Build pre-KRW price windows from normalized confirmed candles.
+    """Build pre-KRW windows without comparing unlike currencies.
 
-    The feature domain never fetches an exchange and never guesses identity or
-    launch provenance. Missing windows and unknown historical launch data remain
-    null instead of becoming zero-return observations or T-8d pseudo-launches.
+    T-window momentum is measured entirely inside the foreign quote currency.
+    A domestic KRW premium is produced only when the foreign quote has a
+    verified quote→KRW conversion at the domestic listing timestamp.
+    Unknown historical launch provenance remains null; T-8d is never a proxy.
     """
 
     rows = _valid_candles(candles)
-    before_open = [row for row in rows if row.ts < domestic_open_at]
+    completed_before_open = [
+        row for row in rows
+        if row.ts + max(60, int(row.interval_seconds)) <= domestic_open_at
+    ]
+    foreign_open = price_at_or_before(rows, domestic_open_at)
+    foreign_open_price = float(foreign_open["price"]) if foreign_open else 0.0
+
     windows: dict[str, Any] = {}
     for key, seconds in PRE_LISTING_WINDOWS:
         point = price_at_or_before(rows, domestic_open_at - seconds)
         windows[key] = point
         windows[f"{key}_price"] = point["price"] if point else None
-        windows[f"{key}_to_domestic_pct"] = (
-            _pct(domestic_open_price, float(point["price"])) if point else None
+        windows[f"{key}_to_foreign_open_pct"] = (
+            _pct(foreign_open_price, float(point["price"]))
+            if point and foreign_open_price > 0
+            else None
         )
 
-    pre_high = max((row.high for row in before_open), default=0.0)
-    pre_low = min((row.low for row in before_open), default=0.0)
+    pre_high = max((row.high for row in completed_before_open), default=0.0)
+    pre_low = min((row.low for row in completed_before_open), default=0.0)
     first = float(foreign_first_price or 0.0)
     first_ts = float(foreign_listing_at or 0.0)
+    quote_rate = float(quote_to_krw_at_open or 0.0)
+    foreign_open_krw = foreign_open_price * quote_rate if foreign_open_price > 0 and quote_rate > 0 else 0.0
 
     return {
         "domestic_open_at": float(domestic_open_at),
-        "domestic_open_price": float(domestic_open_price),
+        "domestic_open_price_krw": float(domestic_open_price) if domestic_open_price > 0 else None,
+        "quote_asset": str(quote_asset or "").upper(),
+        "quote_to_krw_at_open": quote_rate if quote_rate > 0 else None,
+        "foreign_price_at_domestic_open": foreign_open,
+        "foreign_open_price": foreign_open_price if foreign_open_price > 0 else None,
+        "foreign_open_price_krw": foreign_open_krw if foreign_open_krw > 0 else None,
+        "domestic_listing_premium_pct": _pct(domestic_open_price, foreign_open_krw),
         "foreign_listing_at": first_ts if first_ts > 0 else None,
         "foreign_first_price": first if first > 0 else None,
-        "foreign_first_to_domestic_pct": _pct(domestic_open_price, first),
-        "pre_domestic_ath": pre_high or None,
-        "pre_domestic_atl": pre_low or None,
-        "domestic_vs_pre_ath_pct": _pct(domestic_open_price, pre_high),
-        "domestic_vs_pre_atl_pct": _pct(domestic_open_price, pre_low),
+        "foreign_first_to_foreign_open_pct": _pct(foreign_open_price, first),
+        "pre_domestic_ath_foreign_quote": pre_high or None,
+        "pre_domestic_atl_foreign_quote": pre_low or None,
+        "foreign_open_vs_pre_ath_pct": _pct(foreign_open_price, pre_high),
+        "foreign_open_vs_pre_atl_pct": _pct(foreign_open_price, pre_low),
         "windows": windows,
         "candle_count": len(rows),
-        "pre_domestic_candle_count": len(before_open),
+        "completed_pre_domestic_candle_count": len(completed_before_open),
+        "currency_safe": True,
+    }
+
+
+def reaction_features(
+    candles: Iterable[ListingCandle],
+    *,
+    anchor_at: float,
+    anchor_price: float,
+) -> dict[str, Any]:
+    """Return same-currency forward reaction windows from an explicit anchor."""
+
+    rows = _valid_candles(candles)
+    windows: dict[str, Any] = {}
+    for key, seconds in POST_LISTING_WINDOWS:
+        point = price_at_or_after(rows, anchor_at + seconds)
+        windows[key] = point
+        windows[f"{key}_price"] = point["price"] if point else None
+        windows[f"{key}_return_pct"] = (
+            _pct(float(point["price"]), anchor_price) if point else None
+        )
+    return {
+        "anchor_at": float(anchor_at),
+        "anchor_price": float(anchor_price) if anchor_price > 0 else None,
+        "windows": windows,
+        "candle_count": len(rows),
     }
 
 
@@ -192,18 +255,10 @@ def postlisting_features(
     domestic_open_at: float,
     domestic_open_price: float,
 ) -> dict[str, Any]:
-    rows = _valid_candles(candles)
-    windows: dict[str, Any] = {}
-    for key, seconds in POST_LISTING_WINDOWS:
-        point = price_at_or_after(rows, domestic_open_at + seconds)
-        windows[key] = point
-        windows[f"{key}_price"] = point["price"] if point else None
-        windows[f"{key}_return_pct"] = (
-            _pct(float(point["price"]), domestic_open_price) if point else None
-        )
-    return {
-        "domestic_open_at": float(domestic_open_at),
-        "domestic_open_price": float(domestic_open_price),
-        "windows": windows,
-        "candle_count": len(rows),
-    }
+    """Domestic same-KRW forward reaction wrapper kept for call-site clarity."""
+
+    return reaction_features(
+        candles,
+        anchor_at=domestic_open_at,
+        anchor_price=domestic_open_price,
+    )
