@@ -4,6 +4,36 @@
 
 Local multi-asset PAPER monitor + beginner-facing dashboard + secure Cloudflare phone access + adaptive Bithumb-wide per-coin PAPER research.
 
+## Program roadmap
+
+The program-level source of truth is now:
+
+- `docs/workstreams/dashboard-v1/MASTER_ROADMAP.md`
+- Viewer omission/regression checklist: `docs/VIEWER_REBUILD_CHECKLIST.md`
+- Existing dashboard-v1 continuity checklist: `docs/workstreams/dashboard-v1/TASKS.md`
+
+The master roadmap merges the already-completed strategy analytics work with the remaining real-holdings history / records / CI / Phase 5~8 / mobile QA work and adds the new market-intelligence program: automatic listing/delisting lifecycle, pre-KRW CEX/DEX history, D-5 returns, multi-facet sector/geography, flow/CVD, technical structure, news/macro/human/onchain intelligence, unified score v2, AI interpretation, PAPER v2, walk-forward and candidate promotion.
+
+Do not jump directly from raw new features into the current PAPER strategy. Required promotion path is:
+
+`collect → persist → quality/reaction validation → shadow score → parallel PAPER A/B → walk-forward → candidate`.
+
+Immediate new-program execution order after the currently running cleanup/QA is:
+
+1. close small Viewer debt and scroll-position reset
+2. market lifecycle/listing identity foundation
+3. D-5/history + flow/CVD feature store
+4. multi-facet sector/geography
+5. technical structure engine + external reference-repo validation
+6. Phase 5 event/news/macro/human/onchain
+7. score v2 + coin-specific reaction memory
+8. Intelligence Viewer
+9. Phase 6 AI shadow interpretation
+10. parallel `adaptive_intelligence_v2` PAPER forward test
+11. Phase 7 walk-forward
+12. Phase 8 candidate promotion
+13. final 390/430 mobile QA
+
 ## Hard boundary
 
 This workstream remains **PAPER-only**. Use forward-test evidence to find robust candidates before any later live-trading work. Do not add real-money order execution here.
@@ -108,19 +138,12 @@ Generated data remains local/ignored:
 - `b3_trader/data/auto_demo.sqlite3`
 - `dashboard/demo-runtime/KRW-XXX.json`
 
-## Immediate verification after 2026-08-24-8
+## Current verified viewer/publisher state
 
-Because the previous running launcher may still contain the retired external watchdog and the browser may already be frozen, do one clean bootstrap/restart once:
-
-1. Close the frozen Chrome tab/window.
-2. Stop the current secure launcher with `Ctrl+C`.
-3. Run safe `repair-local-sync.ps1` from the latest remote branch, preserving control state.
-4. Confirm local HEAD equals `origin/b3-auto-trader-phase1`.
-5. Start `start-trader-secure.bat` once.
-6. Confirm console says `GitHub sync: in-app single owner (15s, local coin settings preserved)`.
-7. Confirm Settings shows only one build card: `UI 2026.08.24-8`.
-8. Verify PC top nav is one compact centered glass capsule and mobile active icon/label remains visible above the moving Liquid skin.
-9. Verify Chrome remains responsive while Results updates.
+- Cloudflare snapshot/detail publisher recovered after D1 retention pressure.
+- Snapshot retention is bounded and health exposes snapshot age/count.
+- Viewer project-research completion count uses the same definition for numerator and unresolved count.
+- Current work must preserve PAPER scanning and publisher health while adding new features.
 
 ## Safety constraints
 
