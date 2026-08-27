@@ -6,6 +6,7 @@ from typing import Any
 import requests
 
 RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+NON_RETRYABLE_ERROR_CODES = {"D1_WRITE_LIMIT", "D1_STORAGE_LIMIT"}
 
 
 def _retry_delay(response: requests.Response | None, attempt: int) -> float:
@@ -17,6 +18,40 @@ def _retry_delay(response: requests.Response | None, attempt: int) -> float:
             except ValueError:
                 pass
     return min(8.0, 0.75 * (2 ** attempt))
+
+
+def _response_error(response: requests.Response, url: str) -> requests.HTTPError:
+    detail = ""
+    try:
+        payload = response.json()
+        if isinstance(payload, dict):
+            error_payload = payload.get("error")
+            if isinstance(error_payload, dict):
+                code = str(error_payload.get("code") or "").strip()
+                message = str(error_payload.get("message") or "").strip()
+                if code or message:
+                    detail = f" [{code}: {message}]" if code else f" [{message}]"
+    except ValueError:
+        text = str(response.text or "").strip().replace("\r", " ").replace("\n", " ")
+        if text:
+            detail = f" [{text[:240]}]"
+    return requests.HTTPError(
+        f"{response.status_code} Server Error for url: {url}{detail}",
+        response=response,
+    )
+
+
+def _error_code(response: requests.Response) -> str:
+    try:
+        payload = response.json()
+    except ValueError:
+        return ""
+    if not isinstance(payload, dict):
+        return ""
+    error_payload = payload.get("error")
+    if not isinstance(error_payload, dict):
+        return ""
+    return str(error_payload.get("code") or "").strip().upper()
 
 
 def get_with_retry(
@@ -37,9 +72,7 @@ def get_with_retry(
             if response.status_code not in RETRYABLE_STATUS_CODES:
                 response.raise_for_status()
                 return response, attempt
-            last_error = requests.HTTPError(
-                f"{response.status_code} Server Error for url: {response.url}", response=response
-            )
+            last_error = _response_error(response, response.url)
         except (requests.ConnectionError, requests.Timeout) as exc:
             last_error = exc
         except requests.HTTPError:
@@ -62,8 +95,9 @@ def post_with_retry(
 ) -> tuple[requests.Response, int]:
     """POST with bounded retry for transient Cloudflare/network failures.
 
-    Authentication/validation errors are intentionally not retried. The return
-    value contains the successful response plus the number of retries used.
+    Authentication/validation errors are intentionally not retried. Structured
+    quota/storage errors are also terminal until their underlying condition is
+    cleared, so retrying them only creates noise and unnecessary requests.
     """
     last_error: Exception | None = None
     max_attempts = max(1, int(attempts))
@@ -74,9 +108,10 @@ def post_with_retry(
             if response.status_code not in RETRYABLE_STATUS_CODES:
                 response.raise_for_status()
                 return response, attempt
-            last_error = requests.HTTPError(
-                f"{response.status_code} Server Error for url: {url}", response=response
-            )
+            http_error = _response_error(response, url)
+            if _error_code(response) in NON_RETRYABLE_ERROR_CODES:
+                raise http_error
+            last_error = http_error
         except (requests.ConnectionError, requests.Timeout) as exc:
             last_error = exc
         except requests.HTTPError:
