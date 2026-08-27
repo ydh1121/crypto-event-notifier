@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from b3_trader.listing_history import ListingCandle, prelisting_features, price_at_or_before
+from b3_trader.listing_history import ListingCandle, prelisting_features, price_at_or_before, reaction_features
 from b3_trader.listing_identity import ListingIdentity, listing_identity_gate
 
 
@@ -146,3 +146,23 @@ def test_unconfirmed_candle_is_not_used() -> None:
     features = prelisting_features(candles, domestic_open_at=domestic_open, domestic_open_price=20)
     assert features["windows"]["t1h_price"] is None
     assert features["candle_count"] == 0
+
+
+def test_p5m_reaction_uses_minute_evidence_not_hourly_approximation() -> None:
+    anchor = 1_000_000.0
+    hourly = [
+        ListingCandle(ts=anchor, open=10, high=20, low=9, close=19, interval_seconds=3600),
+        ListingCandle(ts=anchor + 3600, open=20, high=22, low=18, close=21, interval_seconds=3600),
+    ]
+    minute = [
+        ListingCandle(ts=anchor + 5 * 60, open=12, high=13, low=11, close=12.5, interval_seconds=60),
+        ListingCandle(ts=anchor + 6 * 60, open=13, high=14, low=12, close=13.5, interval_seconds=60),
+    ]
+    features = reaction_features(hourly, anchor_at=anchor, anchor_price=10, fine_candles=minute)
+    p5m = features["windows"]["p5m"]
+    assert p5m["price"] == 12
+    assert p5m["interval_seconds"] == 60
+    assert p5m["candle_ts"] == anchor + 5 * 60
+    assert features["p5m_source_interval_seconds"] == 60
+    # The one-hour reaction remains based on the hourly history.
+    assert features["windows"]["p1h"]["price"] == 20
