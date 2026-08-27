@@ -82,7 +82,11 @@ class ResearchSupervisor:
         self.cloudflare_market_detail_publisher = CloudflareMarketDetailPublisher()
         self.coin_profile_research = CoinProfileResearchCycleV36()
         self.market_notice_collector = MarketNoticeCollector()
-        self.listing_history_research = ListingHistoryResearchCycle()
+        # ListingHistoryResearchCycle opens several SQLite connections. Do not
+        # construct it here on the supervisor/main thread: Python's sqlite3
+        # connections are thread-affine by default. The listing component owns
+        # creation, use and close on its own worker thread instead.
+        self.listing_history_research: ListingHistoryResearchCycle | None = None
         self.cloudflare_deployer = CloudflarePagesDeployer()
         self.upbit_paper_runner = UpbitPaperResearchRunner()
         self.strategy_lab_runner = ConfiguredStrategyLabRunner()
@@ -94,7 +98,7 @@ class ResearchSupervisor:
             "cloudflare-market-detail-publish": self.cloudflare_market_detail_publisher.publish_once,
             "coin-profile-enrichment": self.coin_profile_research.run_once,
             "market-notice-watch": self.market_notice_collector.run_once,
-            "listing-history-research": self.listing_history_research.run_once,
+            "listing-history-research": self._run_listing_history_once,
             "upbit-paper-research": self.upbit_paper_runner.run_once,
             "strategy-lab-shadow": self.strategy_lab_runner.run_once,
             "cloudflare-pages-deploy": self.cloudflare_deployer.deploy_once,
@@ -105,6 +109,21 @@ class ResearchSupervisor:
         self.last_run_nonce: dict[str, int] = {}
         self._lock = threading.RLock()
         self._install_components()
+
+    def _run_listing_history_once(self) -> dict[str, Any]:
+        """Create and use listing-history SQLite owners on this component thread."""
+        if self.listing_history_research is None:
+            self.listing_history_research = ListingHistoryResearchCycle()
+        return self.listing_history_research.run_once()
+
+    def _close_component_resources(self, name: str) -> None:
+        """Close thread-affine resources before their component thread exits."""
+        if name != "listing-history-research":
+            return
+        cycle = self.listing_history_research
+        self.listing_history_research = None
+        if cycle is not None:
+            cycle.close()
 
     def _install_components(self) -> None:
         components = self.control.get("components") or {}
@@ -183,42 +202,48 @@ class ResearchSupervisor:
         state = self.states[name]
         wake = self.wake_events[name]
         next_due = 0.0
-        while not self.stop_event.is_set():
-            if not state.enabled:
-                if state.status != "running":
-                    state.status = "stopped"
-                wake.wait(2.0)
-                wake.clear()
-                continue
-            now = time.time()
-            forced = bool(self.force_run.get(name))
-            if not forced and next_due > now:
-                wake.wait(min(2.0, max(0.1, next_due - now)))
-                wake.clear()
-                continue
-            self.force_run[name] = False
-            state.status = "running"
-            state.last_started_at = time.time()
-            self._safe_write_status()
-            try:
-                result = runner()
-                state.last_result = result if isinstance(result, dict) else {"result": str(result)}
-                state.last_success_at = time.time()
-                state.last_error = ""
-                state.status = "healthy"
-                _log(f"{name}: healthy")
-            except Exception as exc:
-                state.last_error_at = time.time()
-                state.last_error = f"{type(exc).__name__}: {exc}"
-                state.status = "degraded"
-                _log(f"{name}: degraded: {state.last_error}")
-            finally:
-                state.runs += 1
-                state.last_finished_at = time.time()
-                next_due = state.last_finished_at + state.interval_seconds
+        try:
+            while not self.stop_event.is_set():
                 if not state.enabled:
-                    state.status = "stopped"
+                    if state.status != "running":
+                        state.status = "stopped"
+                    wake.wait(2.0)
+                    wake.clear()
+                    continue
+                now = time.time()
+                forced = bool(self.force_run.get(name))
+                if not forced and next_due > now:
+                    wake.wait(min(2.0, max(0.1, next_due - now)))
+                    wake.clear()
+                    continue
+                self.force_run[name] = False
+                state.status = "running"
+                state.last_started_at = time.time()
                 self._safe_write_status()
+                try:
+                    result = runner()
+                    state.last_result = result if isinstance(result, dict) else {"result": str(result)}
+                    state.last_success_at = time.time()
+                    state.last_error = ""
+                    state.status = "healthy"
+                    _log(f"{name}: healthy")
+                except Exception as exc:
+                    state.last_error_at = time.time()
+                    state.last_error = f"{type(exc).__name__}: {exc}"
+                    state.status = "degraded"
+                    _log(f"{name}: degraded: {state.last_error}")
+                finally:
+                    state.runs += 1
+                    state.last_finished_at = time.time()
+                    next_due = state.last_finished_at + state.interval_seconds
+                    if not state.enabled:
+                        state.status = "stopped"
+                    self._safe_write_status()
+        finally:
+            try:
+                self._close_component_resources(name)
+            except Exception as exc:
+                _log(f"{name}: component close error: {type(exc).__name__}: {exc}")
 
     def run(self) -> None:
         _log("research supervisor starting")
@@ -236,7 +261,6 @@ class ResearchSupervisor:
         for thread in self.threads.values():
             thread.join(timeout=5.0)
         self.market_notice_collector.close()
-        self.listing_history_research.close()
         self._safe_write_status()
         _log("research supervisor stopped")
 
