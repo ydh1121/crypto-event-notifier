@@ -68,6 +68,8 @@ jobs:
           grep -q "quality_guard: 'monotonic'" cloudflare-pages/functions/api/ingest-coin-profiles.ts
           grep -q "summary_source='structured_ko'" cloudflare-pages/functions/api/ingest-coin-profiles.ts
           grep -q 'STORE_CHUNK' cloudflare-pages/functions/api/ingest-coin-profiles-repair.ts
+          grep -q "status==='unresolved'" cloudflare-pages/public/modules/services/coin-profile.js
+          grep -q 'sources<=0' cloudflare-pages/public/modules/services/coin-profile.js
           grep -q 'compositionend' cloudflare-pages/public/modules/shared/sector-ime-guard.js
           grep -q 'strategy-overview' cloudflare-pages/public/modules/shared/table-sort-enhancer.js
           grep -q 'paper-compare' cloudflare-pages/public/modules/shared/table-sort-enhancer.js
