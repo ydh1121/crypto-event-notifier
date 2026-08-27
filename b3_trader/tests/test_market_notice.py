@@ -9,7 +9,12 @@ from b3_trader.market_notice import (
     classify_notice_title,
     extract_notice_symbols,
 )
-from b3_trader.market_notice_sources import _BithumbLinkParser, _upbit_rows
+from b3_trader.market_notice_sources import (
+    _BithumbLinkParser,
+    _upbit_detail_text,
+    _upbit_detail_timestamp,
+    _upbit_rows,
+)
 
 
 def test_notice_title_classification() -> None:
@@ -47,3 +52,14 @@ def test_upbit_rows_accepts_current_and_legacy_shapes() -> None:
     assert [row["id"] for row in _upbit_rows(current)] == [1]
     assert [row["id"] for row in _upbit_rows(legacy)] == [2]
     assert [row["id"] for row in _upbit_rows(root)] == [3]
+
+
+def test_upbit_detail_extractors_are_shape_tolerant() -> None:
+    payload = {
+        "data": {
+            "body": "<p>거래지원 개시: 2026-08-27 17:00</p>",
+            "created_at": "2026-08-27T09:00:00+09:00",
+        }
+    }
+    assert "거래지원 개시" in _upbit_detail_text(payload)
+    assert _upbit_detail_timestamp(payload) > 0
