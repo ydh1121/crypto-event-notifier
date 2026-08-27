@@ -12,6 +12,7 @@ from .listing_identity import ListingIdentity, listing_identity_gate
 
 PRE_WINDOW_SECONDS = 8 * 24 * 3600
 POST_WINDOW_SECONDS = 8 * 24 * 3600
+POST_COMPLETE_SECONDS = 7 * 24 * 3600
 QUOTE_PRIORITY = {"USDT": 0, "USDC": 1, "USD": 2, "FDUSD": 3, "BTC": 4}
 
 
@@ -69,6 +70,7 @@ class ListingHistoryCollector:
 
     def collect_case(self, case: DomesticListingCase) -> dict[str, Any]:
         started = time.time()
+        now = time.time()
         gate = listing_identity_gate(case.identity)
         case_key = self.store.upsert_case(
             domestic_exchange=case.exchange,
@@ -116,15 +118,18 @@ class ListingHistoryCollector:
                 source_results[source.exchange] = {"status": "not_listed", "markets": []}
                 continue
 
-            # One preferred quote market per CEX is enough for the first
-            # pre-listing feature set. Additional pairs can be added later as
-            # independent sources without changing the domain/store contract.
             market = discovered[0]
             listing_at, first_price = self._first_price_if_needed(source, market)
             start_ts = max(0.0, case.open_at - PRE_WINDOW_SECONDS)
-            end_ts = case.open_at + POST_WINDOW_SECONDS
+            end_ts = min(now, case.open_at + POST_WINDOW_SECONDS)
             if listing_at > 0:
                 start_ts = max(listing_at, start_ts)
+            if end_ts <= start_ts:
+                source_results[source.exchange] = {
+                    "status": "waiting_for_market_time",
+                    "markets": [market.to_dict()],
+                }
+                continue
             try:
                 candles = source.hourly_candles(market.market, start_ts=start_ts, end_ts=end_ts)
             except Exception as exc:
@@ -213,7 +218,12 @@ class ListingHistoryCollector:
             }
 
         if successful:
-            status = "complete" if case.open_price > 0 else "waiting_for_domestic_open_price"
+            if case.open_price <= 0:
+                status = "waiting_for_domestic_open_price"
+            elif now < case.open_at + POST_COMPLETE_SECONDS:
+                status = "tracking_postlisting"
+            else:
+                status = "complete"
         else:
             status = "no_foreign_market_found"
         self.store.update_case_status(case_key, status)
