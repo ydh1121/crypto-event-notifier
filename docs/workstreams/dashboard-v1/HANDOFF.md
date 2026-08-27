@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Local multi-asset PAPER monitor + beginner-facing dashboard + secure Cloudflare phone access + adaptive Bithumb-wide per-coin PAPER research + Build 38 market lifecycle/notice/return-window foundation.
+Local multi-asset PAPER monitor + beginner-facing dashboard + secure Cloudflare phone access + adaptive Bithumb-wide per-coin PAPER research + Build 38 market lifecycle/notice/timing/return-window foundation.
 
 ## Program roadmap
 
@@ -39,7 +39,7 @@ No page-specific `scrollTop` copy/paste and no broad DOM `MutationObserver` cont
 Build 38 completed in source/CI:
 - shared same-page UI continuity guard is installed at the Viewer app root
 - same-route router rerenders preserve scroll/focus state through the shared owner
-- `b3_trader/market_lifecycle.py` owns pure lifecycle classification
+- `b3_trader/market_lifecycle.py` owns pure lifecycle classification and lifecycle PAPER entry policy
 - `b3_trader/market_lifecycle_store.py` owns additive lifecycle SQLite tables/events
 - first lifecycle observation is treated as baseline so all existing markets are not mislabeled as new listings
 - a market appearing after baseline becomes `NEW_LISTING`
@@ -47,30 +47,36 @@ Build 38 completed in source/CI:
 - market disappearance requires 3 accepted observations before `TERMINATED`
 - a severely incomplete/empty market-list response is rejected before it can increment missing counters
 - `b3_trader/market_notice_sources.py` owns Bithumb/Upbit official notice adapters
-- `b3_trader/market_notice_store.py` owns notice/event state persistence
-- `b3_trader/market_lifecycle_service.py` composes market-list state with official notice state
+- `b3_trader/market_notice_timing.py` owns pure structured timing extraction
+- `b3_trader/market_notice_store.py` owns notice/event state persistence and additive timing columns
+- structured timing fields are `announcement_at`, `deposit_at`, `trade_open_at`, `termination_at`; date-only wording does not invent midnight
+- `b3_trader/market_notice_audit.py` provides compact read-only live-source/timing coverage inspection
+- `b3_trader/market_lifecycle_service.py` composes market-list state with official notice state and owns the lifecycle entry-policy service boundary
 - `market-notice-watch` runs as a separate supervisor sidecar and cannot place orders
 - lifecycle state and `notice_only` announced listings are projected through the bounded Cloudflare snapshot
-- the sector Viewer renders a modular lifecycle panel for listing-announced/new/caution/termination states
+- the sector Viewer renders a modular lifecycle panel for listing-announced/new/caution/termination states and structured schedule times
 - lifecycle panel refreshes only its own DOM on snapshot polling; it does not rerender the whole page
 - D-5..D-1 completed prior-day return windows reuse `research_market_memory_mx`; no duplicate per-widget exchange calls
-- lifecycle data remains `shadow_only` and does **not** alter current PAPER buy/sell decisions
+- all active KRW markets are already seeded through the existing all-market PAPER account/profile path; newly discovered markets therefore bootstrap their account/profile before scoring and begin market-memory collection on scan
+- `TERMINATION_SCHEDULED` and `TERMINATED` now block new/additional PAPER buys while existing positions can still be sold/managed and historical performance remains stored
+- CAUTION and NEW_LISTING remain shadow information in the current adaptive strategy; broader lifecycle scoring stays deferred to Unified Score v2/PAPER v2
 
 Validation:
-- Build 38 lifecycle/notice/return-window tests PASS
+- Build 38 lifecycle/notice/timing/return-window/entry-policy tests PASS
 - dedicated Build 38 CI PASS
-- full B3 trader CI PASS on the Build 38 completion source
+- full B3 trader CI PASS after preserving legacy trade-plan construction compatibility
 - Python compile PASS
 - Cloudflare typecheck PASS
 - Pages typecheck + JS syntax PASS
 - dashboard smoke PASS
 
 Immediate next action:
-1. sync/deploy/restart the Build 38 source on the Windows runtime and verify the official notice collector against live Bithumb/Upbit responses
-2. verify sector scroll continuity, D-5..24H columns and lifecycle panel on desktop + phone; only then mark the active QA items complete
-3. structure official notice timing into `announcement_at`, `deposit_at`, `trade_open_at`, `termination_at` without mixing parsing into PAPER or Viewer code
-4. bootstrap newly listed markets into profile research / facet classification / PAPER history owners and block new PAPER entries for terminated markets while preserving history
-5. start pre-KRW CEX/DEX listing-history collector/store/feature work
+1. sync/deploy/restart the current Build 38 source on the Windows runtime
+2. run the real Bithumb/Upbit official notice collector and `market_notice_audit --rows 4`; one source may be partial, but all-source failure must be investigated
+3. verify `market-notice-watch`, Cloudflare snapshot publisher and Viewer lifecycle panel are healthy after restart
+4. verify sector scroll continuity and D-5..24H columns on desktop + phone; only then mark the active QA items complete
+5. verify an actual newly listed market traverses account/profile research/sector-facet/history owners end-to-end when the next listing occurs
+6. start pre-KRW CEX/DEX listing-history collector/store/feature work; identity must be contract/chain/provider-backed rather than ticker-only
 
 ## Hard boundary
 
@@ -181,7 +187,7 @@ Generated data remains local/ignored:
 - Cloudflare snapshot/detail publisher recovered after D1 retention pressure.
 - Snapshot retention is bounded and health exposes snapshot age/count.
 - Viewer project-research completion count uses the same definition for numerator and unresolved count.
-- Build 38 source/CI is complete; local runtime/Pages verification is the next operational step.
+- Build 38 source/CI including termination-only PAPER gate is complete; local runtime/Pages/live-notice verification is the next operational step.
 - Current work must preserve PAPER scanning and publisher health while adding new features.
 
 ## Safety constraints
