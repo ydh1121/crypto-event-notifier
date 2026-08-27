@@ -119,9 +119,12 @@ Viewer omission contract: `docs/VIEWER_REBUILD_CHECKLIST.md`
 - [x] Preserve existing pending items: real-holdings history, record strategy/state/system filters, GitHub Actions Viewer status, Phase 5, Phase 6, Phase 7, Phase 8, final 390/430 QA
 - [x] Add new listing/pre-listing CEX/DEX history, caution/delist lifecycle, D-5 price columns, scroll-position preservation, geography/facet taxonomy, news/macro/human/onchain intelligence, order-flow/CVD, technical structure engine and PAPER v2 sequence
 - [x] Implement lifecycle domain + additive local SQLite registry with baseline-safe NEW_LISTING detection, CAUTION mapping, 3-observation termination confirmation and partial-market-response rejection
+- [x] Add official Bithumb/Upbit notice adapters, notice DB, lifecycle notice overlay and independent `market-notice-watch` supervisor sidecar
 - [x] Attach lifecycle state to local PAPER leaderboard/status as `shadow_only`; current PAPER entry/exit logic is unchanged
-- [-] Publish lifecycle state to Viewer and add ticker text-state styling; then add official notice ingestion for announced listing/termination schedule
-- [ ] Add D-5 return-window feature store from the existing shared market-memory history; do not make separate exchange calls per UI feature
+- [x] Publish lifecycle/notice-only state to Cloudflare Viewer and add modular 상장예정/유의/거래종료 panel + ticker state styling
+- [x] Add D-5 return-window feature from existing shared `research_market_memory_mx`; no separate exchange call per UI feature
+- [-] Verify Build 38 on local runtime/Pages and current phone/desktop browser after sync/restart
+- [ ] Structure official notice timestamps into announcement/deposit/trade-open/termination fields
 - [ ] Execute the remaining work in `MASTER_ROADMAP.md` dependency order; do not jump directly to PAPER v2 before feature collection/shadow validation
 
 ## Validation status
@@ -129,8 +132,10 @@ Viewer omission contract: `docs/VIEWER_REBUILD_CHECKLIST.md`
 - [x] Current adaptive research implementation passed Python tests + module compile
 - [x] Current Liquid/research dashboard implementation passed Node dashboard smoke checks
 - [x] Current branch passed Cloudflare typecheck
-- [x] Lifecycle unit tests and full existing Python suite pass in GitHub Actions
-- [x] Cloudflare Pages JS syntax/typecheck passes with shared continuity module
+- [x] Build 38 lifecycle/notice/return-window unit tests pass in GitHub Actions
+- [x] Build 38 dedicated CI passes including Pages typecheck and modular source contract
+- [x] Full B3 trader CI passes on the Build 38 completion HEAD
+- [x] Cloudflare Pages JS syntax/typecheck passes with shared continuity/lifecycle modules
 - [x] PR #1 remains Draft and unmerged
 
 ## Completion condition
