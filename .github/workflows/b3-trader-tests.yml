@@ -118,7 +118,7 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: find public/modules -name '*.js' -print0 | xargs -0 -n1 node --check
-      - name: Validate build 35 source contract
+      - name: Validate Viewer baseline source contract
         shell: bash
         run: |
           set -euo pipefail
@@ -135,7 +135,7 @@ jobs:
             migrations/0004_coin_profile_cache.sql migrations/0005_coin_profile_evidence.sql; do
             test -s "$file"
           done
-          grep -q 'crypto-viewer-build" content="2026.08.27-35' public/index.html
+          grep -Eq 'crypto-viewer-build" content="2026\.08\.27-(3[5-9]|[4-9][0-9]|[1-9][0-9]{2,})' public/index.html
           grep -Eq 'type="module" src="/modules/main\.js\?v=(1[2-9]|[2-9][0-9]+)"' public/index.html
           grep -q '/modules/styles/records-system.css?v=5' public/index.html
           grep -q 'system.js?v=35' public/modules/main.js
