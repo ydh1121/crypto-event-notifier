@@ -64,6 +64,9 @@ jobs:
           grep -q 'general_error' b3_trader/coin_profile_research_cycle_v36.py
           grep -q 'STORE_CHUNK' cloudflare-pages/functions/api/ingest-coin-profiles.ts
           grep -q 'failed_markets' cloudflare-pages/functions/api/ingest-coin-profiles.ts
+          grep -q 'QUALITY_EXCLUDED' cloudflare-pages/functions/api/ingest-coin-profiles.ts
+          grep -q "quality_guard: 'monotonic'" cloudflare-pages/functions/api/ingest-coin-profiles.ts
+          grep -q "summary_source='structured_ko'" cloudflare-pages/functions/api/ingest-coin-profiles.ts
           grep -q 'STORE_CHUNK' cloudflare-pages/functions/api/ingest-coin-profiles-repair.ts
           grep -q 'compositionend' cloudflare-pages/public/modules/shared/sector-ime-guard.js
           grep -q 'strategy-overview' cloudflare-pages/public/modules/shared/table-sort-enhancer.js
