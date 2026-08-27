@@ -21,6 +21,8 @@ def main() -> None:
     collector = text(ROOT / "b3_trader" / "listing_history_collector.py")
     cycle = text(ROOT / "b3_trader" / "listing_history_research_cycle.py")
     domestic_price = text(ROOT / "b3_trader" / "domestic_listing_price.py")
+    domestic_utils = text(ROOT / "b3_trader" / "domestic_candle_utils.py")
+    quote_rate = text(ROOT / "b3_trader" / "listing_quote_rate.py")
     audit = text(ROOT / "b3_trader" / "listing_history_audit.py")
     control = text(ROOT / "b3_trader" / "research_control.py")
     supervisor = text(ROOT / "b3_trader" / "research_supervisor.py")
@@ -52,7 +54,7 @@ def main() -> None:
             "BinanceSpotSource", "OkxSpotSource", "BybitSpotSource",
             "CexSpotMarket", "ListingCandle", "default_cex_sources",
         )),
-        "build39_history_domain_windows": all(token in domain for token in (*pre_windows, *post_windows, "PRE_LISTING_WINDOWS", "POST_LISTING_WINDOWS", "prelisting_features", "postlisting_features")),
+        "build39_history_domain_windows": all(token in domain for token in (*pre_windows, *post_windows, "PRE_LISTING_WINDOWS", "POST_LISTING_WINDOWS", "prelisting_features", "reaction_features")),
         "build39_history_store_separate": all(token in store for token in (
             "ListingHistoryStore", "listing_history_cases", "listing_history_sources",
             "listing_history_candles", "listing_history_features", "domestic_notice_id",
@@ -64,17 +66,32 @@ def main() -> None:
         )),
         "build39_domestic_open_price_public_candle": all(token in domestic_price for token in (
             "DomesticListingPriceResolver", "BithumbClient", "UpbitClient", "candles_minutes",
-            "opening_price",
+            "nearest_opening_price",
+        )) and all(token in domestic_utils for token in (
+            "parse_candle_ts", "nearest_opening_price", "opening_price",
+        )),
+        "build39_quote_to_krw_separate": all(token in quote_rate for token in (
+            "ListingQuoteRateResolver", "KRW-USDT", "KRW-USDC", "KRW-BTC",
+            "quote_rate_at_or_before", "unsupported_quote", "No stablecoin parity is invented",
+        )),
+        "build39_currency_safe_features": all(token in domain for token in (
+            "quote_to_krw_at_open", "foreign_open_price_krw", "domestic_listing_premium_pct",
+            "to_foreign_open_pct", "foreign_first_to_foreign_open_pct", "currency_safe",
+            "_candle_price_without_lookahead",
+        )) and "to_domestic_pct" not in domain and all(token in collector for token in (
+            "ListingQuoteRateResolver", "quote_to_krw", "foreign_postlisting", "reaction_features",
         )),
         "build39_collector_requires_venue_verifier": all(token in collector for token in (
             "ListingVenueVerifier", "_verified_market", "venue_unverified",
             "provider_pair_verification",
         )),
         "build39_launch_price_not_window_inferred": (
-            all(token in collector for token in ("T-8d", "first_candle", "listing_at - 60.0"))
+            "T-8d" in collector
+            and "first_candle" in collector
+            and "listing_at - 60.0" in collector
             and "if first_price <= 0 and candles" not in collector
             and "if listing_at <= 0 and candles" not in collector
-            and "T-8d pseudo-launches" in domain
+            and "T-8d is never a proxy" in domain
             and "foreign_listing_at\": first_ts if first_ts > 0 else None" in domain
             and "foreign_first_price\": first if first > 0 else None" in domain
             and "first = rows[0].open" not in domain
@@ -101,7 +118,7 @@ def main() -> None:
         )),
         "build39_paper_remains_unwired": all(token not in paper for token in (
             "ListingHistoryCollector", "ListingHistoryResearchCycle", "listing_history_features",
-            "prelisting_features",
+            "prelisting_features", "ListingQuoteRateResolver",
         )),
         "build39_architecture_rule": all(token in architecture for token in (
             "collector", "store", "feature", "score", "service/API", "page/view",
