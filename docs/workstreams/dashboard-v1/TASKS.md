@@ -16,6 +16,8 @@ Viewer omission contract: `docs/VIEWER_REBUILD_CHECKLIST.md`
 - [x] Apply Photo-eBook Korean copy + mobile regression rules to dashboard work
 - [x] Keep primary comprehension suitable for a Korean non-trader in their 60s
 - [x] Add `MASTER_ROADMAP.md` as the program-level checklist for market intelligence, scoring, PAPER v2, Phase 5~8 and final QA
+- [x] Add `docs/MODULAR_ARCHITECTURE.md` and make collector/store/feature/score/service/page dependency direction a permanent repository rule
+- [x] Add shared `ui-continuity.js`; do not duplicate page-specific scroll/focus restoration or use broad MutationObserver loops
 
 ## B. Dashboard UI / mobile UX
 
@@ -29,6 +31,7 @@ Viewer omission contract: `docs/VIEWER_REBUILD_CHECKLIST.md`
 - [x] Preserve native iOS horizontal rail momentum
 - [x] Fix detached/covering Liquid bug by moving rail glass/background to a lower visual layer and keeping labels/icons above the moving indicator
 - [x] Use separate horizontal/vertical Liquid bleed so the selector only slightly protrudes outside the rail instead of becoming an oversized blob
+- [-] Verify shared same-page continuity guard fixes sector/master-detail selection scroll reset without interfering with intentional route scroll-to-top
 - [-] User screenshot QA on current iPhone + desktop
 
 ## C. Main multi-asset monitor
@@ -115,13 +118,19 @@ Viewer omission contract: `docs/VIEWER_REBUILD_CHECKLIST.md`
 - [x] Merge the already-completed strategy equity/coin performance/coin×strategy/overall PAPER equity+drawdown work into the master roadmap as completed baseline
 - [x] Preserve existing pending items: real-holdings history, record strategy/state/system filters, GitHub Actions Viewer status, Phase 5, Phase 6, Phase 7, Phase 8, final 390/430 QA
 - [x] Add new listing/pre-listing CEX/DEX history, caution/delist lifecycle, D-5 price columns, scroll-position preservation, geography/facet taxonomy, news/macro/human/onchain intelligence, order-flow/CVD, technical structure engine and PAPER v2 sequence
-- [ ] Execute the pending work in `MASTER_ROADMAP.md` dependency order; do not jump directly to PAPER v2 before feature collection/shadow validation
+- [x] Implement lifecycle domain + additive local SQLite registry with baseline-safe NEW_LISTING detection, CAUTION mapping, 3-observation termination confirmation and partial-market-response rejection
+- [x] Attach lifecycle state to local PAPER leaderboard/status as `shadow_only`; current PAPER entry/exit logic is unchanged
+- [-] Publish lifecycle state to Viewer and add ticker text-state styling; then add official notice ingestion for announced listing/termination schedule
+- [ ] Add D-5 return-window feature store from the existing shared market-memory history; do not make separate exchange calls per UI feature
+- [ ] Execute the remaining work in `MASTER_ROADMAP.md` dependency order; do not jump directly to PAPER v2 before feature collection/shadow validation
 
 ## Validation status
 
 - [x] Current adaptive research implementation passed Python tests + module compile
 - [x] Current Liquid/research dashboard implementation passed Node dashboard smoke checks
 - [x] Current branch passed Cloudflare typecheck
+- [x] Lifecycle unit tests and full existing Python suite pass in GitHub Actions
+- [x] Cloudflare Pages JS syntax/typecheck passes with shared continuity module
 - [x] PR #1 remains Draft and unmerged
 
 ## Completion condition
