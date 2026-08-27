@@ -2,6 +2,12 @@
 
 Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred to later workstream
 
+Program-level roadmap: `docs/workstreams/dashboard-v1/MASTER_ROADMAP.md`
+
+Viewer omission contract: `docs/VIEWER_REBUILD_CHECKLIST.md`
+
+새로운 시장지능/상장생애주기/수급/기술분석/Phase 5~8/PAPER v2 작업의 세부 순서와 체크 상태는 `MASTER_ROADMAP.md`를 우선한다. 이 파일은 dashboard-v1 기존 작업의 연속성 상태를 유지한다.
+
 ## A. Continuity and permanent rules
 
 - [x] Add restart-safe repository protocol in `AGENTS.md`
@@ -9,6 +15,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Record Photo-eBook as the primary approved UI baseline
 - [x] Apply Photo-eBook Korean copy + mobile regression rules to dashboard work
 - [x] Keep primary comprehension suitable for a Korean non-trader in their 60s
+- [x] Add `MASTER_ROADMAP.md` as the program-level checklist for market intelligence, scoring, PAPER v2, Phase 5~8 and final QA
 
 ## B. Dashboard UI / mobile UX
 
@@ -103,6 +110,13 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [>] Add exchange-level hard exposure/daily-loss limits
 - [>] Run a tightly capped live pilot only after adequate forward-test and holdout evidence
 
+## J. Program roadmap continuity
+
+- [x] Merge the already-completed strategy equity/coin performance/coin×strategy/overall PAPER equity+drawdown work into the master roadmap as completed baseline
+- [x] Preserve existing pending items: real-holdings history, record strategy/state/system filters, GitHub Actions Viewer status, Phase 5, Phase 6, Phase 7, Phase 8, final 390/430 QA
+- [x] Add new listing/pre-listing CEX/DEX history, caution/delist lifecycle, D-5 price columns, scroll-position preservation, geography/facet taxonomy, news/macro/human/onchain intelligence, order-flow/CVD, technical structure engine and PAPER v2 sequence
+- [ ] Execute the pending work in `MASTER_ROADMAP.md` dependency order; do not jump directly to PAPER v2 before feature collection/shadow validation
+
 ## Validation status
 
 - [x] Current adaptive research implementation passed Python tests + module compile
@@ -112,4 +126,4 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 ## Completion condition
 
-Finish this workstream when mobile/dashboard UX is approved, adaptive per-coin PAPER research has accumulated enough evidence to identify robust candidates rather than lucky short-term winners, backup is verified, and phone access is convenient. Real-money execution stays deferred.
+Finish this workstream when mobile/dashboard UX is approved, adaptive per-coin PAPER research has accumulated enough evidence to identify robust candidates rather than lucky short-term winners, backup is verified, phone access is convenient, and the program-level items tracked in `MASTER_ROADMAP.md` have either completed or been explicitly moved to a successor workstream. Real-money execution stays deferred.
