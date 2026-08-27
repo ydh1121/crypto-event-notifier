@@ -5,8 +5,10 @@ on:
     branches:
       - "b3-auto-trader-phase1"
     paths:
+      - "b3_trader/coin_profile_identity_safe.py"
       - "b3_trader/coin_profile_integrity_audit.py"
       - "b3_trader/coin_profile_research_cycle_v36.py"
+      - "b3_trader/tests/test_coin_profile_identity_safe.py"
       - "cloudflare-pages/functions/lib/coin-profile-integrity.ts"
       - "cloudflare-pages/functions/api/coin-profile-integrity-audit.ts"
       - "cloudflare-pages/functions/api/coin-profile-integrity.ts"
@@ -35,8 +37,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: pip install -r b3_trader/requirements.txt
-      - run: python -m py_compile b3_trader/coin_profile_integrity_audit.py b3_trader/coin_profile_research_cycle_v36.py scripts/check-sector-build36.py scripts/check-sector-build37.py
+      - run: pip install -r b3_trader/requirements.txt pytest
+      - run: python -m py_compile b3_trader/coin_profile_identity_safe.py b3_trader/coin_profile_integrity_audit.py b3_trader/coin_profile_research_cycle_v36.py scripts/check-sector-build36.py scripts/check-sector-build37.py
+      - run: python -m pytest -q b3_trader/tests/test_coin_profile_identity_safe.py
       - run: node --check cloudflare-pages/public/modules/shared/sector-ime-guard.js
       - run: node --check cloudflare-pages/public/modules/shared/table-sort-enhancer.js
       - run: node --check cloudflare-pages/public/modules/main.js
@@ -51,6 +54,10 @@ jobs:
         run: |
           set -euo pipefail
           grep -q 'content_lead_name_mismatch' cloudflare-pages/functions/lib/coin-profile-integrity.ts
+          grep -q 'exactLeadIsCurrent' cloudflare-pages/functions/lib/coin-profile-integrity.ts
+          grep -q '_manual_identity_matches' b3_trader/coin_profile_identity_safe.py
+          grep -q 'strict_header' b3_trader/coin_profile_identity_safe.py
+          grep -q 'body_only_bitcoin_mentions' b3_trader/tests/test_coin_profile_identity_safe.py
           grep -q 'coin-profile-backlog-v37' b3_trader/coin_profile_research_cycle_v36.py
           grep -q 'compositionend' cloudflare-pages/public/modules/shared/sector-ime-guard.js
           grep -q 'strategy-overview' cloudflare-pages/public/modules/shared/table-sort-enhancer.js
