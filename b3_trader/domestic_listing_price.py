@@ -4,24 +4,12 @@ from datetime import datetime, timezone
 from typing import Any, Protocol
 
 from .bithumb_client import BithumbClient
+from .domestic_candle_utils import nearest_opening_price
 from .upbit_client import UpbitClient
 
 
 class MinuteCandleClient(Protocol):
     def candles_minutes(self, market: str, unit: int = 5, count: int = 120, to: str | None = None) -> list[dict[str, Any]]: ...
-
-
-def _parse_candle_ts(row: dict[str, Any]) -> float:
-    raw = str(row.get("candle_date_time_utc") or "").strip()
-    if not raw:
-        return 0.0
-    try:
-        return datetime.fromisoformat(raw.replace("Z", "+00:00")).replace(tzinfo=timezone.utc).timestamp()
-    except ValueError:
-        try:
-            return datetime.strptime(raw, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc).timestamp()
-        except ValueError:
-            return 0.0
 
 
 def listing_open_from_candles(
@@ -30,26 +18,11 @@ def listing_open_from_candles(
     open_at: float,
     tolerance_seconds: int = 180,
 ) -> dict[str, Any]:
-    candidates: list[tuple[float, dict[str, Any]]] = []
-    for row in candles:
-        if not isinstance(row, dict):
-            continue
-        ts = _parse_candle_ts(row)
-        if ts <= 0:
-            continue
-        try:
-            opening = float(row.get("opening_price") or 0.0)
-        except (TypeError, ValueError):
-            opening = 0.0
-        if opening <= 0:
-            continue
-        distance = abs(ts - float(open_at))
-        if distance <= max(60, int(tolerance_seconds)):
-            candidates.append((distance, {"price": opening, "candle_ts": ts, "distance_seconds": distance}))
-    if not candidates:
-        return {"found": False, "price": 0.0, "candle_ts": 0.0, "distance_seconds": None}
-    candidates.sort(key=lambda item: (item[0], item[1]["candle_ts"]))
-    return {"found": True, **candidates[0][1]}
+    return nearest_opening_price(
+        candles,
+        target_ts=open_at,
+        tolerance_seconds=tolerance_seconds,
+    )
 
 
 class DomesticListingPriceResolver:
