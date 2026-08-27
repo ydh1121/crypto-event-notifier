@@ -29,7 +29,7 @@ def main() -> None:
     architecture = text(ROOT / "docs" / "MODULAR_ARCHITECTURE.md")
 
     pre_windows = ("t7d", "t5d", "t3d", "t1d", "t6h", "t1h")
-    post_windows = ("m5", "h1", "h6", "h24", "d3", "d7")
+    post_windows = ("p5m", "p1h", "p6h", "p24h", "p3d", "p7d")
     checks = {
         "build39_identity_domain": all(token in identity for token in (
             "ListingIdentity", "listing_identity_gate", "provider_identity_missing",
@@ -52,7 +52,7 @@ def main() -> None:
             "BinanceSpotSource", "OkxSpotSource", "BybitSpotSource",
             "CexSpotMarket", "ListingCandle", "default_cex_sources",
         )),
-        "build39_history_domain_windows": all(token in domain for token in (*pre_windows, *post_windows, "prelisting_features", "postlisting_features")),
+        "build39_history_domain_windows": all(token in domain for token in (*pre_windows, *post_windows, "PRE_LISTING_WINDOWS", "POST_LISTING_WINDOWS", "prelisting_features", "postlisting_features")),
         "build39_history_store_separate": all(token in store for token in (
             "ListingHistoryStore", "listing_history_cases", "listing_history_sources",
             "listing_history_candles", "listing_history_features", "domestic_notice_id",
@@ -70,9 +70,16 @@ def main() -> None:
             "ListingVenueVerifier", "_verified_market", "venue_unverified",
             "provider_pair_verification",
         )),
-        "build39_launch_price_not_window_inferred": all(token in collector for token in (
-            "launch window", "T-8d", "first_candle", "listing_at - 60.0",
-        )) and "if first_price <= 0 and candles" not in collector and "if listing_at <= 0 and candles" not in collector,
+        "build39_launch_price_not_window_inferred": (
+            all(token in collector for token in ("T-8d", "first_candle", "listing_at - 60.0"))
+            and "if first_price <= 0 and candles" not in collector
+            and "if listing_at <= 0 and candles" not in collector
+            and "T-8d pseudo-launches" in domain
+            and "foreign_listing_at\": first_ts if first_ts > 0 else None" in domain
+            and "foreign_first_price\": first if first > 0 else None" in domain
+            and "first = rows[0].open" not in domain
+            and "first_ts = foreign_listing_at or (rows[0].ts" not in domain
+        ),
         "build39_postlisting_tracks_7d": "tracking_postlisting" in collector and "POST_COMPLETE_SECONDS = 7 * 24 * 3600" in collector,
         "build39_cycle_bounded": all(token in cycle for token in (
             "ListingHistoryResearchCycle", "MAX_CASES_PER_RUN = 3",
