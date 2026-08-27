@@ -21,6 +21,8 @@ const clean = (value: unknown, limit = 4000) => String(value ?? '').trim().slice
 const symbolOf = (market: string) => market.toUpperCase().replace(/^KRW-/, '').replace(/^USDT-/, '');
 const finite = (value: unknown, fallback = 0) => { const out = Number(value); return Number.isFinite(out) ? out : fallback; };
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+const QUALITY_EXCLUDED = `((CASE excluded.research_status WHEN 'verified' THEN 4 WHEN 'corroborated' THEN 3 WHEN 'single_source' THEN 2 WHEN 'unresolved' THEN 1 ELSE 0 END) * 1000000 + excluded.source_count * 1000 + CAST(excluded.match_confidence * 100 AS INTEGER))`;
+const QUALITY_CURRENT = `((CASE coin_profile_cache.research_status WHEN 'verified' THEN 4 WHEN 'corroborated' THEN 3 WHEN 'single_source' THEN 2 WHEN 'unresolved' THEN 1 ELSE 0 END) * 1000000 + coin_profile_cache.source_count * 1000 + CAST(coin_profile_cache.match_confidence * 100 AS INTEGER))`;
 function safeUrl(value: unknown): string {
   const raw = clean(value, 1200);
   if (!raw) return '';
@@ -134,14 +136,18 @@ export const onRequestPost: PagesFunction<Env> = async ({request, env}) => {
           homepage=CASE WHEN excluded.homepage<>'' THEN excluded.homepage ELSE coin_profile_cache.homepage END,
           image_url=CASE WHEN excluded.image_url<>'' THEN excluded.image_url ELSE coin_profile_cache.image_url END,
           updated_at=excluded.updated_at,
-          business_summary_ko=CASE WHEN excluded.business_summary_ko<>'' THEN excluded.business_summary_ko ELSE coin_profile_cache.business_summary_ko END,
+          business_summary_ko=CASE
+            WHEN excluded.business_summary_ko<>'' THEN excluded.business_summary_ko
+            WHEN coin_profile_cache.summary_source='structured_ko' AND excluded.research_status IN ('unresolved','pending') THEN ''
+            ELSE coin_profile_cache.business_summary_ko END,
           business_summary_en=CASE WHEN excluded.business_summary_en<>'' THEN excluded.business_summary_en ELSE coin_profile_cache.business_summary_en END,
           canonical_sector=excluded.canonical_sector, tags_json=excluded.tags_json, evidence_json=excluded.evidence_json,
           official_docs=CASE WHEN excluded.official_docs<>'' THEN excluded.official_docs ELSE coin_profile_cache.official_docs END,
           whitepaper=CASE WHEN excluded.whitepaper<>'' THEN excluded.whitepaper ELSE coin_profile_cache.whitepaper END,
           source_code=CASE WHEN excluded.source_code<>'' THEN excluded.source_code ELSE coin_profile_cache.source_code END,
           community_json=excluded.community_json, research_status=excluded.research_status, summary_source=excluded.summary_source,
-          source_count=excluded.source_count, match_confidence=excluded.match_confidence, last_verified_at=excluded.last_verified_at`,
+          source_count=excluded.source_count, match_confidence=excluded.match_confidence, last_verified_at=excluded.last_verified_at
+         WHERE ${QUALITY_EXCLUDED} >= ${QUALITY_CURRENT}`,
       ).bind(
         exchange, market, clean(raw.provider, 60), clean(raw.provider_id, 120), clean(raw.korean_name, 180), clean(raw.english_name, 180),
         descriptionKo, descriptionEn, JSON.stringify(categories), safeUrl(raw.homepage), safeUrl(raw.image_url), now,
@@ -159,6 +165,7 @@ export const onRequestPost: PagesFunction<Env> = async ({request, env}) => {
     stored: result.stored,
     failed: failedMarkets.length,
     failed_markets: failedMarkets.slice(0, 8),
+    quality_guard: 'monotonic',
     received_at: now,
     research_status: statusCounts,
   });
