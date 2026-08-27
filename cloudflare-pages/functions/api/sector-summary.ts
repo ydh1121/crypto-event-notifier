@@ -122,7 +122,9 @@ export const onRequestGet:PagesFunction<Env>=async({request,env})=>{
   const positiveTurnover=sectors.reduce((sum,row)=>sum+row.turnover_24h*row.positive_turnover_share_pct/100,0);
   const koreanReady=rows.filter(row=>Boolean(row.business_summary_ko||row.description_ko)).length;
   const researched=rows.filter(row=>Boolean(row.business_summary_ko||row.description_ko)&&!['pending','unresolved'].includes(row.research_status)).length;
-  const unresolved=Math.max(0,rows.length-koreanReady);
+  const unresolved=Math.max(0,rows.length-researched);
+  const koreanMissing=Math.max(0,rows.length-koreanReady);
+  const verificationPending=Math.max(0,koreanReady-researched);
 
   if(sectors.length){
     const latest=await env.DB.prepare('SELECT MAX(ts) AS ts FROM sector_history WHERE exchange=?').bind(exchange).first<{ts:number}>();
@@ -150,8 +152,9 @@ export const onRequestGet:PagesFunction<Env>=async({request,env})=>{
       market_count:rows.length,sector_count:sectors.length,turnover_24h:round(totalTurnover,0),
       positive_turnover_share_pct:round(totalTurnover>0?positiveTurnover/totalTurnover*100:0,2),
       researched_count:researched,korean_ready_count:koreanReady,unresolved_count:unresolved,
+      korean_missing_count:koreanMissing,verification_pending_count:verificationPending,
     },
     sectors,history,taxonomy_source:TAXONOMY_SOURCE_NOTE,
-    methodology:'24시간 거래대금 중 상승 코인에 집중된 비율과 거래대금 가중 등락률을 대표 섹터별로 집계합니다. 프로젝트 프로필은 거래소와 무관한 자산 정보이므로 동일 KRW 종목의 빗썸·업비트 조사 결과를 교차 재사용하며, 한국어 사업 설명이 준비된 종목만 조사 완료 수치에 반영합니다.',
+    methodology:'24시간 거래대금 중 상승 코인에 집중된 비율과 거래대금 가중 등락률을 대표 섹터별로 집계합니다. 프로젝트 프로필은 거래소와 무관한 자산 정보이므로 동일 KRW 종목의 빗썸·업비트 조사 결과를 교차 재사용하며, 한국어 사업 설명이 준비되고 검증 상태가 완료된 종목만 조사 완료 수치에 반영합니다.',
   });
 };
