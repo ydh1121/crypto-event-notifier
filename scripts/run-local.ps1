@@ -11,9 +11,11 @@ $env:AUTO_GIT_SYNC = "true"
 $env:AUTO_GIT_PUSH_CONTROL = "true"
 $env:GIT_SYNC_INTERVAL_SECONDS = "15"
 
-# The normal launcher gives Bithumb PAPER one dedicated restart-safe process owner.
-# local_app keeps its legacy in-process worker only as a direct-run fallback.
-$env:AUTO_DEMO_ENABLED = "false"
+# Keep the PAPER feature enabled for API/UI semantics, but give its runtime to the
+# dedicated restart-safe process owner. Direct local_app runs still retain the
+# embedded-worker fallback when this launcher-only flag is absent.
+$env:AUTO_DEMO_ENABLED = "true"
+$env:AUTO_DEMO_EMBEDDED_WORKER = "false"
 
 # Windows PowerShell 5.1 can surface stderr from a successful native command
 # (for example Git's normal "From https://..." fetch progress) as an ErrorRecord.
