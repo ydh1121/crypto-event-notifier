@@ -19,6 +19,37 @@ function captureSelection(element){
   };
 }
 
+function stableSelector(element,root){
+  if(!(element instanceof HTMLElement))return'';
+  const explicit=element.getAttribute('data-continuity-key');
+  if(explicit)return`[data-continuity-key="${CSS.escape(explicit)}"]`;
+  if(element.id)return`#${CSS.escape(element.id)}`;
+  const classes=[...element.classList].filter(Boolean);
+  for(const name of classes){
+    const selector=`.${CSS.escape(name)}`;
+    if(root?.querySelectorAll?.(selector)?.length===1)return selector;
+  }
+  return'';
+}
+
+function isScrollable(element){
+  if(!(element instanceof HTMLElement))return false;
+  return element.scrollHeight>element.clientHeight+1||element.scrollWidth>element.clientWidth+1;
+}
+
+function captureScrollableAncestors(root,target){
+  const items=[];
+  let element=target instanceof HTMLElement?target.parentElement:null;
+  while(element&&element!==root){
+    if(isScrollable(element)){
+      const selector=stableSelector(element,root);
+      if(selector)items.push({selector,index:0,top:element.scrollTop,left:element.scrollLeft});
+    }
+    element=element.parentElement;
+  }
+  return items;
+}
+
 export function captureUiContinuity(root,{scrollSelectors=[DEFAULT_SCROLL_SELECTOR],preserveWindow=true,preserveFocus=true}={}){
   const scroll=[];
   for(const selector of scrollSelectors){
@@ -66,4 +97,20 @@ export function patchPreservingUi(root,mutate,options={}){
   const result=mutate();
   restoreUiContinuity(root,snapshot,options);
   return result;
+}
+
+export function installSamePageInteractionContinuity(root,{skipSelector='a[href],[data-route],[data-allow-scroll-jump]'}={}){
+  if(!root)return()=>{};
+  const onClickCapture=event=>{
+    const target=event.target instanceof HTMLElement?event.target:null;
+    if(!target||target.closest(skipSelector))return;
+    const snapshot={
+      window:{x:window.scrollX,y:window.scrollY},
+      scroll:captureScrollableAncestors(root,target),
+      focus:null,
+    };
+    queueMicrotask(()=>restoreUiContinuity(root,snapshot,{repeatOnFrame:true}));
+  };
+  root.addEventListener('click',onClickCapture,true);
+  return()=>root.removeEventListener('click',onClickCapture,true);
 }
