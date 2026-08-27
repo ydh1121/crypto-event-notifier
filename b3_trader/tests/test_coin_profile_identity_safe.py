@@ -1,4 +1,5 @@
 from b3_trader.coin_profile_identity_safe import (
+    _drop_ungrounded_profile,
     _manual_identity_matches,
     _manual_intro_identity_matches,
 )
@@ -72,3 +73,26 @@ def test_manual_intro_rejects_foreign_project_lead_even_when_btc_is_mentioned() 
         row("BTC", "비트코인", "Bitcoin"),
         "펌프(PUMP)는 비트코인을 스테이킹하고 BTC 유동성을 제공하는 프로젝트입니다.",
     )
+
+
+def test_ungrounded_profile_drops_template_business_content() -> None:
+    profile = _drop_ungrounded_profile({
+        "source_count": 0,
+        "research_status": "unresolved",
+        "business_summary_ko": "쎄타퓨엘(TFUEL)는 인공지능 프로젝트입니다.",
+        "description_ko": "추정 설명",
+        "description_en": "guessed description",
+        "homepage": "https://wrong.example/",
+        "categories": ["AI"],
+        "tags": ["artificial intelligence"],
+        "community": ["https://wrong.example/community"],
+        "evidence": [],
+        "match_confidence": 0.7,
+    })
+    assert profile["business_summary_ko"] == ""
+    assert profile["description_ko"] == ""
+    assert profile["homepage"] == ""
+    assert profile["categories"] == []
+    assert profile["research_status"] == "unresolved"
+    assert profile["match_confidence"] == 0.0
+    assert profile["ungrounded_content_removed"] is True
