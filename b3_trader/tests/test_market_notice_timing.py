@@ -35,6 +35,19 @@ def test_revised_listing_notice_uses_final_active_clock_time() -> None:
     assert timing.trade_open_at == _ts(2026, 8, 11, 17)
 
 
+def test_revised_listing_notice_across_html_lines_uses_final_clock_time() -> None:
+    published = _ts(2026, 8, 11, 10, 17)
+    timing = parse_notice_timing(
+        """
+        <p>거래 개시 시점 : 2026.08.11(화) 오후 2:00</p>
+        <p>→ 오후 4:00</p>
+        <p>→ 오후 5:00 예정</p>
+        """,
+        published_at=published,
+    )
+    assert timing.trade_open_at == _ts(2026, 8, 11, 17)
+
+
 def test_revised_listing_notice_with_strikethrough_markup_uses_final_clock_time() -> None:
     published = _ts(2026, 8, 11, 10, 17)
     timing = parse_notice_timing(
