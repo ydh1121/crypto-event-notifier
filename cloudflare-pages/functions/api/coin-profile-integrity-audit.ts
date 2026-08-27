@@ -4,7 +4,7 @@ import {evaluateProfileIntegrity,knownProjects,type ProfileIntegrityRow} from '.
 import type {Env} from '../lib/types';
 
 const clean=(value:unknown)=>String(value??'').trim();
-const query=(env:Env,exchange:'bithumb'|'upbit')=>env.DB.prepare(`SELECT exchange,market,korean_name,english_name,provider,provider_id,business_summary_ko,description_ko,description_en,homepage,evidence_json,research_status,source_count,match_confidence,last_verified_at FROM coin_profile_cache WHERE exchange=? ORDER BY market ASC LIMIT 1000`).bind(exchange).all<ProfileIntegrityRow>();
+const query=(env:Env,exchange:'bithumb'|'upbit')=>env.DB.prepare(`SELECT exchange,market,korean_name,english_name,provider,provider_id,substr(COALESCE(business_summary_ko,''),1,700) AS business_summary_ko,substr(COALESCE(description_ko,''),1,700) AS description_ko,substr(COALESCE(description_en,''),1,700) AS description_en,homepage,substr(COALESCE(evidence_json,''),1,1600) AS evidence_json,research_status,source_count,match_confidence,last_verified_at FROM coin_profile_cache WHERE exchange=? ORDER BY market ASC LIMIT 1000`).bind(exchange).all<ProfileIntegrityRow>();
 
 export const onRequestGet:PagesFunction<Env>=async({request,env})=>{
   if(!env.INGEST_TOKEN||bearer(request)!==env.INGEST_TOKEN)return error(401,'INGEST_REQUIRED','프로필 내용 정합성 감사 인증이 필요합니다.');
