@@ -56,11 +56,12 @@ foreach ($name in @("market-notice-watch", "cloudflare-snapshot-publish", "cloud
         continue
     }
     [PSCustomObject]@{
-        component       = $name
-        status          = $component.status
-        last_success_at = Show-Time $component.last_success_at
-        last_error      = $component.last_error
-        runs            = $component.runs
+        component        = $name
+        status           = $component.status
+        interval_seconds = $component.interval_seconds
+        last_success_at  = Show-Time $component.last_success_at
+        last_error       = $component.last_error
+        runs             = $component.runs
     } | Format-List
 }
 
@@ -118,8 +119,15 @@ catch {
 Write-Host "`n=== LOCAL APP / ASSET REGISTRY ==="
 try {
     $appState = Invoke-RestMethod "http://127.0.0.1:8765/api/state" -TimeoutSec 10
-    $assets = @(Invoke-RestMethod "http://127.0.0.1:8765/api/assets" -TimeoutSec 10)
-    $invalidMarkets = @($assets | Where-Object { [string]$_.market -notmatch '^KRW-[A-Z0-9]+$' } | ForEach-Object { [string]$_.market })
+    $assetResponse = Invoke-RestMethod "http://127.0.0.1:8765/api/assets" -TimeoutSec 10
+    # Invoke-RestMethod can preserve a top-level JSON array as one Object[] value.
+    # Pipe once to force normal PowerShell enumeration before validating each market.
+    $assets = @($assetResponse | ForEach-Object { $_ })
+    $invalidMarkets = @(
+        $assets |
+            Where-Object { [string]$_.market -notmatch '^KRW-[A-Z0-9]+$' } |
+            ForEach-Object { [string]$_.market }
+    )
     $lastError = $appState.last_error
     [PSCustomObject]@{
         active_assets        = $assets.Count
@@ -141,11 +149,12 @@ try {
         -Headers @{"Cache-Control"="no-cache"} `
         -TimeoutSec 15
     [PSCustomObject]@{
-        ok               = $remote.ok
-        has_snapshot     = $remote.has_snapshot
-        last_received_at = Show-Time $remote.last_received_at
-        age_seconds      = $remote.age_seconds
-        snapshot_count   = $remote.snapshot_count
+        ok                 = $remote.ok
+        has_snapshot       = $remote.has_snapshot
+        last_received_at   = Show-Time $remote.last_received_at
+        age_seconds        = $remote.age_seconds
+        snapshot_count     = $remote.snapshot_count
+        oldest_received_at = Show-Time $remote.oldest_received_at
     } | Format-List
 }
 catch {
