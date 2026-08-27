@@ -1,0 +1,55 @@
+name: B3 sector Build 38
+
+on:
+  push:
+    branches:
+      - "b3-auto-trader-phase1"
+    paths:
+      - "b3_trader/market_lifecycle.py"
+      - "b3_trader/market_lifecycle_store.py"
+      - "b3_trader/market_return_windows.py"
+      - "b3_trader/market_feature_store.py"
+      - "b3_trader/market_detail_feature_projection.py"
+      - "b3_trader/multi_exchange_paper.py"
+      - "b3_trader/cloudflare_market_detail_strategy_lab.py"
+      - "b3_trader/tests/test_market_lifecycle.py"
+      - "b3_trader/tests/test_market_return_windows.py"
+      - "cloudflare-pages/functions/api/sector-summary.ts"
+      - "cloudflare-pages/public/modules/pages/sectors-v36.js"
+      - "cloudflare-pages/public/modules/pages/sector-coin-table.js"
+      - "cloudflare-pages/public/modules/shared/market-lifecycle.js"
+      - "cloudflare-pages/public/modules/shared/ui-continuity.js"
+      - "cloudflare-pages/public/modules/styles/market-lifecycle.css"
+      - "cloudflare-pages/public/modules/styles/sector-market-data.css"
+      - "cloudflare-pages/public/modules/main.js"
+      - "cloudflare-pages/public/index.html"
+      - "docs/MODULAR_ARCHITECTURE.md"
+      - "scripts/check-sector-build38.py"
+      - ".github/workflows/b3-sector-build38.yml"
+  workflow_dispatch:
+
+jobs:
+  build38:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: pip install -r b3_trader/requirements.txt pytest
+      - run: python -m py_compile b3_trader/market_lifecycle.py b3_trader/market_lifecycle_store.py b3_trader/market_return_windows.py b3_trader/market_feature_store.py b3_trader/market_detail_feature_projection.py b3_trader/multi_exchange_paper.py scripts/check-sector-build38.py
+      - run: python -m pytest -q b3_trader/tests/test_market_lifecycle.py b3_trader/tests/test_market_return_windows.py
+      - run: node --check cloudflare-pages/public/modules/shared/market-lifecycle.js
+      - run: node --check cloudflare-pages/public/modules/shared/ui-continuity.js
+      - run: node --check cloudflare-pages/public/modules/pages/sector-coin-table.js
+      - run: node --check cloudflare-pages/public/modules/pages/sectors-v36.js
+      - run: node --check cloudflare-pages/public/modules/main.js
+      - run: python scripts/check-sector-build38.py
+      - name: Cloudflare Pages typecheck
+        working-directory: cloudflare-pages
+        run: |
+          npm install
+          npm run typecheck
