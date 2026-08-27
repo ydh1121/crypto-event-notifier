@@ -92,6 +92,21 @@ def legacy_files_absent() -> bool:
     return all(not any(PUBLIC.glob(pattern)) for pattern in LEGACY_ROOT_PATTERNS)
 
 
+def main_entry_version(html: str) -> int:
+    marker = "/modules/main.js?v="
+    start = html.find(marker)
+    if start < 0:
+        return 0
+    start += len(marker)
+    end = start
+    while end < len(html) and html[end].isdigit():
+        end += 1
+    try:
+        return int(html[start:end])
+    except ValueError:
+        return 0
+
+
 def main() -> None:
     local = git("rev-parse", "--short", "HEAD")
     remote = git("rev-parse", "--short", "origin/b3-auto-trader-phase1")
@@ -137,10 +152,11 @@ def main() -> None:
     repair = text(ROOT / "scripts/repair-local-sync.ps1")
     gitignore = text(ROOT / ".gitignore")
     checklist = text(CHECKLIST)
+    local_main_version = main_entry_version(index)
 
     static = {
         "build_35": 'crypto-viewer-build" content="2026.08.27-35' in index,
-        "module_entry_v12": 'type="module" src="/modules/main.js?v=12"' in index and "system.js?v=35" in main_js,
+        "module_entry_v12": local_main_version >= 12 and "system.js?v=35" in main_js,
         "all_required_modules": all((PUBLIC / path).exists() for path in REQUIRED),
         "apple_finance_tokens": all(token in tokens_css for token in ("#f5f5f7", "#1d1d1f", "#0066cc", "tabular-nums")),
         "quiet_filter_chips": ".chip-row button.active" in build29_css,
@@ -241,7 +257,8 @@ def main() -> None:
     if url:
         nonce = str(time.time_ns())
         si, ri = fetch(f"{url}/?modular={nonce}")
-        sm, rm = fetch(f"{url}/modules/main.js?v=12&modular={nonce}")
+        remote_main_version = main_entry_version(ri)
+        sm, rm = fetch(f"{url}/modules/main.js?v={remote_main_version or 12}&modular={nonce}")
         sy, rsy = fetch(f"{url}/modules/pages/system.js?v=35&modular={nonce}")
         rc, rrc = fetch(f"{url}/modules/styles/records-system.css?v=5&modular={nonce}")
         st, rst = fetch(f"{url}/modules/pages/strategy.js?modular={nonce}")
@@ -255,7 +272,7 @@ def main() -> None:
             "strategy_status": st,
             "sectors_status": ss,
             "build_35": 'crypto-viewer-build" content="2026.08.27-35' in ri,
-            "module_entry_v12": 'type="module" src="/modules/main.js?v=12"' in ri and "system.js?v=35" in rm,
+            "module_entry_v12": remote_main_version >= 12 and "system.js?v=35" in rm,
             "legacy_files_absent": all(status == 404 for status in legacy_statuses.values()),
             "system_backup_ui": all(token in rsy for token in ("SQLite · Drive 백업", "drive_uploaded", "local_backup_count")),
             "system_buy_candidate_ui": all(token in rsy for token in ("BUY_CANDIDATE 알림", "buy_candidate_sent_count", "last_buy_candidate_sent_at")),
