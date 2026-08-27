@@ -29,6 +29,7 @@ def main() -> None:
     lifecycle_service = text(ROOT / "b3_trader" / "market_lifecycle_service.py")
     lifecycle_projection = text(ROOT / "b3_trader" / "cloudflare_snapshot_lifecycle.py")
     notice_domain = text(ROOT / "b3_trader" / "market_notice.py")
+    notice_timing = text(ROOT / "b3_trader" / "market_notice_timing.py")
     notice_sources = text(ROOT / "b3_trader" / "market_notice_sources.py")
     notice_store = text(ROOT / "b3_trader" / "market_notice_store.py")
     notice_collector = text(ROOT / "b3_trader" / "market_notice_collector.py")
@@ -40,6 +41,7 @@ def main() -> None:
     paper = text(ROOT / "b3_trader" / "multi_exchange_paper.py")
     architecture = text(ROOT / "docs" / "MODULAR_ARCHITECTURE.md")
 
+    timing_fields = ("announcement_at", "deposit_at", "trade_open_at", "termination_at")
     checks = {
         "sector_build_38": 'crypto-sector-build" content="2026.08.27-38' in index,
         "main_v14": '/modules/main.js?v=14' in index and 'sectors-v36.js?v=38' in main_js,
@@ -54,6 +56,7 @@ def main() -> None:
         "lifecycle_selector_shared": "marketLifecycle" in selectors and "notice_only" in selectors,
         "lifecycle_panel_modular": all(token in lifecycle_panel for token in ("renderMarketLifecyclePanel", "refreshMarketLifecyclePanel", "notice_only", "LISTING_ANNOUNCED", "data-market-lifecycle-panel")),
         "lifecycle_panel_live_refresh": "refreshMarketLifecyclePanel" in sector_page and "m.type==='snapshot'" in sector_page,
+        "lifecycle_panel_structured_schedule": "scheduleText" in lifecycle_panel and "trade_open_at" in lifecycle_panel and "termination_at" in lifecycle_panel and "dt(" in lifecycle_panel,
         "lifecycle_panel_responsive": "market-lifecycle-row" in lifecycle_panel_css and "@media(max-width:700px)" in lifecycle_panel_css,
         "sector_history_responsive": "sector-return-strip" in sector_market_css and "repeat(6" in sector_market_css,
         "sector_api_projects_returns": all(token in sector_api for token in ("$.return_windows.d1_pct", "$.return_windows.d2_pct", "$.return_windows.d3_pct", "$.return_windows.d4_pct", "$.return_windows.d5_pct")),
@@ -66,10 +69,15 @@ def main() -> None:
         "lifecycle_partial_api_fail_closed": "MIN_EXISTING_COVERAGE_RATIO" in lifecycle_store and "observation_rejected" in lifecycle_store,
         "lifecycle_notice_projection": all(token in lifecycle_projection for token in ("notice_only", "notice_state_count", "notice_overlay")),
         "notice_domain_separate": all(token in notice_domain for token in ("MarketNotice", "classify_notice_title", "extract_notice_symbols", "lifecycle_state_for_notice")),
+        "notice_domain_structured_timing": all(token in notice_domain for token in timing_fields) and "parse_notice_timing" in notice_domain,
+        "notice_timing_pure_module": all(token in notice_timing for token in ("NoticeTiming", "parse_notice_timing", "DEPOSIT_LABELS", "TRADE_OPEN_LABELS", "TERMINATION_LABELS", "Date-only wording")),
         "notice_sources_separate": "BithumbNoticeSource" in notice_sources and "UpbitNoticeSource" in notice_sources and "get_with_retry" in notice_sources,
+        "notice_sources_detail_timing": "_upbit_detail_text" in notice_sources and 'f"{self.current_url}/{notice_id}"' in notice_sources and "detail_text=detail_text" in notice_sources,
         "notice_store_separate": "MarketNoticeStore" in notice_store and "market_lifecycle_notice_state" in notice_store,
+        "notice_store_additive_timing": "_ensure_notice_timing_columns" in notice_store and all(token in notice_store for token in timing_fields),
         "notice_unknown_timestamp_fail_closed": "never allowed to become a current lifecycle override" in notice_store and "effective_at <= 0" in notice_store,
         "lifecycle_service_composes_notice": "MarketLifecycleService" in lifecycle_service and "merge_lifecycle_state" in lifecycle_service and "notice_only" in lifecycle_service,
+        "lifecycle_service_projects_timing": "NOTICE_DETAIL_FIELDS" in lifecycle_service and all(token in lifecycle_service for token in timing_fields),
         "notice_collector_order_independent": "MarketNoticeCollector" in notice_collector and "sources_failed" in notice_collector and "can_place_orders" in notice_collector,
         "notice_supervisor_component": '"market-notice-watch"' in control and '"market-notice-watch": self.market_notice_collector.run_once' in supervisor,
         "paper_consumes_lifecycle_service": "MarketLifecycleService" in paper and "MarketLifecycleStore" not in paper,
