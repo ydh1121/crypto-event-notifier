@@ -321,7 +321,17 @@ class ListingHistoryCollector:
             else:
                 status = "complete"
         else:
-            status = "no_foreign_market_found"
+            source_statuses = {
+                str(value.get("status") or "")
+                for value in source_results.values()
+                if isinstance(value, dict)
+            }
+            if "venue_unverified" in source_statuses:
+                status = "venue_verification_waiting"
+            elif source_statuses & {"source_error", "candle_error", "waiting_for_market_time"}:
+                status = "foreign_source_waiting"
+            else:
+                status = "no_foreign_market_found"
         self.store.update_case_status(case_key, status)
         return {
             "status": status,
