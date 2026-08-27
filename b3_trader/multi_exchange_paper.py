@@ -23,7 +23,7 @@ from .auto_demo_v2 import (
 from .exchange_public import PublicExchangeAdapter, PublicMarket, public_exchange
 from .market_feature_store import MarketFeatureStore
 from .market_lifecycle import NORMAL
-from .market_lifecycle_store import MarketLifecycleStore
+from .market_lifecycle_service import MarketLifecycleService
 from .scoped_paper_store import ScopedPaperStore
 
 MARKET_MEMORY_RETENTION_DAYS = 45
@@ -49,7 +49,7 @@ class MultiExchangePaperDemo(AutoPaperDemo):
         self.client: PublicExchangeAdapter = public_exchange(self.exchange)
         self.strategy = AssetStrategy()
         self.store = ScopedPaperStore(self.exchange, self.strategy_name)
-        self.lifecycle = MarketLifecycleStore(self.store.conn)
+        self.lifecycle = MarketLifecycleService(self.store.conn)
         self.lifecycle_snapshot = self.lifecycle.snapshot(self.exchange)
         self.market_features = MarketFeatureStore(self.store.conn)
         self.prices: dict[str, float] = {}
@@ -108,6 +108,9 @@ class MultiExchangePaperDemo(AutoPaperDemo):
             "market_count": int(lifecycle.get("market_count") or 0),
             "counts": lifecycle.get("counts") if isinstance(lifecycle.get("counts"), dict) else {},
             "attention": (lifecycle.get("attention") if isinstance(lifecycle.get("attention"), list) else [])[:80],
+            "notice_only": (lifecycle.get("notice_only") if isinstance(lifecycle.get("notice_only"), list) else [])[:40],
+            "notice_state_count": int(lifecycle.get("notice_state_count") or 0),
+            "notice_overlay": bool(lifecycle.get("notice_overlay")),
             "transitions": (lifecycle.get("transitions") if isinstance(lifecycle.get("transitions"), list) else [])[:40],
             "shadow_only": True,
         }
@@ -155,6 +158,7 @@ class MultiExchangePaperDemo(AutoPaperDemo):
                 "public_market_data_only": True,
                 "market_memory_retention_days": MARKET_MEMORY_RETENTION_DAYS,
                 "market_lifecycle_shadow_only": True,
+                "market_lifecycle_notice_overlay": True,
                 "return_windows_source": "research_market_memory_mx",
             },
         }
