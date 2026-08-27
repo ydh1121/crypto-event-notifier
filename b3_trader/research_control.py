@@ -20,10 +20,8 @@ REFERENCE_STATE_PATH = Path("b3_trader/data/research-platform/reference-componen
 WAREHOUSE_STATE_PATH = Path("b3_trader/data/research-warehouse/warehouse-state.json")
 PAGES_DEPLOY_STATE_PATH = Path("b3_trader/data/research-platform/cloudflare-pages-deploy-state.json")
 
-# Cloudflare D1 Free is row-write metered. Keep the Viewer useful while leaving
-# enough daily headroom for profile/evidence writes and other operational data.
-# These minima also clamp older local components.json files that still contain
-# the original 20s/30s publish cadence after the supervisor restarts.
+# Keep Cloudflare D1 Viewer writes inside a bounded budget. The minimum values
+# also clamp older local components.json files that still contain 20s/30s.
 COMPONENT_DEFINITIONS: dict[str, dict[str, Any]] = {
     "warehouse-export": {"label":"AI 분석 데이터 저장","description":"가상매매·시장 기억 데이터를 Parquet 분석 창고에 추가 저장합니다.","default_enabled":True,"default_interval_seconds":300,"min_interval_seconds":60},
     "reference-version-watch": {"label":"외부 레포 버전 확인","description":"참고 GitHub 프로젝트의 새 버전만 확인합니다. 코드는 자동 적용하지 않습니다.","default_enabled":True,"default_interval_seconds":21600,"min_interval_seconds":300},
@@ -222,112 +220,105 @@ def _telegram_summary(settings: Settings) -> dict[str, Any]:
         "buy_candidate_only": automatic_alerts == "buy_candidate_only",
         "buy_candidate_sent_count": int(local.get("buy_candidate_sent_count") or 0),
         "last_buy_candidate_sent_at": float(local.get("last_buy_candidate_sent_at") or 0.0),
+        "last_send_error_at": float(local.get("last_send_error_at") or 0.0),
+        "secret_values_exposed": False,
     }
 
 
 def _remote_access_summary(settings: Settings) -> dict[str, Any]:
-    state = _read_json(Path("b3_trader/data/research-platform/remote-access-state.json"))
+    local = _local_api_json(settings, "/api/network")
+    cloudflare = local.get("cloudflare") if isinstance(local.get("cloudflare"), dict) else {}
+    tailscale = local.get("tailscale") if isinstance(local.get("tailscale"), dict) else {}
+    lan = local.get("lan") if isinstance(local.get("lan"), dict) else {}
     return {
-        "status": str(state.get("status") or "unknown"),
-        "mode": str(state.get("mode") or "cloudflare_https"),
-        "public_direct_port": False,
-        "loopback_bind": str(settings.service_host) in {"127.0.0.1", "localhost"},
+        "local_dashboard_online": bool(local),
+        "loopback_only": bool(local.get("loopback_only", str(settings.service_host).strip() in {"127.0.0.1", "localhost", "::1"})),
+        "lan_enabled": bool(lan.get("enabled")),
+        "cloudflare": {
+            "active": bool(cloudflare.get("active")),
+            "configured": bool(cloudflare.get("configured")),
+            "stable": bool(cloudflare.get("stable")),
+            "mode": str(cloudflare.get("mode") or "none"),
+            "https": bool(cloudflare.get("https", True)),
+            "vpn_required": bool(cloudflare.get("vpn_required", False)),
+        },
+        "tailscale": {
+            "installed": bool(tailscale.get("installed")),
+            "connected": bool(tailscale.get("connected")),
+        },
+        "remote_auth_required": bool(local.get("remote_auth_required", True)),
+        "public_port_forwarding_recommended": bool(local.get("public_port_forwarding_recommended", False)),
         "address_values_exposed": False,
+        "viewer_can_control_pc": False,
     }
 
 
-def platform_snapshot() -> dict[str, Any]:
+def default_control() -> dict[str, Any]:
+    return {"version":2,"revision":1,"enabled":True,"updated_at":time.time(),"components":{name:{"enabled":bool(definition.get("default_enabled",True)),"interval_seconds":float(definition["default_interval_seconds"]),"run_nonce":0} for name,definition in COMPONENT_DEFINITIONS.items()}}
+
+
+def load_control(path: Path = CONTROL_PATH) -> dict[str, Any]:
+    with _LOCK:
+        loaded = _read_json(path)
+        value = default_control()
+        if loaded:
+            value["version"] = max(2, int(loaded.get("version") or 2))
+            value["revision"] = max(1, int(loaded.get("revision") or 1))
+            value["enabled"] = bool(loaded.get("enabled", True))
+            value["updated_at"] = float(loaded.get("updated_at") or value["updated_at"])
+            source_components = loaded.get("components") if isinstance(loaded.get("components"), dict) else {}
+            for name, definition in COMPONENT_DEFINITIONS.items():
+                source = source_components.get(name) if isinstance(source_components.get(name), dict) else {}
+                minimum = float(definition["min_interval_seconds"])
+                interval = max(minimum, float(source.get("interval_seconds") or definition["default_interval_seconds"]))
+                default_enabled = bool(definition.get("default_enabled", True))
+                value["components"][name] = {"enabled":bool(source.get("enabled",default_enabled)),"interval_seconds":interval,"run_nonce":max(0,int(source.get("run_nonce") or 0))}
+        if not path.exists():
+            atomic_json(path, value)
+        return value
+
+
+def patch_component(name: str, *, enabled: bool | None = None, interval_seconds: float | None = None, run_now: bool = False, path: Path = CONTROL_PATH) -> dict[str, Any]:
+    if name not in COMPONENT_DEFINITIONS:
+        raise KeyError(name)
+    with _LOCK:
+        control = load_control(path)
+        component = control["components"][name]
+        if enabled is not None:
+            component["enabled"] = bool(enabled)
+        if interval_seconds is not None:
+            minimum = float(COMPONENT_DEFINITIONS[name]["min_interval_seconds"])
+            component["interval_seconds"] = max(minimum, float(interval_seconds))
+        if run_now:
+            component["run_nonce"] = int(component.get("run_nonce") or 0) + 1
+        control["revision"] = int(control.get("revision") or 1) + 1
+        control["updated_at"] = time.time()
+        atomic_json(path, control)
+        return control
+
+
+def platform_snapshot(*, control_path: Path = CONTROL_PATH, status_path: Path = STATUS_PATH, reference_state_path: Path = REFERENCE_STATE_PATH) -> dict[str, Any]:
+    control = load_control(control_path)
+    status = _read_json(status_path)
+    reference_state = _read_json(reference_state_path)
     settings = Settings()
-    control = load_control()
-    status = _read_json(STATUS_PATH)
+    now = time.time()
+    status_updated_at = float(status.get("updated_at") or 0.0)
+    supervisor_fresh = bool(status.get("running")) and status_updated_at > 0 and now - status_updated_at <= 15.0
+    reference_rows = reference_state.get("components") if isinstance(reference_state.get("components"), list) else []
+    reference_summary = {"checked_at":float(reference_state.get("checked_at") or 0.0),"total":len(reference_rows),"updates":sum(1 for row in reference_rows if isinstance(row,dict) and row.get("status")=="update_available"),"failed":sum(1 for row in reference_rows if isinstance(row,dict) and row.get("status")=="check_failed"),"auto_promote":False}
+    components: list[dict[str, Any]] = []
     status_components = status.get("components") if isinstance(status.get("components"), dict) else {}
-    return {
-        "version": 3,
-        "paper_only": True,
-        "updated_at": time.time(),
+    for name, definition in COMPONENT_DEFINITIONS.items():
+        desired = control["components"].get(name) or {}
+        runtime = status_components.get(name) if isinstance(status_components.get(name), dict) else {}
+        components.append({"name":name,"label":definition["label"],"description":definition["description"],"enabled":bool(desired.get("enabled",definition.get("default_enabled",True))) and bool(control.get("enabled",True)),"interval_seconds":float(desired.get("interval_seconds") or definition["default_interval_seconds"]),"run_nonce":int(desired.get("run_nonce") or 0),"status":runtime.get("status") or ("starting" if supervisor_fresh else "offline"),"last_started_at":float(runtime.get("last_started_at") or 0.0),"last_finished_at":float(runtime.get("last_finished_at") or 0.0),"last_success_at":float(runtime.get("last_success_at") or 0.0),"last_error_at":float(runtime.get("last_error_at") or 0.0),"last_error":str(runtime.get("last_error") or ""),"runs":int(runtime.get("runs") or 0),"last_result":runtime.get("last_result") if isinstance(runtime.get("last_result"),dict) else {}})
+    operations = {
         "git": _git_summary(settings),
         "cloudflare": _cloudflare_summary(status_components),
         "warehouse": _warehouse_summary(status_components),
         "backup": _backup_summary(settings),
         "telegram": _telegram_summary(settings),
         "remote_access": _remote_access_summary(settings),
-        "components": status_components,
-        "control": control,
     }
-
-
-def _default_control() -> dict[str, Any]:
-    return {
-        "version": 3,
-        "revision": 1,
-        "enabled": True,
-        "components": {
-            name: {
-                "enabled": bool(definition.get("default_enabled", True)),
-                "interval_seconds": float(definition["default_interval_seconds"]),
-                "run_nonce": 0,
-            }
-            for name, definition in COMPONENT_DEFINITIONS.items()
-        },
-    }
-
-
-def load_control() -> dict[str, Any]:
-    with _LOCK:
-        current = _read_json(CONTROL_PATH)
-        if not current:
-            current = _default_control()
-            atomic_json(CONTROL_PATH, current)
-            return current
-        changed = False
-        components = current.get("components")
-        if not isinstance(components, dict):
-            components = {}
-            current["components"] = components
-            changed = True
-        for name, definition in COMPONENT_DEFINITIONS.items():
-            cfg = components.get(name)
-            if not isinstance(cfg, dict):
-                components[name] = {
-                    "enabled": bool(definition.get("default_enabled", True)),
-                    "interval_seconds": float(definition["default_interval_seconds"]),
-                    "run_nonce": 0,
-                }
-                changed = True
-                continue
-            minimum = float(definition["min_interval_seconds"])
-            try:
-                interval = float(cfg.get("interval_seconds") or definition["default_interval_seconds"])
-            except (TypeError, ValueError):
-                interval = float(definition["default_interval_seconds"])
-            clamped = max(minimum, interval)
-            if clamped != interval:
-                cfg["interval_seconds"] = clamped
-                changed = True
-            if "run_nonce" not in cfg:
-                cfg["run_nonce"] = 0
-                changed = True
-        if changed:
-            current["revision"] = max(1, int(current.get("revision") or 1)) + 1
-            atomic_json(CONTROL_PATH, current)
-        return current
-
-
-def update_component(name: str, *, enabled: bool | None = None, interval_seconds: float | None = None, force_run: bool = False) -> dict[str, Any]:
-    if name not in COMPONENT_DEFINITIONS:
-        raise KeyError(name)
-    with _LOCK:
-        control = load_control()
-        components = control.setdefault("components", {})
-        cfg = components.setdefault(name, {})
-        definition = COMPONENT_DEFINITIONS[name]
-        if enabled is not None:
-            cfg["enabled"] = bool(enabled)
-        if interval_seconds is not None:
-            minimum = float(definition["min_interval_seconds"])
-            cfg["interval_seconds"] = max(minimum, float(interval_seconds))
-        if force_run:
-            cfg["run_nonce"] = int(cfg.get("run_nonce") or 0) + 1
-        control["revision"] = max(1, int(control.get("revision") or 1)) + 1
-        atomic_json(CONTROL_PATH, control)
-        return control
+    return {"version":3,"paper_only":True,"supervisor_running":supervisor_fresh,"supervisor_pid":int(status.get("pid") or 0),"supervisor_started_at":float(status.get("started_at") or 0.0),"updated_at":status_updated_at,"control_revision":int(control.get("revision") or 1),"components":components,"references":reference_summary,"operations":operations,"safety":{"can_place_orders":False,"can_modify_strategy_profiles":False,"auto_promote_external_code":False,"viewer_can_control_pc":False,"secret_values_exposed":False,"local_addresses_exposed":False,"remote_paths_exposed":False}}
