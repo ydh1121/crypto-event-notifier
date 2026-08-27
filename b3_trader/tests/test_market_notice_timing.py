@@ -26,6 +26,24 @@ def test_listing_notice_extracts_deposit_and_trade_open_times() -> None:
     assert timing.termination_at == 0.0
 
 
+def test_revised_listing_notice_uses_final_active_clock_time() -> None:
+    published = _ts(2026, 8, 11, 10, 17)
+    timing = parse_notice_timing(
+        "거래 개시 시점 : 2026.08.11(화) 오후 2:00 -> 오후 4:00 -> 오후 5:00 예정",
+        published_at=published,
+    )
+    assert timing.trade_open_at == _ts(2026, 8, 11, 17)
+
+
+def test_revised_listing_notice_with_strikethrough_markup_uses_final_clock_time() -> None:
+    published = _ts(2026, 8, 11, 10, 17)
+    timing = parse_notice_timing(
+        "거래 개시 시점 : 2026.08.11(화) <del>오후 2:00</del> -> <del>오후 4:00</del> -> 오후 5:00 예정",
+        published_at=published,
+    )
+    assert timing.trade_open_at == _ts(2026, 8, 11, 17)
+
+
 def test_termination_notice_extracts_korean_datetime() -> None:
     published = _ts(2026, 8, 27, 10)
     timing = parse_notice_timing(
