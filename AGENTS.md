@@ -35,6 +35,19 @@ The current workstream stops at paper-forward-testing, dashboard/analytics, Tele
 
 **Real-money execution is intentionally deferred.** Do not add or enable live order placement in this workstream. Keep `LIVE_TRADING_ENABLED=false`. Future live execution must be handled as a separate workstream with explicit balance reconciliation, order idempotency, partial-fill handling, exchange balance as source of truth, hard daily-loss limits, and a small capped pilot.
 
+## Modular architecture contract
+
+Read `docs/MODULAR_ARCHITECTURE.md` before adding a cross-cutting feature.
+
+- Keep the dependency direction `collector/source → store/repository → feature/domain → score/decision → service/API → page/view`.
+- `pages/*` owns composition and event wiring only. Do not add exchange/API fetches, SQL, long-lived cache, scoring formulas, or reusable calculations to page files.
+- Put cross-page interaction behavior in `public/modules/shared`, data access in `public/modules/services`, app lifecycle in `public/modules/core`, and reusable Cloudflare domain rules in `functions/lib`.
+- Python supervisors/cycles orchestrate modules; they do not own indicator/event/lifecycle formulas.
+- Reuse one raw OHLCV/trade/orderbook history source for return windows, flow, technical indicators and later scoring instead of making each feature call the exchange separately.
+- New score inputs remain shadow-only until history/reaction validation and PAPER A/B evidence exist.
+- Do not solve UI continuity by adding page-specific `scrollTop` variables or broad `MutationObserver`s. Use the shared continuity owner.
+- If the same logic appears twice, stop and extract a common module before continuing.
+
 ## UI/design contract
 
 Read and apply `DESIGN.md` before dashboard work.
