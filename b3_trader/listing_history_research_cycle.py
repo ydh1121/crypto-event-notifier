@@ -45,6 +45,10 @@ def _stored_identity(row: dict[str, Any]) -> ListingIdentity | None:
     return identity if listing_identity_gate(identity)["verified"] else None
 
 
+def _venue_capable_identity(identity: ListingIdentity) -> bool:
+    return identity.provider == "coingecko" and bool(identity.provider_id)
+
+
 def _rotate_cases(rows: list[dict[str, Any]], cursor: int, limit: int) -> tuple[list[dict[str, Any]], int]:
     if not rows:
         return [], 0
@@ -96,17 +100,42 @@ class ListingHistoryResearchCycle:
 
     def _resolve_identity(self, row: dict[str, Any]) -> tuple[ListingIdentity | None, dict[str, Any]]:
         stored = _stored_identity(row)
-        if stored is not None:
+        if stored is not None and _venue_capable_identity(stored):
             return stored, {"status": "stored_verified", "verified": True}
+
         try:
             result = self.identity_resolver.resolve(
                 str(row.get("domestic_exchange") or ""),
                 str(row.get("domestic_market") or ""),
             )
         except Exception as exc:
+            if stored is not None:
+                return stored, {
+                    "status": "stored_verified_legacy",
+                    "verified": True,
+                    "refresh_error": f"{type(exc).__name__}: {exc}"[:300],
+                }
             return None, {"status": "identity_error", "verified": False, "error": f"{type(exc).__name__}: {exc}"[:300]}
+
         identity = result.get("identity") if isinstance(result, dict) else None
-        return (identity if isinstance(identity, ListingIdentity) and result.get("verified") else None), result
+        if isinstance(identity, ListingIdentity) and result.get("verified"):
+            if stored is not None:
+                return identity, {
+                    **result,
+                    "status": "stored_refreshed",
+                    "verified": True,
+                    "previous_provider": stored.provider,
+                    "previous_provider_id": stored.provider_id,
+                }
+            return identity, result
+
+        if stored is not None:
+            return stored, {
+                "status": "stored_verified_legacy",
+                "verified": True,
+                "refresh_status": result.get("status") if isinstance(result, dict) else "invalid_response",
+            }
+        return None, result if isinstance(result, dict) else {"status": "invalid_response", "verified": False}
 
     def _resolve_open_price(self, row: dict[str, Any], now: float) -> tuple[float, dict[str, Any]]:
         current = _num(row.get("domestic_open_price"))
@@ -156,7 +185,7 @@ class ListingHistoryResearchCycle:
             open_price, price_result = self._resolve_open_price(row, now)
             open_at = _num(row.get("domestic_open_at"))
             # Persist verified identity immediately so future cycles do not need
-            # another profile-cache read even when domestic trading has not opened.
+            # another profile-cache read once a venue-capable identity is stored.
             self.store.upsert_case(
                 domestic_exchange=str(row.get("domestic_exchange") or ""),
                 domestic_market=str(row.get("domestic_market") or ""),
