@@ -166,7 +166,11 @@ class ListingHistoryStore:
               identity_json=CASE WHEN excluded.identity_json<>'{}' THEN excluded.identity_json ELSE listing_history_cases.identity_json END,
               identity_verified=MAX(listing_history_cases.identity_verified, excluded.identity_verified),
               identity_confidence=MAX(listing_history_cases.identity_confidence, excluded.identity_confidence),
-              status=excluded.status,
+              status=CASE
+                WHEN excluded.status='pending_identity' AND listing_history_cases.status<>'pending_identity'
+                  THEN listing_history_cases.status
+                ELSE excluded.status
+              END,
               updated_at=excluded.updated_at
             """,
             (
