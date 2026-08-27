@@ -26,6 +26,9 @@ class ListingHistoryStore:
     def close(self) -> None:
         self.conn.close()
 
+    def _columns(self, table: str) -> set[str]:
+        return {str(row[1]) for row in self.conn.execute(f"PRAGMA table_info({table})").fetchall()}
+
     def _ensure_schema(self) -> None:
         self.conn.executescript(
             """
@@ -33,6 +36,7 @@ class ListingHistoryStore:
               case_key TEXT PRIMARY KEY,
               domestic_exchange TEXT NOT NULL,
               domestic_market TEXT NOT NULL,
+              domestic_notice_id TEXT NOT NULL DEFAULT '',
               symbol TEXT NOT NULL,
               announcement_at REAL NOT NULL DEFAULT 0,
               domestic_open_at REAL NOT NULL DEFAULT 0,
@@ -97,14 +101,31 @@ class ListingHistoryStore:
             );
             """
         )
+        existing = self._columns("listing_history_cases")
+        if "domestic_notice_id" not in existing:
+            self.conn.execute(
+                "ALTER TABLE listing_history_cases ADD COLUMN domestic_notice_id TEXT NOT NULL DEFAULT ''"
+            )
         self.conn.commit()
 
     @staticmethod
-    def case_key(domestic_exchange: str, domestic_market: str, domestic_open_at: float) -> str:
+    def case_key(
+        domestic_exchange: str,
+        domestic_market: str,
+        *,
+        domestic_notice_id: str = "",
+        announcement_at: float = 0.0,
+        domestic_open_at: float = 0.0,
+    ) -> str:
         exchange = str(domestic_exchange or "").strip().lower()
         market = str(domestic_market or "").strip().upper()
-        stamp = int(float(domestic_open_at or 0))
-        return f"{exchange}|{market}|{stamp}"
+        stable_notice = str(domestic_notice_id or "").strip()
+        if stable_notice:
+            suffix = f"notice:{stable_notice}"
+        else:
+            stamp = int(float(announcement_at or domestic_open_at or 0))
+            suffix = f"event:{stamp}"
+        return f"{exchange}|{market}|{suffix}"
 
     def upsert_case(
         self,
@@ -112,6 +133,7 @@ class ListingHistoryStore:
         domestic_exchange: str,
         domestic_market: str,
         symbol: str,
+        domestic_notice_id: str = "",
         announcement_at: float = 0.0,
         domestic_open_at: float = 0.0,
         domestic_open_price: float = 0.0,
@@ -120,19 +142,26 @@ class ListingHistoryStore:
         status: str = "pending_identity",
     ) -> str:
         now = time.time()
-        key = self.case_key(domestic_exchange, domestic_market, domestic_open_at)
+        key = self.case_key(
+            domestic_exchange,
+            domestic_market,
+            domestic_notice_id=domestic_notice_id,
+            announcement_at=announcement_at,
+            domestic_open_at=domestic_open_at,
+        )
         identity_json = json.dumps(identity.to_dict() if identity else {}, ensure_ascii=False, separators=(",", ":"))
         confidence = float(identity.match_confidence if identity else 0.0)
         self.conn.execute(
             """
             INSERT INTO listing_history_cases(
-              case_key,domestic_exchange,domestic_market,symbol,announcement_at,domestic_open_at,
+              case_key,domestic_exchange,domestic_market,domestic_notice_id,symbol,announcement_at,domestic_open_at,
               domestic_open_price,identity_json,identity_verified,identity_confidence,status,created_at,updated_at
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(case_key) DO UPDATE SET
+              domestic_notice_id=CASE WHEN excluded.domestic_notice_id<>'' THEN excluded.domestic_notice_id ELSE listing_history_cases.domestic_notice_id END,
               symbol=excluded.symbol,
-              announcement_at=MAX(listing_history_cases.announcement_at, excluded.announcement_at),
-              domestic_open_at=MAX(listing_history_cases.domestic_open_at, excluded.domestic_open_at),
+              announcement_at=CASE WHEN excluded.announcement_at>0 THEN excluded.announcement_at ELSE listing_history_cases.announcement_at END,
+              domestic_open_at=CASE WHEN excluded.domestic_open_at>0 THEN excluded.domestic_open_at ELSE listing_history_cases.domestic_open_at END,
               domestic_open_price=CASE WHEN excluded.domestic_open_price>0 THEN excluded.domestic_open_price ELSE listing_history_cases.domestic_open_price END,
               identity_json=CASE WHEN excluded.identity_json<>'{}' THEN excluded.identity_json ELSE listing_history_cases.identity_json END,
               identity_verified=MAX(listing_history_cases.identity_verified, excluded.identity_verified),
@@ -144,6 +173,7 @@ class ListingHistoryStore:
                 key,
                 str(domestic_exchange or "").lower(),
                 str(domestic_market or "").upper(),
+                str(domestic_notice_id or ""),
                 str(symbol or "").upper(),
                 float(announcement_at or 0),
                 float(domestic_open_at or 0),
