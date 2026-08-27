@@ -37,6 +37,14 @@ if (-not $StatusOnly) {
     & $python -X utf8 -m b3_trader.cloudflare_pages_deployer --force
     if ($LASTEXITCODE -ne 0) { throw "Cloudflare Pages deploy failed." }
 
+    # Build 39 consumes normalized Build 38 notice timing. Refresh official
+    # notices with the current parser/store first so historical zero-timing rows
+    # can be hydrated and promotional listing-event false positives are not
+    # allowed to seed new research cases.
+    Write-Host "`n=== OFFICIAL NOTICE REFRESH ==="
+    & $python -X utf8 -m b3_trader.market_notice_collector
+    if ($LASTEXITCODE -ne 0) { throw "Official notice refresh failed for all sources." }
+
     Write-Host "`n=== LISTING HISTORY RESEARCH CYCLE ==="
     & $python -X utf8 -m b3_trader.listing_history_research_cycle
     if ($LASTEXITCODE -ne 0) { throw "Listing-history research cycle failed." }
