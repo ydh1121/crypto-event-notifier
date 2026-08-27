@@ -27,11 +27,16 @@ def main() -> None:
     control = text(ROOT / "b3_trader" / "research_control.py")
     supervisor = text(ROOT / "b3_trader" / "research_supervisor.py")
     paper = text(ROOT / "b3_trader" / "multi_exchange_paper.py")
+    notice_domain = text(ROOT / "b3_trader" / "market_notice.py")
+    notice_store = text(ROOT / "b3_trader" / "market_notice_store.py")
+    runtime_verify = text(ROOT / "scripts" / "verify-build39-runtime.ps1")
     profile_identity_api = text(ROOT / "cloudflare-pages" / "functions" / "api" / "coin-profile-identity.ts")
     architecture = text(ROOT / "docs" / "MODULAR_ARCHITECTURE.md")
 
     pre_windows = ("t7d", "t5d", "t3d", "t1d", "t6h", "t1h")
     post_windows = ("p5m", "p1h", "p6h", "p24h", "p3d", "p7d")
+    notice_refresh_at = runtime_verify.find("b3_trader.market_notice_collector")
+    listing_cycle_at = runtime_verify.find("b3_trader.listing_history_research_cycle")
     checks = {
         "build39_identity_domain": all(token in identity for token in (
             "ListingIdentity", "listing_identity_gate", "provider_identity_missing",
@@ -64,6 +69,20 @@ def main() -> None:
         "build39_planner_krw_fail_closed": all(token in planner for token in (
             "ListingHistoryPlanner", "event_kind", "LISTING", "KRW", "pending_identity",
         )),
+        "build39_promotional_notice_fail_closed": (
+            'if "이벤트" in compact' in notice_domain
+            and 'if "이벤트" in compact' in planner
+            and "rejected_notice" in planner
+            and "rejected_notice" in store
+        ),
+        "build39_notice_timing_nonzero_preserved": all(token in notice_store for token in (
+            "CASE WHEN excluded.published_at>0 THEN excluded.published_at ELSE market_notices.published_at END",
+            "CASE WHEN excluded.announcement_at>0 THEN excluded.announcement_at ELSE market_notices.announcement_at END",
+            "CASE WHEN excluded.trade_open_at>0 THEN excluded.trade_open_at ELSE market_notices.trade_open_at END",
+        )),
+        "build39_runtime_refreshes_notices_first": (
+            notice_refresh_at >= 0 and listing_cycle_at >= 0 and notice_refresh_at < listing_cycle_at
+        ),
         "build39_domestic_open_price_public_candle": all(token in domestic_price for token in (
             "DomesticListingPriceResolver", "BithumbClient", "UpbitClient", "candles_minutes",
             "nearest_opening_price",
