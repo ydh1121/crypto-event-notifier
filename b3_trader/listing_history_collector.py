@@ -8,6 +8,7 @@ from .listing_history import postlisting_features, prelisting_features
 from .listing_history_sources import BinanceSpotSource, CexSpotMarket, SpotListingSource, default_cex_sources
 from .listing_history_store import ListingHistoryStore
 from .listing_identity import ListingIdentity, listing_identity_gate
+from .listing_venue_verifier import ListingVenueVerifier
 
 
 PRE_WINDOW_SECONDS = 8 * 24 * 3600
@@ -32,8 +33,8 @@ class ListingHistoryCollector:
     """Collect public pre/post domestic-listing history after identity verification.
 
     This module does not discover identity and does not alter PAPER scores. It
-    only consumes a verified identity, normalizes public CEX data and persists
-    features for later validation.
+    only consumes a verified identity, provider-verifies an exact foreign CEX
+    pair, normalizes public candles and persists features for later validation.
     """
 
     def __init__(
@@ -41,9 +42,11 @@ class ListingHistoryCollector:
         *,
         store: ListingHistoryStore | None = None,
         sources: Iterable[SpotListingSource] | None = None,
+        venue_verifier: ListingVenueVerifier | None = None,
     ) -> None:
         self.store = store or ListingHistoryStore()
         self.sources = tuple(sources or default_cex_sources())
+        self.venue_verifier = venue_verifier or ListingVenueVerifier()
 
     def close(self) -> None:
         self.store.close()
@@ -67,6 +70,32 @@ class ListingHistoryCollector:
             if first is not None:
                 return listing_at or first.ts, first_price or first.open
         return listing_at, first_price
+
+    def _verified_market(
+        self,
+        identity: ListingIdentity,
+        discovered: list[CexSpotMarket],
+    ) -> tuple[CexSpotMarket | None, dict[str, Any]]:
+        evidence_rows: list[dict[str, Any]] = []
+        for market in sorted(discovered, key=self._rank_market):
+            evidence = self.venue_verifier.verify(identity, market)
+            evidence_rows.append({"market": market.market, **evidence})
+            if evidence.get("verified"):
+                basis = dict(market.match_basis or {})
+                basis["provider_pair_verification"] = evidence.get("evidence") or {}
+                verified = CexSpotMarket(
+                    exchange=market.exchange,
+                    market=market.market,
+                    base_asset=market.base_asset,
+                    quote_asset=market.quote_asset,
+                    listing_at=market.listing_at,
+                    state=market.state,
+                    first_price=market.first_price,
+                    match_confidence=market.match_confidence,
+                    match_basis=basis,
+                )
+                return verified, {"status": "verified", "checks": evidence_rows}
+        return None, {"status": "venue_unverified", "checks": evidence_rows}
 
     def collect_case(self, case: DomesticListingCase) -> dict[str, Any]:
         started = time.time()
@@ -106,7 +135,7 @@ class ListingHistoryCollector:
         successful = 0
         for source in self.sources:
             try:
-                discovered = sorted(source.discover(case.identity), key=self._rank_market)
+                discovered = source.discover(case.identity)
             except Exception as exc:
                 source_results[source.exchange] = {
                     "status": "source_error",
@@ -118,7 +147,15 @@ class ListingHistoryCollector:
                 source_results[source.exchange] = {"status": "not_listed", "markets": []}
                 continue
 
-            market = discovered[0]
+            market, venue_result = self._verified_market(case.identity, discovered)
+            if market is None:
+                source_results[source.exchange] = {
+                    "status": "venue_unverified",
+                    "markets": [row.to_dict() for row in discovered[:8]],
+                    "venue_verification": venue_result,
+                }
+                continue
+
             listing_at, first_price = self._first_price_if_needed(source, market)
             start_ts = max(0.0, case.open_at - PRE_WINDOW_SECONDS)
             end_ts = min(now, case.open_at + POST_WINDOW_SECONDS)
@@ -128,6 +165,7 @@ class ListingHistoryCollector:
                 source_results[source.exchange] = {
                     "status": "waiting_for_market_time",
                     "markets": [market.to_dict()],
+                    "venue_verification": venue_result,
                 }
                 continue
             try:
@@ -137,6 +175,7 @@ class ListingHistoryCollector:
                     "status": "candle_error",
                     "error": f"{type(exc).__name__}: {exc}",
                     "markets": [market.to_dict()],
+                    "venue_verification": venue_result,
                 }
                 continue
 
@@ -166,6 +205,7 @@ class ListingHistoryCollector:
             features: dict[str, Any] = {
                 "version": 1,
                 "identity_gate": gate,
+                "venue_verification": venue_result,
                 "domestic": {
                     "exchange": case.exchange,
                     "market": case.market,
@@ -215,6 +255,7 @@ class ListingHistoryCollector:
                 "first_price": first_price,
                 "candles": len(candles),
                 "stored": stored,
+                "venue_verification": venue_result,
             }
 
         if successful:
