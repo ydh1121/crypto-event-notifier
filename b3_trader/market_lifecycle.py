@@ -28,9 +28,65 @@ class LifecycleDecision:
     reason: str
 
 
+@dataclass(frozen=True)
+class LifecycleEntryPolicy:
+    state: str
+    entry_allowed: bool
+    add_allowed: bool
+    exit_allowed: bool
+    risk_flag: str
+    reason: str
+
+
 def normalize_lifecycle_state(value: str, default: str = NORMAL) -> str:
     state = str(value or "").strip().upper()
     return state if state in ALL_STATES else default
+
+
+def lifecycle_entry_policy(state: str, *, has_position: bool = False) -> LifecycleEntryPolicy:
+    """Pure PAPER eligibility policy for a composed lifecycle state.
+
+    This is deliberately narrower than the future LifecycleRiskScore. CAUTION is
+    still shadow information for the current adaptive strategy. Confirmed or
+    scheduled termination blocks new/additional PAPER buys while preserving the
+    ability to manage and exit an existing position.
+    """
+    normalized = normalize_lifecycle_state(state)
+    if normalized == LISTING_ANNOUNCED:
+        return LifecycleEntryPolicy(
+            state=normalized,
+            entry_allowed=False,
+            add_allowed=False,
+            exit_allowed=bool(has_position),
+            risk_flag="pre_listing",
+            reason="market_not_open",
+        )
+    if normalized in {TERMINATION_SCHEDULED, TERMINATED}:
+        return LifecycleEntryPolicy(
+            state=normalized,
+            entry_allowed=False,
+            add_allowed=False,
+            exit_allowed=True,
+            risk_flag="termination",
+            reason="trading_support_ending" if normalized == TERMINATION_SCHEDULED else "trading_support_ended",
+        )
+    if normalized == CAUTION:
+        return LifecycleEntryPolicy(
+            state=normalized,
+            entry_allowed=True,
+            add_allowed=True,
+            exit_allowed=True,
+            risk_flag="caution_shadow",
+            reason="caution_not_yet_promoted_to_paper_gate",
+        )
+    return LifecycleEntryPolicy(
+        state=normalized,
+        entry_allowed=True,
+        add_allowed=True,
+        exit_allowed=True,
+        risk_flag="new_listing_shadow" if normalized == NEW_LISTING else "",
+        reason="active_market",
+    )
 
 
 def merge_lifecycle_state(*, base_state: str, notice_state: str = "", market_present: bool) -> LifecycleDecision:
