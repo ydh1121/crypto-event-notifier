@@ -58,7 +58,7 @@ Viewer omission contract: `docs/VIEWER_REBUILD_CHECKLIST.md`
 - [x] Rank markets by current PAPER return and expose current best performer
 - [x] Add dedicated restart-safe `paper_runtime_supervisor` as the normal launcher owner; constructor errors, runtime exceptions and unexpected clean returns all retry without taking down the dashboard/research sidecar
 - [x] Centralize PAPER freshness/PID liveness so stale or reused PIDs cannot suppress recovery; direct `local_app` runs retain the embedded-worker fallback
-- [-] Verify the new PAPER self-heal owner on the Windows runtime after one full launcher restart
+- [x] Verify PAPER self-heal on Windows after full launcher restart: external supervisor PID alive, PAPER `running/fresh`, zero restart/error, PAPER-only safety preserved
 - [-] Leave engine running long enough to collect meaningful trade-frequency / P&L / drawdown / win-rate evidence
 
 ## E. Per-coin feedback DB / bounded learning
@@ -129,9 +129,11 @@ Viewer omission contract: `docs/VIEWER_REBUILD_CHECKLIST.md`
 - [x] Add D-5 return-window feature from existing shared `research_market_memory_mx`; no separate exchange call per UI feature
 - [x] Add termination-only PAPER safety gate: `TERMINATION_SCHEDULED`/`TERMINATED` blocks new/additional PAPER buys while existing position exits/history stay available; CAUTION/NEW_LISTING remain shadow in current adaptive
 - [x] Add dedicated PAPER runtime self-heal ownership and shared liveness policy after live QA exposed a stale/dead PID + stopped worker condition
+- [x] Stabilize Cloudflare D1 write budget after live 503: snapshot 60s, detail 300s, bounded detail batches, unchanged-row skip, quota-aware error handling; Windows runtime publishers verified healthy
 - [-] Existing all-KRW account/profile seeding + market-memory/profile backlog provide automatic new-market bootstrap; verify full profile/sector/facet path on an actual new listing
-- [-] Verify Build 38 on local runtime/Pages and current phone/desktop browser after sync/restart, including live official notice source/timing coverage and PAPER self-heal status
-- [ ] Execute the remaining work in `MASTER_ROADMAP.md` dependency order; next major data work is pre-KRW CEX/DEX listing history, then flow/CVD and multi-facet taxonomy
+- [x] Verify Build 38 runtime/Pages/live official notice timing/PAPER self-heal after sync/restart; publishers healthy, PAPER fresh, asset registry valid, Viewer snapshot current
+- [-] Build 39 pre-KRW CEX foundation: official KRW listing planner, verified profile identity bridge, exact CoinGecko venue-pair verification, Binance/OKX/Bybit adapters, domestic opening-price resolver, additive SQLite store, T-7d~T-1h + post-7d features, bounded 15-minute sidecar, audit CLI and dedicated CI are implemented; live Windows data audit remains
+- [-] Execute the remaining work in `MASTER_ROADMAP.md` dependency order; next after CEX live QA is compact Viewer projection, DEX-first history, then multi-facet/flow-CVD work
 
 ## Validation status
 
@@ -142,6 +144,8 @@ Viewer omission contract: `docs/VIEWER_REBUILD_CHECKLIST.md`
 - [x] Build 38 dedicated CI passes including Pages typecheck and modular source contract
 - [x] Full B3 trader CI passes after PAPER self-heal and malformed-asset fail-closed fixes
 - [x] Cloudflare Pages JS syntax/typecheck passes with shared continuity/lifecycle modules
+- [x] Build 39 dedicated CI passes: listing-history compile/tests, modular contract and Cloudflare Pages typecheck
+- [x] Full B3 trader CI passes with Build 39 source/supervisor additions
 - [x] PR #1 remains Draft and unmerged
 
 ## Completion condition
