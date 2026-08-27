@@ -23,6 +23,11 @@ def is_krw_listing_notice(row: dict[str, Any]) -> bool:
     title = str(row.get("title") or "")
     if not title:
         return False
+    compact = re.sub(r"\s+", "", title)
+    # Old normalized rows may still have event_kind=LISTING even after the
+    # classifier is tightened. A promotional event is never a listing case.
+    if "이벤트" in compact:
+        return False
     return any(pattern.search(title) for pattern in _KRW_PATTERNS)
 
 
@@ -45,10 +50,36 @@ class ListingHistoryPlanner:
         self.history_store.close()
         self.conn.close()
 
+    def _reject_existing_notice_cases(self, exchange: str, notice: dict[str, Any]) -> int:
+        notice_id = str(notice.get("notice_id") or "").strip()
+        symbols = notice.get("symbols") if isinstance(notice.get("symbols"), list) else []
+        rejected = 0
+        if not notice_id:
+            return rejected
+        for raw_symbol in symbols:
+            symbol = str(raw_symbol or "").strip().upper()
+            if not symbol or not symbol.replace("-", "").isalnum():
+                continue
+            key = self.history_store.case_key(
+                exchange,
+                f"KRW-{symbol}",
+                domestic_notice_id=notice_id,
+            )
+            cursor = self.history_store.conn.execute(
+                "SELECT status FROM listing_history_cases WHERE case_key=?",
+                (key,),
+            ).fetchone()
+            if cursor is None or str(cursor["status"] or "") == "rejected_notice":
+                continue
+            self.history_store.update_case_status(key, "rejected_notice")
+            rejected += 1
+        return rejected
+
     def seed_once(self, *, per_exchange_limit: int = 120) -> dict[str, Any]:
         seeded = 0
         considered = 0
         skipped_non_krw = 0
+        rejected_cases = 0
         by_exchange: dict[str, int] = {}
         for exchange in ("bithumb", "upbit"):
             count = 0
@@ -58,6 +89,7 @@ class ListingHistoryPlanner:
                 considered += 1
                 if not is_krw_listing_notice(notice):
                     skipped_non_krw += 1
+                    rejected_cases += self._reject_existing_notice_cases(exchange, notice)
                     continue
                 notice_id = str(notice.get("notice_id") or "")
                 announcement_at = float(notice.get("announcement_at") or notice.get("published_at") or 0.0)
@@ -87,6 +119,7 @@ class ListingHistoryPlanner:
             "considered_listing_notices": considered,
             "seeded_cases": seeded,
             "skipped_non_krw": skipped_non_krw,
+            "rejected_cases": rejected_cases,
             "by_exchange": by_exchange,
             "paper_only": True,
             "can_place_orders": False,
