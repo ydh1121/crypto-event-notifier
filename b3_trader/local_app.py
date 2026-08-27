@@ -22,6 +22,7 @@ from .config import Settings
 from .journal import TradeJournal
 from .local_engine import MultiAssetEngine
 from .network_access import network_status
+from .paper_runtime_liveness import external_status_owner_is_alive, status_is_fresh
 from .research_routes import install_research_routes
 from .runtime_config import RuntimeConfigStore
 from .runtime_state import RuntimeState
@@ -177,17 +178,20 @@ def create_app() -> FastAPI:
     )
 
     demo_enabled = _env_enabled("AUTO_DEMO_ENABLED", True)
+    demo_worker_enabled = _env_enabled("AUTO_DEMO_EMBEDDED_WORKER", True)
     demo_stop = threading.Event()
     demo_thread: threading.Thread | None = None
 
     def demo_snapshot() -> dict[str, Any]:
         payload = _read_demo_status()
-        updated_at = float(payload.get("updated_at") or 0.0)
-        stale_after = max(420.0, float(SCAN_INTERVAL_SECONDS) * 2.2)
-        fresh = bool(updated_at and time.time() - updated_at <= stale_after)
+        fresh = status_is_fresh(
+            payload,
+            scan_interval_seconds=SCAN_INTERVAL_SECONDS,
+        )
         if not payload:
             return {
                 "enabled": demo_enabled,
+                "worker_mode": "embedded" if demo_worker_enabled else "external_supervisor",
                 "running": False,
                 "paper_only": True,
                 "start_krw": 10_000_000.0,
@@ -202,22 +206,19 @@ def create_app() -> FastAPI:
         return {
             **payload,
             "enabled": demo_enabled,
+            "worker_mode": "embedded" if demo_worker_enabled else "external_supervisor",
             "fresh": fresh,
             "running": bool(payload.get("running")) and fresh,
             "state": "running" if bool(payload.get("running")) and fresh else "waiting",
         }
 
     def external_demo_is_alive() -> bool:
-        payload = _read_demo_status()
-        if not payload:
-            return False
-        pid = int(payload.get("pid") or 0)
-        if pid and pid != os.getpid():
-            return _pid_alive(pid)
-        if not pid:
-            updated_at = float(payload.get("updated_at") or 0.0)
-            return bool(updated_at and time.time() - updated_at < max(240.0, SCAN_INTERVAL_SECONDS + 45.0))
-        return False
+        return external_status_owner_is_alive(
+            _read_demo_status(),
+            scan_interval_seconds=SCAN_INTERVAL_SECONDS,
+            pid_alive=_pid_alive,
+            current_pid=os.getpid(),
+        )
 
     def demo_worker() -> None:
         while not demo_stop.is_set():
@@ -229,14 +230,20 @@ def create_app() -> FastAPI:
                 AutoPaperDemo().run(stop_event=demo_stop)
             except Exception as exc:
                 state.set_error(exc, scope="auto_demo")
-                if demo_stop.wait(15.0):
-                    return
             else:
+                if demo_stop.is_set():
+                    return
+                state.set_error("AutoPaperDemo.run returned without a stop request", scope="auto_demo")
+            if demo_stop.wait(15.0):
                 return
 
     def start_demo() -> None:
         nonlocal demo_thread
-        if not demo_enabled or (demo_thread and demo_thread.is_alive()):
+        if (
+            not demo_enabled
+            or not demo_worker_enabled
+            or (demo_thread and demo_thread.is_alive())
+        ):
             return
         demo_thread = threading.Thread(target=demo_worker, name="bithumb-auto-paper-demo", daemon=True)
         demo_thread.start()
@@ -656,6 +663,7 @@ def create_app() -> FastAPI:
     app.state.telegram_store = telegram_store
     app.state.dashboard_token = token
     app.state.demo_enabled = demo_enabled
+    app.state.demo_worker_enabled = demo_worker_enabled
     return app
 
 
