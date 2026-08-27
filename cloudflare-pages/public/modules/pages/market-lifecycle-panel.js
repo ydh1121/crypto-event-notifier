@@ -33,5 +33,16 @@ export function renderMarketLifecyclePanel(lifecycle,{exchange='bithumb',limit=8
   const ending=rows.filter(row=>['TERMINATION_SCHEDULED','TERMINATED'].includes(lifecycleMeta(row?.state).state)).length;
   const visible=rows.slice(0,Math.max(1,Number(limit)||8));
   const exchangeName=EXCHANGE_LABEL[String(exchange||'').toLowerCase()]||String(exchange||'거래소');
-  return`<section class="market-lifecycle-panel"><header><div><span>거래지원 상태</span><h3>${esc(exchangeName)} 상장 · 유의 · 종료 감지</h3><p>공식 공지와 실제 KRW 마켓 변화를 분리 수집한 shadow 정보입니다.</p></div><div class="market-lifecycle-kpis"><span><small>상장예정</small><b>${n(announced)}</b></span><span><small>유의</small><b class="market-lifecycle-caution">${n(caution)}</b></span><span><small>종료</small><b class="market-lifecycle-terminated">${n(ending)}</b></span></div></header>${visible.length?`<div class="market-lifecycle-list">${visible.map(lifecycleRow).join('')}</div>${rows.length>visible.length?`<small class="market-lifecycle-more">외 ${rows.length-visible.length}건의 상태 변경이 기록되어 있습니다.</small>`:''}`:`<div class="market-lifecycle-empty"><b>현재 표시할 거래지원 경보가 없습니다.</b><span>신규 상장·유의·거래종료 공지가 감지되면 이 영역에 자동 표시됩니다.</span></div>`}</section>`;
+  return`<section class="market-lifecycle-panel" data-market-lifecycle-panel><header><div><span>거래지원 상태</span><h3>${esc(exchangeName)} 상장 · 유의 · 종료 감지</h3><p>공식 공지와 실제 KRW 마켓 변화를 분리 수집한 shadow 정보입니다.</p></div><div class="market-lifecycle-kpis"><span><small>상장예정</small><b>${n(announced)}</b></span><span><small>유의</small><b class="market-lifecycle-caution">${n(caution)}</b></span><span><small>종료</small><b class="market-lifecycle-terminated">${n(ending)}</b></span></div></header>${visible.length?`<div class="market-lifecycle-list">${visible.map(lifecycleRow).join('')}</div>${rows.length>visible.length?`<small class="market-lifecycle-more">외 ${rows.length-visible.length}건의 상태 변경이 기록되어 있습니다.</small>`:''}`:`<div class="market-lifecycle-empty"><b>현재 표시할 거래지원 경보가 없습니다.</b><span>신규 상장·유의·거래종료 공지가 감지되면 이 영역에 자동 표시됩니다.</span></div>`}</section>`;
+}
+
+export function refreshMarketLifecyclePanel(root,lifecycle,options={}){
+  const current=root?.querySelector?.('[data-market-lifecycle-panel]');
+  if(!current)return false;
+  const template=document.createElement('template');
+  template.innerHTML=renderMarketLifecyclePanel(lifecycle,options).trim();
+  const next=template.content.firstElementChild;
+  if(!next)return false;
+  current.replaceWith(next);
+  return true;
 }
