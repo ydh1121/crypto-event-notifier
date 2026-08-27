@@ -124,6 +124,30 @@ def _upbit_detail_timestamp(payload: Any) -> float:
     return 0.0
 
 
+def _upbit_public_notice_id(row: dict[str, Any]) -> str:
+    """Extract the user-facing Upbit notice id while keeping row `id` as fallback."""
+    for key in ("announcement_id", "notice_id", "public_id", "article_id", "post_id"):
+        value = str(row.get(key) or "").strip()
+        if value.isdigit():
+            return value
+    # Current list payloads can carry a user-facing notice URL in nested fields.
+    stack: list[Any] = [row]
+    while stack:
+        value = stack.pop()
+        if isinstance(value, dict):
+            stack.extend(value.values())
+            continue
+        if isinstance(value, (list, tuple)):
+            stack.extend(value)
+            continue
+        text = str(value or "")
+        match = re.search(r"upbit\.com/service_center/notice\?[^\s\"']*\bid=(\d+)", text, re.IGNORECASE)
+        if match:
+            return match.group(1)
+    fallback = str(row.get("id") or "").strip()
+    return fallback if fallback.isdigit() else ""
+
+
 class BithumbNoticeSource:
     exchange = "bithumb"
     source = "bithumb_official_feed"
@@ -215,55 +239,62 @@ class UpbitNoticeSource:
             )
             return _upbit_rows(response.json())
 
-    def _detail(self, notice_id: str) -> tuple[str, float]:
+    def _detail(self, *notice_ids: str) -> tuple[str, float]:
         headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
-        candidates = (
-            (f"{self.current_url}/{notice_id}", {"os": "web"}),
-            (f"{self.legacy_url}/{notice_id}", None),
-        )
-        for url, params in candidates:
-            try:
-                response, _ = get_with_retry(
-                    url,
-                    params=params,
-                    headers=headers,
-                    timeout=10,
-                    attempts=2,
-                )
-                payload = response.json()
-                text = _upbit_detail_text(payload)
-                published = _upbit_detail_timestamp(payload)
-                if text or published > 0:
-                    return text, published
-            except (requests.RequestException, ValueError):
+        seen: set[str] = set()
+        for notice_id in notice_ids:
+            clean_id = str(notice_id or "").strip()
+            if not clean_id or clean_id in seen:
                 continue
+            seen.add(clean_id)
+            candidates = (
+                (f"{self.current_url}/{clean_id}", {"os": "web"}),
+                (f"{self.legacy_url}/{clean_id}", None),
+            )
+            for url, params in candidates:
+                try:
+                    response, _ = get_with_retry(
+                        url,
+                        params=params,
+                        headers=headers,
+                        timeout=10,
+                        attempts=2,
+                    )
+                    payload = response.json()
+                    text = _upbit_detail_text(payload)
+                    published = _upbit_detail_timestamp(payload)
+                    if text or published > 0:
+                        return text, published
+                except (requests.RequestException, ValueError):
+                    continue
         return "", 0.0
 
     def fetch(self) -> list[MarketNotice]:
         output: list[MarketNotice] = []
         for row in self._request_rows():
-            notice_id = str(row.get("id") or row.get("announcement_id") or row.get("notice_id") or "").strip()
+            stable_id = str(row.get("id") or row.get("announcement_id") or row.get("notice_id") or "").strip()
+            public_id = _upbit_public_notice_id(row) or stable_id
             title = str(row.get("title") or row.get("subject") or "").strip()
-            if not notice_id or not title:
+            if not stable_id or not title:
                 continue
             published = _timestamp(
                 row.get("created_at") or row.get("createdAt") or row.get("published_at") or row.get("date")
             )
             preliminary = normalize_notice(
                 exchange=self.exchange,
-                notice_id=notice_id,
+                notice_id=stable_id,
                 title=title,
-                url=f"https://upbit.com/service_center/notice?id={notice_id}",
+                url=f"https://upbit.com/service_center/notice?id={public_id}",
                 published_at=published,
                 source=self.source,
             )
             if preliminary.event_kind == OTHER:
                 continue
-            detail_text, detail_published = self._detail(notice_id)
+            detail_text, detail_published = self._detail(public_id, stable_id)
             output.append(
                 normalize_notice(
                     exchange=self.exchange,
-                    notice_id=notice_id,
+                    notice_id=stable_id,
                     title=title,
                     url=preliminary.url,
                     published_at=published or detail_published,
