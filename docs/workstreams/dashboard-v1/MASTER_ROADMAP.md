@@ -14,10 +14,10 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Local SQLite를 PAPER/학습/시간축 feature의 authoritative store로 유지한다.
 - [x] Cloudflare Pages는 read-only Viewer로 유지한다.
 - [x] 코인 identity는 ticker 단독으로 연결하지 않고 거래소 공식명/체인/contract/provider id/공식 domain을 교차검증한다.
-- [ ] 모든 신규 feature는 `수집 → DB 누적 → 품질/반응 검증 → shadow score → PAPER A/B → walk-forward → candidate` 순으로 승격한다.
+- [x] 모든 신규 feature는 `수집 → DB 누적 → 품질/반응 검증 → shadow score → PAPER A/B → walk-forward → candidate` 순으로 승격한다는 개발 규칙을 고정한다.
 - [ ] 같은 가격현상을 여러 지표가 중복 설명할 때 double counting을 막는 feature-family 정규화/상관 감쇠를 적용한다.
 - [ ] 모든 score/feature에 source, source_ts, received_at, freshness, confidence, version을 저장한다.
-- [ ] 외부 GitHub 알고리즘은 참고용으로만 사용하며 URL/license/최근 유지상태/테스트 결과를 문서화한다. 단일 repo를 정답으로 복제하지 않는다.
+- [x] 외부 GitHub 알고리즘은 참고용으로만 사용하며 URL/license/최근 유지상태/테스트 결과를 문서화한 뒤 사용한다는 규칙을 고정한다. 단일 repo를 정답으로 복제하지 않는다.
 
 ## 1. 현재 완료된 분석 기반
 
@@ -31,6 +31,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] 섹터 history D1 누적
 - [x] 코인 프로필 전수조사 + identity integrity/backlog
 - [x] Cloudflare snapshot/detail 전송 및 bounded retention
+- [x] Build 38 lifecycle/notice/return-window 모듈 기반 + 전용 CI
 
 ## 2. 기존 Viewer 잔여 작업 — 먼저 닫을 것
 
@@ -39,19 +40,21 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [ ] 판단상태 변경 기록 별도 탭/필터
 - [ ] 시스템 이벤트 기록 별도 탭/필터
 - [ ] GitHub Actions CI 상태를 Viewer 시스템 화면에 표시
-- [ ] 섹터 순위/코인 선택 및 기타 master-detail 선택 시 현재 스크롤 위치 보존. polling/selection 때문에 page/aside가 상단으로 점프하지 않게 한다.
-- [ ] 섹터 코인 표에서 `D-5 / D-4 / D-3 / D-2 / D-1 / 24H` 일별 등락을 24H 왼쪽에 표시하고 모바일에서는 우선순위형 축약/가로 스크롤 적용
+- [-] 섹터 순위/코인 선택 및 기타 master-detail 선택 시 현재 스크롤 위치 보존. 공통 `ui-continuity.js` 구현 완료, 실제 브라우저 QA 대기
+- [-] 섹터 코인 표 `D-5 / D-4 / D-3 / D-2 / D-1 / 24H` 표시 구현 완료. 실제 runtime 데이터/모바일 우선순위 QA 대기
 - [ ] 390px / 430px 집중 모바일 QA를 마지막 통합 QA에 유지하되 각 단계에서도 회귀 확인
 
 ## 3. 신규 상장·유의·거래종료 자동 생애주기
 
 ### 3.1 거래소 market lifecycle registry
 - [x] 빗썸/업비트 KRW market 목록을 동적으로 조회하는 기반
-- [ ] market 목록 diff를 저장해 신규상장/market 제거를 자동 감지
-- [ ] 거래소 공식 공지/상장 안내를 연결해 `announcement_at`, `deposit_at`, `trade_open_at` 기록
-- [ ] 상태 모델: `NORMAL`, `LISTING_ANNOUNCED`, `NEW_LISTING`, `CAUTION`, `TERMINATION_SCHEDULED`, `TERMINATED`
-- [ ] `유의 촉구`와 `유의`는 Viewer에서 동일 CAUTION 계층으로 취급
-- [ ] 티커 텍스트: CAUTION=주황, 거래종료 예정/종료=빨강. 색만 의존하지 않고 텍스트/상태 label도 병기
+- [x] additive lifecycle registry/event journal로 market 목록 변화, 신규 market, 3회 연속 부재를 저장해 신규상장/제거를 자동 감지
+- [-] 거래소 공식 공지 collector/DB/overlay 연결 완료. 다음 단계에서 `announcement_at`, `deposit_at`, `trade_open_at`, `termination_at`을 구조화
+- [x] 상태 모델: `NORMAL`, `LISTING_ANNOUNCED`, `NEW_LISTING`, `CAUTION`, `TERMINATION_SCHEDULED`, `TERMINATED`
+- [x] `유의 촉구`와 `유의`를 Viewer에서 동일 CAUTION 계층으로 취급
+- [x] 티커/상태 표시: CAUTION=주황, 거래종료 예정/종료=빨강, 신규/상장예정=별도 label. 색만 의존하지 않고 텍스트 병기
+- [x] `notice_only`를 Cloudflare snapshot에 투영해 아직 KRW market이 생기지 않은 `LISTING_ANNOUNCED`도 Viewer에서 표시
+- [x] 공식 공지 + 실제 market-list lifecycle을 섹터 Viewer의 독립 panel에서 실시간 snapshot 갱신으로 표시
 - [ ] 신규 상장 발생 시 profile research, sector/facet 분류, PAPER account, history collector에 자동 bootstrap
 - [ ] 거래종료 종목은 신규 PAPER 진입 대상에서 제거하되 과거 성과/history는 보존
 
@@ -88,7 +91,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 ### 5.1 다중 기간 가격 history
 - [ ] 1m/5m/15m/1h/4h/1d OHLCV의 bounded local history 수집
-- [ ] D-1~D-5 일별 등락과 1/3/5/7/30일 누적수익률 저장
+- [-] 기존 `research_market_memory_mx`를 재사용해 completed prior-day D-1~D-5 return window 구현/Viewer 연결 완료. 1/3/5/7/30일 누적수익률은 추가 필요
 - [ ] BTC/ETH/도미넌스/시장 breadth 대비 상대강도 저장
 - [ ] cross-exchange price gap 및 국내 premium/discount 저장
 
@@ -307,20 +310,21 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 권장 실행 순서는 아래와 같다.
 
-1. Viewer 잔여 작은 부채 + scroll reset 수정
-2. 신규상장/유의/거래종료 lifecycle + market identity
-3. D-5~24H 가격 history + flow/CVD feature store
-4. multi-facet sector/geography
-5. 기술분석/구조 엔진 + reference repo 검증
-6. Phase 5 news/macro/human/onchain ingest + event reaction DB
-7. 통합 score v2 + coin-specific reaction memory
-8. Intelligence Viewer
-9. Phase 6 AI 종합해석 shadow
-10. PAPER `adaptive_intelligence_v2` 병렬 forward test
-11. Phase 7 walk-forward
-12. Phase 8 candidate promotion
-13. 실제 보유/기록/운영 잔여 완결
-14. 최종 390/430 모바일 집중 QA
+1. Viewer 잔여 작은 부채 + scroll reset 수정/QA
+2. 신규상장/유의/거래종료 lifecycle + 공지 시간 구조화 + market identity
+3. 국내 상장 전 CEX/DEX 가격 이력
+4. D-5~24H 가격 history 확장 + flow/CVD feature store
+5. multi-facet sector/geography
+6. 기술분석/구조 엔진 + reference repo 검증
+7. Phase 5 news/macro/human/onchain ingest + event reaction DB
+8. 통합 score v2 + coin-specific reaction memory
+9. Intelligence Viewer
+10. Phase 6 AI 종합해석 shadow
+11. PAPER `adaptive_intelligence_v2` 병렬 forward test
+12. Phase 7 walk-forward
+13. Phase 8 candidate promotion
+14. 실제 보유/기록/운영 잔여 완결
+15. 최종 390/430 모바일 집중 QA
 
 ## 18. 완료 판단 기준
 
