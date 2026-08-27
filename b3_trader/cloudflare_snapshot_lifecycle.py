@@ -3,11 +3,13 @@ from __future__ import annotations
 from typing import Any
 
 from .cloudflare_snapshot_publisher import (
+    DEMO_DB_PATH,
     DEMO_STATUS_PATH,
     UPBIT_STATUS_PATH,
     CloudflareSnapshotPublisher as BaseCloudflareSnapshotPublisher,
     _read_json,
 )
+from .listing_history_snapshot import build_listing_history_snapshot
 
 
 def _lifecycle_map(demo: dict[str, Any]) -> dict[str, str]:
@@ -46,7 +48,7 @@ def apply_lifecycle_projection(payload: dict[str, Any], demo: dict[str, Any]) ->
 
 
 class CloudflareSnapshotPublisher(BaseCloudflareSnapshotPublisher):
-    """Snapshot publisher projection that adds already-computed lifecycle state."""
+    """Viewer projection for lifecycle state and compact listing-history research."""
 
     def build_snapshot(self) -> dict[str, Any]:
         snapshot = super().build_snapshot()
@@ -64,4 +66,7 @@ class CloudflareSnapshotPublisher(BaseCloudflareSnapshotPublisher):
 
         # Preserve the backward-compatible Bithumb root projection as well.
         apply_lifecycle_projection(public, bithumb_demo)
+        # Listing-history candles remain local. Only the read-only compact
+        # case/source/feature projection is added to the existing snapshot row.
+        public["listing_history"] = build_listing_history_snapshot(DEMO_DB_PATH)
         return snapshot
