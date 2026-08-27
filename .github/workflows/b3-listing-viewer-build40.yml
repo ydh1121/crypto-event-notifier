@@ -14,6 +14,7 @@ on:
       - "cloudflare-pages/public/modules/pages/research.js"
       - "cloudflare-pages/public/modules/styles/research.css"
       - "scripts/check-listing-viewer-build40.py"
+      - "scripts/verify-listing-viewer-build40.py"
       - ".github/workflows/b3-listing-viewer-build40.yml"
   workflow_dispatch:
 
@@ -35,10 +36,13 @@ jobs:
           b3_trader/listing_history_snapshot.py
           b3_trader/cloudflare_snapshot_lifecycle.py
           scripts/check-listing-viewer-build40.py
+          scripts/verify-listing-viewer-build40.py
       - name: Compact projection tests
         run: python -m pytest -q b3_trader/tests/test_listing_history_snapshot.py
       - name: Build 40 contract
         run: python scripts/check-listing-viewer-build40.py
+      - name: Local snapshot budget check
+        run: python scripts/verify-listing-viewer-build40.py
       - name: Viewer JavaScript syntax
         run: |
           node --check cloudflare-pages/public/modules/pages/research.js
