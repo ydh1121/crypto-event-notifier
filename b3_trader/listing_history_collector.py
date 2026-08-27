@@ -65,10 +65,31 @@ class ListingHistoryCollector:
         first_price = float(market.first_price or 0)
         if listing_at > 0 and first_price > 0:
             return listing_at, first_price
-        if isinstance(source, BinanceSpotSource):
+
+        if listing_at > 0 and first_price <= 0:
+            try:
+                launch_rows = source.hourly_candles(
+                    market.market,
+                    start_ts=max(0.0, listing_at - 60.0),
+                    end_ts=listing_at + 2 * 3600.0,
+                )
+            except Exception:
+                launch_rows = []
+            launch_rows = [
+                row for row in launch_rows
+                if listing_at - 3600.0 <= row.ts <= listing_at + 2 * 3600.0
+            ]
+            if launch_rows:
+                first = sorted(launch_rows, key=lambda row: row.ts)[0]
+                return listing_at, float(first.open)
+
+        # Binance exchangeInfo does not expose launchTime. Its kline history can
+        # explicitly request the first exchange candle without confusing it with
+        # the T-8d research-window boundary.
+        if listing_at <= 0 and isinstance(source, BinanceSpotSource):
             first = source.first_candle(market.market)
             if first is not None:
-                return listing_at or first.ts, first_price or first.open
+                return float(first.ts), float(first.open)
         return listing_at, first_price
 
     def _verified_market(
@@ -179,11 +200,6 @@ class ListingHistoryCollector:
                 }
                 continue
 
-            if first_price <= 0 and candles:
-                first_price = candles[0].open
-            if listing_at <= 0 and candles:
-                listing_at = candles[0].ts
-
             self.store.upsert_source(
                 case_key=case_key,
                 source_exchange=market.exchange,
@@ -218,7 +234,7 @@ class ListingHistoryCollector:
                     "exchange": market.exchange,
                     "market": market.market,
                     "quote_asset": market.quote_asset,
-                    "listing_at": listing_at,
+                    "listing_at": listing_at if listing_at > 0 else None,
                     "first_price": first_price if first_price > 0 else None,
                     "match_confidence": market.match_confidence,
                     "match_basis": market.match_basis or {},
