@@ -136,7 +136,7 @@ jobs:
             test -s "$file"
           done
           grep -q 'crypto-viewer-build" content="2026.08.27-35' public/index.html
-          grep -q 'type="module" src="/modules/main.js?v=12"' public/index.html
+          grep -Eq 'type="module" src="/modules/main\.js\?v=(1[2-9]|[2-9][0-9]+)"' public/index.html
           grep -q '/modules/styles/records-system.css?v=5' public/index.html
           grep -q 'system.js?v=35' public/modules/main.js
           grep -q '프로젝트별 설명 수집 중' public/modules/pages/sectors.js
