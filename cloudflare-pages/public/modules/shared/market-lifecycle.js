@@ -1,5 +1,6 @@
 const META={
   NORMAL:{label:'',tone:'normal'},
+  LISTING_ANNOUNCED:{label:'상장예정',tone:'new'},
   NEW_LISTING:{label:'신규',tone:'new'},
   CAUTION:{label:'유의',tone:'caution'},
   TERMINATION_SCHEDULED:{label:'거래종료 예정',tone:'terminated'},
