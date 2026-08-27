@@ -49,14 +49,17 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 ### 3.1 거래소 market lifecycle registry
 - [x] 빗썸/업비트 KRW market 목록을 동적으로 조회하는 기반
 - [x] additive lifecycle registry/event journal로 market 목록 변화, 신규 market, 3회 연속 부재를 저장해 신규상장/제거를 자동 감지
-- [-] 거래소 공식 공지 collector/DB/overlay 연결 완료. 다음 단계에서 `announcement_at`, `deposit_at`, `trade_open_at`, `termination_at`을 구조화
+- [x] 거래소 공식 공지 collector/DB/overlay 및 `announcement_at`, `deposit_at`, `trade_open_at`, `termination_at` 구조화 parser/store/Viewer projection 구현
+- [x] 공지 timing은 정확한 날짜+시각이 있는 경우만 저장하고 날짜만 있는 경우 임의 `00:00`을 만들지 않는 fail-closed 규칙 적용
+- [x] compact `market_notice_audit` CLI로 거래소별 notice/event/timing coverage를 확인 가능하게 함
+- [-] 실제 Windows runtime에서 빗썸/업비트 공식 공지 source와 timing coverage 실데이터 검증 대기
 - [x] 상태 모델: `NORMAL`, `LISTING_ANNOUNCED`, `NEW_LISTING`, `CAUTION`, `TERMINATION_SCHEDULED`, `TERMINATED`
 - [x] `유의 촉구`와 `유의`를 Viewer에서 동일 CAUTION 계층으로 취급
 - [x] 티커/상태 표시: CAUTION=주황, 거래종료 예정/종료=빨강, 신규/상장예정=별도 label. 색만 의존하지 않고 텍스트 병기
 - [x] `notice_only`를 Cloudflare snapshot에 투영해 아직 KRW market이 생기지 않은 `LISTING_ANNOUNCED`도 Viewer에서 표시
 - [x] 공식 공지 + 실제 market-list lifecycle을 섹터 Viewer의 독립 panel에서 실시간 snapshot 갱신으로 표시
-- [ ] 신규 상장 발생 시 profile research, sector/facet 분류, PAPER account, history collector에 자동 bootstrap
-- [ ] 거래종료 종목은 신규 PAPER 진입 대상에서 제거하되 과거 성과/history는 보존
+- [-] 신규 KRW market 발견 즉시 PAPER account/profile + market-memory 경로는 기존 전수 universe 구조로 자동 bootstrap된다. profile research backlog도 KRW universe에서 누락을 자동 포착한다. sector/facet까지 포함한 end-to-end 실환경 검증은 대기
+- [x] `TERMINATION_SCHEDULED`/`TERMINATED`는 신규 PAPER 진입·추가매수를 차단하고 기존 포지션의 매도/정리와 과거 성과/history는 보존. CAUTION/NEW_LISTING은 현재 adaptive에서는 아직 shadow
 
 ### 3.2 국내 상장 전 가격 추적
 - [ ] identity를 먼저 contract/chain/provider id로 확정 후 해외 CEX/DEX market을 연결
