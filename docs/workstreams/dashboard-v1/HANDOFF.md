@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Local multi-asset PAPER monitor + beginner-facing dashboard + secure Cloudflare phone access + adaptive Bithumb-wide per-coin PAPER research + Build 38 market lifecycle/notice/timing/return-window foundation.
+Local multi-asset PAPER monitor + beginner-facing dashboard + secure Cloudflare phone access + adaptive Bithumb-wide per-coin PAPER research + verified Build 38 market lifecycle foundation + Build 39 pre-KRW CEX listing-history source/CI foundation.
 
 ## Program roadmap
 
@@ -36,7 +36,7 @@ No page-specific `scrollTop` copy/paste and no broad DOM `MutationObserver` cont
 
 ## Current market-intelligence implementation status
 
-Build 38 completed in source/CI:
+Build 38 completed and live-verified:
 - shared same-page UI continuity guard is installed at the Viewer app root
 - same-route router rerenders preserve scroll/focus state through the shared owner
 - `b3_trader/market_lifecycle.py` owns pure lifecycle classification and lifecycle PAPER entry policy
@@ -58,25 +58,49 @@ Build 38 completed in source/CI:
 - lifecycle panel refreshes only its own DOM on snapshot polling; it does not rerender the whole page
 - D-5..D-1 completed prior-day return windows reuse `research_market_memory_mx`; no duplicate per-widget exchange calls
 - all active KRW markets are already seeded through the existing all-market PAPER account/profile path; newly discovered markets therefore bootstrap their account/profile before scoring and begin market-memory collection on scan
-- `TERMINATION_SCHEDULED` and `TERMINATED` now block new/additional PAPER buys while existing positions can still be sold/managed and historical performance remains stored
+- `TERMINATION_SCHEDULED` and `TERMINATED` block new/additional PAPER buys while existing positions can still be sold/managed and historical performance remains stored
 - CAUTION and NEW_LISTING remain shadow information in the current adaptive strategy; broader lifecycle scoring stays deferred to Unified Score v2/PAPER v2
+- normal launcher owns Bithumb PAPER through `paper_runtime_supervisor`; stale/dead/reused PID cannot suppress recovery
+- Cloudflare D1 writes are bounded at snapshot 60s / detail 300s with capped detail batches and unchanged-row skipping
+- Windows live verification confirmed notice/snapshot/detail components healthy, PAPER `running/fresh`, valid asset registry and current Viewer snapshot
+
+Build 39 pre-KRW CEX foundation completed in source/CI, live data QA pending:
+- `listing_identity.py` owns the fail-closed identity gate; ticker-only matching is forbidden
+- `/api/coin-profile-identity` reuses verified/corroborated `coin_profile_cache` identity via INGEST bearer authentication rather than duplicating project research
+- existing CoinGecko evidence is surfaced as a stable `coingecko_id`; multi-source/CMC provider ids are not assumed to be CoinGecko ids
+- `listing_venue_verifier.py` requires exact CoinGecko coin-id + venue identifier + base/target pair before foreign candles are accepted
+- initial public CEX adapters are Binance, OKX and Bybit; each normalizes to the shared `ListingCandle` domain
+- `listing_history_planner.py` seeds only official KRW listing notices and rejects Upbit USDT-only notices as KRW cases
+- listing case keys use stable domestic notice id when available; changed trade-open schedules update the same case
+- `domestic_listing_price.py` resolves the domestic listing start price from public 1-minute candles around `trade_open_at`, not from current ticker price
+- additive local SQLite owns `listing_history_cases`, `listing_history_sources`, `listing_history_candles`, `listing_history_features`
+- prelisting windows are T-7d/T-5d/T-3d/T-1d/T-6h/T-1h; postlisting tracking is +5m/+1h/+6h/+24h/+3d/+7d
+- unknown foreign launch time/first price stays null; the first candle of the bounded T-8d research window is never treated as a historical CEX launch price
+- when a venue exposes a launch timestamp, first price is resolved only from a narrow launch-time candle window; Binance may use its explicit first historical kline path
+- `tracking_postlisting` remains active until 7-day reaction data can mature
+- `listing-history-research` is an independent 15-minute supervisor component, processes at most 3 cases per run, and has no PAPER score/order authority
+- `listing_history_audit.py` provides read-only case/status/identity/source/candle/feature audit output
+- `scripts/check-listing-build39.py` and dedicated `B3 listing Build 39` workflow enforce the modular/ticker-safety/PAPER-unwired contract
+- `scripts/verify-build39-runtime.ps1` performs contract → Pages deploy → one bounded live cycle → audit; `-StatusOnly` checks the supervisor component and accumulated DB state
 
 Validation:
-- Build 38 lifecycle/notice/timing/return-window/entry-policy tests PASS
-- dedicated Build 38 CI PASS
-- full B3 trader CI PASS after preserving legacy trade-plan construction compatibility
-- Python compile PASS
-- Cloudflare typecheck PASS
-- Pages typecheck + JS syntax PASS
-- dashboard smoke PASS
+- Build 38 dedicated CI PASS
+- Build 38 Windows runtime/PAPER self-heal/live official notice/Cloudflare publisher verification PASS
+- Build 39 listing-history tests PASS
+- Build 39 modular contract PASS
+- Build 39 Cloudflare Pages typecheck PASS
+- full B3 trader push and PR CI PASS with Build 39 source/supervisor changes
+- PR #1 remains Draft/unmerged
 
 Immediate next action:
-1. sync/deploy/restart the current Build 38 source on the Windows runtime
-2. run the real Bithumb/Upbit official notice collector and `market_notice_audit --rows 4`; one source may be partial, but all-source failure must be investigated
-3. verify `market-notice-watch`, Cloudflare snapshot publisher and Viewer lifecycle panel are healthy after restart
-4. verify sector scroll continuity and D-5..24H columns on desktop + phone; only then mark the active QA items complete
-5. verify an actual newly listed market traverses account/profile research/sector-facet/history owners end-to-end when the next listing occurs
-6. start pre-KRW CEX/DEX listing-history collector/store/feature work; identity must be contract/chain/provider-backed rather than ticker-only
+1. keep the currently healthy Windows runtime unchanged until the final Build 39 HEAD is synced once
+2. sync the final Build 39 HEAD and run `scripts/verify-build39-runtime.ps1`; it deploys the new identity bridge before the first listing-history cycle
+3. inspect recent actual KRW listing cases with `listing_history_audit --rows 6`: case seeding, verified identity, exact foreign venue pair, domestic opening price, prelisting windows and source errors
+4. restart `start-trader-secure.bat` once because `research_supervisor.py` changed, then run `scripts/verify-build39-runtime.ps1 -StatusOnly`
+5. require `listing-history-research` to be healthy at 900 seconds and confirm existing PAPER/snapshot/detail components remain healthy
+6. only after live CEX data quality is confirmed, project compact listing-history features to the Viewer; never send raw listing candles to D1
+7. then implement DEX-first pool/launch history using chain+contract identity and minimum liquidity/volume thresholds
+8. keep sector-scroll/D-5 mobile/desktop visual QA and actual-new-listing end-to-end profile/facet QA open until observed in the browser/live event
 
 ## Hard boundary
 
@@ -184,10 +208,12 @@ Generated data remains local/ignored:
 
 ## Current verified viewer/publisher state
 
-- Cloudflare snapshot/detail publisher recovered after D1 retention pressure.
+- Cloudflare snapshot/detail publishers are healthy after D1 retention/write-budget fixes.
 - Snapshot retention is bounded and health exposes snapshot age/count.
+- Current cadence is snapshot 60 seconds and market detail 300 seconds; unchanged detail rows are skipped and bounded batches protect D1 write budget.
 - Viewer project-research completion count uses the same definition for numerator and unresolved count.
-- Build 38 source/CI including termination-only PAPER gate is complete; local runtime/Pages/live-notice verification is the next operational step.
+- Build 38 lifecycle/notice/timing/termination PAPER gate and PAPER self-heal are live-verified.
+- Build 39 CEX listing-history foundation is source/CI complete; Windows live CEX data audit is the current operational gate.
 - Current work must preserve PAPER scanning and publisher health while adding new features.
 
 ## Safety constraints
