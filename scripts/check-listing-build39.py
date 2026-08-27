@@ -55,7 +55,7 @@ def main() -> None:
         )),
         "build39_legacy_identity_refresh": all(token in cycle for token in (
             "_venue_capable_identity", "stored_refreshed", "stored_verified_legacy",
-            "previous_provider", "coingecko",
+            "refresh_provider", "previous_provider", "coingecko",
         )),
         "build39_venue_provider_pair_verification": all(token in venue for token in (
             "ListingVenueVerifier", "COINGECKO_TICKERS_URL", "exchange_ids",
@@ -92,24 +92,29 @@ def main() -> None:
         )),
         "build39_notice_revision_uses_final_time": all(token in notice_timing for token in (
             "_REVISION_MARKERS", "_revised_datetime", "clocks[-1]",
-            "final clock value",
+            "entire bounded segment", "split across line breaks",
+        )),
+        "build39_upbit_public_notice_id": all(token in notice_sources for token in (
+            "_upbit_public_notice_id", "announcement_id", "service_center/notice",
+            "stable_id", "public_id", "self._detail(public_id, stable_id)",
         )),
         "build39_upbit_detail_endpoint_fallback": all(token in notice_sources for token in (
-            "current_url", "legacy_url", "candidates = (",
-            "self.legacy_url}/{notice_id}",
+            "current_url", "legacy_url", "for notice_id in notice_ids",
+            "self.legacy_url}/{clean_id}",
         )),
         "build39_runtime_refreshes_notices_first": (
             notice_refresh_at >= 0 and listing_cycle_at >= 0 and notice_refresh_at < listing_cycle_at
         ),
         "build39_domestic_open_price_public_candle": all(token in domestic_price for token in (
             "DomesticListingPriceResolver", "BithumbClient", "UpbitClient", "candles_minutes",
-            "nearest_opening_price",
+            "opening_price_at_or_after", "OPEN_SEARCH_SECONDS", "response_count",
         )) and all(token in domestic_utils for token in (
-            "parse_candle_ts", "nearest_opening_price", "opening_price",
+            "parse_candle_ts", "candle_date_time_kst", "opening_price_at_or_after",
+            "first_opening_price_at_or_after_trade_open",
         )),
         "build39_domestic_candle_exchange_timezone": all(token in domestic_price for token in (
             "candle_query_to", "KST", "Bithumb documents `to` as a KST clock time",
-            "Upbit accepts an ISO-8601 UTC Zulu timestamp",
+            "Upbit accepts ISO-8601 UTC Zulu time",
         )),
         "build39_quote_to_krw_separate": all(token in quote_rate for token in (
             "ListingQuoteRateResolver", "KRW-USDT", "KRW-USDC", "KRW-BTC",
