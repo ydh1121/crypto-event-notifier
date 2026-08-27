@@ -100,6 +100,7 @@ try {
         running                = $demo.running
         fresh                  = $demo.fresh
         state                  = $demo.state
+        worker_mode            = $demo.worker_mode
         pid                    = $demo.pid
         updated_at             = Show-Time $demo.updated_at
         last_scan_completed    = Show-Time $demo.last_scan_completed
@@ -112,6 +113,25 @@ try {
 }
 catch {
     Write-Host "LOCAL DEMO ERROR: $($_.Exception.Message)"
+}
+
+Write-Host "`n=== LOCAL APP / ASSET REGISTRY ==="
+try {
+    $appState = Invoke-RestMethod "http://127.0.0.1:8765/api/state" -TimeoutSec 10
+    $assets = @(Invoke-RestMethod "http://127.0.0.1:8765/api/assets" -TimeoutSec 10)
+    $invalidMarkets = @($assets | Where-Object { [string]$_.market -notmatch '^KRW-[A-Z0-9]+$' } | ForEach-Object { [string]$_.market })
+    $lastError = $appState.last_error
+    [PSCustomObject]@{
+        active_assets        = $assets.Count
+        invalid_asset_count = $invalidMarkets.Count
+        invalid_assets      = if ($invalidMarkets.Count) { $invalidMarkets -join ', ' } else { '' }
+        last_error_scope     = if ($lastError) { $lastError.scope } else { '' }
+        last_error_type      = if ($lastError) { $lastError.type } else { '' }
+        last_error_message   = if ($lastError) { $lastError.message } else { '' }
+    } | Format-List
+}
+catch {
+    Write-Host "LOCAL APP STATUS ERROR: $($_.Exception.Message)"
 }
 
 Write-Host "`n=== REMOTE VIEWER HEALTH ==="
