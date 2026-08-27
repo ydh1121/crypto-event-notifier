@@ -21,6 +21,7 @@ from .auto_demo_v2 import (
     _num,
 )
 from .exchange_public import PublicExchangeAdapter, PublicMarket, public_exchange
+from .market_feature_store import MarketFeatureStore
 from .market_lifecycle import NORMAL
 from .market_lifecycle_store import MarketLifecycleStore
 from .scoped_paper_store import ScopedPaperStore
@@ -50,6 +51,7 @@ class MultiExchangePaperDemo(AutoPaperDemo):
         self.store = ScopedPaperStore(self.exchange, self.strategy_name)
         self.lifecycle = MarketLifecycleStore(self.store.conn)
         self.lifecycle_snapshot = self.lifecycle.snapshot(self.exchange)
+        self.market_features = MarketFeatureStore(self.store.conn)
         self.prices: dict[str, float] = {}
         self.names: dict[str, str] = {}
         self.market_meta: dict[str, PublicMarket] = {}
@@ -80,6 +82,12 @@ class MultiExchangePaperDemo(AutoPaperDemo):
     def _write_market_detail(self, market: str) -> None:
         detail = self.store.market_detail(market)
         if detail:
+            detail = self.market_features.enrich_market_detail(
+                detail,
+                exchange=self.exchange,
+                market=market,
+                strategy=self.strategy_name,
+            )
             _atomic_json(self.detail_dir / f"{market.replace('/', '_')}.json", detail)
 
     def _write_status(self, *, scanned: int, total: int, error: str = "") -> None:
@@ -145,6 +153,7 @@ class MultiExchangePaperDemo(AutoPaperDemo):
                 "public_market_data_only": True,
                 "market_memory_retention_days": MARKET_MEMORY_RETENTION_DAYS,
                 "market_lifecycle_shadow_only": True,
+                "return_windows_source": "research_market_memory_mx",
             },
         }
         _atomic_json(self.status_path, payload)
