@@ -56,13 +56,7 @@ def row_matches_candidate(row: dict[str, str], candidate_name: Any) -> bool:
 
 
 def _manual_header(text: str) -> str:
-    """Return only the identity/header area before the manual description.
-
-    pypdf frequently inserts line breaks between Korean labels, e.g.
-    ``가상자산\n소개``. Literal ``str.find`` therefore treated the whole first
-    page as a header and allowed body mentions such as Bitcoin/BTC to validate a
-    PUMPBTC PDF. Marker detection is whitespace-tolerant and fail-closed now.
-    """
+    """Return only the identity/header area before the manual description."""
 
     visible = text[:_MANUAL_HEADER_LIMIT]
     positions: list[int] = []
@@ -119,12 +113,7 @@ def _manual_identity_matches(row: dict[str, str], text: str) -> bool:
 
 
 def _manual_intro_identity_matches(row: dict[str, str], intro: str) -> bool:
-    """Require the description itself to start with the current exchange asset.
-
-    This second guard catches malformed/exotic PDFs whose header happens to
-    contain a referenced asset. Bithumb manual introductions normally begin with
-    the project identity, so failing closed is preferable to cross-contamination.
-    """
+    """Require the description itself to start with the current exchange asset."""
 
     probe = _normalize(_clean_html(intro, 320))
     if not probe:
@@ -139,6 +128,28 @@ def _manual_intro_identity_matches(row: dict[str, str], intro: str) -> bool:
     if len(symbol) >= 2 and probe.startswith(symbol):
         return True
     return False
+
+
+def _drop_ungrounded_profile(profile: dict[str, Any]) -> dict[str, Any]:
+    """Do not present taxonomy/template guesses as researched business facts."""
+
+    if int(profile.get("source_count") or 0) > 0:
+        return profile
+    safe = dict(profile)
+    for key in (
+        "description_ko", "description_en", "business_summary_ko", "business_summary_en",
+        "homepage", "image_url", "official_docs", "whitepaper", "source_code",
+    ):
+        safe[key] = ""
+    safe["categories"] = []
+    safe["tags"] = []
+    safe["community"] = []
+    safe["evidence"] = []
+    safe["research_status"] = "unresolved"
+    safe["summary_source"] = ""
+    safe["match_confidence"] = 0.0
+    safe["ungrounded_content_removed"] = True
+    return safe
 
 
 class IdentitySafeCoinProfileEnricher(CoinProfileEnricher):
@@ -274,5 +285,6 @@ class IdentitySafeCoinProfileEnricher(CoinProfileEnricher):
         profile = super()._build_profile(row, cmc_raw, upbit_available=safe_upbit)
         profile["english_name"] = row.get("english_name") or profile.get("english_name")
         profile["korean_name"] = row.get("korean_name") or profile.get("korean_name")
+        profile = _drop_ungrounded_profile(profile)
         profile["identity_guard"] = "exchange_name_verified"
         return profile
