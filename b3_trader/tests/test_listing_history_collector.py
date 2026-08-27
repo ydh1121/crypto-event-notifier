@@ -41,6 +41,50 @@ class FakeSource:
         ]
 
 
+class FakeUnknownLaunchSource(FakeSource):
+    exchange = "unknown"
+
+    def discover(self, identity: ListingIdentity) -> list[CexSpotMarket]:
+        self.discover_calls += 1
+        return [
+            CexSpotMarket(
+                exchange="unknown",
+                market="ABCUSDT",
+                base_asset="ABC",
+                quote_asset="USDT",
+                listing_at=0,
+                first_price=0,
+                match_confidence=identity.match_confidence,
+                match_basis={"identity_gate": "verified"},
+            )
+        ]
+
+
+class FakeKnownLaunchSource(FakeSource):
+    exchange = "known"
+
+    def discover(self, identity: ListingIdentity) -> list[CexSpotMarket]:
+        self.discover_calls += 1
+        return [
+            CexSpotMarket(
+                exchange="known",
+                market="ABCUSDT",
+                base_asset="ABC",
+                quote_asset="USDT",
+                listing_at=50_000,
+                first_price=0,
+                match_confidence=identity.match_confidence,
+                match_basis={"identity_gate": "verified"},
+            )
+        ]
+
+    def hourly_candles(self, market: str, *, start_ts: float, end_ts: float) -> list[ListingCandle]:
+        self.candle_calls += 1
+        if end_ts <= 50_000 + 2 * 3600:
+            return [ListingCandle(ts=50_000, open=3, high=4, low=2, close=3.5)]
+        return super().hourly_candles(market, start_ts=start_ts, end_ts=end_ts)
+
+
 class FakeVenueVerifier:
     def __init__(self, verified: bool = True) -> None:
         self.verified = verified
@@ -66,24 +110,26 @@ def verified_identity() -> ListingIdentity:
     )
 
 
+def _case() -> DomesticListingCase:
+    domestic = 10 * 24 * 3600.0
+    return DomesticListingCase(
+        exchange="bithumb",
+        market="KRW-ABC",
+        symbol="ABC",
+        announcement_at=domestic - 3600,
+        open_at=domestic,
+        open_price=20,
+        identity=verified_identity(),
+    )
+
+
 def test_collector_persists_provider_verified_case(tmp_path: Path) -> None:
     source = FakeSource()
     verifier = FakeVenueVerifier()
     store = ListingHistoryStore(tmp_path / "listing.sqlite3")
     collector = ListingHistoryCollector(store=store, sources=(source,), venue_verifier=verifier)
-    domestic = 10 * 24 * 3600.0
     try:
-        result = collector.collect_case(
-            DomesticListingCase(
-                exchange="bithumb",
-                market="KRW-ABC",
-                symbol="ABC",
-                announcement_at=domestic - 3600,
-                open_at=domestic,
-                open_price=20,
-                identity=verified_identity(),
-            )
-        )
+        result = collector.collect_case(_case())
         assert result["status"] == "complete"
         assert result["sources_ok"] == 1
         assert source.discover_calls == 1
@@ -102,19 +148,8 @@ def test_collector_rejects_unverified_foreign_pair(tmp_path: Path) -> None:
         sources=(source,),
         venue_verifier=FakeVenueVerifier(False),
     )
-    domestic = 10 * 24 * 3600.0
     try:
-        result = collector.collect_case(
-            DomesticListingCase(
-                exchange="bithumb",
-                market="KRW-ABC",
-                symbol="ABC",
-                announcement_at=domestic - 3600,
-                open_at=domestic,
-                open_price=20,
-                identity=verified_identity(),
-            )
-        )
+        result = collector.collect_case(_case())
         assert result["status"] == "no_foreign_market_found"
         assert result["sources_ok"] == 0
         assert result["sources"]["fake"]["status"] == "venue_unverified"
@@ -142,5 +177,40 @@ def test_collector_rejects_weak_identity_without_network(tmp_path: Path) -> None
         assert result["status"] == "rejected_identity"
         assert source.discover_calls == 0
         assert source.candle_calls == 0
+    finally:
+        collector.close()
+
+
+def test_unknown_foreign_launch_is_not_inferred_from_prelisting_window(tmp_path: Path) -> None:
+    source = FakeUnknownLaunchSource()
+    store = ListingHistoryStore(tmp_path / "listing.sqlite3")
+    collector = ListingHistoryCollector(store=store, sources=(source,), venue_verifier=FakeVenueVerifier())
+    try:
+        result = collector.collect_case(_case())
+        assert result["sources_ok"] == 1
+        row = store.conn.execute(
+            "SELECT source_listing_at,first_price FROM listing_history_sources WHERE source_exchange='unknown'"
+        ).fetchone()
+        assert row is not None
+        assert float(row["source_listing_at"]) == 0
+        assert float(row["first_price"]) == 0
+    finally:
+        collector.close()
+
+
+def test_known_foreign_launch_fetches_price_from_launch_window(tmp_path: Path) -> None:
+    source = FakeKnownLaunchSource()
+    store = ListingHistoryStore(tmp_path / "listing.sqlite3")
+    collector = ListingHistoryCollector(store=store, sources=(source,), venue_verifier=FakeVenueVerifier())
+    try:
+        result = collector.collect_case(_case())
+        assert result["sources_ok"] == 1
+        row = store.conn.execute(
+            "SELECT source_listing_at,first_price FROM listing_history_sources WHERE source_exchange='known'"
+        ).fetchone()
+        assert row is not None
+        assert float(row["source_listing_at"]) == 50_000
+        assert float(row["first_price"]) == 3
+        assert source.candle_calls >= 2
     finally:
         collector.close()
