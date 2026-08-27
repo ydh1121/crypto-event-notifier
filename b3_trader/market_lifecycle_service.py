@@ -16,6 +16,17 @@ from .market_lifecycle_store import MarketLifecycleStore
 from .market_notice_store import MarketNoticeStore
 
 ATTENTION_STATES = {LISTING_ANNOUNCED, NEW_LISTING, CAUTION, TERMINATION_SCHEDULED, TERMINATED}
+NOTICE_DETAIL_FIELDS = {
+    "notice_id",
+    "title",
+    "url",
+    "source",
+    "effective_at",
+    "announcement_at",
+    "deposit_at",
+    "trade_open_at",
+    "termination_at",
+}
 
 
 class MarketLifecycleService:
@@ -28,6 +39,12 @@ class MarketLifecycleService:
     @staticmethod
     def _market_key(source: Any) -> str:
         return str(getattr(source, "market", "") or "").strip().upper()
+
+    @staticmethod
+    def _notice_detail(source: Any) -> dict[str, Any]:
+        if not isinstance(source, dict):
+            return {}
+        return {key: value for key, value in source.items() if key in NOTICE_DETAIL_FIELDS}
 
     def _compose(self, exchange: str, base: dict[str, Any], active_markets: set[str]) -> dict[str, Any]:
         notice = self.notice_store.state_snapshot(exchange)
@@ -66,10 +83,7 @@ class MarketLifecycleService:
             {
                 "market": market,
                 "state": state,
-                **({
-                    key: value for key, value in (notice_details.get(market) or {}).items()
-                    if key in {"notice_id", "title", "url", "source", "effective_at"}
-                }),
+                **self._notice_detail(notice_details.get(market)),
             }
             for market, state in states.items()
             if market not in base_states and state == LISTING_ANNOUNCED
@@ -78,17 +92,13 @@ class MarketLifecycleService:
         for market, state in states.items():
             if state not in ATTENTION_STATES:
                 continue
-            detail = notice_details.get(market) if isinstance(notice_details.get(market), dict) else {}
+            detail = self._notice_detail(notice_details.get(market))
             attention.append(
                 {
                     "market": market,
                     "state": state,
                     "reason": reasons.get(market, ""),
-                    "notice_id": str(detail.get("notice_id") or ""),
-                    "title": str(detail.get("title") or ""),
-                    "url": str(detail.get("url") or ""),
-                    "source": str(detail.get("source") or ""),
-                    "effective_at": float(detail.get("effective_at") or 0.0),
+                    **detail,
                 }
             )
         attention.sort(key=lambda row: (float(row.get("effective_at") or 0.0), str(row.get("market") or "")), reverse=True)
