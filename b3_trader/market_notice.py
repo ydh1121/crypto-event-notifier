@@ -4,6 +4,7 @@ import re
 from dataclasses import dataclass
 
 from .market_lifecycle import CAUTION, LISTING_ANNOUNCED, NORMAL, TERMINATION_SCHEDULED
+from .market_notice_timing import parse_notice_timing
 
 LISTING = "LISTING"
 CAUTION_NOTICE = "CAUTION"
@@ -24,6 +25,10 @@ class MarketNotice:
     event_kind: str
     symbols: tuple[str, ...]
     source: str
+    announcement_at: float = 0.0
+    deposit_at: float = 0.0
+    trade_open_at: float = 0.0
+    termination_at: float = 0.0
 
 
 def extract_notice_symbols(title: str) -> tuple[str, ...]:
@@ -70,14 +75,21 @@ def normalize_notice(
     url: str,
     published_at: float = 0.0,
     source: str = "official_notice",
+    detail_text: str = "",
 ) -> MarketNotice:
+    published = max(0.0, float(published_at or 0.0))
+    timing = parse_notice_timing(detail_text, published_at=published)
     return MarketNotice(
         exchange=str(exchange or "").strip().lower(),
         notice_id=str(notice_id or "").strip(),
         title=str(title or "").strip(),
         url=str(url or "").strip(),
-        published_at=max(0.0, float(published_at or 0.0)),
+        published_at=published,
         event_kind=classify_notice_title(title),
         symbols=extract_notice_symbols(title),
         source=str(source or "official_notice"),
+        announcement_at=timing.announcement_at,
+        deposit_at=timing.deposit_at,
+        trade_open_at=timing.trade_open_at,
+        termination_at=timing.termination_at,
     )
