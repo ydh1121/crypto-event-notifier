@@ -42,6 +42,14 @@ class FakeSource:
         ]
 
 
+class FakeNotListedSource(FakeSource):
+    exchange = "empty"
+
+    def discover(self, identity: ListingIdentity) -> list[CexSpotMarket]:
+        self.discover_calls += 1
+        return []
+
+
 class FakeUnknownLaunchSource(FakeSource):
     exchange = "unknown"
 
@@ -197,16 +205,29 @@ def test_collector_keeps_domestic_premium_null_without_quote_rate(tmp_path: Path
         collector.close()
 
 
-def test_collector_rejects_unverified_foreign_pair(tmp_path: Path) -> None:
+def test_collector_marks_discovered_but_unverified_pair_as_waiting(tmp_path: Path) -> None:
     source = FakeSource()
     store = ListingHistoryStore(tmp_path / "listing.sqlite3")
     collector = _collector(store, source, verifier=FakeVenueVerifier(False))
     try:
         result = collector.collect_case(_case())
-        assert result["status"] == "no_foreign_market_found"
+        assert result["status"] == "venue_verification_waiting"
         assert result["sources_ok"] == 0
         assert result["sources"]["fake"]["status"] == "venue_unverified"
         assert source.candle_calls == 0
+        assert len(store.pending_cases()) == 1
+    finally:
+        collector.close()
+
+
+def test_collector_uses_no_foreign_market_only_when_discovery_is_empty(tmp_path: Path) -> None:
+    source = FakeNotListedSource()
+    store = ListingHistoryStore(tmp_path / "listing.sqlite3")
+    collector = _collector(store, source)
+    try:
+        result = collector.collect_case(_case())
+        assert result["status"] == "no_foreign_market_found"
+        assert result["sources"]["empty"]["status"] == "not_listed"
     finally:
         collector.close()
 
