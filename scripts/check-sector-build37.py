@@ -34,6 +34,8 @@ def main() -> None:
     integrity_api = text(ROOT / "cloudflare-pages" / "functions" / "api" / "coin-profile-integrity-audit.ts")
     per_market_integrity = text(ROOT / "cloudflare-pages" / "functions" / "api" / "coin-profile-integrity.ts")
     backlog = text(ROOT / "cloudflare-pages" / "functions" / "api" / "coin-profile-backlog-v37.ts")
+    ingest = text(ROOT / "cloudflare-pages" / "functions" / "api" / "ingest-coin-profiles.ts")
+    repair_ingest = text(ROOT / "cloudflare-pages" / "functions" / "api" / "ingest-coin-profiles-repair.ts")
     service = text(PUBLIC / "modules" / "services" / "coin-profile.js")
     cycle = text(ROOT / "b3_trader" / "coin_profile_research_cycle_v36.py")
     identity_safe = text(ROOT / "b3_trader" / "coin_profile_identity_safe.py")
@@ -64,6 +66,9 @@ def main() -> None:
         "strict_manual_intro_guard": "_manual_intro_identity_matches" in identity_safe and "intro_text" in identity_safe,
         "strict_manual_collision_tests": all(token in identity_tests for token in ("body_only_bitcoin_mentions", "split_marker_body_only_bitcoin_mentions", "prefix_name_collision", "symbol_embedded_in_other_symbol", "manual_intro_rejects_foreign_project_lead")),
         "identity_repair_quarantine": all(token in cycle for token in ("_repair_profile_matches_current", "_quarantine_profile", "identity_quarantined", "replace_existing")),
+        "general_failure_does_not_block_precision": all(token in cycle for token in ("general_error", "precision_error", "self._precision_once")),
+        "profile_ingest_partial_failure_safe": all(token in ingest for token in ("STORE_CHUNK", "storePrepared", "failed_markets", "Number.isFinite")),
+        "profile_repair_ingest_partial_failure_safe": all(token in repair_ingest for token in ("STORE_CHUNK", "storePrepared", "failed_markets", "Number.isFinite")),
         "supervisor_uses_v37_backlog": "coin-profile-backlog-v37" in cycle,
         "integrity_audit_command": "coin-profile-integrity-audit" in audit_client and "sample_rows" in audit_client and "--full" in audit_client,
         "pypdf_warning_guard": 'logging.getLogger("pypdf").setLevel(logging.ERROR)' in cycle,
