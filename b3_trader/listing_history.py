@@ -229,13 +229,23 @@ def reaction_features(
     *,
     anchor_at: float,
     anchor_price: float,
+    fine_candles: Iterable[ListingCandle] | None = None,
 ) -> dict[str, Any]:
-    """Return same-currency forward reaction windows from an explicit anchor."""
+    """Return same-currency forward reaction windows from an explicit anchor.
+
+    The +5 minute window must use minute-resolution evidence when supplied. It
+    must never be silently approximated with an hourly candle by the collector.
+    Longer windows continue to use the bounded hourly history.
+    """
 
     rows = _valid_candles(candles)
+    fine_rows = _valid_candles(fine_candles) if fine_candles is not None else None
     windows: dict[str, Any] = {}
     for key, seconds in POST_LISTING_WINDOWS:
-        point = price_at_or_after(rows, anchor_at + seconds)
+        if key == "p5m" and fine_rows is not None:
+            point = price_at_or_after(fine_rows, anchor_at + seconds, max_lead_seconds=120)
+        else:
+            point = price_at_or_after(rows, anchor_at + seconds)
         windows[key] = point
         windows[f"{key}_price"] = point["price"] if point else None
         windows[f"{key}_return_pct"] = (
@@ -246,6 +256,10 @@ def reaction_features(
         "anchor_price": float(anchor_price) if anchor_price > 0 else None,
         "windows": windows,
         "candle_count": len(rows),
+        "p5m_source_interval_seconds": (
+            min((row.interval_seconds for row in fine_rows), default=0) if fine_rows is not None else None
+        ),
+        "p5m_exact_minute_required": fine_rows is not None,
     }
 
 
