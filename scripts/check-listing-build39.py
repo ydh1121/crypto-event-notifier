@@ -71,8 +71,8 @@ def main() -> None:
             "provider_pair_verification",
         )),
         "build39_launch_price_not_window_inferred": all(token in collector for token in (
-            "launchTime", "T-8d", "first_candle", "listing_at - 60.0",
-        )) and "if first_price <= 0 and candles" not in collector,
+            "launch window", "T-8d", "first_candle", "listing_at - 60.0",
+        )) and "if first_price <= 0 and candles" not in collector and "if listing_at <= 0 and candles" not in collector,
         "build39_postlisting_tracks_7d": "tracking_postlisting" in collector and "POST_COMPLETE_SECONDS = 7 * 24 * 3600" in collector,
         "build39_cycle_bounded": all(token in cycle for token in (
             "ListingHistoryResearchCycle", "MAX_CASES_PER_RUN = 3",
