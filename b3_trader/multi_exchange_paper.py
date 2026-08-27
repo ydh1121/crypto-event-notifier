@@ -173,7 +173,8 @@ class MultiExchangePaperDemo(AutoPaperDemo):
             "notice_overlay": bool(lifecycle.get("notice_overlay")),
             "transitions": (lifecycle.get("transitions") if isinstance(lifecycle.get("transitions"), list) else [])[:40],
             "entry_blocked_markets": sum(1 for row in leaderboard if not row.get("lifecycle_entry_eligible", True)),
-            "shadow_only": True,
+            "paper_gate": "termination_only",
+            "shadow_only": False,
         }
         payload = {
             "running": not bool(error),
@@ -218,10 +219,11 @@ class MultiExchangePaperDemo(AutoPaperDemo):
                 "max_slippage_bps": MAX_SLIPPAGE_BPS,
                 "public_market_data_only": True,
                 "market_memory_retention_days": MARKET_MEMORY_RETENTION_DAYS,
-                "market_lifecycle_shadow_only": True,
+                "market_lifecycle_mode": "termination_gate_only",
                 "market_lifecycle_notice_overlay": True,
                 "termination_blocks_new_paper_entries": True,
                 "caution_remains_shadow_for_current_adaptive": True,
+                "new_listing_remains_shadow_for_current_adaptive": True,
                 "return_windows_source": "research_market_memory_mx",
             },
         }
