@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from b3_trader.listing_history import ListingCandle
-from b3_trader.listing_history_collector import DomesticListingCase, ListingHistoryCollector
+from b3_trader.listing_history_collector import FEATURE_VERSION, DomesticListingCase, ListingHistoryCollector
 from b3_trader.listing_history_sources import CexSpotMarket
 from b3_trader.listing_history_store import ListingHistoryStore
 from b3_trader.listing_identity import ListingIdentity
@@ -16,6 +16,7 @@ class FakeSource:
     def __init__(self) -> None:
         self.discover_calls = 0
         self.candle_calls = 0
+        self.minute_calls = 0
 
     def discover(self, identity: ListingIdentity) -> list[CexSpotMarket]:
         self.discover_calls += 1
@@ -39,6 +40,19 @@ class FakeSource:
             ListingCandle(ts=domestic - 24 * 3600, open=10, high=12, low=9, close=11),
             ListingCandle(ts=domestic - 3600, open=15, high=17, low=14, close=16),
             ListingCandle(ts=domestic + 3600, open=22, high=23, low=20, close=21),
+            ListingCandle(ts=domestic + 6 * 3600, open=24, high=26, low=23, close=25),
+            ListingCandle(ts=domestic + 24 * 3600, open=28, high=30, low=27, close=29),
+            ListingCandle(ts=domestic + 3 * 24 * 3600, open=32, high=34, low=31, close=33),
+            ListingCandle(ts=domestic + 7 * 24 * 3600, open=40, high=42, low=39, close=41),
+        ]
+
+    def minute_candles(self, market: str, *, start_ts: float, end_ts: float) -> list[ListingCandle]:
+        self.minute_calls += 1
+        domestic = 10 * 24 * 3600.0
+        return [
+            ListingCandle(ts=domestic, open=16, high=17, low=15, close=16.5, interval_seconds=60),
+            ListingCandle(ts=domestic + 5 * 60, open=18, high=19, low=17, close=18.5, interval_seconds=60),
+            ListingCandle(ts=domestic + 6 * 60, open=18.5, high=19, low=18, close=18.8, interval_seconds=60),
         ]
 
 
@@ -159,7 +173,7 @@ def _collector(store: ListingHistoryStore, source, verifier=None, quote=None) ->
     )
 
 
-def test_collector_persists_provider_verified_case_and_quote_rate(tmp_path: Path) -> None:
+def test_collector_persists_provider_verified_case_quote_rate_and_exact_p5m(tmp_path: Path) -> None:
     source = FakeSource()
     verifier = FakeVenueVerifier()
     quote = FakeQuoteRateResolver(rate=1.0)
@@ -171,18 +185,24 @@ def test_collector_persists_provider_verified_case_and_quote_rate(tmp_path: Path
         assert result["sources_ok"] == 1
         assert source.discover_calls == 1
         assert source.candle_calls == 1
+        assert source.minute_calls == 1
+        assert result["sources"]["fake"]["minute_candles"] == 3
+        assert result["sources"]["fake"]["fine_reaction_status"] == "collected"
         assert verifier.calls == [("alpha-beta-coin", "ABCUSDT")]
         assert quote.calls == [("USDT", _case().open_at)]
         feature_row = store.conn.execute(
             "SELECT feature_version,feature_json FROM listing_history_features WHERE source_exchange='fake'"
         ).fetchone()
         assert feature_row is not None
-        assert int(feature_row["feature_version"]) == 2
+        assert int(feature_row["feature_version"]) == FEATURE_VERSION == 3
         payload = json.loads(feature_row["feature_json"])
         assert payload["prelisting"]["currency_safe"] is True
         assert payload["prelisting"]["quote_asset"] == "USDT"
         assert payload["foreign_postlisting"]["anchor_price"] == 16
-        assert store.pending_cases() == []
+        assert payload["foreign_postlisting"]["windows"]["p5m"]["price"] == 18
+        assert payload["foreign_postlisting"]["windows"]["p5m"]["interval_seconds"] == 60
+        assert payload["foreign_postlisting"]["p5m_source_interval_seconds"] == 60
+        assert store.pending_cases(required_feature_version=FEATURE_VERSION) == []
     finally:
         collector.close()
 
@@ -215,7 +235,8 @@ def test_collector_marks_discovered_but_unverified_pair_as_waiting(tmp_path: Pat
         assert result["sources_ok"] == 0
         assert result["sources"]["fake"]["status"] == "venue_unverified"
         assert source.candle_calls == 0
-        assert len(store.pending_cases()) == 1
+        assert source.minute_calls == 0
+        assert len(store.pending_cases(required_feature_version=FEATURE_VERSION)) == 1
     finally:
         collector.close()
 
@@ -251,6 +272,7 @@ def test_collector_rejects_weak_identity_without_network(tmp_path: Path) -> None
         assert result["status"] == "rejected_identity"
         assert source.discover_calls == 0
         assert source.candle_calls == 0
+        assert source.minute_calls == 0
     finally:
         collector.close()
 
