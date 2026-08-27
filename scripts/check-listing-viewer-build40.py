@@ -77,7 +77,7 @@ def main() -> None:
         )),
         "build40_cache_boundary": (
             "./pages/research.js?v=40" in main_js
-            and 'crypto-viewer-build" content="2026.08.28-40"' in index
+            and 'crypto-viewer-build" content="2026.08.27-40"' in index
             and "/modules/styles/research.css?v=4" in index
             and "/modules/main.js?v=15" in index
         ),
