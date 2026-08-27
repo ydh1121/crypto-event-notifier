@@ -217,18 +217,27 @@ class UpbitNoticeSource:
 
     def _detail(self, notice_id: str) -> tuple[str, float]:
         headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
-        try:
-            response, _ = get_with_retry(
-                f"{self.current_url}/{notice_id}",
-                params={"os": "web"},
-                headers=headers,
-                timeout=10,
-                attempts=2,
-            )
-            payload = response.json()
-            return _upbit_detail_text(payload), _upbit_detail_timestamp(payload)
-        except (requests.RequestException, ValueError):
-            return "", 0.0
+        candidates = (
+            (f"{self.current_url}/{notice_id}", {"os": "web"}),
+            (f"{self.legacy_url}/{notice_id}", None),
+        )
+        for url, params in candidates:
+            try:
+                response, _ = get_with_retry(
+                    url,
+                    params=params,
+                    headers=headers,
+                    timeout=10,
+                    attempts=2,
+                )
+                payload = response.json()
+                text = _upbit_detail_text(payload)
+                published = _upbit_detail_timestamp(payload)
+                if text or published > 0:
+                    return text, published
+            except (requests.RequestException, ValueError):
+                continue
+        return "", 0.0
 
     def fetch(self) -> list[MarketNotice]:
         output: list[MarketNotice] = []
