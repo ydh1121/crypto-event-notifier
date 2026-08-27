@@ -6,6 +6,7 @@ import{fullPublic}from'./shared/selectors.js';
 import{age,esc}from'./shared/format.js';
 import{installSectorImeGuard}from'./shared/sector-ime-guard.js?v=37';
 import{installTableSortEnhancer}from'./shared/table-sort-enhancer.js?v=37';
+import{installSamePageInteractionContinuity}from'./shared/ui-continuity.js';
 import{createDashboardPage}from'./pages/dashboard.js';
 import{createResearchPage}from'./pages/research.js';
 import{createAssetsPage}from'./pages/assets.js';
@@ -18,6 +19,7 @@ import{createSystemPage}from'./pages/system.js?v=35';
 installSectorImeGuard();
 installTableSortEnhancer();
 const root=document.getElementById('pageRoot'),nav=document.getElementById('mainNav');
+installSamePageInteractionContinuity(root);
 let router=null;
 const pages={
   dashboard:()=>createDashboardPage({store,navigate:n=>router.go(n)}),
