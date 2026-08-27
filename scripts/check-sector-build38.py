@@ -50,7 +50,7 @@ def main() -> None:
         "sector_history_responsive": "sector-return-strip" in sector_market_css and "repeat(6" in sector_market_css,
         "sector_api_projects_returns": all(token in sector_api for token in ("$.return_windows.d1_pct", "$.return_windows.d2_pct", "$.return_windows.d3_pct", "$.return_windows.d4_pct", "$.return_windows.d5_pct")),
         "sector_api_projects_lifecycle": "$.lifecycle_state" in sector_api and "lifecycle_counts" in sector_api,
-        "return_window_domain": all(token in returns for token in ("d1_pct", "d2_pct", "d3_pct", "d4_pct", "d5_pct")),
+        "return_window_domain": all(token in returns for token in ("PRIOR_DAY_COUNT = 5", "prior_daily_returns", 'result[f"d{day}_pct"]', "range(1, PRIOR_DAY_COUNT + 1)")),
         "return_window_store_reuses_memory": "research_market_memory_mx" in market_features and "return_windows" in market_features,
         "detail_projection_thin": "return_windows" in detail_projection and "lifecycle_state" in detail_projection,
         "lifecycle_domain_separate": "decide_lifecycle_state" in lifecycle_domain and "merge_lifecycle_state" in lifecycle_domain,
