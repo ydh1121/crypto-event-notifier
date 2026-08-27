@@ -23,6 +23,13 @@ _GENERIC_NAME_WORDS = {
     "token", "coin", "network", "protocol", "finance", "foundation",
     "project", "ecosystem", "platform", "labs", "dao",
 }
+_MANUAL_HEADER_LIMIT = 5000
+_MANUAL_HEADER_MARKERS = (
+    "가상자산 소개",
+    "가상자산소개",
+    "가상자산 기본 정보",
+    "가상자산기본정보",
+)
 
 
 def _name_tokens(value: Any) -> list[str]:
@@ -50,16 +57,59 @@ def row_matches_candidate(row: dict[str, str], candidate_name: Any) -> bool:
     return project_name_matches(row.get("english_name"), candidate_name)
 
 
-def _identity_in_text(row: dict[str, str], text: str) -> bool:
-    normalized = _normalize(text)
-    ko = _normalize(row.get("korean_name"))
-    en = _normalize(row.get("english_name"))
-    if ko and len(ko) >= 2 and ko in normalized:
-        return True
-    if en and len(en) >= 4 and en in normalized:
-        return True
+def _manual_header(text: str) -> str:
+    visible = text[:_MANUAL_HEADER_LIMIT]
+    positions = [visible.find(marker) for marker in _MANUAL_HEADER_MARKERS]
+    positions = [position for position in positions if position > 0]
+    if positions:
+        visible = visible[: min(positions)]
+    return visible[:_MANUAL_HEADER_LIMIT]
+
+
+def _identity_pattern(value: Any) -> str:
+    raw = _text(value)
+    tokens = re.findall(r"[A-Za-z0-9가-힣]+", raw)
+    if not tokens:
+        return ""
+    if len(tokens) > 1:
+        body = r"[\s·•._\-–—/:：()\[\]]*".join(re.escape(token) for token in tokens)
+    else:
+        token = tokens[0]
+        if re.fullmatch(r"[가-힣]{2,}", token):
+            body = r"[\s·•._\-–—/:：()\[\]]*".join(re.escape(char) for char in token)
+        else:
+            body = re.escape(token)
+    return rf"(?<![A-Za-z0-9가-힣]){body}(?![A-Za-z0-9가-힣])"
+
+
+def _identity_phrase_in_text(text: str, value: Any) -> bool:
+    pattern = _identity_pattern(value)
+    return bool(pattern and re.search(pattern, text, re.I))
+
+
+def _manual_identity_matches(row: dict[str, str], text: str) -> bool:
+    """Require project identity in the PDF header, not merely a body mention.
+
+    Crypto manuals routinely mention BTC, ETH, parent chains, partner protocols,
+    and similarly named projects in the body. A body-wide substring check can
+    therefore attach a perfectly valid PDF to the wrong asset. The manual is
+    accepted only when the exchange identity is corroborated in the document
+    header by two independent fields.
+    """
+
+    header = _manual_header(text)
+    korean_name = _text(row.get("korean_name"))
+    english_name = _text(row.get("english_name"))
     symbol = _text(row.get("symbol")).upper()
-    if len(symbol) >= 4 and re.search(rf"(?<![A-Z0-9]){re.escape(symbol)}(?![A-Z0-9])", text.upper()):
+    korean_hit = _identity_phrase_in_text(header, korean_name)
+    english_hit = _identity_phrase_in_text(header, english_name)
+    symbol_hit = bool(
+        len(symbol) >= 2
+        and re.search(rf"(?<![A-Z0-9]){re.escape(symbol)}(?![A-Z0-9])", header.upper())
+    )
+    if korean_hit and english_hit:
+        return True
+    if symbol_hit and (korean_hit or english_hit):
         return True
     return False
 
@@ -140,7 +190,7 @@ class IdentitySafeCoinProfileEnricher(CoinProfileEnricher):
             text = "\n".join((page.extract_text() or "") for page in reader.pages[:6])
         except Exception:
             return {}
-        if not _identity_in_text(row, text):
+        if not _manual_identity_matches(row, text):
             return {}
         text = re.sub(r"[ \t]+", " ", text)
         intro = re.search(r"가상자산\s*소개\s*(.*?)\s*가상자산\s*기본\s*정보", text, re.S)
@@ -152,7 +202,7 @@ class IdentitySafeCoinProfileEnricher(CoinProfileEnricher):
             "purpose_ko": _clean_html(purpose.group(1) if purpose else "", 500),
             "homepage": _safe_url((homepage.group(1) if homepage else "").rstrip(".,)")),
             "whitepaper": _safe_url((whitepaper.group(1) if whitepaper else "").rstrip(".,)")),
-            "identity_verified": "true",
+            "identity_verified": "strict_header",
         }
 
     def _bithumb_manual(self, row: dict[str, str]) -> dict[str, str]:
