@@ -60,6 +60,15 @@ def _remove_generated_package_lock() -> None:
         pass
 
 
+def _command_label(args: list[str]) -> str:
+    return " ".join(Path(args[0]).name if index == 0 else part for index, part in enumerate(args[:5]))
+
+
+def _output_tail(value: str, limit: int = 5000) -> str:
+    text = (value or "").strip()
+    return text[-limit:] if len(text) > limit else text
+
+
 def _run(
     args: list[str],
     *,
@@ -81,8 +90,16 @@ def _run(
         env=env,
     )
     if completed.returncode != 0:
-        label = " ".join(Path(args[0]).name if index == 0 else part for index, part in enumerate(args[:4]))
-        raise RuntimeError(f"{label} failed with exit code {completed.returncode}")
+        detail = "\n".join(
+            item
+            for item in (
+                f"{_command_label(args)} failed with exit code {completed.returncode}",
+                f"stdout:\n{_output_tail(completed.stdout)}" if completed.stdout.strip() else "",
+                f"stderr:\n{_output_tail(completed.stderr)}" if completed.stderr.strip() else "",
+            )
+            if item
+        )
+        raise RuntimeError(detail)
     return completed
 
 
@@ -111,21 +128,46 @@ class CloudflarePagesDeployer:
             return ingest[: -len("/api/ingest")]
         return f"https://{self.project}.pages.dev"
 
-    def _relevant_changes(self, previous_head: str, head: str) -> list[str]:
+    def _changed_paths(self, previous_head: str, head: str, *paths: str) -> list[str]:
         if not previous_head or previous_head == head:
             return []
         try:
-            output = _git(
-                "diff",
-                "--name-only",
-                f"{previous_head}..{head}",
-                "--",
-                "cloudflare-pages",
-                ".github/workflows/deploy-pages-viewer.yml",
-            )
+            output = _git("diff", "--name-only", f"{previous_head}..{head}", "--", *paths)
         except Exception:
-            return ["cloudflare-pages"]
+            return list(paths)
         return [line.strip() for line in output.splitlines() if line.strip()]
+
+    def _relevant_changes(self, previous_head: str, head: str) -> list[str]:
+        return self._changed_paths(
+            previous_head,
+            head,
+            "cloudflare-pages",
+            ".github/workflows/deploy-pages-viewer.yml",
+        )
+
+    def _migration_changes(self, previous_head: str, head: str) -> list[str]:
+        if not previous_head:
+            return ["first-deploy"]
+        return self._changed_paths(previous_head, head, "cloudflare-pages/migrations")
+
+    def _apply_migrations(self, wrangler: str, child_env: dict[str, str]) -> None:
+        args = [wrangler, "d1", "migrations", "apply", self.database, "--remote"]
+        last_error: Exception | None = None
+        for attempt in range(1, 4):
+            try:
+                _run(
+                    args,
+                    cwd=VIEWER_DIR,
+                    timeout=180.0,
+                    input_text="y\n",
+                    env=child_env,
+                )
+                return
+            except Exception as exc:
+                last_error = exc
+                if attempt < 3:
+                    time.sleep(2.0 * attempt)
+        raise RuntimeError(f"D1 migration failed after 3 attempts:\n{last_error}") from last_error
 
     def deploy_once(self, *, force: bool = False) -> dict[str, Any]:
         load_dotenv(REPO_ROOT / ".env", override=True)
@@ -148,6 +190,7 @@ class CloudflarePagesDeployer:
         state = _read_json(STATE_PATH)
         previous_head = str(state.get("deployed_head") or "")
         changes = self._relevant_changes(previous_head, head) if previous_head else ["first-deploy"]
+        migration_changes = self._migration_changes(previous_head, head)
         if not force and previous_head == head:
             return {
                 "status": "up_to_date",
@@ -188,20 +231,13 @@ class CloudflarePagesDeployer:
             if (VIEWER_DIR / script).exists():
                 _run([node, "--check", script], cwd=VIEWER_DIR, timeout=60.0, env=child_env)
 
-        _run(
-            [
-                wrangler,
-                "d1",
-                "migrations",
-                "apply",
-                self.database,
-                "--remote",
-            ],
-            cwd=VIEWER_DIR,
-            timeout=180.0,
-            input_text="y\n",
-            env=child_env,
-        )
+        # D1 migrations are schema work, not a prerequisite for every code-only force deploy.
+        # Re-running Wrangler's remote migration command on every deploy made a transient D1
+        # outage block otherwise valid Pages/API releases. Apply only when migration files
+        # changed since the last successfully deployed HEAD (or on the first deployment).
+        if migration_changes:
+            self._apply_migrations(wrangler, child_env)
+
         _run(
             [
                 wrangler,
@@ -227,7 +263,7 @@ class CloudflarePagesDeployer:
         health = response.json() if response.content else {}
         now = time.time()
         payload = {
-            "version": 1,
+            "version": 2,
             "configured": True,
             "project": self.project,
             "database": self.database,
@@ -236,6 +272,8 @@ class CloudflarePagesDeployer:
             "deployed_at": now,
             "checked_at": now,
             "changed_files": changes[:40],
+            "migration_changes": migration_changes[:20],
+            "migrations_applied": bool(migration_changes),
             "health_ok": bool(isinstance(health, dict) and health.get("ok")),
         }
         _atomic_json(STATE_PATH, payload)
@@ -245,6 +283,8 @@ class CloudflarePagesDeployer:
             "head": head,
             "viewer_url": viewer_url,
             "changed_files": len(changes),
+            "migration_changes": len(migration_changes),
+            "migrations_applied": bool(migration_changes),
             "health_ok": payload["health_ok"],
             "elapsed_seconds": round(time.time() - started, 3),
         }
