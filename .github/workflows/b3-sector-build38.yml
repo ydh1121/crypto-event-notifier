@@ -5,14 +5,25 @@ on:
     branches:
       - "b3-auto-trader-phase1"
     paths:
+      - "b3_trader/http_retry.py"
       - "b3_trader/market_lifecycle.py"
       - "b3_trader/market_lifecycle_store.py"
+      - "b3_trader/market_lifecycle_service.py"
+      - "b3_trader/market_notice.py"
+      - "b3_trader/market_notice_sources.py"
+      - "b3_trader/market_notice_store.py"
+      - "b3_trader/market_notice_collector.py"
       - "b3_trader/market_return_windows.py"
       - "b3_trader/market_feature_store.py"
       - "b3_trader/market_detail_feature_projection.py"
       - "b3_trader/multi_exchange_paper.py"
+      - "b3_trader/research_control.py"
+      - "b3_trader/research_supervisor.py"
       - "b3_trader/cloudflare_market_detail_strategy_lab.py"
       - "b3_trader/tests/test_market_lifecycle.py"
+      - "b3_trader/tests/test_market_lifecycle_notice.py"
+      - "b3_trader/tests/test_market_notice.py"
+      - "b3_trader/tests/test_market_notice_collector.py"
       - "b3_trader/tests/test_market_return_windows.py"
       - "cloudflare-pages/functions/api/sector-summary.ts"
       - "cloudflare-pages/public/modules/pages/sectors-v36.js"
@@ -40,8 +51,8 @@ jobs:
         with:
           node-version: "22"
       - run: pip install -r b3_trader/requirements.txt pytest
-      - run: python -m py_compile b3_trader/market_lifecycle.py b3_trader/market_lifecycle_store.py b3_trader/market_return_windows.py b3_trader/market_feature_store.py b3_trader/market_detail_feature_projection.py b3_trader/multi_exchange_paper.py scripts/check-sector-build38.py
-      - run: python -m pytest -q b3_trader/tests/test_market_lifecycle.py b3_trader/tests/test_market_return_windows.py
+      - run: python -m py_compile b3_trader/http_retry.py b3_trader/market_lifecycle.py b3_trader/market_lifecycle_store.py b3_trader/market_lifecycle_service.py b3_trader/market_notice.py b3_trader/market_notice_sources.py b3_trader/market_notice_store.py b3_trader/market_notice_collector.py b3_trader/market_return_windows.py b3_trader/market_feature_store.py b3_trader/market_detail_feature_projection.py b3_trader/multi_exchange_paper.py b3_trader/research_control.py b3_trader/research_supervisor.py scripts/check-sector-build38.py
+      - run: python -m pytest -q b3_trader/tests/test_market_lifecycle.py b3_trader/tests/test_market_lifecycle_notice.py b3_trader/tests/test_market_notice.py b3_trader/tests/test_market_notice_collector.py b3_trader/tests/test_market_return_windows.py
       - run: node --check cloudflare-pages/public/modules/shared/market-lifecycle.js
       - run: node --check cloudflare-pages/public/modules/shared/ui-continuity.js
       - run: node --check cloudflare-pages/public/modules/pages/sector-coin-table.js
