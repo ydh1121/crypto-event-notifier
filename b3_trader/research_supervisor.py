@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 from .cloudflare_market_detail_strategy_lab import CloudflareMarketDetailPublisher
 from .cloudflare_pages_deployer import CloudflarePagesDeployer
-from .cloudflare_snapshot_publisher import CloudflareSnapshotPublisher
+from .cloudflare_snapshot_lifecycle import CloudflareSnapshotPublisher
 from .coin_profile_research_cycle_v36 import CoinProfileResearchCycleV36
 from .reference_components import ReferenceComponentWatcher
 from .research_control import COMPONENT_DEFINITIONS, STATUS_PATH, atomic_json, load_control
