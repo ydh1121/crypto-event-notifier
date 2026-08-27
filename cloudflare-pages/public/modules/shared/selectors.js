@@ -8,6 +8,10 @@ export function exchangePublic(state,exchange='bithumb'){
   return{...pub,...selected,exchange,exchanges:pub.exchanges,exchange_records:pub.exchange_records||{},recent_records:pub.exchange_records?.[exchange]||pub.recent_records,research_node:pub.research_node,strategy_lab:pub.strategy_lab,published_at:pub.published_at,multi_exchange_updated_at:pub.multi_exchange_updated_at};
 }
 export const rowsFor=(state,exchange='bithumb')=>Array.isArray(exchangePublic(state,exchange).leaderboard)?exchangePublic(state,exchange).leaderboard:[];
+export function marketLifecycle(state,exchange='bithumb'){
+  const value=exchangePublic(state,exchange).market_lifecycle;
+  return value&&typeof value==='object'?value:{market_count:0,counts:{},attention:[],notice_only:[],transitions:[],notice_state_count:0,notice_overlay:false,shadow_only:true};
+}
 export function combinedPaper(state){
   const pub=fullPublic(state),parts=['bithumb','upbit'].map(x=>pub.exchanges?.[x]).filter(Boolean);
   if(!parts.length){const p=pub,start=n(p.aggregate_virtual_capital_krw),equity=n(p.equity_krw);return{start,equity,pnl:n(p.pnl_krw||equity-start),cash:n(p.cash_krw),active:n(p.active_positions),markets:n(p.market_count)}}
