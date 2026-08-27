@@ -39,6 +39,13 @@ def main() -> None:
     post_windows = ("p5m", "p1h", "p6h", "p24h", "p3d", "p7d")
     notice_refresh_at = runtime_verify.find("b3_trader.market_notice_collector")
     listing_cycle_at = runtime_verify.find("b3_trader.listing_history_research_cycle")
+    supervisor_init_start = supervisor.find("def __init__(self) -> None:")
+    supervisor_lazy_start = supervisor.find("def _run_listing_history_once")
+    supervisor_init = (
+        supervisor[supervisor_init_start:supervisor_lazy_start]
+        if supervisor_init_start >= 0 and supervisor_lazy_start > supervisor_init_start
+        else ""
+    )
     checks = {
         "build39_identity_domain": all(token in identity for token in (
             "ListingIdentity", "listing_identity_gate", "provider_identity_missing",
@@ -188,9 +195,15 @@ def main() -> None:
         "build39_supervisor_component": all(token in control for token in (
             '"listing-history-research"', '"default_interval_seconds":900', '"min_interval_seconds":300',
         )) and all(token in supervisor for token in (
-            "ListingHistoryResearchCycle", '"listing-history-research": self.listing_history_research.run_once',
-            "self.listing_history_research.close()",
+            "ListingHistoryResearchCycle", '"listing-history-research": self._run_listing_history_once',
+            "def _run_listing_history_once", "def _close_component_resources", "cycle.close()",
         )),
+        "build39_listing_history_thread_owned": (
+            "self.listing_history_research: ListingHistoryResearchCycle | None = None" in supervisor_init
+            and "self.listing_history_research = ListingHistoryResearchCycle()" not in supervisor_init
+            and '"listing-history-research": self._run_listing_history_once' in supervisor
+            and "self._close_component_resources(name)" in supervisor
+        ),
         "build39_paper_remains_unwired": all(token not in paper for token in (
             "ListingHistoryCollector", "ListingHistoryResearchCycle", "listing_history_features",
             "prelisting_features", "ListingQuoteRateResolver",
