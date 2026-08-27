@@ -8,6 +8,8 @@ from typing import Any, Iterable
 
 from .market_lifecycle import CAUTION, NEW_LISTING, NORMAL, TERMINATED, decide_lifecycle_state
 
+MIN_EXISTING_COVERAGE_RATIO = 0.75
+
 
 class MarketLifecycleStore:
     """Additive lifecycle registry backed by the existing local SQLite connection."""
@@ -95,6 +97,12 @@ class MarketLifecycleStore:
             ),
         )
 
+    def _observation_is_safe(self, existing_count: int, current_count: int) -> tuple[bool, float]:
+        if existing_count <= 0:
+            return current_count > 0, 1.0 if current_count > 0 else 0.0
+        ratio = current_count / existing_count
+        return current_count > 0 and ratio >= MIN_EXISTING_COVERAGE_RATIO, ratio
+
     def observe_markets(
         self,
         exchange: str,
@@ -115,6 +123,20 @@ class MarketLifecycleStore:
             market, symbol, name, warning = self._market_fields(source)
             if market.startswith("KRW-"):
                 current[market] = (symbol, name, warning)
+
+        safe, coverage_ratio = self._observation_is_safe(len(existing), len(current))
+        if not safe:
+            snapshot = self.snapshot(exchange)
+            snapshot.update(
+                {
+                    "baseline_run": baseline_run,
+                    "transitions": [],
+                    "observation_rejected": True,
+                    "observed_market_count": len(current),
+                    "coverage_ratio": coverage_ratio,
+                }
+            )
+            return snapshot
 
         for market, (symbol, name, warning) in current.items():
             previous = existing.get(market)
@@ -233,8 +255,15 @@ class MarketLifecycleStore:
 
         self.conn.commit()
         snapshot = self.snapshot(exchange)
-        snapshot["baseline_run"] = baseline_run
-        snapshot["transitions"] = transitions
+        snapshot.update(
+            {
+                "baseline_run": baseline_run,
+                "transitions": transitions,
+                "observation_rejected": False,
+                "observed_market_count": len(current),
+                "coverage_ratio": coverage_ratio,
+            }
+        )
         return snapshot
 
     def snapshot(self, exchange: str) -> dict[str, Any]:
