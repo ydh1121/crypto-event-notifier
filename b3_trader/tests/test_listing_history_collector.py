@@ -41,6 +41,20 @@ class FakeSource:
         ]
 
 
+class FakeVenueVerifier:
+    def __init__(self, verified: bool = True) -> None:
+        self.verified = verified
+        self.calls = []
+
+    def verify(self, identity: ListingIdentity, market: CexSpotMarket):
+        self.calls.append((identity.provider_id, market.market))
+        return {
+            "verified": self.verified,
+            "status": "provider_pair_verified" if self.verified else "provider_pair_not_found",
+            "evidence": {"provider": "coingecko", "coin_id": identity.provider_id},
+        }
+
+
 def verified_identity() -> ListingIdentity:
     return ListingIdentity(
         symbol="ABC",
@@ -52,10 +66,11 @@ def verified_identity() -> ListingIdentity:
     )
 
 
-def test_collector_persists_verified_case(tmp_path: Path) -> None:
+def test_collector_persists_provider_verified_case(tmp_path: Path) -> None:
     source = FakeSource()
+    verifier = FakeVenueVerifier()
     store = ListingHistoryStore(tmp_path / "listing.sqlite3")
-    collector = ListingHistoryCollector(store=store, sources=(source,))
+    collector = ListingHistoryCollector(store=store, sources=(source,), venue_verifier=verifier)
     domestic = 10 * 24 * 3600.0
     try:
         result = collector.collect_case(
@@ -73,7 +88,37 @@ def test_collector_persists_verified_case(tmp_path: Path) -> None:
         assert result["sources_ok"] == 1
         assert source.discover_calls == 1
         assert source.candle_calls == 1
+        assert verifier.calls == [("alpha-beta-coin", "ABCUSDT")]
         assert store.pending_cases() == []
+    finally:
+        collector.close()
+
+
+def test_collector_rejects_unverified_foreign_pair(tmp_path: Path) -> None:
+    source = FakeSource()
+    store = ListingHistoryStore(tmp_path / "listing.sqlite3")
+    collector = ListingHistoryCollector(
+        store=store,
+        sources=(source,),
+        venue_verifier=FakeVenueVerifier(False),
+    )
+    domestic = 10 * 24 * 3600.0
+    try:
+        result = collector.collect_case(
+            DomesticListingCase(
+                exchange="bithumb",
+                market="KRW-ABC",
+                symbol="ABC",
+                announcement_at=domestic - 3600,
+                open_at=domestic,
+                open_price=20,
+                identity=verified_identity(),
+            )
+        )
+        assert result["status"] == "no_foreign_market_found"
+        assert result["sources_ok"] == 0
+        assert result["sources"]["fake"]["status"] == "venue_unverified"
+        assert source.candle_calls == 0
     finally:
         collector.close()
 
@@ -81,7 +126,7 @@ def test_collector_persists_verified_case(tmp_path: Path) -> None:
 def test_collector_rejects_weak_identity_without_network(tmp_path: Path) -> None:
     source = FakeSource()
     store = ListingHistoryStore(tmp_path / "listing.sqlite3")
-    collector = ListingHistoryCollector(store=store, sources=(source,))
+    collector = ListingHistoryCollector(store=store, sources=(source,), venue_verifier=FakeVenueVerifier())
     try:
         result = collector.collect_case(
             DomesticListingCase(
