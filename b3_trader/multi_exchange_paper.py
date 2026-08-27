@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .asset_strategy import AssetStrategy
+from .asset_strategy import AssetSignal, AssetStrategy
 from .auto_demo_v2 import (
     BUY_COOLDOWN_SECONDS,
     DEFAULT_BASE_WEIGHT_PCT,
@@ -27,6 +27,7 @@ from .market_lifecycle_service import MarketLifecycleService
 from .scoped_paper_store import ScopedPaperStore
 
 MARKET_MEMORY_RETENTION_DAYS = 45
+ENTRY_INTENTS = {"buy", "explore", "idle_explore"}
 
 
 class MultiExchangePaperDemo(AutoPaperDemo):
@@ -66,8 +67,8 @@ class MultiExchangePaperDemo(AutoPaperDemo):
         self.lifecycle_snapshot = self.lifecycle.observe_markets(self.exchange, markets)
         self.market_meta = {row.market: row for row in markets}
         names = {row.market: row.name for row in markets}
-        # Seed every KRW market immediately so each exchange/market/strategy owns
-        # an independent 10M account even when a smoke run limits scoring work.
+        # Seed every active KRW market immediately. A market discovered after
+        # baseline therefore receives its PAPER account/profile before scoring.
         for row in markets:
             self.store.ensure_market(row.market, row.symbol, row.name)
         return self.client.krw_tickers(), names
@@ -79,11 +80,74 @@ class MultiExchangePaperDemo(AutoPaperDemo):
             rows = rows[:market_limit]
         return rows, breadth
 
+    def _entry_policy(self, market: str, account: dict[str, Any]):
+        return self.lifecycle.entry_policy(
+            self.exchange,
+            market,
+            has_position=_num(account.get("volume")) > 0,
+            snapshot=self.lifecycle_snapshot,
+        )
+
+    def _build_trade_plan(
+        self,
+        account: dict[str, Any],
+        profile: dict[str, Any],
+        signal: AssetSignal,
+        opportunity: float,
+        price: float,
+        intent: str,
+    ) -> dict[str, Any]:
+        plan = super()._build_trade_plan(account, profile, signal, opportunity, price, intent)
+        policy = self._entry_policy(str(account.get("market") or ""), account)
+        plan["lifecycle_state"] = policy.state
+        plan["lifecycle_entry_eligible"] = policy.entry_allowed
+        plan["lifecycle_add_eligible"] = policy.add_allowed
+        plan["lifecycle_risk_flag"] = policy.risk_flag
+        plan["lifecycle_policy_reason"] = policy.reason
+        if not policy.entry_allowed or not policy.add_allowed:
+            plan["suggested_weight_pct"] = 0.0
+            plan["expected_entry_price"] = 0.0
+        return plan
+
+    def _trade_intent(
+        self,
+        account: dict[str, Any],
+        profile: dict[str, Any],
+        signal: AssetSignal,
+        opportunity: float,
+        price: float,
+        now: float,
+        plan: dict[str, Any],
+    ) -> tuple[str, str]:
+        intent, reason = super()._trade_intent(account, profile, signal, opportunity, price, now, plan)
+        policy = self._entry_policy(str(account.get("market") or ""), account)
+        if intent in ENTRY_INTENTS and not policy.entry_allowed:
+            return "wait", f"lifecycle_block {policy.state}: {policy.reason}; {reason}"
+        if intent == "add" and not policy.add_allowed:
+            return "hold", f"lifecycle_block {policy.state}: {policy.reason}; {reason}"
+        return intent, reason
+
+    def _lifecycle_decorated_row(self, row: dict[str, Any]) -> dict[str, Any]:
+        market = str(row.get("market") or "")
+        account = {"market": market, "volume": 1.0 if row.get("has_position") else 0.0}
+        policy = self._entry_policy(market, account)
+        return {
+            **row,
+            "lifecycle_state": policy.state,
+            "lifecycle_entry_eligible": policy.entry_allowed,
+            "lifecycle_add_eligible": policy.add_allowed,
+            "lifecycle_risk_flag": policy.risk_flag,
+        }
+
     def _write_market_detail(self, market: str) -> None:
         detail = self.store.market_detail(market)
         if detail:
-            states = self.lifecycle_snapshot.get("states") if isinstance(self.lifecycle_snapshot, dict) else {}
-            detail["lifecycle_state"] = str((states.get(market) if isinstance(states, dict) else "") or NORMAL)
+            account = detail.get("account") if isinstance(detail.get("account"), dict) else {}
+            policy = self._entry_policy(market, account)
+            detail["lifecycle_state"] = policy.state
+            detail["lifecycle_entry_eligible"] = policy.entry_allowed
+            detail["lifecycle_add_eligible"] = policy.add_allowed
+            detail["lifecycle_risk_flag"] = policy.risk_flag
             detail = self.market_features.enrich_market_detail(
                 detail,
                 exchange=self.exchange,
@@ -94,11 +158,7 @@ class MultiExchangePaperDemo(AutoPaperDemo):
 
     def _write_status(self, *, scanned: int, total: int, error: str = "") -> None:
         lifecycle = self.lifecycle_snapshot if isinstance(self.lifecycle_snapshot, dict) else {}
-        lifecycle_states = lifecycle.get("states") if isinstance(lifecycle.get("states"), dict) else {}
-        leaderboard = [
-            {**row, "lifecycle_state": str(lifecycle_states.get(str(row.get("market") or "")) or NORMAL)}
-            for row in self.store.leaderboard(5000)
-        ]
+        leaderboard = [self._lifecycle_decorated_row(row) for row in self.store.leaderboard(5000)]
         active_positions = sum(1 for row in leaderboard if row["has_position"])
         total_equity = sum(_num(row.get("equity_krw")) for row in leaderboard)
         total_cash = sum(_num(row.get("cash_krw")) for row in leaderboard)
@@ -112,6 +172,7 @@ class MultiExchangePaperDemo(AutoPaperDemo):
             "notice_state_count": int(lifecycle.get("notice_state_count") or 0),
             "notice_overlay": bool(lifecycle.get("notice_overlay")),
             "transitions": (lifecycle.get("transitions") if isinstance(lifecycle.get("transitions"), list) else [])[:40],
+            "entry_blocked_markets": sum(1 for row in leaderboard if not row.get("lifecycle_entry_eligible", True)),
             "shadow_only": True,
         }
         payload = {
@@ -159,6 +220,8 @@ class MultiExchangePaperDemo(AutoPaperDemo):
                 "market_memory_retention_days": MARKET_MEMORY_RETENTION_DAYS,
                 "market_lifecycle_shadow_only": True,
                 "market_lifecycle_notice_overlay": True,
+                "termination_blocks_new_paper_entries": True,
+                "caution_remains_shadow_for_current_adaptive": True,
                 "return_windows_source": "research_market_memory_mx",
             },
         }
