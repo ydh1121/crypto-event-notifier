@@ -22,7 +22,7 @@ from .auto_demo_v2 import (
 )
 from .exchange_public import PublicExchangeAdapter, PublicMarket, public_exchange
 from .market_feature_store import MarketFeatureStore
-from .market_lifecycle import NORMAL
+from .market_lifecycle import NORMAL, lifecycle_entry_policy
 from .market_lifecycle_service import MarketLifecycleService
 from .scoped_paper_store import ScopedPaperStore
 
@@ -81,11 +81,20 @@ class MultiExchangePaperDemo(AutoPaperDemo):
         return rows, breadth
 
     def _entry_policy(self, market: str, account: dict[str, Any]):
-        return self.lifecycle.entry_policy(
-            self.exchange,
+        has_position = _num(account.get("volume")) > 0
+        lifecycle = getattr(self, "lifecycle", None)
+        snapshot = getattr(self, "lifecycle_snapshot", None)
+        exchange = str(getattr(self, "exchange", "") or "")
+        if lifecycle is None or not exchange or not isinstance(snapshot, dict):
+            # Compatibility for legacy/test construction paths that intentionally
+            # bypass __init__. The normal active-market policy preserves the
+            # previous trade-plan behavior without duplicating lifecycle logic.
+            return lifecycle_entry_policy(NORMAL, has_position=has_position)
+        return lifecycle.entry_policy(
+            exchange,
             market,
-            has_position=_num(account.get("volume")) > 0,
-            snapshot=self.lifecycle_snapshot,
+            has_position=has_position,
+            snapshot=snapshot,
         )
 
     def _build_trade_plan(
