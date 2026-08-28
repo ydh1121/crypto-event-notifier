@@ -150,6 +150,10 @@ def test_resolver_crosswalks_verified_provider_by_name_symbol_and_domain(monkeyp
     assert result["coingecko_venue_id"] == "interfold"
     assert result["coingecko_crosswalk"]["basis"]["domain_overlap"] == ["interfold.example"]
     assert result["coingecko_crosswalk"]["basis"]["search_query_basis"] == "verified_english_name"
+    assert result["coingecko_crosswalk"]["contracts_checked"] is True
+    assert result["coingecko_crosswalk"]["contracts"] == [
+        {"platform_id": "ethereum", "token_address": "0xabcdef"}
+    ]
 
 
 def test_resolver_never_promotes_same_ticker_with_wrong_project_name(monkeypatch) -> None:
