@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .cloudflare_snapshot_budget import apply_snapshot_budget
 from .cloudflare_snapshot_publisher import (
     DEMO_DB_PATH,
     DEMO_STATUS_PATH,
@@ -48,7 +49,7 @@ def apply_lifecycle_projection(payload: dict[str, Any], demo: dict[str, Any]) ->
 
 
 class CloudflareSnapshotPublisher(BaseCloudflareSnapshotPublisher):
-    """Viewer projection for lifecycle state and compact listing-history research."""
+    """Viewer projection for lifecycle state and bounded compact research data."""
 
     def build_snapshot(self) -> dict[str, Any]:
         snapshot = super().build_snapshot()
@@ -69,4 +70,6 @@ class CloudflareSnapshotPublisher(BaseCloudflareSnapshotPublisher):
         # Listing-history candles remain local. Only the read-only compact
         # case/source/feature projection is added to the existing snapshot row.
         public["listing_history"] = build_listing_history_snapshot(DEMO_DB_PATH)
-        return snapshot
+        # Build 41 removes duplicate Bithumb projection blocks and reserves
+        # payload headroom before future compact DEX research is introduced.
+        return apply_snapshot_budget(snapshot)
