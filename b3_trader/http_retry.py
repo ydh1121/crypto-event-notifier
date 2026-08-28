@@ -9,15 +9,23 @@ RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 NON_RETRYABLE_ERROR_CODES = {"D1_WRITE_LIMIT", "D1_STORAGE_LIMIT"}
 
 
-def _retry_delay(response: requests.Response | None, attempt: int) -> float:
+def _retry_delay(
+    response: requests.Response | None,
+    attempt: int,
+    *,
+    floor_seconds: float = 0.0,
+    cap_seconds: float = 10.0,
+) -> float:
+    floor = max(0.0, float(floor_seconds))
+    cap = max(floor, float(cap_seconds))
     if response is not None:
         raw = response.headers.get("Retry-After", "").strip()
         if raw:
             try:
-                return max(0.25, min(10.0, float(raw)))
+                return max(0.25, min(cap, max(floor, float(raw))))
             except ValueError:
                 pass
-    return min(8.0, 0.75 * (2 ** attempt))
+    return min(cap, max(floor, 0.75 * (2 ** attempt)))
 
 
 def _response_error(response: requests.Response, url: str) -> requests.HTTPError:
@@ -61,8 +69,14 @@ def get_with_retry(
     params: dict[str, Any] | None = None,
     timeout: float = 12.0,
     attempts: int = 3,
+    retry_delay_floor_seconds: float = 0.0,
+    retry_delay_cap_seconds: float = 10.0,
 ) -> tuple[requests.Response, int]:
-    """GET with bounded retry for transient public-source/network failures."""
+    """GET with bounded retry for transient public-source/network failures.
+
+    Callers hitting strict public rate limits can request a larger retry-delay
+    floor/cap without changing the default retry cadence used elsewhere.
+    """
     last_error: Exception | None = None
     max_attempts = max(1, int(attempts))
     for attempt in range(max_attempts):
@@ -79,7 +93,14 @@ def get_with_retry(
             raise
         if attempt >= max_attempts - 1:
             break
-        time.sleep(_retry_delay(response, attempt))
+        time.sleep(
+            _retry_delay(
+                response,
+                attempt,
+                floor_seconds=retry_delay_floor_seconds,
+                cap_seconds=retry_delay_cap_seconds,
+            )
+        )
     if last_error is not None:
         raise last_error
     raise RuntimeError("HTTP GET failed without a response")
