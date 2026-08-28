@@ -14,6 +14,7 @@ from .cloudflare_market_detail_strategy_lab import CloudflareMarketDetailPublish
 from .cloudflare_pages_deployer import CloudflarePagesDeployer
 from .cloudflare_snapshot_lifecycle import CloudflareSnapshotPublisher
 from .coin_profile_research_cycle_v36 import CoinProfileResearchCycleV36
+from .dex_launch_research_cycle import DexLaunchResearchCycle
 from .listing_history_research_cycle import ListingHistoryResearchCycle
 from .market_notice_collector import MarketNoticeCollector
 from .reference_components import ReferenceComponentWatcher
@@ -82,11 +83,11 @@ class ResearchSupervisor:
         self.cloudflare_market_detail_publisher = CloudflareMarketDetailPublisher()
         self.coin_profile_research = CoinProfileResearchCycleV36()
         self.market_notice_collector = MarketNoticeCollector()
-        # ListingHistoryResearchCycle opens several SQLite connections. Do not
-        # construct it here on the supervisor/main thread: Python's sqlite3
-        # connections are thread-affine by default. The listing component owns
-        # creation, use and close on its own worker thread instead.
+        # ListingHistoryResearchCycle and DexLaunchResearchCycle open SQLite
+        # connections. They must be created, used and closed on their own
+        # component worker threads; never construct them on the main thread.
         self.listing_history_research: ListingHistoryResearchCycle | None = None
+        self.dex_launch_research: DexLaunchResearchCycle | None = None
         self.cloudflare_deployer = CloudflarePagesDeployer()
         self.upbit_paper_runner = UpbitPaperResearchRunner()
         self.strategy_lab_runner = ConfiguredStrategyLabRunner()
@@ -99,6 +100,7 @@ class ResearchSupervisor:
             "coin-profile-enrichment": self.coin_profile_research.run_once,
             "market-notice-watch": self.market_notice_collector.run_once,
             "listing-history-research": self._run_listing_history_once,
+            "dex-launch-research": self._run_dex_launch_once,
             "upbit-paper-research": self.upbit_paper_runner.run_once,
             "strategy-lab-shadow": self.strategy_lab_runner.run_once,
             "cloudflare-pages-deploy": self.cloudflare_deployer.deploy_once,
@@ -116,14 +118,25 @@ class ResearchSupervisor:
             self.listing_history_research = ListingHistoryResearchCycle()
         return self.listing_history_research.run_once()
 
+    def _run_dex_launch_once(self) -> dict[str, Any]:
+        """Create and use DEX-research SQLite owners on this component thread."""
+        if self.dex_launch_research is None:
+            self.dex_launch_research = DexLaunchResearchCycle()
+        return self.dex_launch_research.run_once()
+
     def _close_component_resources(self, name: str) -> None:
         """Close thread-affine resources before their component thread exits."""
-        if name != "listing-history-research":
+        if name == "listing-history-research":
+            cycle = self.listing_history_research
+            self.listing_history_research = None
+            if cycle is not None:
+                cycle.close()
             return
-        cycle = self.listing_history_research
-        self.listing_history_research = None
-        if cycle is not None:
-            cycle.close()
+        if name == "dex-launch-research":
+            cycle = self.dex_launch_research
+            self.dex_launch_research = None
+            if cycle is not None:
+                cycle.close()
 
     def _install_components(self) -> None:
         components = self.control.get("components") or {}
@@ -162,6 +175,8 @@ class ResearchSupervisor:
                     "market_lifecycle_shadow_only": True,
                     "listing_history_public_sources_only": True,
                     "listing_history_shadow_only": True,
+                    "dex_launch_public_sources_only": True,
+                    "dex_launch_shadow_only": True,
                 },
             }
         atomic_json(STATUS_PATH, payload)
