@@ -17,6 +17,7 @@ def main() -> None:
     cycle = text("b3_trader/dex_launch_research_cycle.py")
     store = text("b3_trader/dex_launch_store.py")
     lifecycle = text("b3_trader/cloudflare_snapshot_lifecycle.py")
+    dex_snapshot = text("b3_trader/dex_launch_snapshot.py") if (ROOT / "b3_trader/dex_launch_snapshot.py").exists() else ""
     secure_launcher = text("start-trader-secure.bat")
     stale_cleanup = text("scripts/cleanup-stale-runtime-supervisors.ps1")
 
@@ -64,7 +65,16 @@ def main() -> None:
             and ".place_order(" not in cycle
             and "place_order(" not in cycle
         ),
-        "build43_raw_dex_stays_local": "dex_launch" not in lifecycle,
+        "build43_raw_dex_stays_local": (
+            "dex_launch_candles" not in lifecycle
+            and (
+                not dex_snapshot
+                or (
+                    '"raw_candles_included": False' in dex_snapshot
+                    and "dex_launch_candles" not in dex_snapshot
+                )
+            )
+        ),
         "build43_stale_supervisor_cleanup": (
             "cleanup-stale-runtime-supervisors.ps1" in secure_launcher
             and '.venv\\Scripts\\python.exe' in stale_cleanup
