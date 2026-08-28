@@ -16,6 +16,7 @@ def main() -> None:
     store = text("b3_trader/dex_launch_store.py")
     features = text("b3_trader/dex_launch_features.py")
     cycle = text("b3_trader/dex_launch_research_cycle.py")
+    resolver = text("b3_trader/listing_identity_resolver.py")
     lifecycle = text("b3_trader/cloudflare_snapshot_lifecycle.py")
 
     checks = {
@@ -64,6 +65,19 @@ def main() -> None:
             and "def _exact_minute_point" in features
             and 'int(point.get("interval_seconds") or 0) == 60' in features
             and 'abs(float(point.get("candle_ts") or 0.0) - float(point.get("target_ts") or 0.0)) <= 1.0' in features
+        ),
+        "build42_verified_cross_provider_bridge": (
+            "CG_SEARCH_URL" in resolver
+            and 'params={"query": identity.english_name}' in resolver
+            and "_strong_name_match(identity.english_name" in resolver
+            and "domain_overlap" in resolver
+            and "contract_match" in resolver
+            and '"verified_cross_provider"' in resolver
+        ),
+        "build42_crosswalk_not_ticker_search": (
+            'params={"query": identity.symbol}' not in resolver
+            and 'params={"query": symbol}' not in resolver
+            and '"search_query_basis": "verified_english_name"' in resolver
         ),
         "build42_raw_dex_not_cloud_projected": "dex_launch" not in lifecycle,
         "build42_paper_remains_unwired": (
