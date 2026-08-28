@@ -17,6 +17,8 @@ def main() -> None:
     cycle = text("b3_trader/dex_launch_research_cycle.py")
     store = text("b3_trader/dex_launch_store.py")
     lifecycle = text("b3_trader/cloudflare_snapshot_lifecycle.py")
+    secure_launcher = text("start-trader-secure.bat")
+    stale_cleanup = text("scripts/cleanup-stale-runtime-supervisors.ps1")
 
     checks = {
         "build43_component_registered": (
@@ -63,6 +65,14 @@ def main() -> None:
             and "place_order(" not in cycle
         ),
         "build43_raw_dex_stays_local": "dex_launch" not in lifecycle,
+        "build43_stale_supervisor_cleanup": (
+            "cleanup-stale-runtime-supervisors.ps1" in secure_launcher
+            and '.venv\\Scripts\\python.exe' in stale_cleanup
+            and "Get-CimInstance Win32_Process" in stale_cleanup
+            and "b3_trader.research_supervisor" in stale_cleanup
+            and "b3_trader.paper_runtime_supervisor" in stale_cleanup
+            and "Stop-Process" in stale_cleanup
+        ),
     }
 
     print("=== DEX SUPERVISOR BUILD 43 CONTRACT ===")
