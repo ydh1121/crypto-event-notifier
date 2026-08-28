@@ -9,6 +9,7 @@ import{installTableSortEnhancer}from'./shared/table-sort-enhancer.js?v=37';
 import{installSamePageInteractionContinuity}from'./shared/ui-continuity.js?v=38';
 import{createDashboardPage}from'./pages/dashboard.js';
 import{createResearchPage}from'./pages/research.js?v=40';
+import{installDexLaunchResearchPanel}from'./pages/dex-launch-panel.js?v=44';
 import{createAssetsPage}from'./pages/assets.js';
 import{createPaperPage}from'./pages/paper.js';
 import{createStrategyPage}from'./pages/strategy.js';
@@ -20,6 +21,7 @@ installSectorImeGuard();
 installTableSortEnhancer();
 const root=document.getElementById('pageRoot'),nav=document.getElementById('mainNav');
 installSamePageInteractionContinuity(root);
+installDexLaunchResearchPanel({store,root});
 let router=null;
 const pages={
   dashboard:()=>createDashboardPage({store,navigate:n=>router.go(n)}),
