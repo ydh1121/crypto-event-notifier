@@ -1,0 +1,87 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def text(path: str) -> str:
+    return (ROOT / path).read_text(encoding="utf-8")
+
+
+def main() -> None:
+    source = text("b3_trader/dex_launch_sources.py")
+    store = text("b3_trader/dex_launch_store.py")
+    features = text("b3_trader/dex_launch_features.py")
+    cycle = text("b3_trader/dex_launch_research_cycle.py")
+    lifecycle = text("b3_trader/cloudflare_snapshot_lifecycle.py")
+
+    checks = {
+        "build42_exact_contract_identity": (
+            "coin_contracts" in source
+            and '"platform_id"' in source
+            and '"token_address"' in source
+            and "normalize_contract_address" in source
+        ),
+        "build42_dynamic_network_mapping": (
+            '"coingecko_asset_platform_id"' in source
+            and '"/networks"' in source
+            and "MAX_NETWORK_PAGES" in source
+        ),
+        "build42_token_address_pool_discovery": (
+            "/tokens/{token}/pools" in source
+            and '"h24_volume_usd_liquidity_desc"' in source
+        ),
+        "build42_address_oriented_ohlcv": (
+            "/pools/{pool}/ohlcv/{frame}" in source
+            and '"token": token' in source
+            and '"before_timestamp"' in source
+        ),
+        "build42_public_rate_budget": (
+            "DEFAULT_GT_MIN_INTERVAL_SECONDS = 6.2" in source
+            and "MAX_CASES_PER_RUN = 1" in cycle
+            and "MAX_CONTRACTS_PER_CASE = 2" in cycle
+        ),
+        "build42_liquidity_and_volume_gate": (
+            "MIN_POOL_LIQUIDITY_USD = 25_000.0" in cycle
+            and "MIN_POOL_VOLUME_H24_USD = 10_000.0" in cycle
+            and "and _num(pool.get(\"volume_h24_usd\")) >= self.min_volume_h24_usd" in cycle
+        ),
+        "build42_local_additive_tables": all(
+            name in store
+            for name in (
+                "dex_launch_case_status",
+                "dex_launch_assets",
+                "dex_launch_pools",
+                "dex_launch_candles",
+                "dex_launch_features",
+            )
+        ),
+        "build42_exact_p5m_minute": (
+            '"p5m_exact_minute"' in features
+            and 'int(p5m.get("interval_seconds") or 0) == 60' in features
+        ),
+        "build42_raw_dex_not_cloud_projected": "dex_launch" not in lifecycle,
+        "build42_paper_remains_unwired": (
+            '"paper_only": True' in cycle
+            and '"can_place_orders": False' in cycle
+            and "from .decision" not in cycle
+            and "from .order" not in cycle
+        ),
+        "build42_no_ticker_pool_search": (
+            "/search/pools" not in source
+            and "search/pools" not in cycle
+        ),
+    }
+    print("=== DEX BUILD 42 CONTRACT ===")
+    print(json.dumps(checks, ensure_ascii=False, indent=2))
+    if not all(checks.values()):
+        failed = [name for name, ok in checks.items() if not ok]
+        raise SystemExit(f"DEX_BUILD42=FAIL: {', '.join(failed)}")
+    print("DEX_BUILD42=PASS")
+
+
+if __name__ == "__main__":
+    main()
