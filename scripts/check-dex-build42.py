@@ -17,6 +17,7 @@ def main() -> None:
     features = text("b3_trader/dex_launch_features.py")
     cycle = text("b3_trader/dex_launch_research_cycle.py")
     resolver = text("b3_trader/listing_identity_resolver.py")
+    retry = text("b3_trader/http_retry.py")
     verifier = text("scripts/verify-dex-build42.py")
     lifecycle = text("b3_trader/cloudflare_snapshot_lifecycle.py")
 
@@ -45,6 +46,15 @@ def main() -> None:
             "DEFAULT_GT_MIN_INTERVAL_SECONDS = 6.2" in source
             and "MAX_CASES_PER_RUN = 1" in cycle
             and "MAX_CONTRACTS_PER_CASE = 2" in cycle
+        ),
+        "build42_rate_limit_backoff": (
+            "retry_delay_floor_seconds" in retry
+            and "retry_delay_cap_seconds" in retry
+            and "GT_RETRY_DELAY_FLOOR_SECONDS = 12.0" in source
+            and "CG_RETRY_DELAY_FLOOR_SECONDS = 15.0" in source
+            and "retry_delay_floor_seconds=GT_RETRY_DELAY_FLOOR_SECONDS" in source
+            and "retry_delay_floor_seconds=CG_RETRY_DELAY_FLOOR_SECONDS" in source
+            and "CG_RETRY_DELAY_FLOOR_SECONDS = 15.0" in resolver
         ),
         "build42_liquidity_and_volume_gate": (
             "MIN_POOL_LIQUIDITY_USD = 25_000.0" in cycle
@@ -78,6 +88,13 @@ def main() -> None:
             and 'str(row.get("symbol") or "").strip().upper() == identity.symbol' in resolver
             and "_strong_name_match(identity.english_name, row.get(\"name\"))" in resolver
             and '"search_query_basis": "verified_english_name"' in resolver
+        ),
+        "build42_crosswalk_contract_reuse": (
+            '"contracts_checked": True' in resolver
+            and '"contracts": platform_contracts' in resolver
+            and "def _verified_crosswalk_contracts" in cycle
+            and 'contract_source = "identity_crosswalk" if bridged_contracts is not None else "coingecko_detail"' in cycle
+            and "if bridged_contracts is not None:" in cycle
         ),
         "build42_targeted_case_qa": (
             '"--case-key"' in verifier
