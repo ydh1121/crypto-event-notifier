@@ -19,6 +19,10 @@ USER_AGENT = "crypto-research-dex-launch/42"
 NETWORK_CACHE_PATH = Path("b3_trader/data/research-platform/geckoterminal-network-map.json")
 NETWORK_CACHE_SECONDS = 24 * 3600
 DEFAULT_GT_MIN_INTERVAL_SECONDS = 6.2
+GT_RETRY_DELAY_FLOOR_SECONDS = 12.0
+GT_RETRY_DELAY_CAP_SECONDS = 60.0
+CG_RETRY_DELAY_FLOOR_SECONDS = 15.0
+CG_RETRY_DELAY_CAP_SECONDS = 60.0
 MAX_NETWORK_PAGES = 10
 MAX_POOL_ROWS = 20
 MAX_OHLCV_RESULTS = 1000
@@ -107,6 +111,8 @@ class GeckoTerminalDexSource:
                 params=params or {},
                 timeout=18,
                 attempts=3,
+                retry_delay_floor_seconds=GT_RETRY_DELAY_FLOOR_SECONDS,
+                retry_delay_cap_seconds=GT_RETRY_DELAY_CAP_SECONDS,
             )
         finally:
             self._last_gt_request_at = self.now_fn()
@@ -188,6 +194,8 @@ class GeckoTerminalDexSource:
             },
             timeout=18,
             attempts=3,
+            retry_delay_floor_seconds=CG_RETRY_DELAY_FLOOR_SECONDS,
+            retry_delay_cap_seconds=CG_RETRY_DELAY_CAP_SECONDS,
         )
         payload = response.json()
         if not isinstance(payload, dict) or str(payload.get("id") or "").strip() != coin_id:
