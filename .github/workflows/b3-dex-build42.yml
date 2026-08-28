@@ -10,7 +10,10 @@ on:
       - "b3_trader/dex_launch_features.py"
       - "b3_trader/dex_launch_research_cycle.py"
       - "b3_trader/dex_launch_audit.py"
+      - "b3_trader/listing_identity_resolver.py"
+      - "b3_trader/http_retry.py"
       - "b3_trader/tests/test_dex_launch_build42.py"
+      - "b3_trader/tests/test_listing_identity_resolver.py"
       - "scripts/check-dex-build42.py"
       - "scripts/verify-dex-build42.py"
       - ".github/workflows/b3-dex-build42.yml"
@@ -28,6 +31,8 @@ jobs:
       - name: Compile DEX research
         run: >-
           python -m py_compile
+          b3_trader/http_retry.py
+          b3_trader/listing_identity_resolver.py
           b3_trader/dex_launch_sources.py
           b3_trader/dex_launch_store.py
           b3_trader/dex_launch_features.py
@@ -36,7 +41,10 @@ jobs:
           scripts/check-dex-build42.py
           scripts/verify-dex-build42.py
       - name: DEX research tests
-        run: python -m pytest -q b3_trader/tests/test_dex_launch_build42.py
+        run: >-
+          python -m pytest -q
+          b3_trader/tests/test_dex_launch_build42.py
+          b3_trader/tests/test_listing_identity_resolver.py
       - name: Build 42 contract
         run: python scripts/check-dex-build42.py
       - name: Empty local verifier
