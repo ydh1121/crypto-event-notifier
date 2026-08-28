@@ -9,6 +9,7 @@ from b3_trader.dex_launch_features import domestic_window_features
 from b3_trader.dex_launch_research_cycle import DexLaunchResearchCycle
 from b3_trader.dex_launch_sources import DexCandle, normalize_contract_address
 from b3_trader.dex_launch_store import DexLaunchStore
+from b3_trader.listing_identity import ListingIdentity
 
 
 def candle(ts: float, price: float, interval: int) -> DexCandle:
@@ -36,7 +37,12 @@ def test_domestic_feature_requires_exact_minute_for_p5m() -> None:
     assert result["p5m_exact_minute"] is True
 
 
-def _create_listing_case(path: Path, *, open_at: float = 1_000_000.0) -> None:
+def _create_listing_case(
+    path: Path,
+    *,
+    open_at: float = 1_000_000.0,
+    identity: dict | None = None,
+) -> None:
     conn = sqlite3.connect(str(path))
     conn.execute(
         """
@@ -61,7 +67,7 @@ def _create_listing_case(path: Path, *, open_at: float = 1_000_000.0) -> None:
             "KRW-TST",
             "TST",
             open_at,
-            json.dumps({"provider": "coingecko", "provider_id": "test-token"}),
+            json.dumps(identity or {"provider": "coingecko", "provider_id": "test-token"}),
             1,
             "complete",
             open_at,
@@ -82,7 +88,7 @@ class FakeSource:
 
     def token_pools(self, network_id: str, token_address: str):
         assert network_id == "eth"
-        assert token_address == "0xABC"
+        assert normalize_contract_address(token_address) == "0xabc"
         return [
             {
                 "pool_address": "0xPOOL",
@@ -132,6 +138,34 @@ class FailIdentityResolver:
         raise AssertionError("stored exact CoinGecko identity should be used")
 
 
+class CrosswalkIdentityResolver:
+    def resolve(self, exchange: str, market: str):
+        assert exchange == "bithumb"
+        assert market == "KRW-TST"
+        return {
+            "status": "verified_cross_provider",
+            "verified": True,
+            "identity": ListingIdentity(
+                symbol="TST",
+                english_name="Test Token",
+                provider="coingecko",
+                provider_id="test-token",
+                official_domains=("example.org",),
+                match_confidence=0.99,
+            ),
+            "coingecko_crosswalk": {
+                "verified": True,
+                "contracts_checked": True,
+                "contracts": [{"platform_id": "ethereum", "token_address": "0xABC"}],
+            },
+        }
+
+
+class NoCoinDetailSource(FakeSource):
+    def coin_contracts(self, coin_id: str):
+        raise AssertionError("verified crosswalk contracts must prevent duplicate CoinGecko detail fetch")
+
+
 def test_cycle_persists_only_exact_contract_primary_pool(tmp_path: Path) -> None:
     db = tmp_path / "research.sqlite3"
     _create_listing_case(db)
@@ -175,6 +209,37 @@ def test_cycle_persists_only_exact_contract_primary_pool(tmp_path: Path) -> None
     ).fetchall()
     assert dict(pools[0]) == {"pool_address": "0xpool", "gate_status": "accepted", "selected_primary": 1}
     assert dict(pools[1]) == {"pool_address": "0xlow", "gate_status": "rejected_quality", "selected_primary": 0}
+    store.close()
+
+
+def test_cycle_reuses_verified_crosswalk_contracts_without_second_coin_detail(tmp_path: Path) -> None:
+    db = tmp_path / "crosswalk.sqlite3"
+    _create_listing_case(
+        db,
+        identity={
+            "provider": "multi-source",
+            "provider_id": "provider-123",
+            "symbol": "TST",
+            "english_name": "Test Token",
+        },
+    )
+    store = DexLaunchStore(db)
+    cycle = DexLaunchResearchCycle(
+        db,
+        store=store,
+        identity_resolver=CrosswalkIdentityResolver(),
+        source=NoCoinDetailSource(),
+        state_path=tmp_path / "crosswalk-state.json",
+        max_cases_per_run=1,
+    )
+    result = cycle.run_once()
+    assert result["complete"] == 1
+    row = result["results"][0]
+    assert row["identity_status"] == "verified_cross_provider"
+    assert row["coingecko_id"] == "test-token"
+    assert row["contract_source"] == "identity_crosswalk"
+    assert row["contract_count"] == 1
+    assert row["mapped_contract_count"] == 1
     store.close()
 
 
