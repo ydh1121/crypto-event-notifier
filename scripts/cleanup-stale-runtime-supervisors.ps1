@@ -51,7 +51,7 @@ foreach ($process in $processes) {
     Stop-Process -Id $pidValue -Force -ErrorAction Stop
     $stopped += [PSCustomObject]@{ pid = $pidValue; module = $matchedModule }
   } catch {
-    Write-Warning "Could not stop stale $matchedModule process $pidValue: $($_.Exception.Message)"
+    Write-Warning "Could not stop stale $matchedModule process ${pidValue}: $($_.Exception.Message)"
   }
 }
 
