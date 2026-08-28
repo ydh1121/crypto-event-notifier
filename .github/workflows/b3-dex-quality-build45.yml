@@ -1,0 +1,47 @@
+name: B3 DEX Quality Build 45
+
+on:
+  push:
+    branches:
+      - "b3-auto-trader-phase1"
+    paths:
+      - "b3_trader/dex_launch_quality.py"
+      - "b3_trader/tests/test_dex_launch_quality.py"
+      - "b3_trader/dex_launch_research_cycle.py"
+      - "scripts/check-dex-build42.py"
+      - "scripts/check-dex-supervisor-build43.py"
+      - "scripts/check-dex-cloud-projection-build44.py"
+      - "scripts/check-dex-quality-build45.py"
+      - "scripts/verify-dex-quality-build45.py"
+      - "scripts/verify-cloudflare-build44-runtime.py"
+      - ".github/workflows/b3-dex-quality-build45.yml"
+  workflow_dispatch:
+
+jobs:
+  build45:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r b3_trader/requirements.txt pytest
+      - name: Compile quality gate and verifiers
+        run: >-
+          python -m py_compile
+          b3_trader/dex_launch_quality.py
+          scripts/check-dex-quality-build45.py
+          scripts/verify-dex-quality-build45.py
+          scripts/verify-cloudflare-build44-runtime.py
+      - name: Direct quality verifier import bootstrap
+        run: python scripts/verify-dex-quality-build45.py || test $? -eq 0
+      - name: DEX quality unit tests
+        run: python -m pytest -q b3_trader/tests/test_dex_launch_quality.py b3_trader/tests/test_dex_launch_snapshot.py
+      - name: Build 42 regression contract
+        run: python scripts/check-dex-build42.py
+      - name: Build 43 regression contract
+        run: python scripts/check-dex-supervisor-build43.py
+      - name: Build 44 regression contract
+        run: python scripts/check-dex-cloud-projection-build44.py
+      - name: Build 45 quality contract
+        run: python scripts/check-dex-quality-build45.py
