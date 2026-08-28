@@ -11,7 +11,13 @@ from .http_retry import get_with_retry
 from .listing_identity import ListingIdentity, listing_identity_gate
 
 
-USER_AGENT = "crypto-research-listing-identity/1.0"
+USER_AGENT = "crypto-research-listing-identity/1.1"
+CG_SEARCH_URL = "https://api.coingecko.com/api/v3/search"
+CG_DETAIL_URL = "https://api.coingecko.com/api/v3/coins/{coin_id}"
+_GENERIC_NAME_WORDS = {
+    "the", "token", "coin", "network", "protocol", "finance", "foundation",
+    "project", "ecosystem", "platform", "labs", "dao",
+}
 
 
 def _coingecko_id_from_evidence(values: Any) -> str:
@@ -32,16 +38,59 @@ def _coingecko_id_from_evidence(values: Any) -> str:
     return ""
 
 
-class ListingIdentityResolver:
-    """Read already-researched identity from the Cloudflare profile cache.
+def _name_tokens(value: Any) -> tuple[str, ...]:
+    words = re.findall(r"[a-z0-9]+", str(value or "").lower())
+    return tuple(word for word in words if word not in _GENERIC_NAME_WORDS)
 
-    This avoids duplicating CoinGecko/CMC/manual research inside listing-history.
-    Only profile rows already marked verified/corroborated by the profile pipeline
-    are eligible; weaker rows remain pending instead of falling back to ticker.
+
+def _strong_name_match(expected: Any, candidate: Any) -> bool:
+    left = _name_tokens(expected)
+    right = _name_tokens(candidate)
+    return bool(left and right and left == right)
+
+
+def _domain(value: Any) -> str:
+    raw = str(value or "").strip().lower()
+    if not raw:
+        return ""
+    if "://" not in raw:
+        raw = "https://" + raw
+    try:
+        host = (urlparse(raw).hostname or "").lower().strip(".")
+    except ValueError:
+        return ""
+    return host[4:] if host.startswith("www.") else host
+
+
+def _detail_domains(payload: dict[str, Any]) -> set[str]:
+    links = payload.get("links") if isinstance(payload.get("links"), dict) else {}
+    homepages = links.get("homepage") if isinstance(links.get("homepage"), list) else []
+    return {host for host in (_domain(value) for value in homepages) if host}
+
+
+def _detail_contracts(payload: dict[str, Any]) -> set[str]:
+    platforms = payload.get("platforms") if isinstance(payload.get("platforms"), dict) else {}
+    result: set[str] = set()
+    for value in platforms.values():
+        address = str(value or "").strip()
+        if not address:
+            continue
+        result.add(address.lower() if address.lower().startswith("0x") else address)
+    return result
+
+
+class ListingIdentityResolver:
+    """Read researched identity from the Cloudflare profile cache.
+
+    Ticker-only matching is forbidden. When a remote identity is already verified
+    but lacks CoinGecko evidence, a bounded cross-provider bridge may promote it
+    to a CoinGecko id only after exact symbol + strong project-name matching and
+    an independent domain/contract check when those anchors are available.
     """
 
     def __init__(self) -> None:
         load_dotenv(override=True)
+        self._crosswalk_cache: dict[tuple[str, str, tuple[str, ...], str], dict[str, Any]] = {}
 
     @staticmethod
     def _endpoint() -> tuple[str, str]:
@@ -53,6 +102,106 @@ class ListingIdentityResolver:
         if ingest.endswith("/api/ingest"):
             return ingest[: -len("/api/ingest")] + "/api/coin-profile-identity", token
         return ingest.rstrip("/") + "/api/coin-profile-identity", token
+
+    def _crosswalk_coingecko(self, identity: ListingIdentity) -> dict[str, Any]:
+        key = (
+            identity.symbol,
+            identity.english_name.lower(),
+            tuple(sorted(identity.official_domains)),
+            identity.contract_address,
+        )
+        cached = self._crosswalk_cache.get(key)
+        if cached is not None:
+            return dict(cached)
+
+        if not identity.english_name:
+            result = {"status": "english_name_missing", "verified": False, "coin_id": ""}
+            self._crosswalk_cache[key] = result
+            return dict(result)
+
+        response, search_retries = get_with_retry(
+            CG_SEARCH_URL,
+            headers={"Accept": "application/json", "User-Agent": USER_AGENT},
+            params={"query": identity.english_name},
+            timeout=15,
+            attempts=3,
+        )
+        payload = response.json()
+        rows = payload.get("coins") if isinstance(payload, dict) and isinstance(payload.get("coins"), list) else []
+        candidates = [
+            row for row in rows
+            if isinstance(row, dict)
+            and str(row.get("symbol") or "").strip().upper() == identity.symbol
+            and _strong_name_match(identity.english_name, row.get("name"))
+            and str(row.get("id") or "").strip()
+        ]
+        candidates.sort(key=lambda row: int(row.get("market_cap_rank") or 999999))
+
+        expected_domains = set(identity.official_domains)
+        expected_contract = str(identity.contract_address or "").strip()
+        if expected_contract.lower().startswith("0x"):
+            expected_contract = expected_contract.lower()
+
+        for candidate in candidates[:5]:
+            coin_id = str(candidate.get("id") or "").strip()
+            detail_response, detail_retries = get_with_retry(
+                CG_DETAIL_URL.format(coin_id=coin_id),
+                headers={"Accept": "application/json", "User-Agent": USER_AGENT},
+                params={
+                    "localization": "false",
+                    "tickers": "false",
+                    "market_data": "false",
+                    "community_data": "false",
+                    "developer_data": "false",
+                    "sparkline": "false",
+                },
+                timeout=18,
+                attempts=3,
+            )
+            detail = detail_response.json()
+            if not isinstance(detail, dict):
+                continue
+            if str(detail.get("id") or "").strip() != coin_id:
+                continue
+            if str(detail.get("symbol") or "").strip().upper() != identity.symbol:
+                continue
+            if not _strong_name_match(identity.english_name, detail.get("name")):
+                continue
+
+            detail_domains = _detail_domains(detail)
+            domain_overlap = sorted(expected_domains & detail_domains)
+            contracts = _detail_contracts(detail)
+            contract_match = bool(expected_contract and expected_contract in contracts)
+
+            if expected_domains and not domain_overlap and not contract_match:
+                continue
+            if not expected_domains and expected_contract and not contract_match:
+                continue
+
+            result = {
+                "status": "verified",
+                "verified": True,
+                "coin_id": coin_id,
+                "basis": {
+                    "symbol_exact": True,
+                    "strong_name_match": True,
+                    "domain_overlap": domain_overlap,
+                    "contract_match": contract_match,
+                    "search_query_basis": "verified_english_name",
+                },
+                "retries": int(search_retries) + int(detail_retries),
+            }
+            self._crosswalk_cache[key] = result
+            return dict(result)
+
+        result = {
+            "status": "coingecko_crosswalk_unverified",
+            "verified": False,
+            "coin_id": "",
+            "retries": int(search_retries),
+        }
+        self._crosswalk_cache[key] = result
+        return dict(result)
 
     def resolve(self, exchange: str, market: str) -> dict[str, Any]:
         url, token = self._endpoint()
@@ -79,9 +228,6 @@ class ListingIdentityResolver:
         coingecko_id = str(source.get("coingecko_id") or "").strip() or _coingecko_id_from_evidence(evidence)
         provider = str(source.get("provider") or "").strip().lower()
         provider_id = str(source.get("provider_id") or "").strip()
-        # Multi-source profiles can store a CMC numeric id in provider_id. If a
-        # CoinGecko id is already part of the verified profile evidence, prefer
-        # that stable id because it can cross-check exact CEX venue tickers.
         if coingecko_id:
             provider = "coingecko"
             provider_id = coingecko_id
@@ -97,13 +243,47 @@ class ListingIdentityResolver:
         local_gate = listing_identity_gate(identity)
         remote_verified = bool(payload.get("verified"))
         verified = bool(remote_verified and local_gate["verified"])
+        crosswalk: dict[str, Any] = {}
+
+        if verified and not coingecko_id and identity.provider != "coingecko":
+            try:
+                crosswalk = self._crosswalk_coingecko(identity)
+            except Exception as exc:
+                crosswalk = {
+                    "status": "coingecko_crosswalk_error",
+                    "verified": False,
+                    "coin_id": "",
+                    "error": f"{type(exc).__name__}: {exc}"[:300],
+                }
+            if crosswalk.get("verified") and str(crosswalk.get("coin_id") or "").strip():
+                coingecko_id = str(crosswalk.get("coin_id") or "").strip()
+                identity = ListingIdentity(
+                    symbol=identity.symbol,
+                    english_name=identity.english_name,
+                    korean_name=identity.korean_name,
+                    provider="coingecko",
+                    provider_id=coingecko_id,
+                    chain=identity.chain,
+                    contract_address=identity.contract_address,
+                    official_domains=identity.official_domains,
+                    match_confidence=identity.match_confidence,
+                    verified_at=identity.verified_at,
+                )
+                local_gate = listing_identity_gate(identity)
+                verified = bool(remote_verified and local_gate["verified"])
+
         return {
-            "status": "verified" if verified else "profile_not_verified",
+            "status": (
+                "verified_cross_provider"
+                if verified and crosswalk.get("verified")
+                else "verified" if verified else "profile_not_verified"
+            ),
             "verified": verified,
             "identity": identity if verified else None,
             "identity_payload": identity.to_dict(),
             "coingecko_venue_id": coingecko_id,
+            "coingecko_crosswalk": crosswalk,
             "local_gate": local_gate,
             "remote_gate": payload.get("gate") if isinstance(payload.get("gate"), dict) else {},
-            "retries": retries,
+            "retries": retries + int(crosswalk.get("retries") or 0),
         }
