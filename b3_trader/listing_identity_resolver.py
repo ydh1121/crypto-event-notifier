@@ -11,9 +11,11 @@ from .http_retry import get_with_retry
 from .listing_identity import ListingIdentity, listing_identity_gate
 
 
-USER_AGENT = "crypto-research-listing-identity/1.1"
+USER_AGENT = "crypto-research-listing-identity/1.2"
 CG_SEARCH_URL = "https://api.coingecko.com/api/v3/search"
 CG_DETAIL_URL = "https://api.coingecko.com/api/v3/coins/{coin_id}"
+CG_RETRY_DELAY_FLOOR_SECONDS = 15.0
+CG_RETRY_DELAY_CAP_SECONDS = 60.0
 _GENERIC_NAME_WORDS = {
     "the", "token", "coin", "network", "protocol", "finance", "foundation",
     "project", "ecosystem", "platform", "labs", "dao",
@@ -68,15 +70,32 @@ def _detail_domains(payload: dict[str, Any]) -> set[str]:
     return {host for host in (_domain(value) for value in homepages) if host}
 
 
-def _detail_contracts(payload: dict[str, Any]) -> set[str]:
+def _normalize_contract_address(value: Any) -> str:
+    raw = str(value or "").strip()
+    if raw.startswith("0x") or raw.startswith("0X"):
+        return raw.lower()
+    return raw
+
+
+def _detail_platform_contracts(payload: dict[str, Any]) -> list[dict[str, str]]:
     platforms = payload.get("platforms") if isinstance(payload.get("platforms"), dict) else {}
-    result: set[str] = set()
-    for value in platforms.values():
-        address = str(value or "").strip()
-        if not address:
+    result: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for platform_id, raw_address in platforms.items():
+        platform = str(platform_id or "").strip()
+        address = _normalize_contract_address(raw_address)
+        if not platform or not address:
             continue
-        result.add(address.lower() if address.lower().startswith("0x") else address)
+        key = (platform, address)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append({"platform_id": platform, "token_address": address})
     return result
+
+
+def _detail_contracts(payload: dict[str, Any]) -> set[str]:
+    return {row["token_address"] for row in _detail_platform_contracts(payload)}
 
 
 class ListingIdentityResolver:
@@ -103,6 +122,18 @@ class ListingIdentityResolver:
             return ingest[: -len("/api/ingest")] + "/api/coin-profile-identity", token
         return ingest.rstrip("/") + "/api/coin-profile-identity", token
 
+    @staticmethod
+    def _coingecko_get(url: str, *, params: dict[str, Any], timeout: float) -> tuple[Any, int]:
+        return get_with_retry(
+            url,
+            headers={"Accept": "application/json", "User-Agent": USER_AGENT},
+            params=params,
+            timeout=timeout,
+            attempts=3,
+            retry_delay_floor_seconds=CG_RETRY_DELAY_FLOOR_SECONDS,
+            retry_delay_cap_seconds=CG_RETRY_DELAY_CAP_SECONDS,
+        )
+
     def _crosswalk_coingecko(self, identity: ListingIdentity) -> dict[str, Any]:
         key = (
             identity.symbol,
@@ -115,16 +146,20 @@ class ListingIdentityResolver:
             return dict(cached)
 
         if not identity.english_name:
-            result = {"status": "english_name_missing", "verified": False, "coin_id": ""}
+            result = {
+                "status": "english_name_missing",
+                "verified": False,
+                "coin_id": "",
+                "contracts_checked": False,
+                "contracts": [],
+            }
             self._crosswalk_cache[key] = result
             return dict(result)
 
-        response, search_retries = get_with_retry(
+        response, search_retries = self._coingecko_get(
             CG_SEARCH_URL,
-            headers={"Accept": "application/json", "User-Agent": USER_AGENT},
             params={"query": identity.english_name},
             timeout=15,
-            attempts=3,
         )
         payload = response.json()
         rows = payload.get("coins") if isinstance(payload, dict) and isinstance(payload.get("coins"), list) else []
@@ -138,15 +173,12 @@ class ListingIdentityResolver:
         candidates.sort(key=lambda row: int(row.get("market_cap_rank") or 999999))
 
         expected_domains = set(identity.official_domains)
-        expected_contract = str(identity.contract_address or "").strip()
-        if expected_contract.lower().startswith("0x"):
-            expected_contract = expected_contract.lower()
+        expected_contract = _normalize_contract_address(identity.contract_address)
 
         for candidate in candidates[:5]:
             coin_id = str(candidate.get("id") or "").strip()
-            detail_response, detail_retries = get_with_retry(
+            detail_response, detail_retries = self._coingecko_get(
                 CG_DETAIL_URL.format(coin_id=coin_id),
-                headers={"Accept": "application/json", "User-Agent": USER_AGENT},
                 params={
                     "localization": "false",
                     "tickers": "false",
@@ -156,7 +188,6 @@ class ListingIdentityResolver:
                     "sparkline": "false",
                 },
                 timeout=18,
-                attempts=3,
             )
             detail = detail_response.json()
             if not isinstance(detail, dict):
@@ -170,7 +201,8 @@ class ListingIdentityResolver:
 
             detail_domains = _detail_domains(detail)
             domain_overlap = sorted(expected_domains & detail_domains)
-            contracts = _detail_contracts(detail)
+            platform_contracts = _detail_platform_contracts(detail)
+            contracts = {row["token_address"] for row in platform_contracts}
             contract_match = bool(expected_contract and expected_contract in contracts)
 
             if expected_domains and not domain_overlap and not contract_match:
@@ -182,6 +214,8 @@ class ListingIdentityResolver:
                 "status": "verified",
                 "verified": True,
                 "coin_id": coin_id,
+                "contracts_checked": True,
+                "contracts": platform_contracts,
                 "basis": {
                     "symbol_exact": True,
                     "strong_name_match": True,
@@ -198,6 +232,8 @@ class ListingIdentityResolver:
             "status": "coingecko_crosswalk_unverified",
             "verified": False,
             "coin_id": "",
+            "contracts_checked": False,
+            "contracts": [],
             "retries": int(search_retries),
         }
         self._crosswalk_cache[key] = result
@@ -253,6 +289,8 @@ class ListingIdentityResolver:
                     "status": "coingecko_crosswalk_error",
                     "verified": False,
                     "coin_id": "",
+                    "contracts_checked": False,
+                    "contracts": [],
                     "error": f"{type(exc).__name__}: {exc}"[:300],
                 }
             if crosswalk.get("verified") and str(crosswalk.get("coin_id") or "").strip():
