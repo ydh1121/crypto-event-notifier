@@ -17,6 +17,10 @@ from b3_trader.dex_launch_quality import (  # noqa: E402
 
 
 def main() -> None:
+    if "--import-check" in sys.argv:
+        print("DEX_QUALITY_BUILD45_IMPORT=PASS")
+        return
+
     quality = evaluate_dex_launch_quality()
     cases = quality.get("cases") if isinstance(quality.get("cases"), list) else []
     partial = [
