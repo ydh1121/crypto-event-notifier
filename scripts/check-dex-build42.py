@@ -61,7 +61,9 @@ def main() -> None:
         ),
         "build42_exact_p5m_minute": (
             '"p5m_exact_minute"' in features
-            and 'int(p5m.get("interval_seconds") or 0) == 60' in features
+            and "def _exact_minute_point" in features
+            and 'int(point.get("interval_seconds") or 0) == 60' in features
+            and 'abs(float(point.get("candle_ts") or 0.0) - float(point.get("target_ts") or 0.0)) <= 1.0' in features
         ),
         "build42_raw_dex_not_cloud_projected": "dex_launch" not in lifecycle,
         "build42_paper_remains_unwired": (
