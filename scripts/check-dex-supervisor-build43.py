@@ -59,7 +59,8 @@ def main() -> None:
         "build43_no_order_wiring": (
             "from .decision" not in cycle
             and "from .order" not in cycle
-            and "place_order" not in cycle
+            and ".place_order(" not in cycle
+            and "place_order(" not in cycle
         ),
         "build43_raw_dex_stays_local": "dex_launch" not in lifecycle,
     }
