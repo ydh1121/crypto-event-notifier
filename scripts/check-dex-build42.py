@@ -20,6 +20,7 @@ def main() -> None:
     retry = text("b3_trader/http_retry.py")
     verifier = text("scripts/verify-dex-build42.py")
     lifecycle = text("b3_trader/cloudflare_snapshot_lifecycle.py")
+    dex_snapshot = text("b3_trader/dex_launch_snapshot.py") if (ROOT / "b3_trader/dex_launch_snapshot.py").exists() else ""
 
     checks = {
         "build42_exact_contract_identity": (
@@ -102,7 +103,17 @@ def main() -> None:
             and '"targeted_research"' in verifier
             and "cycle._research_case(target, time.time())" in verifier
         ),
-        "build42_raw_dex_not_cloud_projected": "dex_launch" not in lifecycle,
+        "build42_raw_dex_not_cloud_projected": (
+            "dex_launch_candles" not in lifecycle
+            and "SELECT" not in lifecycle
+            and (
+                not dex_snapshot
+                or (
+                    '"raw_candles_included": False' in dex_snapshot
+                    and "dex_launch_candles" not in dex_snapshot
+                )
+            )
+        ),
         "build42_paper_remains_unwired": (
             '"paper_only": True' in cycle
             and '"can_place_orders": False' in cycle
