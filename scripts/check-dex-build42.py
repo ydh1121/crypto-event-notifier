@@ -68,14 +68,16 @@ def main() -> None:
             and 'abs(float(point.get("candle_ts") or 0.0) - float(point.get("target_ts") or 0.0)) <= 1.0' in features
         ),
         "build42_verified_cross_provider_bridge": (
-            "_verified_coingecko_crosswalk" in resolver
+            "def _crosswalk_coingecko" in resolver
             and '"verified_cross_provider"' in resolver
-            and "candidate_id = self._verified_coingecko_crosswalk(identity)" in resolver
+            and "crosswalk = self._crosswalk_coingecko(identity)" in resolver
+            and '"coingecko_crosswalk"' in resolver
         ),
         "build42_crosswalk_not_ticker_search": (
-            'params={"query": name}' in resolver
-            and 'if str(row.get("symbol") or "").strip().upper() != symbol:' in resolver
-            and "_name_match" in resolver
+            'params={"query": identity.english_name}' in resolver
+            and 'str(row.get("symbol") or "").strip().upper() == identity.symbol' in resolver
+            and "_strong_name_match(identity.english_name, row.get(\"name\"))" in resolver
+            and '"search_query_basis": "verified_english_name"' in resolver
         ),
         "build42_targeted_case_qa": (
             '"--case-key"' in verifier
