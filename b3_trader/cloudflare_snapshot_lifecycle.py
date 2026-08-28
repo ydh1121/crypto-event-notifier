@@ -10,6 +10,7 @@ from .cloudflare_snapshot_publisher import (
     CloudflareSnapshotPublisher as BaseCloudflareSnapshotPublisher,
     _read_json,
 )
+from .dex_launch_snapshot import build_dex_launch_snapshot
 from .listing_history_snapshot import build_listing_history_snapshot
 
 
@@ -67,9 +68,8 @@ class CloudflareSnapshotPublisher(BaseCloudflareSnapshotPublisher):
 
         # Preserve the backward-compatible Bithumb root projection as well.
         apply_lifecycle_projection(public, bithumb_demo)
-        # Listing-history candles remain local. Only the read-only compact
-        # case/source/feature projection is added to the existing snapshot row.
+        # Research OHLCV remains local. Only read-only compact derived summaries
+        # are added to the existing snapshot row before Build 41 budgeting.
         public["listing_history"] = build_listing_history_snapshot(DEMO_DB_PATH)
-        # Build 41 removes duplicate Bithumb projection blocks and reserves
-        # payload headroom before future compact DEX research is introduced.
+        public["dex_launch"] = build_dex_launch_snapshot(DEMO_DB_PATH)
         return apply_snapshot_budget(snapshot)
