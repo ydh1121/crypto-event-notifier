@@ -8,7 +8,7 @@ from typing import Any
 
 from .auto_demo_v2 import DB_PATH
 from .dex_launch_features import FEATURE_VERSION, build_dex_features
-from .dex_launch_sources import DexCandle, GeckoTerminalDexSource
+from .dex_launch_sources import DexCandle, GeckoTerminalDexSource, normalize_contract_address
 from .dex_launch_store import DexLaunchStore
 from .listing_identity import ListingIdentity
 from .listing_identity_resolver import ListingIdentityResolver
@@ -54,6 +54,28 @@ def _stored_coingecko_id(row: dict[str, Any]) -> str:
     return provider_id if provider == "coingecko" and provider_id else ""
 
 
+def _verified_crosswalk_contracts(result: dict[str, Any]) -> list[dict[str, str]] | None:
+    crosswalk = result.get("coingecko_crosswalk") if isinstance(result.get("coingecko_crosswalk"), dict) else {}
+    if not crosswalk.get("verified") or not crosswalk.get("contracts_checked"):
+        return None
+    rows = crosswalk.get("contracts") if isinstance(crosswalk.get("contracts"), list) else []
+    contracts: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        platform_id = str(row.get("platform_id") or "").strip()
+        token_address = normalize_contract_address(row.get("token_address"))
+        if not platform_id or not token_address:
+            continue
+        key = (platform_id, token_address)
+        if key in seen:
+            continue
+        seen.add(key)
+        contracts.append({"platform_id": platform_id, "token_address": token_address})
+    return contracts
+
+
 class DexLaunchResearchCycle:
     """Exact-contract, public-source DEX sidecar; never wired to PAPER decisions."""
 
@@ -81,23 +103,27 @@ class DexLaunchResearchCycle:
         if self._owns_store:
             self.store.close()
 
-    def _coingecko_id(self, row: dict[str, Any]) -> tuple[str, str]:
+    def _coingecko_identity(
+        self,
+        row: dict[str, Any],
+    ) -> tuple[str, str, list[dict[str, str]] | None]:
         stored = _stored_coingecko_id(row)
         if stored:
-            return stored, "stored_verified"
+            return stored, "stored_verified", None
         try:
             result = self.identity_resolver.resolve(
                 str(row.get("domestic_exchange") or ""),
                 str(row.get("domestic_market") or ""),
             )
         except Exception as exc:
-            return "", f"identity_error:{type(exc).__name__}"
+            return "", f"identity_error:{type(exc).__name__}", None
         identity = result.get("identity") if isinstance(result, dict) else None
         if not result.get("verified") or not isinstance(identity, ListingIdentity):
-            return "", str(result.get("status") or "identity_waiting")
+            return "", str(result.get("status") or "identity_waiting"), None
         if identity.provider != "coingecko" or not identity.provider_id:
-            return "", "coingecko_identity_missing"
-        return str(identity.provider_id), "remote_verified"
+            return "", "coingecko_identity_missing", None
+        identity_status = str(result.get("status") or "remote_verified")
+        return str(identity.provider_id), identity_status, _verified_crosswalk_contracts(result)
 
     def _quality_pass(self, pool: dict[str, Any]) -> bool:
         return bool(
@@ -182,22 +208,33 @@ class DexLaunchResearchCycle:
 
     def _research_case(self, row: dict[str, Any], now: float) -> dict[str, Any]:
         case_key = str(row.get("case_key") or "")
-        coingecko_id, identity_status = self._coingecko_id(row)
+        coingecko_id, identity_status, bridged_contracts = self._coingecko_identity(row)
         if not coingecko_id:
             self.store.upsert_case_status(case_key, status="identity_waiting", error=identity_status)
             return {"case_key": case_key, "status": "identity_waiting", "identity_status": identity_status}
 
-        try:
-            contracts = self.source.coin_contracts(coingecko_id)
-        except Exception as exc:
-            error = f"{type(exc).__name__}: {exc}"[:400]
-            self.store.upsert_case_status(
-                case_key,
-                coingecko_id=coingecko_id,
-                status="source_waiting",
-                error=error,
-            )
-            return {"case_key": case_key, "status": "source_waiting", "error": error}
+        contract_source = "identity_crosswalk" if bridged_contracts is not None else "coingecko_detail"
+        if bridged_contracts is not None:
+            contracts = bridged_contracts
+        else:
+            try:
+                contracts = self.source.coin_contracts(coingecko_id)
+            except Exception as exc:
+                error = f"{type(exc).__name__}: {exc}"[:400]
+                self.store.upsert_case_status(
+                    case_key,
+                    coingecko_id=coingecko_id,
+                    status="source_waiting",
+                    error=error,
+                )
+                return {
+                    "case_key": case_key,
+                    "status": "source_waiting",
+                    "identity_status": identity_status,
+                    "coingecko_id": coingecko_id,
+                    "contract_source": contract_source,
+                    "error": error,
+                }
         if not contracts:
             self.store.upsert_case_status(
                 case_key,
@@ -205,7 +242,13 @@ class DexLaunchResearchCycle:
                 status="no_contract_identity",
                 contract_count=0,
             )
-            return {"case_key": case_key, "status": "no_contract_identity", "coingecko_id": coingecko_id}
+            return {
+                "case_key": case_key,
+                "status": "no_contract_identity",
+                "identity_status": identity_status,
+                "coingecko_id": coingecko_id,
+                "contract_source": contract_source,
+            }
 
         required_platforms = {str(item.get("platform_id") or "") for item in contracts if item.get("platform_id")}
         try:
@@ -219,7 +262,14 @@ class DexLaunchResearchCycle:
                 contract_count=len(contracts),
                 error=error,
             )
-            return {"case_key": case_key, "status": "source_waiting", "error": error}
+            return {
+                "case_key": case_key,
+                "status": "source_waiting",
+                "identity_status": identity_status,
+                "coingecko_id": coingecko_id,
+                "contract_source": contract_source,
+                "error": error,
+            }
 
         mapped = [
             {**item, "network_id": network_map.get(str(item.get("platform_id") or ""), "")}
@@ -245,7 +295,9 @@ class DexLaunchResearchCycle:
             return {
                 "case_key": case_key,
                 "status": "network_unmapped",
+                "identity_status": identity_status,
                 "coingecko_id": coingecko_id,
+                "contract_source": contract_source,
                 "platforms": sorted(required_platforms),
             }
 
@@ -408,6 +460,7 @@ class DexLaunchResearchCycle:
             "status": status,
             "identity_status": identity_status,
             "coingecko_id": coingecko_id,
+            "contract_source": contract_source,
             "contract_count": len(contracts),
             "mapped_contract_count": len(mapped),
             "accepted_pool_count": accepted_total,
