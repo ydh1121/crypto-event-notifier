@@ -12,12 +12,19 @@ if str(ROOT) not in sys.path:
 
 from b3_trader.dex_launch_audit import audit_dex_launch
 from b3_trader.dex_launch_research_cycle import DexLaunchResearchCycle
+from b3_trader.dex_launch_store import DexLaunchStore
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Verify local-only Build 42 DEX launch research")
     parser.add_argument("--collect", action="store_true", help="run one bounded public-source collection cycle")
     args = parser.parse_args()
+
+    # The verifier owns only additive DEX research tables. On a fresh CI root,
+    # initialize those tables before auditing; existing listing/PAPER rows are
+    # never deleted or rewritten.
+    schema = DexLaunchStore()
+    schema.close()
 
     cycle_result = None
     if args.collect:
