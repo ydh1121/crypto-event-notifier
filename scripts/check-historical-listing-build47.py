@@ -18,8 +18,8 @@ def main() -> None:
 
     checks = {
         "build47_additive_historical_backfill": "class HistoricalListingBackfill" in module,
-        "build47_official_bithumb_pages": "https://feed.bithumb.com" in module and "\"page\": page" in module,
-        "build47_official_upbit_pages": "https://api-manager.upbit.com/api/v1/announcements" in module and "\"per_page\": self.per_page" in module,
+        "build47_official_bithumb_pages": "https://feed.bithumb.com" in module and '"page": page' in module,
+        "build47_official_upbit_pages": "https://api-manager.upbit.com/api/v1/announcements" in module and '"per_page": self.per_page' in module,
         "build47_listing_detail_only": "if preliminary.event_kind != LISTING" in module,
         "build47_final_krw_gate": "is_krw_listing_notice" in module,
         "build47_stable_notice_case_key": "domestic_notice_id=notice.notice_id" in module,
@@ -29,7 +29,7 @@ def main() -> None:
         "build47_no_identity_or_dex_execution": "ListingIdentityResolver" not in module and "DexLaunchResearchCycle" not in module and "GeckoTerminal" not in module,
         "build47_quality_thresholds_unchanged": "MIN_USABLE_CASES = 20" in quality and "MIN_EXACT_P5M_COVERAGE = 0.60" in quality,
         "build47_direct_verifier_bootstrap": "sys.path.insert" in verifier and "--import-check" in verifier,
-        "build47_no_score_decision_order_wiring": "can_place_orders\": False" in module and "score_wired\": False" in module and ".place_order(" not in module,
+        "build47_no_score_decision_order_wiring": '"can_place_orders": False' in module and '"score_wired": False' in module and ".place_order(" not in module,
     }
     print("=== HISTORICAL LISTING BUILD 47 CONTRACT ===")
     print(json.dumps(checks, ensure_ascii=False, indent=2))
