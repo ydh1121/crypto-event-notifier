@@ -14,6 +14,8 @@ on:
       - "b3_trader/tests/test_research_control.py"
       - "scripts/check-dex-supervisor-build43.py"
       - "scripts/verify-dex-supervisor-build43.py"
+      - "scripts/cleanup-stale-runtime-supervisors.ps1"
+      - "start-trader-secure.bat"
       - ".github/workflows/b3-dex-supervisor-build43.yml"
   workflow_dispatch:
 
