@@ -56,6 +56,15 @@ def _point(row: DexCandle | None, target: float) -> dict[str, Any] | None:
     }
 
 
+def _exact_minute_point(point: dict[str, Any] | None) -> bool:
+    if not isinstance(point, dict):
+        return False
+    return bool(
+        int(point.get("interval_seconds") or 0) == 60
+        and abs(float(point.get("candle_ts") or 0.0) - float(point.get("target_ts") or 0.0)) <= 1.0
+    )
+
+
 def domestic_window_features(
     *,
     domestic_open_at: float,
@@ -93,7 +102,7 @@ def domestic_window_features(
             "return_from_domestic_open_pct": _pct(float(row.open), reference_price) if row else None,
         } if row else None
 
-    p5m = post.get("p5m") if isinstance(post.get("p5m"), dict) else {}
+    p5m = post.get("p5m") if isinstance(post.get("p5m"), dict) else None
     return {
         "status": "collected",
         "reference": {
@@ -103,7 +112,7 @@ def domestic_window_features(
         },
         "pre": pre,
         "post": post,
-        "p5m_exact_minute": bool(p5m and int(p5m.get("interval_seconds") or 0) == 60),
+        "p5m_exact_minute": _exact_minute_point(p5m),
     }
 
 
@@ -155,6 +164,9 @@ def launch_window_features(
             else None
         ),
         "windows": windows,
+        "p5m_exact_minute": _exact_minute_point(
+            windows.get("p5m") if isinstance(windows.get("p5m"), dict) else None
+        ),
     }
 
 
