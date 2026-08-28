@@ -17,6 +17,7 @@ def main() -> None:
     budget = text("b3_trader/cloudflare_snapshot_budget.py")
     panel = text("cloudflare-pages/public/modules/pages/dex-launch-panel.js")
     main_js = text("cloudflare-pages/public/modules/main.js")
+    verifier = text("scripts/verify-dex-cloud-projection-build44.py")
 
     checks = {
         "build44_compact_projection_module": (
@@ -69,6 +70,12 @@ def main() -> None:
             and "getMarketDetail" not in panel
             and "fetch(" not in panel
             and "installDexLaunchResearchPanel({store,root})" in main_js
+        ),
+        "build44_direct_verifier_import_bootstrap": (
+            "ROOT = Path(__file__).resolve().parents[1]" in verifier
+            and "sys.path.insert(0, str(ROOT))" in verifier
+            and '"--import-check" in sys.argv' in verifier
+            and "DEX_CLOUD_PROJECTION_BUILD44_IMPORT=PASS" in verifier
         ),
         "build44_no_paper_or_order_wiring": (
             "from .decision" not in projection
