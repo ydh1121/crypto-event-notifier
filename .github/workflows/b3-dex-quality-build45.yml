@@ -34,7 +34,7 @@ jobs:
           scripts/verify-dex-quality-build45.py
           scripts/verify-cloudflare-build44-runtime.py
       - name: Direct quality verifier import bootstrap
-        run: python scripts/verify-dex-quality-build45.py || test $? -eq 0
+        run: python scripts/verify-dex-quality-build45.py --import-check
       - name: DEX quality unit tests
         run: python -m pytest -q b3_trader/tests/test_dex_launch_quality.py b3_trader/tests/test_dex_launch_snapshot.py
       - name: Build 42 regression contract
