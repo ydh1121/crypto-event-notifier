@@ -26,7 +26,24 @@ def test_diversity_priority_order() -> None:
     ) == (module.PRIORITY_PARTIAL_RETRY, "partial_completion_retry")
 
 
-def test_plan_prioritizes_new_unique_before_duplicate_and_partial(monkeypatch, tmp_path: Path) -> None:
+def test_progress_priority_prefers_fresh_unresearched() -> None:
+    assert module._progress_priority(
+        {
+            "reason": "eligible_unresearched_or_retryable",
+            "derived_completion": "unresearched",
+            "stored_status": "",
+        }
+    ) == (module.PROGRESS_FRESH_UNRESEARCHED, "fresh_unresearched")
+    assert module._progress_priority(
+        {
+            "reason": "eligible_unresearched_or_retryable",
+            "derived_completion": "not_usable",
+            "stored_status": "source_waiting",
+        }
+    ) == (module.PROGRESS_RETRYABLE_EXISTING, "retryable_existing_status")
+
+
+def test_plan_prioritizes_fresh_new_unique_before_retry_duplicate_and_partial(monkeypatch, tmp_path: Path) -> None:
     runner = module.DexDiversityBackfillRunner.__new__(module.DexDiversityBackfillRunner)
     runner.path = tmp_path / "db.sqlite3"
 
@@ -36,32 +53,56 @@ def test_plan_prioritizes_new_unique_before_duplicate_and_partial(monkeypatch, t
         "shadow_only": True,
         "can_place_orders": False,
         "score_wired": False,
-        "candidate_count": 5,
+        "candidate_count": 7,
         "candidates": [
+            {
+                "case_key": "retry-new",
+                "coingecko_id": "retry-asset",
+                "reason": "eligible_unresearched_or_retryable",
+                "derived_completion": "not_usable",
+                "stored_status": "source_waiting",
+            },
             {
                 "case_key": "dup",
                 "coingecko_id": "already-usable",
                 "reason": "eligible_unresearched_or_retryable",
+                "derived_completion": "not_usable",
+                "stored_status": "source_waiting",
             },
             {
                 "case_key": "partial",
                 "coingecko_id": "partial-asset",
                 "reason": "complete_partial_retry",
+                "derived_completion": "complete_partial",
+                "stored_status": "complete",
             },
             {
                 "case_key": "new-first",
                 "coingecko_id": "new-asset",
                 "reason": "eligible_unresearched_or_retryable",
+                "derived_completion": "unresearched",
+                "stored_status": "",
             },
             {
                 "case_key": "new-second-exchange",
                 "coingecko_id": "new-asset",
                 "reason": "eligible_unresearched_or_retryable",
+                "derived_completion": "unresearched",
+                "stored_status": "",
+            },
+            {
+                "case_key": "new-other",
+                "coingecko_id": "other-asset",
+                "reason": "eligible_unresearched_or_retryable",
+                "derived_completion": "unresearched",
+                "stored_status": "",
             },
             {
                 "case_key": "unknown",
                 "coingecko_id": "",
                 "reason": "eligible_unresearched_or_retryable",
+                "derived_completion": "not_usable",
+                "stored_status": "identity_waiting",
             },
         ],
     }
@@ -95,15 +136,11 @@ def test_plan_prioritizes_new_unique_before_duplicate_and_partial(monkeypatch, t
     monkeypatch.setattr(module, "_verified_listing_coingecko_id", lambda path, key: "")
 
     plan = runner.plan(limit=10)
-    assert [row["case_key"] for row in plan["candidates"]] == [
-        "new-first",
-        "unknown",
-        "dup",
-        "new-second-exchange",
-        "partial",
-    ]
-    second = next(row for row in plan["candidates"] if row["case_key"] == "new-second-exchange")
-    assert second["diversity_reason"] == "same_batch_duplicate_asset"
+    ordered = [row["case_key"] for row in plan["candidates"]]
+    assert ordered[:3] == ["new-first", "new-other", "retry-new"]
+    second_exchange = next(row for row in plan["candidates"] if row["case_key"] == "new-second-exchange")
+    assert second_exchange["diversity_reason"] == "same_batch_duplicate_asset"
+    assert plan["policy"]["fresh_unresearched_before_retry"] is True
     assert plan["policy"]["one_event_per_new_asset_per_batch"] is True
     assert plan["policy"]["changes_build45_thresholds"] is False
     assert plan["sample_composition"]["unique_assets"] == 12
