@@ -143,6 +143,13 @@ class GeckoTerminalDexSource:
             if str(platform).strip() and str(network).strip()
         }
 
+    @staticmethod
+    def _network_page_has_next(payload: dict[str, Any]) -> bool | None:
+        links = payload.get("links")
+        if not isinstance(links, dict) or "next" not in links:
+            return None
+        return bool(str(links.get("next") or "").strip())
+
     def network_map(self, required_platforms: set[str] | None = None) -> dict[str, str]:
         required = {str(item).strip() for item in (required_platforms or set()) if str(item).strip()}
         if not self._network_map:
@@ -167,6 +174,8 @@ class GeckoTerminalDexSource:
                 if platform and network:
                     mapping[platform] = network
             if required and required.issubset(mapping):
+                break
+            if self._network_page_has_next(payload) is False:
                 break
 
         self._network_map = mapping
