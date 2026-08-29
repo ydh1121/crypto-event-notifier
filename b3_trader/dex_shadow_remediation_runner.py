@@ -4,6 +4,7 @@ import json
 import math
 import sqlite3
 import time
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -51,6 +52,15 @@ def _component_busy(path: Path, name: str) -> bool:
 def _launch_collected(feature: dict[str, Any]) -> bool:
     launch = feature.get("pool_launch_window") if isinstance(feature.get("pool_launch_window"), dict) else {}
     return str(launch.get("status") or "") == "collected"
+
+
+def _source_key(candidate: dict[str, Any]) -> tuple[str, str, str, float]:
+    return (
+        str(candidate.get("network_id") or ""),
+        str(candidate.get("token_address") or ""),
+        str(candidate.get("pool_address") or ""),
+        float(candidate.get("pool_created_at") or 0.0),
+    )
 
 
 class DexShadowRemediationRunner:
@@ -128,44 +138,55 @@ class DexShadowRemediationRunner:
         finally:
             conn.close()
 
-        best_by_case: dict[str, dict[str, Any]] = {}
+        rows_by_case: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for raw in rows:
             row = dict(raw)
             case_key = str(row.get("case_key") or "")
-            asset_key = str(row.get("asset_key") or "")
-            created = float(row.get("pool_created_at") or 0.0)
-            feature = _feature_json(row.get("feature_json"))
-            if not case_key or not asset_key or _launch_collected(feature):
-                continue
-            if created <= 0 or float(now) - created > DEX_OHLCV_HISTORY_SECONDS:
-                continue
-            last_attempt = float(attempts.get(asset_key) or 0.0)
-            if last_attempt > cutoff:
-                continue
-            launch = feature.get("pool_launch_window") if isinstance(feature.get("pool_launch_window"), dict) else {}
-            status = str(launch.get("status") or "")
-            if status not in {"", "not_available", "launch_ohlcv_unavailable"}:
-                continue
-            candidate = {
-                "case_key": case_key,
-                "asset_key": asset_key,
-                "network_id": str(row.get("network_id") or ""),
-                "token_address": str(row.get("token_address") or ""),
-                "pool_address": str(row.get("pool_address") or ""),
-                "pool_created_at": created,
-                "domestic_open_at": float(row.get("domestic_open_at") or 0.0),
-                "feature_version": int(row.get("feature_version") or FEATURE_VERSION),
-                "launch_status": status or "missing",
-                "pool_age_days": round(max(0.0, float(now) - created) / 86400.0, 4),
-            }
-            current = best_by_case.get(case_key)
-            if current is None or candidate["pool_created_at"] > current["pool_created_at"]:
-                best_by_case[case_key] = candidate
+            if case_key:
+                rows_by_case[case_key].append(row)
 
-        candidates = sorted(
-            best_by_case.values(),
-            key=lambda row: (float(row.get("pool_age_days") or math.inf), str(row.get("case_key") or "")),
-        )
+        candidates: list[dict[str, Any]] = []
+        for case_key, case_rows in rows_by_case.items():
+            parsed_rows = [(row, _feature_json(row.get("feature_json"))) for row in case_rows]
+            if any(_launch_collected(feature) for _, feature in parsed_rows):
+                continue
+
+            eligible: list[dict[str, Any]] = []
+            for row, feature in parsed_rows:
+                asset_key = str(row.get("asset_key") or "")
+                created = float(row.get("pool_created_at") or 0.0)
+                if not asset_key or created <= 0 or float(now) - created > DEX_OHLCV_HISTORY_SECONDS:
+                    continue
+                last_attempt = float(attempts.get(asset_key) or 0.0)
+                if last_attempt > cutoff:
+                    continue
+                launch = feature.get("pool_launch_window") if isinstance(feature.get("pool_launch_window"), dict) else {}
+                status = str(launch.get("status") or "")
+                if status not in {"", "not_available", "launch_ohlcv_unavailable"}:
+                    continue
+                eligible.append(
+                    {
+                        "case_key": case_key,
+                        "asset_key": asset_key,
+                        "network_id": str(row.get("network_id") or ""),
+                        "token_address": str(row.get("token_address") or ""),
+                        "pool_address": str(row.get("pool_address") or ""),
+                        "pool_created_at": created,
+                        "domestic_open_at": float(row.get("domestic_open_at") or 0.0),
+                        "feature_version": int(row.get("feature_version") or FEATURE_VERSION),
+                        "launch_status": status or "missing",
+                        "pool_age_days": round(max(0.0, float(now) - created) / 86400.0, 4),
+                    }
+                )
+            if eligible:
+                candidates.append(max(eligible, key=lambda row: float(row.get("pool_created_at") or 0.0)))
+
+        candidates.sort(key=lambda row: (float(row.get("pool_age_days") or math.inf), str(row.get("case_key") or "")))
+        source_groups: dict[tuple[str, str, str, float], int] = defaultdict(int)
+        for candidate in candidates:
+            source_groups[_source_key(candidate)] += 1
+        for candidate in candidates:
+            candidate["shared_source_case_count"] = source_groups[_source_key(candidate)]
         return candidates[: max(1, min(100, int(limit)))]
 
     def plan(self, *, now: float | None = None) -> dict[str, Any]:
@@ -194,6 +215,7 @@ class DexShadowRemediationRunner:
         else:
             action = "manual_review_needed"
 
+        distinct_sources = len({_source_key(candidate) for candidate in candidates})
         return {
             "status": "planned",
             "paper_only": True,
@@ -205,6 +227,9 @@ class DexShadowRemediationRunner:
             "remediation": remediation,
             "launch_recovery": {
                 "candidate_count": len(candidates),
+                "distinct_source_count": distinct_sources,
+                "case_level_missing_only": True,
+                "shared_source_fetch_reuse": True,
                 "default_max_cases": DEFAULT_MAX_LAUNCH_RECOVERY_CASES,
                 "hard_max_cases": MAX_LAUNCH_RECOVERY_CASES,
                 "retry_after_seconds": LAUNCH_RETRY_AFTER_SECONDS,
@@ -218,17 +243,45 @@ class DexShadowRemediationRunner:
             },
         }
 
-    def _recover_launch(self, candidate: dict[str, Any], *, now: float) -> dict[str, Any]:
+    def _recover_launch(
+        self,
+        candidate: dict[str, Any],
+        *,
+        now: float,
+        source_cache: dict[tuple[str, str, str, float], dict[str, Any]],
+    ) -> dict[str, Any]:
         asset_key = str(candidate.get("asset_key") or "")
         pool_address = str(candidate.get("pool_address") or "")
+        source_key = _source_key(candidate)
+        source_reused = source_key in source_cache
+        if not source_reused:
+            try:
+                hourly, minute = self.cycle._launch_candles(
+                    network_id=str(candidate.get("network_id") or ""),
+                    pool_address=pool_address,
+                    token_address=str(candidate.get("token_address") or ""),
+                    pool_created_at=float(candidate.get("pool_created_at") or 0.0),
+                    now=float(now),
+                )
+                source_cache[source_key] = {"ok": True, "hourly": hourly, "minute": minute}
+            except Exception as exc:
+                source_cache[source_key] = {
+                    "ok": False,
+                    "error": f"{type(exc).__name__}: {exc}"[:400],
+                }
+        source_result = source_cache[source_key]
+        if not source_result.get("ok"):
+            return {
+                "case_key": str(candidate.get("case_key") or ""),
+                "asset_key": asset_key,
+                "status": "source_waiting",
+                "source_reused": source_reused,
+                "error": str(source_result.get("error") or "source_error"),
+            }
+
+        hourly = list(source_result.get("hourly") or [])
+        minute = list(source_result.get("minute") or [])
         try:
-            hourly, minute = self.cycle._launch_candles(
-                network_id=str(candidate.get("network_id") or ""),
-                pool_address=pool_address,
-                token_address=str(candidate.get("token_address") or ""),
-                pool_created_at=float(candidate.get("pool_created_at") or 0.0),
-                now=float(now),
-            )
             self.cycle.store.upsert_candles(
                 asset_key=asset_key,
                 pool_address=pool_address,
@@ -270,6 +323,7 @@ class DexShadowRemediationRunner:
                 "case_key": str(candidate.get("case_key") or ""),
                 "asset_key": asset_key,
                 "status": str(launch.get("status") or "unavailable"),
+                "source_reused": source_reused,
                 "launch_hourly": len(hourly),
                 "launch_minute": len(minute),
                 "pool_age_days": candidate.get("pool_age_days"),
@@ -279,6 +333,7 @@ class DexShadowRemediationRunner:
                 "case_key": str(candidate.get("case_key") or ""),
                 "asset_key": asset_key,
                 "status": "source_waiting",
+                "source_reused": source_reused,
                 "error": f"{type(exc).__name__}: {exc}"[:400],
             }
 
@@ -310,12 +365,13 @@ class DexShadowRemediationRunner:
 
         launch_results: list[dict[str, Any]] = []
         attempted_at: dict[str, float] = {}
+        source_cache: dict[tuple[str, str, str, float], dict[str, Any]] = {}
         if action in {"launch_recovery_plus_historical_expansion", "launch_recovery_only"}:
             candidates = list(before.get("launch_recovery", {}).get("preview") or [])[:max_launch_cases]
             for candidate in candidates:
                 if self._busy()["dex_launch_research"] or self._busy()["listing_history_research"]:
                     break
-                result = self._recover_launch(candidate, now=current_now)
+                result = self._recover_launch(candidate, now=current_now, source_cache=source_cache)
                 launch_results.append(result)
                 attempted_at[str(candidate.get("asset_key") or "")] = current_now
 
@@ -346,6 +402,7 @@ class DexShadowRemediationRunner:
             "selected_action": action,
             "launch_case_budget": max_launch_cases,
             "processed_launch": len(launch_results),
+            "distinct_launch_source_fetches": len(source_cache),
             "launch_results": launch_results,
             "historical_pages_per_exchange": HISTORICAL_PAGES_PER_EXCHANGE if historical_result else 0,
             "historical_result": historical_result,
