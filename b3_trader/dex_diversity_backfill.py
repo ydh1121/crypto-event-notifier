@@ -82,8 +82,10 @@ class DexDiversityBackfillRunner(DexLaunchBackfillRunner):
     The Build46 execution path remains the owner of network work, cooldowns,
     stored-complete preservation, and the hard two-case cap. Build51 only sorts
     candidates so new CoinGecko assets are researched before duplicate exchange
-    events and before complete_partial retries. It never changes Build45 quality
-    thresholds and never wires DEX data into score, PAPER decisions, or orders.
+    events and before complete_partial retries. A second exchange event for the
+    same new CoinGecko asset is also demoted within the same batch. It never
+    changes Build45 quality thresholds and never wires DEX data into score,
+    PAPER decisions, or orders.
     """
 
     def __init__(
@@ -100,6 +102,7 @@ class DexDiversityBackfillRunner(DexLaunchBackfillRunner):
         quality = evaluate_dex_launch_quality(self.path)
         audit = audit_dex_sample(self.path)
         usable_ids = _usable_asset_ids(quality)
+        scheduled_new_ids: set[str] = set()
 
         ranked: list[dict[str, Any]] = []
         for index, source in enumerate(base.get("candidates") or []):
@@ -112,6 +115,13 @@ class DexDiversityBackfillRunner(DexLaunchBackfillRunner):
                     str(candidate.get("case_key") or ""),
                 )
             priority, diversity_reason = _candidate_priority(candidate, usable_asset_ids=usable_ids)
+            coin_id = str(candidate.get("coingecko_id") or "").strip()
+            if priority == PRIORITY_NEW_UNIQUE and coin_id:
+                if coin_id in scheduled_new_ids:
+                    priority = PRIORITY_DUPLICATE_EVENT
+                    diversity_reason = "same_batch_duplicate_asset"
+                else:
+                    scheduled_new_ids.add(coin_id)
             candidate["diversity_priority"] = priority
             candidate["diversity_reason"] = diversity_reason
             candidate["original_order"] = index
@@ -148,6 +158,7 @@ class DexDiversityBackfillRunner(DexLaunchBackfillRunner):
             },
             "policy": {
                 "new_unique_asset_first": True,
+                "one_event_per_new_asset_per_batch": True,
                 "unknown_identity_second": True,
                 "duplicate_event_after_unique": True,
                 "partial_retry_last": True,
