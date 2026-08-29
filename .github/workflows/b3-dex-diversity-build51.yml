@@ -19,6 +19,7 @@ on:
       - "scripts/check-dex-diversity-build51.py"
       - "scripts/verify-dex-diversity-build51.py"
       - ".github/workflows/b3-dex-diversity-build51.yml"
+  workflow_dispatch:
 
 jobs:
   build51:
@@ -36,11 +37,11 @@ jobs:
       - name: Diversity unit tests
         run: python -m pytest -q b3_trader/tests/test_dex_diversity_backfill.py b3_trader/tests/test_dex_launch_backfill.py b3_trader/tests/test_dex_launch_quality.py
       - name: Build 42 regression contract
-        run: python scripts/check-dex-launch-build42.py
+        run: python scripts/check-dex-build42.py
       - name: Build 43 regression contract
         run: python scripts/check-dex-supervisor-build43.py
       - name: Build 44 regression contract
-        run: python scripts/check-dex-cloudflare-build44.py
+        run: python scripts/check-dex-cloud-projection-build44.py
       - name: Build 45 regression contract
         run: python scripts/check-dex-quality-build45.py
       - name: Build 46 regression contract
