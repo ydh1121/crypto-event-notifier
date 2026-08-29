@@ -21,6 +21,10 @@ PRIORITY_UNKNOWN_IDENTITY = 1
 PRIORITY_DUPLICATE_EVENT = 2
 PRIORITY_PARTIAL_RETRY = 3
 
+PROGRESS_FRESH_UNRESEARCHED = 0
+PROGRESS_RETRYABLE_EXISTING = 1
+PROGRESS_NOT_APPLICABLE = 2
+
 
 def _verified_listing_coingecko_id(path: Path, case_key: str) -> str:
     if not path.exists():
@@ -76,16 +80,27 @@ def _candidate_priority(candidate: dict[str, Any], *, usable_asset_ids: set[str]
     return PRIORITY_DUPLICATE_EVENT, "duplicate_asset_event"
 
 
-class DexDiversityBackfillRunner(DexLaunchBackfillRunner):
-    """Build51 diversity-aware ordering for the existing bounded DEX backfill.
+def _progress_priority(candidate: dict[str, Any]) -> tuple[int, str]:
+    derived = str(candidate.get("derived_completion") or "").strip()
+    stored = str(candidate.get("stored_status") or "").strip()
+    reason = str(candidate.get("reason") or "").strip()
+    if reason == "eligible_unresearched_or_retryable" and derived == "unresearched" and not stored:
+        return PROGRESS_FRESH_UNRESEARCHED, "fresh_unresearched"
+    if reason == "eligible_unresearched_or_retryable":
+        return PROGRESS_RETRYABLE_EXISTING, "retryable_existing_status"
+    return PROGRESS_NOT_APPLICABLE, "not_applicable"
 
-    The Build46 execution path remains the owner of network work, cooldowns,
-    stored-complete preservation, and the hard two-case cap. Build51 only sorts
-    candidates so new CoinGecko assets are researched before duplicate exchange
-    events and before complete_partial retries. A second exchange event for the
-    same new CoinGecko asset is also demoted within the same batch. It never
-    changes Build45 quality thresholds and never wires DEX data into score,
-    PAPER decisions, or orders.
+
+class DexDiversityBackfillRunner(DexLaunchBackfillRunner):
+    """Build51 diversity/progress-aware ordering for bounded DEX backfill.
+
+    Build46 remains the owner of network work, cooldowns, stored-complete
+    preservation, and the hard two-case cap. Build51 only sorts candidates.
+    New CoinGecko assets are placed before duplicate exchange events and partial
+    retries, while fresh unresearched new assets are placed before already-failed
+    retryable new assets. A second exchange event for the same new CoinGecko asset
+    is demoted within the same batch. Build45 thresholds remain unchanged and DEX
+    data is never wired into score, PAPER decisions, or orders.
     """
 
     def __init__(
@@ -122,14 +137,18 @@ class DexDiversityBackfillRunner(DexLaunchBackfillRunner):
                     diversity_reason = "same_batch_duplicate_asset"
                 else:
                     scheduled_new_ids.add(coin_id)
+            progress_priority, progress_reason = _progress_priority(candidate)
             candidate["diversity_priority"] = priority
             candidate["diversity_reason"] = diversity_reason
+            candidate["progress_priority"] = progress_priority
+            candidate["progress_reason"] = progress_reason
             candidate["original_order"] = index
             ranked.append(candidate)
 
         ranked.sort(
             key=lambda row: (
                 int(row.get("diversity_priority") or 0),
+                int(row.get("progress_priority") or 0),
                 int(row.get("original_order") or 0),
             )
         )
@@ -137,16 +156,20 @@ class DexDiversityBackfillRunner(DexLaunchBackfillRunner):
         event_cases = audit.get("event_cases") if isinstance(audit.get("event_cases"), dict) else {}
         coverage = audit.get("coverage") if isinstance(audit.get("coverage"), dict) else {}
         counts: dict[str, int] = {}
+        progress_counts: dict[str, int] = {}
         for row in ranked:
             key = str(row.get("diversity_reason") or "unknown")
             counts[key] = counts.get(key, 0) + 1
+            progress_key = str(row.get("progress_reason") or "unknown")
+            progress_counts[progress_key] = progress_counts.get(progress_key, 0) + 1
 
         return {
             **base,
-            "mode": "diversity_aware",
+            "mode": "diversity_progress_aware",
             "candidate_count": len(ranked),
             "candidates": ranked[:preview_limit],
             "priority_counts": dict(sorted(counts.items())),
+            "progress_counts": dict(sorted(progress_counts.items())),
             "sample_composition": {
                 "usable_event_cases": int(event_cases.get("usable") or 0),
                 "unique_assets": int(event_cases.get("unique_assets") or 0),
@@ -158,6 +181,7 @@ class DexDiversityBackfillRunner(DexLaunchBackfillRunner):
             },
             "policy": {
                 "new_unique_asset_first": True,
+                "fresh_unresearched_before_retry": True,
                 "one_event_per_new_asset_per_batch": True,
                 "unknown_identity_second": True,
                 "duplicate_event_after_unique": True,
