@@ -36,7 +36,7 @@ def test_plan_prioritizes_new_unique_before_duplicate_and_partial(monkeypatch, t
         "shadow_only": True,
         "can_place_orders": False,
         "score_wired": False,
-        "candidate_count": 4,
+        "candidate_count": 5,
         "candidates": [
             {
                 "case_key": "dup",
@@ -49,13 +49,18 @@ def test_plan_prioritizes_new_unique_before_duplicate_and_partial(monkeypatch, t
                 "reason": "complete_partial_retry",
             },
             {
-                "case_key": "unknown",
-                "coingecko_id": "",
+                "case_key": "new-first",
+                "coingecko_id": "new-asset",
                 "reason": "eligible_unresearched_or_retryable",
             },
             {
-                "case_key": "new",
+                "case_key": "new-second-exchange",
                 "coingecko_id": "new-asset",
+                "reason": "eligible_unresearched_or_retryable",
+            },
+            {
+                "case_key": "unknown",
+                "coingecko_id": "",
                 "reason": "eligible_unresearched_or_retryable",
             },
         ],
@@ -90,7 +95,16 @@ def test_plan_prioritizes_new_unique_before_duplicate_and_partial(monkeypatch, t
     monkeypatch.setattr(module, "_verified_listing_coingecko_id", lambda path, key: "")
 
     plan = runner.plan(limit=10)
-    assert [row["case_key"] for row in plan["candidates"]] == ["new", "unknown", "dup", "partial"]
+    assert [row["case_key"] for row in plan["candidates"]] == [
+        "new-first",
+        "unknown",
+        "dup",
+        "new-second-exchange",
+        "partial",
+    ]
+    second = next(row for row in plan["candidates"] if row["case_key"] == "new-second-exchange")
+    assert second["diversity_reason"] == "same_batch_duplicate_asset"
+    assert plan["policy"]["one_event_per_new_asset_per_batch"] is True
     assert plan["policy"]["changes_build45_thresholds"] is False
     assert plan["sample_composition"]["unique_assets"] == 12
 
