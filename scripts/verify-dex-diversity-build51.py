@@ -42,13 +42,18 @@ def main() -> None:
         print("=== DEX DIVERSITY BUILD 51 RUNTIME ===")
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         safety = payload["safety"]
+        policy = plan.get("policy") if isinstance(plan.get("policy"), dict) else {}
         if not (
             safety["paper_only"]
             and safety["shadow_only"]
             and not safety["can_place_orders"]
             and not safety["score_wired"]
             and int(plan.get("max_cases_per_run") or 0) <= 2
-            and plan.get("mode") == "diversity_aware"
+            and plan.get("mode") == "diversity_progress_aware"
+            and bool(policy.get("new_unique_asset_first"))
+            and bool(policy.get("fresh_unresearched_before_retry"))
+            and bool(policy.get("one_event_per_new_asset_per_batch"))
+            and not bool(policy.get("changes_build45_thresholds"))
         ):
             raise SystemExit("DEX_DIVERSITY_BUILD51_RUNTIME=FAIL")
         print("DEX_DIVERSITY_BUILD51_RUNTIME=PASS")
