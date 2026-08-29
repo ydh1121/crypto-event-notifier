@@ -21,6 +21,7 @@ def main() -> None:
         "build51_additive_diversity_runner": "class DexDiversityBackfillRunner(DexLaunchBackfillRunner)" in diversity,
         "build51_reuses_build46_execution": "super().run_once(max_cases=max_cases)" in diversity,
         "build51_new_unique_first": "PRIORITY_NEW_UNIQUE = 0" in diversity and "new_unique_asset" in diversity,
+        "build51_same_batch_asset_dedupe": "same_batch_duplicate_asset" in diversity and "one_event_per_new_asset_per_batch" in diversity,
         "build51_duplicate_after_unique": "PRIORITY_DUPLICATE_EVENT = 2" in diversity and "duplicate_asset_event" in diversity,
         "build51_partial_retry_last": "PRIORITY_PARTIAL_RETRY = 3" in diversity and "partial_completion_retry" in diversity,
         "build51_resolves_verified_listing_identity": "_verified_listing_coingecko_id" in diversity,
