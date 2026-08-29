@@ -33,6 +33,8 @@ def main() -> None:
         "build55_bounded_launch_recovery": "MAX_LAUNCH_RECOVERY_CASES = 2" in runner and "max_launch_cases" in runner,
         "build55_launch_cooldown": "LAUNCH_RETRY_AFTER_SECONDS = 6 * 3600" in runner and "launch_attempted_at" in runner,
         "build55_selected_primary_only": "p.selected_primary=1" in runner,
+        "build55_case_level_missing_only": 'if any(_launch_collected(feature) for _, feature in parsed_rows):' in runner and '"case_level_missing_only": True' in runner,
+        "build55_shared_source_fetch_reuse": "source_cache" in runner and '"shared_source_fetch_reuse": True' in runner and '"distinct_launch_source_fetches"' in runner,
         "build55_preserves_domestic_feature": 'feature["pool_launch_window"] = launch' in runner and "launch_window_features" in runner,
         "build55_reuses_build47_official_history": "HistoricalListingBackfill" in runner and "official_sources_only" in runner,
         "build55_one_history_page_per_exchange": "HISTORICAL_PAGES_PER_EXCHANGE = 1" in runner,
