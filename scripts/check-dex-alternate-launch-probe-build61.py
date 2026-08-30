@@ -13,7 +13,13 @@ def main() -> None:
     verify = VERIFY.read_text(encoding="utf-8")
     checks = {
         "build61_paper_shadow_only": '"paper_only": True' in source and '"shadow_only": True' in source,
-        "build61_no_orders": '"can_place_orders": False' in source and "place_order" not in source,
+        "build61_no_orders": (
+            '"can_place_orders": False' in source
+            and ".place_order(" not in source
+            and " place_order(" not in source
+            and ".submit_order(" not in source
+            and " submit_order(" not in source
+        ),
         "build61_no_score_wiring": '"score_wired": False' in source,
         "build61_non_primary_only": '"accepted_non_primary_only": True' in source and 'int(row["selected_primary"] or 0) != 0' in source,
         "build61_no_primary_mutation": '"selected_primary_mutation": False' in source and "UPDATE dex_launch_pools" not in source,
