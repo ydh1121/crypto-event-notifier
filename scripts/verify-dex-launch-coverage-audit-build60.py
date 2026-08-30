@@ -27,6 +27,10 @@ def main() -> None:
     criteria = payload.get("launch_feature_criteria") if isinstance(payload.get("launch_feature_criteria"), dict) else {}
     summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
     review = payload.get("review") if isinstance(payload.get("review"), dict) else {}
+    usable = int(summary.get("usable_event_cases") or 0)
+    launch = int(summary.get("launch_feature_cases") or 0)
+    required = int(summary.get("required_launch_feature_cases") or 0)
+    additional = int(summary.get("additional_launch_cases_needed") or 0)
     safe = bool(
         payload.get("ok")
         and payload.get("paper_only")
@@ -39,8 +43,9 @@ def main() -> None:
         and payload.get("changes_feature_criteria") is False
         and criteria.get("counted_when") == "feature_json.pool_launch_window.status == collected"
         and criteria.get("partial_hourly_rows_alone_are_not_sufficient") is True
-        and int(summary.get("launch_feature_cases") or 0) <= int(summary.get("usable_event_cases") or 0)
-        and int(summary.get("required_launch_feature_cases") or 0) >= int(summary.get("launch_feature_cases") or 0)
+        and 0 <= launch <= usable
+        and 0 <= required <= usable
+        and additional == max(0, required - launch)
         and review.get("wire_shadow_score_now") is False
     )
     if not safe:
