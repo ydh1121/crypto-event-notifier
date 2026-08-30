@@ -36,7 +36,7 @@ def main() -> None:
         ),
         "build66_no_whole_v1_score_inversion": (
             "audit_dex_shadow_scores" not in source
-            and "_case_score(" not in source
+            and "from .dex_shadow_score import _case_score" not in source
             and "100.0 -" not in source
         ),
         "build66_postlisting_labels_evaluation_only": (
