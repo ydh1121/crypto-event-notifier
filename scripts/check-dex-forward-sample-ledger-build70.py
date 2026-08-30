@@ -13,7 +13,12 @@ def main() -> None:
         "build70_uses_build66_forward_scores": "audit_dex_shadow_score_v2_forward" in SOURCE,
         "build70_uses_frozen_build65_protocol": "FORWARD_VALIDATION_PROTOCOL" in SOURCE,
         "build70_event_and_asset_dedup_counts": "unique_asset_count" in SOURCE and "asset_dedup" in SOURCE,
-        "build70_core_label_coverage": all(window in SOURCE for window in ("p1h", "p6h", "p24h")),
+        "build70_core_label_coverage": (
+            "CORE_WINDOWS" in SOURCE
+            and "event_labels" in SOURCE
+            and "asset_labels" in SOURCE
+            and '"label_coverage"' in SOURCE
+        ),
         "build70_no_early_statistics": '"validation_statistics_calculated": False' in SOURCE,
         "build70_historical_contamination_fail_closed": "historical_contamination_blocked" in SOURCE,
         "build70_read_only": '"read_only": True' in SOURCE and '"database_mutation": False' in SOURCE,
