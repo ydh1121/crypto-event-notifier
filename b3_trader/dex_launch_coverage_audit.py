@@ -202,6 +202,7 @@ def audit_dex_launch_coverage(
 
     case_assets: dict[str, list[dict[str, Any]]] = defaultdict(list)
     classification_counts: Counter[str] = Counter()
+    gap_classification_counts: Counter[str] = Counter()
     fresh_source_keys: set[tuple[str, str, str, float]] = set()
     partial_reference_gap: list[dict[str, Any]] = []
     inconsistent_reference_rows: list[dict[str, Any]] = []
@@ -212,6 +213,9 @@ def audit_dex_launch_coverage(
         asset_key = str(row.get("asset_key") or "")
         pool_address = str(row.get("pool_address") or "")
         created = float(row.get("pool_created_at") or 0.0)
+        case_already_counted = bool(
+            int(quality_by_key.get(case_key, {}).get("launch_feature_asset_count") or 0) > 0
+        )
         feature = _json(row.get("feature_json"))
         launch = feature.get("pool_launch_window") if isinstance(feature.get("pool_launch_window"), dict) else {}
         launch_status = str(launch.get("status") or "feature_missing")
@@ -242,8 +246,6 @@ def audit_dex_launch_coverage(
         else:
             classification = "unattempted_source_candidate"
 
-        if classification == "unattempted_source_candidate":
-            fresh_source_keys.add(source_key)
         detail = {
             "case_key": case_key,
             "asset_key": asset_key,
@@ -261,38 +263,44 @@ def audit_dex_launch_coverage(
             "reference_available_by_original_build42_rule": reference_available,
             "source_previously_attempted": source_attempted,
             "within_geckoterminal_history_window": within_history,
+            "case_already_counted_for_launch": case_already_counted,
             "classification": classification,
         }
         case_assets[case_key].append(detail)
         classification_counts[classification] += 1
-        if classification == "partial_candles_without_launch_reference":
-            partial_reference_gap.append(detail)
-        elif classification == "persisted_reference_present_status_unavailable":
-            inconsistent_reference_rows.append(detail)
 
-        for alt in accepted_pools_by_asset.get(asset_key, []):
-            if bool(alt.get("selected_primary")):
-                continue
-            alt_created = float(alt.get("pool_created_at") or 0.0)
-            if alt_created <= 0 or current_now - alt_created > DEX_OHLCV_HISTORY_SECONDS:
-                continue
-            alt_key = _source_key(alt)
-            alternate_pool_opportunities.append(
-                {
-                    "case_key": case_key,
-                    "asset_key": asset_key,
-                    "network_id": str(alt.get("network_id") or ""),
-                    "token_address": str(alt.get("token_address") or ""),
-                    "pool_address": str(alt.get("pool_address") or ""),
-                    "dex_id": str(alt.get("dex_id") or ""),
-                    "pool_created_at": alt_created,
-                    "pool_age_days": round(max(0.0, current_now - alt_created) / 86400.0, 4),
-                    "reserve_usd": float(alt.get("reserve_usd") or 0.0),
-                    "volume_h24_usd": float(alt.get("volume_h24_usd") or 0.0),
-                    "source_previously_attempted": bool(alt_key in attempted_source_keys),
-                    "reason": "accepted_non_primary_pool_within_history_window",
-                }
-            )
+        if not case_already_counted:
+            gap_classification_counts[classification] += 1
+            if classification == "unattempted_source_candidate":
+                fresh_source_keys.add(source_key)
+            if classification == "partial_candles_without_launch_reference":
+                partial_reference_gap.append(detail)
+            elif classification == "persisted_reference_present_status_unavailable":
+                inconsistent_reference_rows.append(detail)
+
+            for alt in accepted_pools_by_asset.get(asset_key, []):
+                if bool(alt.get("selected_primary")):
+                    continue
+                alt_created = float(alt.get("pool_created_at") or 0.0)
+                if alt_created <= 0 or current_now - alt_created > DEX_OHLCV_HISTORY_SECONDS:
+                    continue
+                alt_key = _source_key(alt)
+                alternate_pool_opportunities.append(
+                    {
+                        "case_key": case_key,
+                        "asset_key": asset_key,
+                        "network_id": str(alt.get("network_id") or ""),
+                        "token_address": str(alt.get("token_address") or ""),
+                        "pool_address": str(alt.get("pool_address") or ""),
+                        "dex_id": str(alt.get("dex_id") or ""),
+                        "pool_created_at": alt_created,
+                        "pool_age_days": round(max(0.0, current_now - alt_created) / 86400.0, 4),
+                        "reserve_usd": float(alt.get("reserve_usd") or 0.0),
+                        "volume_h24_usd": float(alt.get("volume_h24_usd") or 0.0),
+                        "source_previously_attempted": bool(alt_key in attempted_source_keys),
+                        "reason": "launch_missing_case_has_accepted_non_primary_pool_within_history_window",
+                    }
+                )
 
     counted_cases: list[dict[str, Any]] = []
     missing_cases: list[dict[str, Any]] = []
@@ -346,7 +354,8 @@ def audit_dex_launch_coverage(
             "alternate_accepted_pool_candidates": len(alternate_pool_opportunities),
             "persisted_reference_inconsistencies": len(inconsistent_reference_rows),
         },
-        "classification_counts": dict(sorted(classification_counts.items())),
+        "classification_counts_all_primary_assets": dict(sorted(classification_counts.items())),
+        "classification_counts_launch_missing_cases": dict(sorted(gap_classification_counts.items())),
         "counted_cases": counted_cases,
         "missing_cases": missing_cases,
         "partial_reference_gap_assets": partial_reference_gap,
