@@ -76,6 +76,13 @@ class BithumbClient:
             raise RuntimeError(f"No orderbook data for {market}")
         return data[0]
 
+    def trades_ticks(self, market: str, *, count: int = 200, cursor: str | None = None) -> list[dict[str, Any]]:
+        params: dict[str, Any] = {"market": market, "count": max(1, min(500, int(count)))}
+        if cursor:
+            params["cursor"] = str(cursor)
+        data = self._get("/v1/trades/ticks", params)
+        return data if isinstance(data, list) else []
+
     def candles_minutes(
         self,
         market: str,
