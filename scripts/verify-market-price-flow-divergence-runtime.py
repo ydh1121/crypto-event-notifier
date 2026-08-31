@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from b3_trader.market_ohlcv_research_cycle import STATE_PATH
 from b3_trader.market_price_flow_divergence import MarketPriceFlowDivergenceStore
 from b3_trader.research_control import STATUS_PATH
 
@@ -39,6 +40,7 @@ def main() -> None:
 
     now = time.time()
     status = _read_json(STATUS_PATH)
+    cycle_state = _read_json(STATE_PATH)
     components = status.get("components") if isinstance(status.get("components"), dict) else {}
     component = components.get("market-ohlcv-history") if isinstance(components.get("market-ohlcv-history"), dict) else {}
     last_result = component.get("last_result") if isinstance(component.get("last_result"), dict) else {}
@@ -72,14 +74,16 @@ def main() -> None:
     ]
 
     price_flow_result = last_result.get("price_flow_divergence") if isinstance(last_result.get("price_flow_divergence"), dict) else {}
+    cycle_contract = cycle_state.get("price_flow_divergence") if isinstance(cycle_state.get("price_flow_divergence"), dict) else {}
     checks = {
         "supervisor_running": supervisor_running,
         "supervisor_status_fresh": status_fresh,
         "component_registered": bool(component),
         "component_enabled": bool(component.get("enabled")),
         "component_not_degraded": component_status != "degraded",
-        "cycle_price_flow_present": bool(price_flow_result),
-        "cycle_price_flow_error_free": not bool(price_flow_result) or price_flow_result.get("ok") is True,
+        "cycle_contract_registered": int(cycle_state.get("version") or 0) >= 6 and bool(cycle_contract),
+        "cycle_contract_score_unwired": not bool(cycle_contract) or cycle_contract.get("score_wired") is False,
+        "last_cycle_price_flow_error_free": not bool(price_flow_result) or price_flow_result.get("ok") is True,
         "table_ready": audit.get("table_exists") is True,
         "data_ready": int(audit.get("ready_rows") or 0) > 0,
         "five_minute_benchmarks_ready": EXPECTED_PAIRS.issubset(ready_5m_pairs),
@@ -108,8 +112,9 @@ def main() -> None:
             "component_registered",
             "component_enabled",
             "component_not_degraded",
-            "cycle_price_flow_present",
-            "cycle_price_flow_error_free",
+            "cycle_contract_registered",
+            "cycle_contract_score_unwired",
+            "last_cycle_price_flow_error_free",
         ]
     if args.require_data:
         required += ["table_ready", "data_ready"]
@@ -122,6 +127,11 @@ def main() -> None:
         "checks": checks,
         "ready_5m_pairs": sorted([f"{exchange}:{market}" for exchange, market in ready_5m_pairs]),
         "latest_absorption_candidates": candidate_rows,
+        "cycle_state": {
+            "version": int(cycle_state.get("version") or 0),
+            "updated_at": float(cycle_state.get("updated_at") or 0.0),
+            "price_flow_divergence": cycle_contract,
+        },
         "component": {
             "status": component_status,
             "interval_seconds": float(component.get("interval_seconds") or 0.0),
