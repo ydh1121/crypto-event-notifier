@@ -101,6 +101,36 @@ class MarketFeatureStore:
             "horizons": horizons,
         }
 
+    def cross_exchange_gap(self, *, market: str) -> dict[str, Any]:
+        try:
+            exists = self.conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='research_market_cross_exchange_gap_mx'"
+            ).fetchone()
+        except sqlite3.Error:
+            exists = None
+        if not exists:
+            return {"feature_version": 0, "market": str(market), "gap_ready": False}
+        try:
+            row = self.conn.execute(
+                """SELECT market,symbol,bithumb_market,upbit_market,bithumb_name,upbit_name,
+                          identity_verified,identity_basis,bithumb_price,upbit_price,
+                          bithumb_source_ts,upbit_source_ts,source_skew_seconds,
+                          upbit_vs_bithumb_pct,absolute_gap_pct,gap_ready,source_timeframe,
+                          source_table,received_at,feature_version
+                   FROM research_market_cross_exchange_gap_mx WHERE market=?""",
+                (str(market),),
+            ).fetchone()
+        except sqlite3.Error:
+            row = None
+        if not row:
+            return {"feature_version": 0, "market": str(market), "gap_ready": False}
+        result = dict(row)
+        result["identity_verified"] = bool(result.get("identity_verified"))
+        result["gap_ready"] = bool(result.get("gap_ready"))
+        result["paper_only"] = True
+        result["score_wired"] = False
+        return result
+
     def enrich_market_detail(
         self,
         detail: dict[str, Any],
@@ -112,6 +142,7 @@ class MarketFeatureStore:
         if not detail:
             return detail
         detail["relative_strength"] = self.relative_strength(exchange=exchange, market=market)
+        detail["cross_exchange_gap"] = self.cross_exchange_gap(market=market)
         signal = detail.get("signal") if isinstance(detail.get("signal"), dict) else {}
         summary = detail.get("summary") if isinstance(detail.get("summary"), dict) else {}
         try:
