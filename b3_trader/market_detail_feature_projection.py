@@ -3,6 +3,41 @@ from __future__ import annotations
 from typing import Any
 
 
+def _compact_relative_strength(source: dict[str, Any]) -> dict[str, Any]:
+    relative = source.get("relative_strength") if isinstance(source.get("relative_strength"), dict) else {}
+    horizons = relative.get("horizons") if isinstance(relative.get("horizons"), dict) else {}
+    compact_horizons: dict[str, Any] = {}
+    for key in ("1", "3", "7", "30"):
+        row = horizons.get(key) if isinstance(horizons.get(key), dict) else {}
+        if not row:
+            continue
+        compact_horizons[key] = {
+            "as_of_ts": row.get("as_of_ts"),
+            "asset_return_pct": row.get("asset_return_pct"),
+            "btc_return_pct": row.get("btc_return_pct"),
+            "eth_return_pct": row.get("eth_return_pct"),
+            "vs_btc_pp": row.get("vs_btc_pp"),
+            "vs_eth_pp": row.get("vs_eth_pp"),
+            "breadth_positive_pct": row.get("breadth_positive_pct"),
+            "breadth_median_return_pct": row.get("breadth_median_return_pct"),
+            "vs_breadth_median_pp": row.get("vs_breadth_median_pp"),
+            "breadth_sample_count": int(row.get("breadth_sample_count") or 0),
+            "breadth_universe_count": int(row.get("breadth_universe_count") or 0),
+            "breadth_coverage_pct": row.get("breadth_coverage_pct"),
+            "breadth_ready": bool(row.get("breadth_ready")),
+            "source_timeframe": str(row.get("source_timeframe") or "1d"),
+            "source_ts": row.get("source_ts"),
+            "received_at": row.get("received_at"),
+            "feature_version": int(row.get("feature_version") or 0),
+        }
+    return {
+        "feature_version": int(relative.get("feature_version") or 0),
+        "horizons": compact_horizons,
+        "paper_only": True,
+        "score_wired": False,
+    }
+
+
 def apply_market_feature_projection(source: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
     """Copy precomputed market features into a bounded Cloudflare detail payload."""
     returns = source.get("return_windows") if isinstance(source.get("return_windows"), dict) else {}
@@ -21,6 +56,7 @@ def apply_market_feature_projection(source: dict[str, Any], result: dict[str, An
         "cum_7d_pct": returns.get("cum_7d_pct"),
         "cum_30d_pct": returns.get("cum_30d_pct"),
     }
+    result["relative_strength"] = _compact_relative_strength(source)
     result["lifecycle_state"] = str(source.get("lifecycle_state") or "NORMAL")
-    result["version"] = max(5, int(result.get("version") or 0))
+    result["version"] = max(6, int(result.get("version") or 0))
     return result
