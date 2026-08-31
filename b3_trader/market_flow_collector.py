@@ -155,6 +155,8 @@ class MarketFlowCollector:
                 page_latest = max(float(row["trade_ts"]) for row in page_rows)
                 oldest_ts = page_oldest if oldest_ts <= 0 else min(oldest_ts, page_oldest)
                 latest_ts = max(latest_ts, page_latest)
+            if len(page) < TRADE_PAGE_SIZE:
+                break
             if previous_covered > 0 and oldest_ts > 0 and oldest_ts <= previous_covered:
                 break
             last = page[-1] if isinstance(page[-1], dict) else {}
