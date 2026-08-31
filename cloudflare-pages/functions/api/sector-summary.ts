@@ -8,6 +8,7 @@ type SectorRow = {
   exchange:string; market:string; symbol:string; name_ko:string; name_en:string;
   source_ts:number; received_at:number; turnover_24h:number; change_24h_pct:number;
   d1_pct:number|null; d2_pct:number|null; d3_pct:number|null; d4_pct:number|null; d5_pct:number|null;
+  cum_1d_pct:number|null; cum_3d_pct:number|null; cum_5d_pct:number|null; cum_7d_pct:number|null; cum_30d_pct:number|null;
   lifecycle_state:string;
   opportunity_score:number; position_value_krw:number; categories:string[]; tags:string[];
   canonical_sector:string; research_status:string; business_summary_ko:string; business_summary_en:string;
@@ -16,6 +17,7 @@ type SectorRow = {
 type SectorCoin = {
   market:string; symbol:string; name_ko:string; name_en:string; turnover_24h:number;
   change_24h_pct:number; d1_pct:number|null; d2_pct:number|null; d3_pct:number|null; d4_pct:number|null; d5_pct:number|null;
+  cum_1d_pct:number|null; cum_3d_pct:number|null; cum_5d_pct:number|null; cum_7d_pct:number|null; cum_30d_pct:number|null;
   lifecycle_state:string; opportunity_score:number; profile_cached:boolean; research_status:string;
 };
 type SectorAggregate = {
@@ -50,6 +52,11 @@ export const onRequestGet:PagesFunction<Env>=async({request,env})=>{
       json_extract(md.detail_json,'$.return_windows.d3_pct') AS d3_pct,
       json_extract(md.detail_json,'$.return_windows.d4_pct') AS d4_pct,
       json_extract(md.detail_json,'$.return_windows.d5_pct') AS d5_pct,
+      json_extract(md.detail_json,'$.return_windows.cum_1d_pct') AS cum_1d_pct,
+      json_extract(md.detail_json,'$.return_windows.cum_3d_pct') AS cum_3d_pct,
+      json_extract(md.detail_json,'$.return_windows.cum_5d_pct') AS cum_5d_pct,
+      json_extract(md.detail_json,'$.return_windows.cum_7d_pct') AS cum_7d_pct,
+      json_extract(md.detail_json,'$.return_windows.cum_30d_pct') AS cum_30d_pct,
       COALESCE(NULLIF(json_extract(md.detail_json,'$.lifecycle_state'),''),'NORMAL') AS lifecycle_state,
       CAST(COALESCE(json_extract(md.detail_json,'$.signal.opportunity_score'),json_extract(md.detail_json,'$.summary.opportunity_score'),0) AS REAL) AS opportunity_score,
       CAST(COALESCE(json_extract(md.detail_json,'$.summary.position_value_krw'),0) AS REAL) AS position_value_krw,
@@ -87,6 +94,8 @@ export const onRequestGet:PagesFunction<Env>=async({request,env})=>{
       turnover_24h:Math.max(0,num(row.turnover_24h)),change_24h_pct:num(row.change_24h_pct),
       d1_pct:nullableNum(row.d1_pct),d2_pct:nullableNum(row.d2_pct),d3_pct:nullableNum(row.d3_pct),
       d4_pct:nullableNum(row.d4_pct),d5_pct:nullableNum(row.d5_pct),
+      cum_1d_pct:nullableNum(row.cum_1d_pct),cum_3d_pct:nullableNum(row.cum_3d_pct),
+      cum_5d_pct:nullableNum(row.cum_5d_pct),cum_7d_pct:nullableNum(row.cum_7d_pct),cum_30d_pct:nullableNum(row.cum_30d_pct),
       lifecycle_state:String(row.lifecycle_state||'NORMAL').trim().toUpperCase(),
       opportunity_score:num(row.opportunity_score),position_value_krw:Math.max(0,num(row.position_value_krw)),
       categories:parseList(row.categories_json),tags:parseList(row.tags_json),
@@ -112,6 +121,8 @@ export const onRequestGet:PagesFunction<Env>=async({request,env})=>{
       market:row.market,symbol:row.symbol,name_ko:row.name_ko,name_en:row.name_en,
       turnover_24h:row.turnover_24h,change_24h_pct:row.change_24h_pct,
       d1_pct:row.d1_pct,d2_pct:row.d2_pct,d3_pct:row.d3_pct,d4_pct:row.d4_pct,d5_pct:row.d5_pct,
+      cum_1d_pct:row.cum_1d_pct,cum_3d_pct:row.cum_3d_pct,cum_5d_pct:row.cum_5d_pct,
+      cum_7d_pct:row.cum_7d_pct,cum_30d_pct:row.cum_30d_pct,
       lifecycle_state:row.lifecycle_state,opportunity_score:row.opportunity_score,
       profile_cached:koreanReady,research_status:row.research_status,
     });
