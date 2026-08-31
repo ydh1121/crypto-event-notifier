@@ -43,6 +43,7 @@ def main() -> None:
     architecture = text(ROOT / "docs" / "MODULAR_ARCHITECTURE.md")
 
     timing_fields = ("announcement_at", "deposit_at", "trade_open_at", "termination_at")
+    cumulative_paths = tuple(f"$.return_windows.cum_{day}d_pct" for day in (1, 3, 5, 7, 30))
     checks = {
         "sector_build_38": 'crypto-sector-build" content="2026.08.27-38' in index,
         "main_v15": '/modules/main.js?v=15' in index and 'sectors-v36.js?v=38' in main_js,
@@ -51,6 +52,7 @@ def main() -> None:
         "sector_scroll_anchor": 'data-preserve-scroll' in sector_page,
         "sector_table_modular": "renderSectorCoinTable" in sector_page and "sector-coin-row columns" not in sector_page,
         "sector_table_history": all(token in sector_table for token in ("d5_pct", "D-5", "d1_pct", "D-1", "change_24h_pct", "24H")),
+        "sector_table_cumulative_history": all(token in sector_table for token in ("cum_1d_pct", "1D", "cum_3d_pct", "3D", "cum_5d_pct", "5D", "cum_7d_pct", "7D", "cum_30d_pct", "30D", "sector-cumulative-strip")),
         "sector_table_uses_lifecycle_helper": "lifecycleMeta" in sector_table and "market-lifecycle.js" in sector_table,
         "lifecycle_shared_mapping": all(token in lifecycle_js for token in ("LISTING_ANNOUNCED", "NEW_LISTING", "CAUTION", "TERMINATION_SCHEDULED", "TERMINATED")),
         "lifecycle_color_contract": "market-lifecycle-caution" in lifecycle_css and "market-lifecycle-terminated" in lifecycle_css,
@@ -60,11 +62,14 @@ def main() -> None:
         "lifecycle_panel_structured_schedule": "scheduleText" in lifecycle_panel and "trade_open_at" in lifecycle_panel and "termination_at" in lifecycle_panel and "dt(" in lifecycle_panel,
         "lifecycle_panel_responsive": "market-lifecycle-row" in lifecycle_panel_css and "@media(max-width:700px)" in lifecycle_panel_css,
         "sector_history_responsive": "sector-return-strip" in sector_market_css and "repeat(6" in sector_market_css,
+        "sector_cumulative_history_responsive": "sector-cumulative-strip" in sector_market_css and "repeat(5" in sector_market_css,
         "sector_api_projects_returns": all(token in sector_api for token in ("$.return_windows.d1_pct", "$.return_windows.d2_pct", "$.return_windows.d3_pct", "$.return_windows.d4_pct", "$.return_windows.d5_pct")),
+        "sector_api_projects_cumulative_returns": all(token in sector_api for token in cumulative_paths),
         "sector_api_projects_lifecycle": "$.lifecycle_state" in sector_api and "lifecycle_counts" in sector_api,
         "return_window_domain": all(token in returns for token in ("PRIOR_DAY_COUNT = 5", "prior_daily_returns", 'result[f"d{day}_pct"]', "range(1, PRIOR_DAY_COUNT + 1)")),
-        "return_window_store_reuses_memory": "research_market_memory_mx" in market_features and "return_windows" in market_features,
-        "detail_projection_thin": "return_windows" in detail_projection and "lifecycle_state" in detail_projection,
+        "cumulative_return_window_domain": all(token in returns for token in ("CUMULATIVE_RETURN_DAYS = (1, 3, 5, 7, 30)", "cumulative_returns", 'result[f"cum_{day}d_pct"]', 'result["cumulative_coverage"]')),
+        "return_window_store_reuses_memory": "research_market_memory_mx" in market_features and "return_windows" in market_features and "lookback_days=max(CUMULATIVE_RETURN_DAYS) + 0.25" in market_features,
+        "detail_projection_thin": all(token in detail_projection for token in ("return_windows", "lifecycle_state", "cumulative_coverage", "cum_30d_pct")),
         "lifecycle_domain_separate": all(token in lifecycle_domain for token in ("decide_lifecycle_state", "merge_lifecycle_state", "lifecycle_entry_policy", "LifecycleEntryPolicy")),
         "lifecycle_store_separate": "MarketLifecycleStore" in lifecycle_store and "market_lifecycle_events" in lifecycle_store,
         "lifecycle_partial_api_fail_closed": "MIN_EXISTING_COVERAGE_RATIO" in lifecycle_store and "observation_rejected" in lifecycle_store,
