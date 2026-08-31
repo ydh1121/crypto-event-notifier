@@ -9,6 +9,7 @@ from .auto_demo_v2 import DB_PATH
 from .exchange_public import PublicExchangeAdapter, public_exchange
 from .market_ohlcv_collector import MarketOhlcvCollector, TIMEFRAMES
 from .market_ohlcv_store import MarketOhlcvStore
+from .market_relative_strength import BENCHMARK_MARKETS, MarketRelativeStrengthEngine
 from .research_control import atomic_json
 
 STATE_PATH = Path("b3_trader/data/research-platform/market-ohlcv-cycle-state.json")
@@ -27,21 +28,36 @@ def _read_state(path: Path) -> dict[str, Any]:
 
 
 def _rotate(markets: list[str], cursor: int, limit: int) -> tuple[list[str], int]:
-    if not markets:
-        return [], 0
+    if not markets or limit <= 0:
+        return [], 0 if not markets else max(0, int(cursor)) % len(markets)
     total = len(markets)
     start = max(0, int(cursor)) % total
     picked = [markets[(start + offset) % total] for offset in range(min(total, max(1, int(limit))))]
     return picked, (start + len(picked)) % total
 
 
+def _pick_markets(markets: list[str], cursor: int) -> tuple[list[str], int]:
+    """Always keep BTC/ETH benchmark history fresh inside the same eight-market cap."""
+    benchmark_set = set(BENCHMARK_MARKETS)
+    benchmarks = [market for market in BENCHMARK_MARKETS if market in markets]
+    rotating = [market for market in markets if market not in benchmark_set]
+    remaining = max(0, MAX_MARKETS_PER_EXCHANGE_PER_RUN - len(benchmarks))
+    picked_rotating, next_cursor = _rotate(rotating, cursor, remaining)
+    picked = [*benchmarks, *picked_rotating]
+    if not benchmarks and len(picked) < MAX_MARKETS_PER_EXCHANGE_PER_RUN:
+        picked, next_cursor = _rotate(markets, cursor, MAX_MARKETS_PER_EXCHANGE_PER_RUN)
+    return picked[:MAX_MARKETS_PER_EXCHANGE_PER_RUN], next_cursor
+
+
 class MarketOhlcvResearchCycle:
     """PAPER-independent bounded history owner for KRW market OHLCV.
 
-    Each run rotates at most eight markets per exchange. The collector bridges
-    only the missing window (up to 200 bars/request) and the store retains the
-    newest 400 bars per market/timeframe. It does not read or change strategies,
-    fills, positions or orders.
+    Each run keeps KRW-BTC and KRW-ETH fresh and rotates the remaining slots,
+    for at most eight markets per exchange. The collector bridges only the
+    missing window (up to 200 bars/request) and the store retains the newest 400
+    bars per market/timeframe. Latest-only relative-strength features are then
+    derived from local 1d history. No strategy, fill, position or order state is
+    read or changed.
     """
 
     def __init__(
@@ -57,6 +73,7 @@ class MarketOhlcvResearchCycle:
         self.store = store or MarketOhlcvStore(self.path)
         self.adapters = adapters or {name: public_exchange(name) for name in EXCHANGES}
         self.collector = collector or MarketOhlcvCollector(self.store)
+        self.relative_strength = MarketRelativeStrengthEngine(self.store.conn)
         self.state_path = Path(state_path)
         self._owns_store = store is None
 
@@ -76,6 +93,7 @@ class MarketOhlcvResearchCycle:
         total_pruned = 0
         total_failures = 0
         total_processed = 0
+        total_relative_features = 0
 
         for exchange in EXCHANGES:
             adapter = self.adapters.get(exchange)
@@ -97,11 +115,7 @@ class MarketOhlcvResearchCycle:
                 next_cursors[exchange] = int(cursors.get(exchange) or 0)
                 continue
 
-            picked, cursor = _rotate(
-                markets,
-                int(cursors.get(exchange) or 0),
-                MAX_MARKETS_PER_EXCHANGE_PER_RUN,
-            )
+            picked, cursor = _pick_markets(markets, int(cursors.get(exchange) or 0))
             next_cursors[exchange] = cursor
             market_results: list[dict[str, Any]] = []
             for market in picked:
@@ -112,21 +126,38 @@ class MarketOhlcvResearchCycle:
                 total_pruned += int(outcome.get("rows_pruned") or 0)
                 total_failures += int(outcome.get("failures") or 0)
                 total_processed += 1
+
+            try:
+                relative = self.relative_strength.compute_exchange(exchange, universe_count=len(markets))
+            except Exception as exc:
+                total_failures += 1
+                relative = {
+                    "ok": False,
+                    "status": "relative_strength_error",
+                    "features_written": 0,
+                    "error": f"{type(exc).__name__}: {exc}"[:300],
+                    "paper_only": True,
+                    "can_place_orders": False,
+                }
+            total_relative_features += int(relative.get("features_written") or 0)
             exchange_results[exchange] = {
                 "status": "collected" if picked else "no_markets",
                 "universe": len(markets),
                 "processed": len(picked),
                 "cursor": cursor,
+                "benchmarks_prioritized": [market for market in BENCHMARK_MARKETS if market in picked],
                 "markets": market_results,
+                "relative_strength": relative,
             }
 
         atomic_json(
             self.state_path,
             {
-                "version": 1,
+                "version": 2,
                 "updated_at": time.time(),
                 "cursors": next_cursors,
                 "max_markets_per_exchange_per_run": MAX_MARKETS_PER_EXCHANGE_PER_RUN,
+                "benchmark_markets": list(BENCHMARK_MARKETS),
             },
         )
         return {
@@ -138,14 +169,16 @@ class MarketOhlcvResearchCycle:
             "can_modify_strategy": False,
             "network_public_only": True,
             "database_mutation": True,
-            "database_scope": "research_market_ohlcv_mx_only",
+            "database_scope": "market_history_research_tables_only",
             "retention_bars_per_market_timeframe": self.store.retention_bars,
             "timeframes": [spec.name for spec in TIMEFRAMES],
+            "benchmark_markets": list(BENCHMARK_MARKETS),
             "max_markets_per_exchange_per_run": MAX_MARKETS_PER_EXCHANGE_PER_RUN,
             "markets_processed": total_processed,
             "requests": total_requests,
             "rows_written": total_written,
             "rows_pruned": total_pruned,
+            "relative_strength_features_written": total_relative_features,
             "failures": total_failures,
             "exchanges": exchange_results,
             "elapsed_seconds": round(time.time() - started, 3),
