@@ -65,6 +65,42 @@ class MarketFeatureStore:
         )
         return market_return_windows(rows, as_of_ts=as_of_ts)
 
+    def relative_strength(self, *, exchange: str, market: str) -> dict[str, Any]:
+        try:
+            exists = self.conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='research_market_relative_strength_mx'"
+            ).fetchone()
+        except sqlite3.Error:
+            exists = None
+        if not exists:
+            return {"feature_version": 0, "exchange": exchange, "market": market, "horizons": {}}
+        try:
+            rows = self.conn.execute(
+                """SELECT horizon_days,as_of_ts,asset_return_pct,btc_return_pct,eth_return_pct,
+                          vs_btc_pp,vs_eth_pp,breadth_positive_pct,breadth_median_return_pct,
+                          vs_breadth_median_pp,breadth_sample_count,breadth_universe_count,
+                          breadth_coverage_pct,breadth_ready,source_timeframe,source_table,
+                          source_ts,received_at,feature_version
+                   FROM research_market_relative_strength_mx
+                   WHERE exchange=? AND market=? ORDER BY horizon_days ASC""",
+                (str(exchange), str(market)),
+            ).fetchall()
+        except sqlite3.Error:
+            rows = []
+        horizons: dict[str, Any] = {}
+        version = 0
+        for row in rows:
+            item = dict(row)
+            version = max(version, int(item.get("feature_version") or 0))
+            item["breadth_ready"] = bool(item.get("breadth_ready"))
+            horizons[str(int(item.get("horizon_days") or 0))] = item
+        return {
+            "feature_version": version,
+            "exchange": str(exchange),
+            "market": str(market),
+            "horizons": horizons,
+        }
+
     def enrich_market_detail(
         self,
         detail: dict[str, Any],
@@ -75,6 +111,7 @@ class MarketFeatureStore:
     ) -> dict[str, Any]:
         if not detail:
             return detail
+        detail["relative_strength"] = self.relative_strength(exchange=exchange, market=market)
         signal = detail.get("signal") if isinstance(detail.get("signal"), dict) else {}
         summary = detail.get("summary") if isinstance(detail.get("summary"), dict) else {}
         try:
