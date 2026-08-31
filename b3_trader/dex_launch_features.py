@@ -21,7 +21,7 @@ POST_WINDOWS = {
     "p3d": 3 * 86400,
     "p7d": 7 * 86400,
 }
-FEATURE_VERSION = 1
+FEATURE_VERSION = 2
 
 
 def _pct(after: float, before: float) -> float | None:
@@ -116,6 +116,28 @@ def domestic_window_features(
     }
 
 
+def _launch_price_provenance(reference: DexCandle) -> dict[str, Any]:
+    """Describe what the public DEX source can and cannot prove at launch.
+
+    GeckoTerminal OHLCV proves an observed trade price/volume near pool creation,
+    but it does not provide historical pool reserve at that candle. Therefore the
+    observed price must not be promoted to a validated liquidity-qualified launch
+    price. Future historical-liquidity sources can fill the validated fields
+    without changing the meaning of the observation stored here.
+    """
+
+    return {
+        "status": "observed_price_only_historical_liquidity_unverified",
+        "observed_reference_ts": float(reference.ts),
+        "observed_reference_price": float(reference.open),
+        "observed_reference_volume_usd": float(reference.volume_usd or 0.0),
+        "historical_liquidity_verified": False,
+        "validated_launch_price": None,
+        "validated_launch_at": None,
+        "source_limitation": "ohlcv_has_trade_volume_but_not_historical_pool_reserve",
+    }
+
+
 def launch_window_features(
     *,
     pool_created_at: float,
@@ -138,6 +160,13 @@ def launch_window_features(
                 if domestic_open_at and float(domestic_open_at) >= created
                 else None
             ),
+            "launch_price_provenance": {
+                "status": "launch_price_unavailable",
+                "historical_liquidity_verified": False,
+                "validated_launch_price": None,
+                "validated_launch_at": None,
+                "source_limitation": "ohlcv_reference_unavailable",
+            },
         }
     first = float(reference.open)
     windows: dict[str, Any] = {}
@@ -153,11 +182,15 @@ def launch_window_features(
     return {
         "status": "collected",
         "pool_created_at": created,
+        # This is an observed OHLCV reference, not a historically-liquidity-
+        # validated launch price. Consumers must inspect launch_price_provenance.
         "reference": {
             "candle_ts": float(reference.ts),
             "price": first,
+            "volume_usd": float(reference.volume_usd or 0.0),
             "interval_seconds": int(reference.interval_seconds),
         },
+        "launch_price_provenance": _launch_price_provenance(reference),
         "pool_age_days_at_domestic_listing": (
             round((float(domestic_open_at) - created) / 86400.0, 4)
             if domestic_open_at and float(domestic_open_at) >= created
