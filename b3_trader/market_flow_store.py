@@ -285,7 +285,13 @@ class MarketFlowStore:
             ),
         )
         self.conn.commit()
-        self._prune_history("research_market_orderbook_flow_mx", exchange, market, "snapshot_ts", self.book_retention)
+        self._prune_history(
+            "research_market_orderbook_flow_mx",
+            str(row["exchange"]),
+            str(row["market"]),
+            "snapshot_ts",
+            self.book_retention,
+        )
 
     def insert_feature(self, row: dict[str, Any]) -> None:
         self.conn.execute(
@@ -324,7 +330,13 @@ class MarketFlowStore:
             ),
         )
         self.conn.commit()
-        self._prune_history("research_market_flow_feature_mx", exchange, market, "feature_ts", self.feature_retention)
+        self._prune_history(
+            "research_market_flow_feature_mx",
+            str(row["exchange"]),
+            str(row["market"]),
+            "feature_ts",
+            self.feature_retention,
+        )
 
     def _prune_history(self, table: str, exchange: str, market: str, ts_column: str, keep: int) -> None:
         if table not in {"research_market_orderbook_flow_mx", "research_market_flow_feature_mx"}:
