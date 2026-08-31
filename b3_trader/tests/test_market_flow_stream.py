@@ -92,13 +92,16 @@ def test_stream_store_dedupes_and_builds_continuity_gated_windows(tmp_path: Path
         first = store.insert_trades(rows, received_at=now - 10)
         second = store.insert_trades(rows, received_at=now - 5)
         assert first["inserted"] == 3
+        assert first["raw_inserts"] == 3
         assert second["inserted"] == 0
 
         written = store.compute_window_features(now=now)
         assert written == 6
         audit = store.audit()
+        assert audit["stream_seen_rows"] == 3
         assert audit["minute_rows"] >= 2
         assert audit["window_rows"] == 6
+        assert audit["stream_dedupe_independent_of_rest"] is True
         latest = {row["window_label"]: row for row in audit["latest_windows"]}
         assert latest["1m"]["continuity_complete"] == 1
         assert latest["5m"]["continuity_complete"] == 1
@@ -106,6 +109,51 @@ def test_stream_store_dedupes_and_builds_continuity_gated_windows(tmp_path: Path
         assert latest["1h"]["continuity_complete"] == 0
         assert latest["5m"]["side_coverage_pct"] == 100.0
         assert latest["5m"]["session_cvd_quote"] == 200.0
+    finally:
+        store.close()
+
+
+def test_stream_cvd_is_not_lost_when_rest_raw_row_already_exists(tmp_path: Path) -> None:
+    path = tmp_path / "stream.sqlite3"
+    store = MarketFlowStreamStore(path)
+    now = 1_788_000_900.0
+    row = _trade(77, now - 10, "BID")
+    try:
+        store.mark_connected(
+            "upbit",
+            ["KRW-BTC"],
+            process_started_at=now - 600,
+            connected_since=now - 600,
+            reconnects=0,
+        )
+        store.conn.execute(
+            """INSERT INTO research_market_trade_flow_mx(
+                   exchange,market,sequential_id,trade_ts,trade_price,trade_volume,
+                   quote_volume,aggressor_side,side_source,received_at,schema_version
+               ) VALUES(?,?,?,?,?,?,?,?,?,?,1)""",
+            (
+                row["exchange"],
+                row["market"],
+                row["sequential_id"],
+                row["trade_ts"],
+                row["trade_price"],
+                row["trade_volume"],
+                row["quote_volume"],
+                row["aggressor_side"],
+                row["side_source"],
+                now - 20,
+            ),
+        )
+        store.conn.commit()
+
+        result = store.insert_trades([row], received_at=now)
+        session = store.session("upbit", "KRW-BTC")
+        audit = store.audit()
+        assert result["inserted"] == 1
+        assert result["raw_inserts"] == 0
+        assert session["inserts"] == 1
+        assert session["session_cvd_quote"] == 100.0
+        assert audit["stream_seen_rows"] == 1
     finally:
         store.close()
 
@@ -137,6 +185,9 @@ def test_reconnect_resets_cvd_anchor_and_window_continuity(tmp_path: Path) -> No
         after = store.session("upbit", "KRW-BTC")
         assert after["session_cvd_quote"] == 0.0
         assert after["connected_since"] == now - 20
+        assert after["last_trade_ts"] == 0.0
+        assert after["messages_seen"] == 0
+        assert after["inserts"] == 0
 
         store.insert_trades([_trade(2, now - 10, "ASK")], received_at=now - 5)
         store.compute_window_features(now=now)
