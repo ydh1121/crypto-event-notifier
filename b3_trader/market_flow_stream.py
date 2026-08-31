@@ -134,6 +134,7 @@ class StreamWorker:
         self.buffer: list[dict[str, Any]] = []
         self.last_flush_at = 0.0
         self.ever_connected = False
+        self.opened_in_run = False
 
     def _update(self, **values: Any) -> None:
         with self.state_lock:
@@ -160,6 +161,7 @@ class StreamWorker:
 
     def _on_open(self, ws: websocket.WebSocketApp) -> None:
         now = time.time()
+        self.opened_in_run = True
         if self.ever_connected:
             self._increment("reconnects")
         self.ever_connected = True
@@ -231,6 +233,7 @@ class StreamWorker:
         backoff = 1.0
         try:
             while not self.stop_event.is_set():
+                self.opened_in_run = False
                 self._update(status="connecting", endpoint=self.endpoint)
                 self.app = websocket.WebSocketApp(
                     self.endpoint,
@@ -251,10 +254,10 @@ class StreamWorker:
                     self._flush(force=True)
                 if self.stop_event.is_set():
                     break
+                if self.opened_in_run:
+                    backoff = 1.0
                 self.stop_event.wait(backoff)
                 backoff = min(RECONNECT_MAX_SECONDS, max(1.0, backoff * 2.0))
-                if bool(self.state.get("connected")):
-                    backoff = 1.0
         finally:
             if self.store:
                 try:
