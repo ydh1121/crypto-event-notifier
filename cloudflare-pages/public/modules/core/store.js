@@ -2,7 +2,7 @@ const STORAGE_KEY='cryptoViewerUiV6';
 const defaults={
   route:'dashboard',
   researchExchange:'bithumb',paperExchange:'bithumb',strategyExchange:'bithumb',sectorExchange:'bithumb',
-  researchMarket:'',assetMarket:'',paperMarket:'',sectorSelected:'',sectorRange:'24h',sectorCoinMarket:'',sectorCoinSort:'turnover_desc',
+  researchMarket:'',assetMarket:'',assetHistoryRange:'7d',paperMarket:'',sectorSelected:'',sectorRange:'24h',sectorCoinMarket:'',sectorCoinSort:'turnover_desc',
   researchSearch:'',researchFilter:'all',researchRange:'24h',
   paperTab:'summary',paperSearch:'',paperFilter:'all',paperSort:'return_desc',paperRange:'24h',paperPortfolioRange:'24h',
   paperCompareSearch:'',paperCompareSort:'gap_desc',
