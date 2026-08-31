@@ -22,6 +22,7 @@ class PublicExchangeAdapter(Protocol):
     def krw_markets(self) -> list[PublicMarket]: ...
     def krw_tickers(self) -> list[dict[str, Any]]: ...
     def candles_minutes(self, market: str, unit: int = 5, count: int = 120) -> list[dict[str, Any]]: ...
+    def candles_days(self, market: str, count: int = 120) -> list[dict[str, Any]]: ...
     def orderbook(self, market: str) -> dict[str, Any]: ...
 
 
@@ -57,6 +58,9 @@ class BithumbPublicAdapter:
 
     def candles_minutes(self, market: str, unit: int = 5, count: int = 120) -> list[dict[str, Any]]:
         return self.client.candles_minutes(market, unit=unit, count=count)
+
+    def candles_days(self, market: str, count: int = 120) -> list[dict[str, Any]]:
+        return self.client.candles_days(market, count=count)
 
     def orderbook(self, market: str) -> dict[str, Any]:
         return self.client.orderbook(market)
@@ -94,6 +98,9 @@ class UpbitPublicAdapter:
 
     def candles_minutes(self, market: str, unit: int = 5, count: int = 120) -> list[dict[str, Any]]:
         return self.client.candles_minutes(market, unit=unit, count=count)
+
+    def candles_days(self, market: str, count: int = 120) -> list[dict[str, Any]]:
+        return self.client.candles_days(market, count=count)
 
     def orderbook(self, market: str) -> dict[str, Any]:
         return self.client.orderbook(market)
