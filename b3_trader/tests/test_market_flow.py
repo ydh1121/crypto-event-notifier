@@ -5,6 +5,8 @@ from pathlib import Path
 from b3_trader.market_flow_collector import MarketFlowCollector
 from b3_trader.market_flow_store import MarketFlowStore
 
+BASE_TS = 1_800_000_000.0
+
 
 class FakeAdapter:
     exchange = "upbit"
@@ -49,16 +51,16 @@ def test_flow_uses_exchange_aggressor_side_and_dedupes(tmp_path: Path) -> None:
     store = MarketFlowStore(path)
     adapter = FakeAdapter(
         [
-            _trade(3, 1000.0, 100.0, 2.0, "BID"),
-            _trade(2, 990.0, 100.0, 1.0, "ASK"),
-            _trade(1, 980.0, 100.0, 1.0, "BID"),
+            _trade(3, BASE_TS, 100.0, 2.0, "BID"),
+            _trade(2, BASE_TS - 10.0, 100.0, 1.0, "ASK"),
+            _trade(1, BASE_TS - 20.0, 100.0, 1.0, "BID"),
         ],
-        _book(1001.0),
+        _book(BASE_TS + 1.0),
     )
     collector = MarketFlowCollector(store)
     try:
-        first = collector.collect_market(adapter, "KRW-AAA", now=1002.0)
-        second = collector.collect_market(adapter, "KRW-AAA", now=1003.0)
+        first = collector.collect_market(adapter, "KRW-AAA", now=BASE_TS + 2.0)
+        second = collector.collect_market(adapter, "KRW-AAA", now=BASE_TS + 3.0)
         audit = store.audit()
         assert first["rows_inserted"] == 3
         assert second["rows_inserted"] == 0
@@ -82,23 +84,23 @@ def test_flow_does_not_advance_continuity_across_unbridged_gap(tmp_path: Path) -
     collector = MarketFlowCollector(store)
     try:
         first = FakeAdapter(
-            [_trade(2, 1000.0, 100.0, 1.0, "BID"), _trade(1, 900.0, 100.0, 1.0, "ASK")],
-            _book(1001.0),
+            [_trade(2, BASE_TS, 100.0, 1.0, "BID"), _trade(1, BASE_TS - 100.0, 100.0, 1.0, "ASK")],
+            _book(BASE_TS + 1.0),
         )
-        initial = collector.collect_market(first, "KRW-AAA", now=1002.0)
+        initial = collector.collect_market(first, "KRW-AAA", now=BASE_TS + 2.0)
         assert initial["cycle_continuity_complete"] is True
-        assert initial["covered_through_ts"] == 1000.0
+        assert initial["covered_through_ts"] == BASE_TS
 
         gap = FakeAdapter(
-            [_trade(4, 2000.0, 100.0, 1.0, "BID"), _trade(3, 1900.0, 100.0, 1.0, "ASK")],
-            _book(2001.0),
+            [_trade(4, BASE_TS + 1000.0, 100.0, 1.0, "BID"), _trade(3, BASE_TS + 900.0, 100.0, 1.0, "ASK")],
+            _book(BASE_TS + 1001.0),
         )
-        later = collector.collect_market(gap, "KRW-AAA", now=2002.0)
+        later = collector.collect_market(gap, "KRW-AAA", now=BASE_TS + 1002.0)
         cursor = store.cursor("upbit", "KRW-AAA")
         assert later["cycle_continuity_complete"] is False
         assert later["recent_5m_continuity_complete"] is False
-        assert later["covered_through_ts"] == 1000.0
-        assert float(cursor["covered_through_ts"]) == 1000.0
+        assert later["covered_through_ts"] == BASE_TS
+        assert float(cursor["covered_through_ts"]) == BASE_TS
     finally:
         store.close()
 
@@ -108,14 +110,14 @@ def test_flow_rejects_unknown_side_instead_of_guessing(tmp_path: Path) -> None:
     store = MarketFlowStore(path)
     adapter = FakeAdapter(
         [
-            _trade(2, 1000.0, 100.0, 1.0, "UNKNOWN"),
-            _trade(1, 990.0, 100.0, 1.0, "BID"),
+            _trade(2, BASE_TS, 100.0, 1.0, "UNKNOWN"),
+            _trade(1, BASE_TS - 10.0, 100.0, 1.0, "BID"),
         ],
-        _book(1001.0),
+        _book(BASE_TS + 1.0),
     )
     collector = MarketFlowCollector(store)
     try:
-        result = collector.collect_market(adapter, "KRW-AAA", now=1002.0)
+        result = collector.collect_market(adapter, "KRW-AAA", now=BASE_TS + 2.0)
         assert result["rows_observed"] == 1
         assert result["rows_inserted"] == 1
         assert result["side_source"] == "exchange"
