@@ -12,6 +12,7 @@ from typing import Any
 from dotenv import load_dotenv
 import websocket
 
+from .market_flow_orderbook_stream_store import MarketFlowOrderbookStreamStore
 from .market_flow_stream_store import MarketFlowStreamStore
 from .research_control import atomic_json
 from .research_work_lock import ResearchWorkLock
@@ -79,16 +80,70 @@ def normalize_stream_trade(exchange: str, row: dict[str, Any], received_at: floa
     }
 
 
+def normalize_stream_orderbook(exchange: str, row: dict[str, Any], received_at: float) -> dict[str, Any] | None:
+    if str(row.get("type") or "").lower() != "orderbook":
+        return None
+    market = str(row.get("code") or row.get("market") or "").upper()
+    source_ts = _epoch_seconds(row.get("timestamp"))
+    units = row.get("orderbook_units")
+    if not market or source_ts <= 0 or not isinstance(units, list) or not units:
+        return None
+    parsed: list[tuple[float, float, float, float]] = []
+    for unit in units:
+        if not isinstance(unit, dict):
+            continue
+        try:
+            ask_price = float(unit.get("ask_price") or 0.0)
+            bid_price = float(unit.get("bid_price") or 0.0)
+            ask_size = float(unit.get("ask_size") or 0.0)
+            bid_size = float(unit.get("bid_size") or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if ask_price <= 0 or bid_price <= 0 or ask_size < 0 or bid_size < 0:
+            continue
+        parsed.append((ask_price, bid_price, ask_size, bid_size))
+        if len(parsed) >= 5:
+            break
+    if not parsed:
+        return None
+    best_ask = min(value[0] for value in parsed)
+    best_bid = max(value[1] for value in parsed)
+    if best_ask <= best_bid:
+        return None
+    bid_depth = sum(bid_price * bid_size for _, bid_price, _, bid_size in parsed)
+    ask_depth = sum(ask_price * ask_size for ask_price, _, ask_size, _ in parsed)
+    total_depth = bid_depth + ask_depth
+    mid = (best_bid + best_ask) / 2.0
+    spread_bps = ((best_ask - best_bid) / mid * 10_000.0) if mid > 0 else 0.0
+    imbalance_pct = ((bid_depth - ask_depth) / total_depth * 100.0) if total_depth > 0 else 0.0
+    return {
+        "exchange": str(exchange),
+        "market": market,
+        "source_ts": source_ts,
+        "best_bid_price": best_bid,
+        "best_ask_price": best_ask,
+        "bid_depth_top5_quote": bid_depth,
+        "ask_depth_top5_quote": ask_depth,
+        "spread_bps": spread_bps,
+        "imbalance_pct": imbalance_pct,
+        "received_at": float(received_at),
+    }
+
+
 def _subscription(exchange: str, markets: tuple[str, ...]) -> str:
     trade: dict[str, Any] = {"type": "trade", "codes": list(markets)}
+    orderbook: dict[str, Any] = {"type": "orderbook", "codes": list(markets)}
     if exchange == "upbit":
         trade["is_only_realtime"] = True
+        orderbook["is_only_realtime"] = True
     elif exchange == "bithumb":
         trade["isOnlyRealtime"] = True
+        orderbook["isOnlyRealtime"] = True
     return json.dumps(
         [
             {"ticket": f"b3-flow-{exchange}-{uuid.uuid4()}"},
             trade,
+            orderbook,
             {"format": "DEFAULT"},
         ],
         separators=(",", ":"),
@@ -130,6 +185,7 @@ class StreamWorker:
         self.state_lock = state_lock
         self.process_started_at = process_started_at
         self.store: MarketFlowStreamStore | None = None
+        self.orderbook_store: MarketFlowOrderbookStreamStore | None = None
         self.app: websocket.WebSocketApp | None = None
         self.buffer: list[dict[str, Any]] = []
         self.last_flush_at = 0.0
@@ -194,6 +250,17 @@ class StreamWorker:
         if not isinstance(payload, dict):
             self._increment("parse_errors")
             return
+        payload_type = str(payload.get("type") or "").lower()
+        if payload_type == "orderbook":
+            row = normalize_stream_orderbook(self.exchange, payload, received_at)
+            if row is None or row["market"] not in self.markets or not self.orderbook_store:
+                return
+            self._increment("orderbook_messages")
+            result = self.orderbook_store.insert_snapshot(row, received_at=received_at)
+            if result.get("accepted"):
+                self._increment("orderbook_samples")
+                self._update(last_orderbook_ts=float(row["source_ts"]))
+            return
         row = normalize_stream_trade(self.exchange, payload, received_at)
         if row is None:
             return
@@ -230,6 +297,7 @@ class StreamWorker:
 
     def run(self) -> None:
         self.store = MarketFlowStreamStore()
+        self.orderbook_store = MarketFlowOrderbookStreamStore()
         backoff = 1.0
         try:
             while not self.stop_event.is_set():
@@ -266,6 +334,9 @@ class StreamWorker:
                     pass
                 self.store.close()
                 self.store = None
+            if self.orderbook_store:
+                self.orderbook_store.close()
+                self.orderbook_store = None
             self._update(connected=False, status="stopped")
 
     def stop(self) -> None:
@@ -295,9 +366,12 @@ class MarketFlowStreamService:
                 "last_disconnect_at": 0.0,
                 "last_message_at": 0.0,
                 "last_trade_ts": 0.0,
+                "last_orderbook_ts": 0.0,
                 "messages": 0,
                 "rows_observed": 0,
                 "rows_inserted": 0,
+                "orderbook_messages": 0,
+                "orderbook_samples": 0,
                 "parse_errors": 0,
                 "reconnects": 0,
                 "last_error": "",
@@ -310,8 +384,10 @@ class MarketFlowStreamService:
         self.threads: dict[str, threading.Thread] = {}
         self.process_lock_acquired = False
         self.window_features_written = 0
+        self.orderbook_window_features_written = 0
         self.last_feature_at = 0.0
         self.last_feature_error = ""
+        self.last_orderbook_feature_error = ""
 
     def stop(self) -> None:
         self.stop_event.set()
@@ -322,7 +398,7 @@ class MarketFlowStreamService:
         with self.state_lock:
             exchanges = {name: dict(state) for name, state in self.states.items()}
         return {
-            "ok": not bool(self.last_feature_error),
+            "ok": not bool(self.last_feature_error or self.last_orderbook_feature_error),
             "status": "running" if running and not self.stop_event.is_set() else "stopped",
             "pid": os.getpid(),
             "running": bool(running) and not self.stop_event.is_set(),
@@ -332,8 +408,10 @@ class MarketFlowStreamService:
             "markets": list(self.markets),
             "exchanges": exchanges,
             "window_features_written": self.window_features_written,
+            "orderbook_window_features_written": self.orderbook_window_features_written,
             "last_feature_at": self.last_feature_at,
             "last_feature_error": self.last_feature_error,
+            "last_orderbook_feature_error": self.last_orderbook_feature_error,
             "network_public_only": True,
             "authentication_used": False,
             "paper_only": True,
@@ -343,18 +421,28 @@ class MarketFlowStreamService:
             "can_modify_strategy": False,
             "raw_cloud_projection": False,
             "cvd_scope": "websocket_contiguous_session",
+            "orderbook_scope": "sampled_top5_same_best_price_replenishment_proxy",
         }
 
     def _write_status(self, *, running: bool) -> None:
         atomic_json(STATUS_PATH, self._status_payload(running=running))
 
-    def _aggregate_windows(self, store: MarketFlowStreamStore) -> None:
+    def _aggregate_windows(
+        self,
+        store: MarketFlowStreamStore,
+        orderbook_store: MarketFlowOrderbookStreamStore,
+    ) -> None:
         try:
             self.window_features_written += int(store.compute_window_features())
             self.last_feature_at = time.time()
             self.last_feature_error = ""
         except Exception as exc:
             self.last_feature_error = f"{type(exc).__name__}: {exc}"[:500]
+        try:
+            self.orderbook_window_features_written += int(orderbook_store.compute_window_features())
+            self.last_orderbook_feature_error = ""
+        except Exception as exc:
+            self.last_orderbook_feature_error = f"{type(exc).__name__}: {exc}"[:500]
 
     def run(self) -> None:
         process_lock = ResearchWorkLock(PROCESS_LOCK_PATH)
@@ -362,6 +450,7 @@ class MarketFlowStreamService:
             return
         self.process_lock_acquired = True
         aggregate_store = MarketFlowStreamStore()
+        aggregate_orderbook_store = MarketFlowOrderbookStreamStore()
         try:
             for exchange in ENDPOINTS:
                 worker = StreamWorker(
@@ -384,15 +473,16 @@ class MarketFlowStreamService:
             while not self.stop_event.wait(STATUS_INTERVAL_SECONDS):
                 now = time.time()
                 if now >= next_feature:
-                    self._aggregate_windows(aggregate_store)
+                    self._aggregate_windows(aggregate_store, aggregate_orderbook_store)
                     next_feature = now + FEATURE_INTERVAL_SECONDS
                 self._write_status(running=True)
         finally:
             self.stop()
             for thread in self.threads.values():
                 thread.join(timeout=5.0)
-            self._aggregate_windows(aggregate_store)
+            self._aggregate_windows(aggregate_store, aggregate_orderbook_store)
             aggregate_store.close()
+            aggregate_orderbook_store.close()
             self.process_lock_acquired = False
             self._write_status(running=False)
             process_lock.release()
