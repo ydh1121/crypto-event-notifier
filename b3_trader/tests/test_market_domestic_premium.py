@@ -143,7 +143,7 @@ def test_premium_requires_same_verified_identity_and_exact_foreign_pair(tmp_path
         assert row["reference_market"] == "AAAUSDT"
         assert row["reference_price_quote"] == 0.07
         assert row["quote_to_krw"] == 1400.0
-        assert row["reference_price_krw"] == 98.0
+        assert round(float(row["reference_price_krw"]), 8) == 98.0
         assert round(float(row["bithumb_premium_pct"]), 6) == round((100.0 / 98.0 - 1.0) * 100.0, 6)
         assert round(float(row["upbit_premium_pct"]), 6) == round((102.0 / 98.0 - 1.0) * 100.0, 6)
         assert row["paper_only"] is True
