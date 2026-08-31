@@ -130,19 +130,20 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 ### 5.2 순매수/순매도 · volume delta
 - [x] 빗썸/업비트 public recent-trade feed의 aggressor side를 검증하고 거래소 제공 `ASK/BID`만 직접 저장하도록 고정. ticker/tick-rule 추정으로 side를 만들어내지 않음
 - [>] 현재 빗썸/업비트 source가 side를 직접 제공하므로 tick rule/orderbook 기반 side 추정은 사용하지 않는다. 향후 side 미제공 source를 추가할 때만 추정값+confidence 계약을 별도 구현
-- [-] public recent trade를 sequential-id dedupe해 buy_volume, sell_volume, delta=`buy-sell`, delta_pct와 local contiguous observation 기준 anchored observed CVD로 저장하는 기반 구현. 회당 시장/페이지 bound와 continuity gate를 고정했으며 전체 CI PASS, Windows 실데이터 coverage QA 대기
-- [ ] 1m/5m/15m/1h/4h/1d 완전 CVD/volume delta history. REST bounded observation의 continuity가 부족한 고빈도 시장은 완전 CVD로 승격하지 않고 WebSocket 연속수집 필요성을 실환경 coverage로 판단
-- [-] orderbook spread, top-5/all bid·ask quote depth와 imbalance 저장 구현. raw orderbook은 로컬 SQLite에만 유지하고 score/PAPER는 미연결. slippage 및 bid/ask replenishment 속도는 추가 구현 필요
-- [ ] price-flow divergence DB화
+- [x] REST public recent trade의 sequential-id dedupe 기반 buy/sell/delta와 WebSocket 연속 trade 기반 anchored observed CVD를 함께 저장. WebSocket은 빗썸/업비트 BTC/ETH에서 1m/5m/15m/1h 연속성 실환경 QA를 통과했으며 REST continuity가 불완전한 구간을 완전 CVD로 오인하지 않음
+- [-] 1m/5m/15m/1h WebSocket CVD/volume delta history는 실환경 연속수집·검증 완료. 4h/1d는 동일 연속 스트림에서 자연 누적 중이며 프로세스 재시작/긴 단절 구간은 continuity gate로 fail-closed 유지
+- [x] orderbook spread, top-5/all bid·ask quote depth, imbalance와 same-best-price bid/ask replenishment proxy를 로컬 SQLite에 저장. raw orderbook은 로컬에만 유지하고 Windows runtime에서 BTC/ETH 5m continuity/replenishment evidence PASS, score/PAPER 미연결
+- [x] `research_market_price_flow_divergence_mx` DB화 및 Windows 실데이터 QA 완료. 정확한 완료 OHLCV + continuous WebSocket trade + continuous WebSocket orderbook만 결합하며 4h/1d 가격은 연속 완료 1h candle 조합. 실측 660행 중 658 ready, waiting 2, alignment/continuity 위반 0 확인
 - [ ] Viewer 테이블/상세에 순매수·순매도·delta·CVD 및 기간 비교 표시
 
 ### 5.3 매집/분산 판정
-- [ ] 단순 `가격하락 + 순매수>0 = 매집`으로 처리하지 않는다.
-- [ ] `강한 market sell(negative delta)인데 가격 하락 효율이 낮고 bid가 반복 보충`되면 passive buy absorption/매집 후보
-- [ ] `강한 market buy(positive delta)인데 가격 상승 효율이 낮고 ask가 반복 보충`되면 passive sell absorption/분산 후보
-- [ ] price efficiency = 가격변화 / 공격적 체결량, replenishment, CVD divergence, volume profile 위치를 결합
-- [ ] accumulation/distribution score와 confidence를 시간축으로 저장
-- [ ] 코인별 `flow → 이후 15m/1h/4h/1d 수익률` 반응계수를 누적
+- [x] 단순 `가격하락 + 순매수>0 = 매집`으로 처리하지 않는 규칙을 코드/로드맵에 고정. absorption은 가격·aggressive flow·orderbook replenishment가 동일 시간축에서 함께 성립한 연구 evidence로만 취급
+- [x] `강한 market sell(negative delta)인데 가격 하락 효율이 낮고 bid가 반복 보충`되는 `passive_buy_absorption_candidate` v1 구현
+- [x] `강한 market buy(positive delta)인데 가격 상승 효율이 낮고 ask가 반복 보충`되는 `passive_sell_absorption_candidate` v1 구현. Windows 실제 BTC/ETH에서 후보 발생 확인
+- [-] price efficiency=`가격변화 bps / 공격적 체결대금 1억원`, replenishment, CVD/price opposition을 시간축 DB에 결합 완료. Volume Profile 위치 결합은 6.1 구현 이후 추가
+- [-] absorption heuristic v1은 실데이터에서 658 ready 중 passive buy 84, passive sell 136으로 후보 밀도가 높아 `매집/분산 확정`이나 score로 승격하지 않음. forward reaction의 방향성·hit rate·표본 안정성을 먼저 검증한 뒤 confidence/threshold를 설계
+- [-] `research_market_flow_reaction_mx`와 통계 table로 각 divergence signal 종료 이후 정확한 완료 OHLCV만 사용해 `flow → 이후 15m/1h/4h/1d 수익률`을 forward-only 누적하는 기반 구현. 15m/1h/4h는 연속 1m path, 1d는 400-bar retention 내 연속 5m path를 요구하며 누락/시간축 불일치는 fail-closed. 전체 CI PASS, Windows runtime reaction QA 대기
+- [ ] 검증된 reaction 표본을 기반으로 accumulation/distribution score와 confidence를 시간축으로 저장. 동일 현상의 1m/5m/15m/1h 중복 설명은 feature-family 상관 감쇠/중복제거 전에 합산 금지
 
 ## 6. 기술분석·시장구조 엔진
 
