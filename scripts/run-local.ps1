@@ -220,11 +220,22 @@ function Start-ForwardPipelineScheduler {
   return $process
 }
 
+function Start-MarketFlowStream {
+  param([string]$PythonPath)
+  $statusPath = Join-Path $repo "b3_trader\data\research-platform\market-flow-stream.json"
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $statusPath) | Out-Null
+  $process = Start-Process -FilePath $PythonPath -ArgumentList @("-m", "b3_trader.market_flow_stream") -PassThru -WindowStyle Hidden
+  Write-Host "Market Flow WebSocket: ON (Bithumb/Upbit BTC+ETH, PAPER-only, score/order unwired)" -ForegroundColor Green
+  return $process
+}
+
 $researchSupervisor = $null
 $paperSupervisor = $null
 $forwardScheduler = $null
+$marketFlowStream = $null
 try {
   $forwardScheduler = Start-ForwardPipelineScheduler -PythonPath $python
+  $marketFlowStream = Start-MarketFlowStream -PythonPath $python
   $researchSupervisor = Start-ResearchSupervisor -PythonPath $python
   $paperSupervisor = Start-PaperRuntimeSupervisor -PythonPath $python
   Write-Host "Starting Crypto Auto Trader..."
@@ -234,7 +245,10 @@ try {
     $code = $LASTEXITCODE
     if ($code -eq 0) { break }
     if ($code -eq 75) {
-      Write-Host "GitHub runtime update applied. Restarting trader and PAPER/research/forward supervisors automatically..."
+      Write-Host "GitHub runtime update applied. Restarting trader and PAPER/research/forward/flow supervisors automatically..."
+      if ($marketFlowStream -and -not $marketFlowStream.HasExited) {
+        Stop-Process -Id $marketFlowStream.Id -Force -ErrorAction SilentlyContinue
+      }
       if ($forwardScheduler -and -not $forwardScheduler.HasExited) {
         Stop-Process -Id $forwardScheduler.Id -Force -ErrorAction SilentlyContinue
       }
@@ -246,6 +260,7 @@ try {
       }
       Start-Sleep -Seconds 2
       $forwardScheduler = Start-ForwardPipelineScheduler -PythonPath $python
+      $marketFlowStream = Start-MarketFlowStream -PythonPath $python
       $researchSupervisor = Start-ResearchSupervisor -PythonPath $python
       $paperSupervisor = Start-PaperRuntimeSupervisor -PythonPath $python
       continue
@@ -254,6 +269,9 @@ try {
     Start-Sleep -Seconds 5
   }
 } finally {
+  if ($marketFlowStream -and -not $marketFlowStream.HasExited) {
+    Stop-Process -Id $marketFlowStream.Id -Force -ErrorAction SilentlyContinue
+  }
   if ($forwardScheduler -and -not $forwardScheduler.HasExited) {
     Stop-Process -Id $forwardScheduler.Id -Force -ErrorAction SilentlyContinue
   }
