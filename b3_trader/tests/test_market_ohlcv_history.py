@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 from b3_trader.exchange_public import PublicMarket
 from b3_trader.market_ohlcv_collector import MarketOhlcvCollector, TimeframeSpec, normalize_candles
@@ -54,6 +55,25 @@ class FakeAdapter:
 
     def orderbook(self, market: str) -> dict:
         return {}
+
+
+class FakeHttpError(RuntimeError):
+    def __init__(self, status_code: int) -> None:
+        self.response = SimpleNamespace(status_code=status_code, headers={})
+        super().__init__(f"HTTP {status_code}")
+
+
+class RateLimitedFakeAdapter(FakeAdapter):
+    def __init__(self, exchange: str) -> None:
+        super().__init__(exchange, markets=1)
+        self.rate_limit_seen = False
+
+    def candles_minutes(self, market: str, unit: int = 5, count: int = 120) -> list[dict]:
+        self.minute_calls.append((market, unit, count))
+        if unit == 240 and not self.rate_limit_seen:
+            self.rate_limit_seen = True
+            raise FakeHttpError(429)
+        return [self._row("2026-08-31T05:00:00")]
 
 
 def test_normalize_candle_uses_utc_open_time_and_closed_flag() -> None:
@@ -110,6 +130,30 @@ def test_fetch_count_bridges_only_missing_history() -> None:
     assert MarketOhlcvCollector.fetch_count(latest_ts=9_700.0, now=10_000.0, seconds=60) == 7
     assert MarketOhlcvCollector.fetch_count(latest_ts=9_900.0, now=10_000.0, seconds=300) == 3
     assert MarketOhlcvCollector.fetch_count(latest_ts=1.0, now=100_000.0, seconds=60) == 200
+
+
+def test_collector_retries_one_429_without_marking_timeframe_failed(tmp_path: Path) -> None:
+    store = MarketOhlcvStore(tmp_path / "ohlcv.sqlite3")
+    clock = iter(float(index) for index in range(100))
+    sleeps: list[float] = []
+    collector = MarketOhlcvCollector(
+        store,
+        sleep_fn=sleeps.append,
+        monotonic_fn=lambda: next(clock),
+    )
+    adapter = RateLimitedFakeAdapter("upbit")
+    try:
+        result = collector.collect_market(adapter, "KRW-C00", now=1788153000.0)
+        assert result["ok"] is True
+        assert result["failures"] == 0
+        assert result["requests"] == 7
+        assert result["rate_limit_retries"] == 1
+        assert result["timeframes"]["4h"]["status"] == "collected"
+        assert result["timeframes"]["4h"]["attempts"] == 2
+        assert result["timeframes"]["4h"]["rate_limit_retries"] == 1
+        assert sleeps == [1.05]
+    finally:
+        store.close()
 
 
 def test_cycle_rotates_eight_markets_per_exchange_and_six_timeframes(tmp_path: Path) -> None:
