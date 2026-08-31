@@ -25,6 +25,7 @@ WINDOW_SECONDS = {
     "4h": 4 * 60 * 60,
     "1d": 24 * 60 * 60,
 }
+HOURLY_COMPOSED_WINDOWS = {"4h": 4, "1d": 24}
 
 
 def _finite(value: Any) -> float | None:
@@ -41,8 +42,10 @@ class MarketPriceFlowDivergenceStore:
     The join is intentionally strict:
     - WebSocket trade-flow and orderbook windows must share the exact window.
     - Both WebSocket windows must have continuity_complete=1.
-    - feature_ts must sit on the requested timeframe boundary.
-    - A completed OHLCV candle must start exactly at window_start_ts.
+    - feature_ts must sit on the requested UTC research-window boundary.
+    - 1m/5m/15m/1h use an exact completed native OHLCV candle.
+    - 4h/1d are composed from exactly 4/24 contiguous completed 1h candles so
+      exchange-specific native 4h/day session boundaries cannot be misjoined.
 
     Candidate labels are preregistered research heuristics only. They are not an
     accumulation/distribution score and are not wired to PAPER or live orders.
@@ -160,17 +163,38 @@ class MarketPriceFlowDivergenceStore:
         return [dict(row) for row in rows]
 
     def _price_candle(self, row: dict[str, Any]) -> dict[str, Any] | None:
+        label = str(row["window_label"])
+        start = float(row["window_start_ts"])
+        if label in HOURLY_COMPOSED_WINDOWS:
+            expected = HOURLY_COMPOSED_WINDOWS[label]
+            rows = self.conn.execute(
+                """SELECT candle_ts,open,close,is_closed,received_at
+                   FROM research_market_ohlcv_mx
+                   WHERE exchange=? AND market=? AND timeframe='1h'
+                     AND candle_ts>=? AND candle_ts<? AND is_closed=1
+                   ORDER BY candle_ts ASC""",
+                (str(row["exchange"]), str(row["market"]), start, float(row["window_end_ts"])),
+            ).fetchall()
+            if len(rows) != expected:
+                return None
+            expected_ts = [start + offset * 3600.0 for offset in range(expected)]
+            actual_ts = [float(value["candle_ts"] or 0.0) for value in rows]
+            if actual_ts != expected_ts:
+                return None
+            return {
+                "candle_ts": start,
+                "open": float(rows[0]["open"]),
+                "close": float(rows[-1]["close"]),
+                "is_closed": 1,
+                "received_at": max(float(value["received_at"] or 0.0) for value in rows),
+            }
+
         price = self.conn.execute(
             """SELECT candle_ts,open,close,is_closed,received_at
                FROM research_market_ohlcv_mx
                WHERE exchange=? AND market=? AND timeframe=? AND candle_ts=? AND is_closed=1
                ORDER BY received_at DESC LIMIT 1""",
-            (
-                str(row["exchange"]),
-                str(row["market"]),
-                str(row["window_label"]),
-                float(row["window_start_ts"]),
-            ),
+            (str(row["exchange"]), str(row["market"]), label, start),
         ).fetchone()
         return dict(price) if price else None
 
@@ -471,7 +495,7 @@ class MarketPriceFlowDivergenceStore:
                 "min_replenishment_pairs": MIN_REPLENISHMENT_PAIRS,
                 "quote_normalization_krw": QUOTE_NORMALIZATION_KRW,
             },
-            "join_contract": "exact_aligned_closed_ohlcv+continuous_ws_trade+continuous_ws_orderbook",
+            "join_contract": "exact_aligned_closed_ohlcv+continuous_ws_trade+continuous_ws_orderbook;4h/1d=contiguous_closed_1h_composition",
             "source": "ws_trade+ws_orderbook+rest_ohlcv",
             "paper_only": True,
             "score_wired": False,
