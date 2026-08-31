@@ -103,6 +103,9 @@ Validation:
 - Build 39 modular contract PASS
 - Build 39 Cloudflare Pages typecheck PASS
 - full B3 trader push and PR CI PASS with Build 39 source/supervisor changes
+- Build 71 local full Python suite 255 tests, compileall, Build 65~71 contract chain and workflow YAML validation PASS
+- Build 71 code commit `5c8081d` dedicated forward-validation CI PASS
+- Build 71 code commit `5c8081d` full B3 trader CI PASS
 - PR #1 remains Draft/unmerged
 
 Immediate next action:
