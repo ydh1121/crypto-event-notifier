@@ -17,6 +17,7 @@ from .coin_profile_research_cycle_v36 import CoinProfileResearchCycleV36
 from .dex_launch_research_cycle import DexLaunchResearchCycle
 from .listing_history_research_cycle import ListingHistoryResearchCycle
 from .market_notice_collector import MarketNoticeCollector
+from .market_ohlcv_research_cycle import MarketOhlcvResearchCycle
 from .reference_components import ReferenceComponentWatcher
 from .research_control import COMPONENT_DEFINITIONS, STATUS_PATH, atomic_json, load_control
 from .research_work_lock import ResearchWorkLock
@@ -92,9 +93,9 @@ class ResearchSupervisor:
         self.cloudflare_market_detail_publisher = CloudflareMarketDetailPublisher()
         self.coin_profile_research = CoinProfileResearchCycleV36()
         self.market_notice_collector = MarketNoticeCollector()
-        # ListingHistoryResearchCycle and DexLaunchResearchCycle open SQLite
-        # connections. They must be created, used and closed on their own
-        # component worker threads; never construct them on the main thread.
+        # SQLite-owning research cycles must be created, used and closed on
+        # their own component worker threads; never construct them on main.
+        self.market_ohlcv_research: MarketOhlcvResearchCycle | None = None
         self.listing_history_research: ListingHistoryResearchCycle | None = None
         self.dex_launch_research: DexLaunchResearchCycle | None = None
         self.cloudflare_deployer = CloudflarePagesDeployer()
@@ -108,6 +109,7 @@ class ResearchSupervisor:
             "cloudflare-market-detail-publish": self.cloudflare_market_detail_publisher.publish_once,
             "coin-profile-enrichment": self.coin_profile_research.run_once,
             "market-notice-watch": self.market_notice_collector.run_once,
+            "market-ohlcv-history": self._run_market_ohlcv_once,
             "listing-history-research": self._run_listing_history_once,
             "dex-launch-research": self._run_dex_launch_once,
             "upbit-paper-research": self.upbit_paper_runner.run_once,
@@ -120,6 +122,15 @@ class ResearchSupervisor:
         self.last_run_nonce: dict[str, int] = {}
         self._lock = threading.RLock()
         self._install_components()
+
+    def _run_market_ohlcv_once(self) -> dict[str, Any]:
+        """Run bounded public OHLCV collection under the shared research lock."""
+        with ResearchWorkLock() as work_lock:
+            if not work_lock.acquired:
+                return self._research_work_lock_busy("market-ohlcv-history")
+            if self.market_ohlcv_research is None:
+                self.market_ohlcv_research = MarketOhlcvResearchCycle()
+            return self.market_ohlcv_research.run_once()
 
     def _run_listing_history_once(self) -> dict[str, Any]:
         """Create and use listing-history SQLite owners on this component thread."""
@@ -174,6 +185,12 @@ class ResearchSupervisor:
 
     def _close_component_resources(self, name: str) -> None:
         """Close thread-affine resources before their component thread exits."""
+        if name == "market-ohlcv-history":
+            cycle = self.market_ohlcv_research
+            self.market_ohlcv_research = None
+            if cycle is not None:
+                cycle.close()
+            return
         if name == "listing-history-research":
             cycle = self.listing_history_research
             self.listing_history_research = None
@@ -230,6 +247,8 @@ class ResearchSupervisor:
                     "coin_profile_identity_guard": True,
                     "market_notice_public_sources_only": True,
                     "market_lifecycle_shadow_only": True,
+                    "market_ohlcv_public_sources_only": True,
+                    "market_ohlcv_paper_unwired": True,
                     "listing_history_public_sources_only": True,
                     "listing_history_shadow_only": True,
                     "dex_launch_public_sources_only": True,
