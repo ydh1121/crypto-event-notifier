@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from typing import Any
 
@@ -131,6 +132,40 @@ class MarketFeatureStore:
         result["score_wired"] = False
         return result
 
+    def domestic_premium(self, *, market: str) -> dict[str, Any]:
+        try:
+            exists = self.conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='research_market_domestic_premium_mx'"
+            ).fetchone()
+        except sqlite3.Error:
+            exists = None
+        if not exists:
+            return {"feature_version": 0, "market": str(market), "status": "not_available"}
+        try:
+            row = self.conn.execute(
+                """SELECT market,symbol,provider,provider_id,identity_verified,status,
+                          bithumb_price_krw,upbit_price_krw,reference_exchange,reference_market,
+                          reference_quote_asset,reference_price_quote,quote_to_krw,reference_price_krw,
+                          reference_source_ts,bithumb_premium_pct,upbit_premium_pct,
+                          foreign_verified_sources,foreign_price_gap_pct,source_evidence_json,
+                          received_at,feature_version
+                   FROM research_market_domestic_premium_mx WHERE market=?""",
+                (str(market),),
+            ).fetchone()
+        except sqlite3.Error:
+            row = None
+        if not row:
+            return {"feature_version": 0, "market": str(market), "status": "not_available"}
+        result = dict(row)
+        result["identity_verified"] = bool(result.get("identity_verified"))
+        try:
+            result["source_evidence"] = json.loads(str(result.pop("source_evidence_json") or "[]"))
+        except json.JSONDecodeError:
+            result["source_evidence"] = []
+        result["paper_only"] = True
+        result["score_wired"] = False
+        return result
+
     def enrich_market_detail(
         self,
         detail: dict[str, Any],
@@ -143,6 +178,7 @@ class MarketFeatureStore:
             return detail
         detail["relative_strength"] = self.relative_strength(exchange=exchange, market=market)
         detail["cross_exchange_gap"] = self.cross_exchange_gap(market=market)
+        detail["domestic_premium"] = self.domestic_premium(market=market)
         signal = detail.get("signal") if isinstance(detail.get("signal"), dict) else {}
         summary = detail.get("summary") if isinstance(detail.get("summary"), dict) else {}
         try:
