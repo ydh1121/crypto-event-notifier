@@ -83,10 +83,23 @@ class BithumbClient:
         count: int = 120,
         to: str | None = None,
     ) -> list[dict[str, Any]]:
-        params: dict[str, Any] = {"market": market, "count": count}
+        params: dict[str, Any] = {"market": market, "count": max(1, min(200, int(count)))}
         if to:
             params["to"] = to
-        return self._get(f"/v1/candles/minutes/{unit}", params)
+        data = self._get(f"/v1/candles/minutes/{int(unit)}", params)
+        return data if isinstance(data, list) else []
+
+    def candles_days(
+        self,
+        market: str,
+        count: int = 120,
+        to: str | None = None,
+    ) -> list[dict[str, Any]]:
+        params: dict[str, Any] = {"market": market, "count": max(1, min(200, int(count)))}
+        if to:
+            params["to"] = to
+        data = self._get("/v1/candles/days", params)
+        return data if isinstance(data, list) else []
 
     def order_chance(self, market: str) -> dict[str, Any]:
         return self._get("/v1/orders/chance", {"market": market}, private=True)
