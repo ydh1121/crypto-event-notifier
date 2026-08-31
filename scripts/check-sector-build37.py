@@ -45,8 +45,11 @@ def main() -> None:
     sort_audit = text(ROOT / "docs" / "VIEWER_TABLE_SORT_AUDIT_BUILD37.md")
 
     checks = {
-        "sector_build_37": 'crypto-sector-build" content="2026.08.27-37' in index,
-        "main_v13": '/modules/main.js?v=13' in index,
+        "sector_build_37_or_newer": any(
+            f'crypto-sector-build" content="2026.08.27-{v}' in index
+            for v in (37, 38)
+        ),
+        "main_v15": '/modules/main.js?v=15' in index,
         "sector_search_and_filters": "data-sector-search" in sector_page and all(token in sector_page for token in ("조사완료", "추가조사", "상승", "하락", "미분류")),
         "sector_mobile_cards": "grid-template-columns:repeat(3,minmax(0,1fr))" in build36_css and "min-width:650px" not in build36_css,
         "ime_guard_installed": "installSectorImeGuard" in main_js and "compositionstart" in ime and "compositionend" in ime and "event.isComposing" in ime,
@@ -88,8 +91,8 @@ def main() -> None:
     if url:
         for name, path in {
             "index": "/",
-            "main": "/modules/main.js?v=13",
-            "sector_page": "/modules/pages/sectors-v36.js?v=36",
+            "main": "/modules/main.js?v=15",
+            "sector_page": "/modules/pages/sectors-v36.js?v=38",
             "build37_css": "/modules/styles/build37.css?v=1",
             "ime": "/modules/shared/sector-ime-guard.js?v=37",
             "sorter": "/modules/shared/table-sort-enhancer.js?v=37",
