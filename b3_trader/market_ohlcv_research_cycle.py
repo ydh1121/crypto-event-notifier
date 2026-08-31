@@ -11,6 +11,7 @@ from .market_cross_exchange_gap import MarketCrossExchangeGapEngine
 from .market_domestic_premium import MarketDomesticPremiumEngine
 from .market_flow_collector import MarketFlowCollector
 from .market_flow_reaction import MarketFlowReactionStore
+from .market_flow_reliability import MarketFlowReliabilityStore
 from .market_flow_store import MarketFlowStore
 from .market_ohlcv_collector import MarketOhlcvCollector, TIMEFRAMES
 from .market_ohlcv_store import MarketOhlcvStore
@@ -82,7 +83,9 @@ class MarketOhlcvResearchCycle:
     from completed OHLCV plus continuous WebSocket trade/orderbook windows. The
     cycle then evaluates only forward candles that occur after each completed
     divergence signal, producing 15m/1h/4h/1d reaction evidence and aggregate
-    coefficients. Neither stage is wired to scoring, PAPER decisions or orders.
+    coefficients. A preregistered cross-exchange reliability gate then classifies
+    reaction groups as collecting, mixed, directional-watch or validated-candidate.
+    None of these stages is wired to scoring, PAPER decisions or orders.
     """
 
     def __init__(
@@ -99,6 +102,7 @@ class MarketOhlcvResearchCycle:
         self.flow_store = MarketFlowStore(self.path)
         self.price_flow_divergence = MarketPriceFlowDivergenceStore(self.path)
         self.flow_reaction = MarketFlowReactionStore(self.path)
+        self.flow_reliability = MarketFlowReliabilityStore(self.path)
         self.adapters = adapters or {name: public_exchange(name) for name in EXCHANGES}
         self.collector = collector or MarketOhlcvCollector(self.store)
         self.flow_collector = MarketFlowCollector(self.flow_store)
@@ -109,6 +113,7 @@ class MarketOhlcvResearchCycle:
         self._owns_store = store is None
 
     def close(self) -> None:
+        self.flow_reliability.close()
         self.flow_reaction.close()
         self.price_flow_divergence.close()
         self.flow_store.close()
@@ -312,10 +317,27 @@ class MarketOhlcvResearchCycle:
                 "can_place_orders": False,
             }
 
+        try:
+            flow_reliability_result = self.flow_reliability.compute(now=time.time())
+        except Exception as exc:
+            total_failures += 1
+            flow_reliability_result = {
+                "ok": False,
+                "status": "flow_reliability_error",
+                "groups_written": 0,
+                "observation_ready_rows": 0,
+                "promotion_ready_rows": 0,
+                "error": f"{type(exc).__name__}: {exc}"[:300],
+                "paper_only": True,
+                "shadow_only": True,
+                "score_wired": False,
+                "can_place_orders": False,
+            }
+
         atomic_json(
             self.state_path,
             {
-                "version": 7,
+                "version": 8,
                 "updated_at": time.time(),
                 "cursors": next_cursors,
                 "premium_cursor": next_premium_cursor,
@@ -345,6 +367,15 @@ class MarketOhlcvResearchCycle:
                 "flow_reaction": {
                     "join_contract": "forward_only_exact_contiguous_closed_ohlcv_after_signal_window",
                     "horizons": ["15m", "1h", "4h", "1d"],
+                    "feature_version": 1,
+                    "score_wired": False,
+                },
+                "flow_reliability": {
+                    "source": "market_flow_reaction",
+                    "observation_min_per_venue": 20,
+                    "promotion_min_per_venue": 50,
+                    "promotion_min_pooled": 120,
+                    "promotion_wilson_lower_pct": 50.0,
                     "feature_version": 1,
                     "score_wired": False,
                 },
@@ -386,6 +417,7 @@ class MarketOhlcvResearchCycle:
             "domestic_premium": premium_result,
             "price_flow_divergence": price_flow_result,
             "flow_reaction": flow_reaction_result,
+            "flow_reliability": flow_reliability_result,
             "failures": total_failures,
             "exchanges": exchange_results,
             "elapsed_seconds": round(time.time() - started, 3),
