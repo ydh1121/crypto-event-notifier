@@ -25,6 +25,7 @@ def main() -> None:
     quote_rate = text(ROOT / "b3_trader" / "listing_quote_rate.py")
     audit = text(ROOT / "b3_trader" / "listing_history_audit.py")
     control = text(ROOT / "b3_trader" / "research_control.py")
+    work_lock = text(ROOT / "b3_trader" / "research_work_lock.py")
     supervisor = text(ROOT / "b3_trader" / "research_supervisor.py")
     paper = text(ROOT / "b3_trader" / "multi_exchange_paper.py")
     notice_domain = text(ROOT / "b3_trader" / "market_notice.py")
@@ -32,13 +33,14 @@ def main() -> None:
     notice_timing = text(ROOT / "b3_trader" / "market_notice_timing.py")
     notice_sources = text(ROOT / "b3_trader" / "market_notice_sources.py")
     runtime_verify = text(ROOT / "scripts" / "verify-build39-runtime.ps1")
+    safe_runtime_runner = text(ROOT / "scripts" / "run-build39-listing-cycle-safe.py")
     profile_identity_api = text(ROOT / "cloudflare-pages" / "functions" / "api" / "coin-profile-identity.ts")
     architecture = text(ROOT / "docs" / "MODULAR_ARCHITECTURE.md")
 
     pre_windows = ("t7d", "t5d", "t3d", "t1d", "t6h", "t1h")
     post_windows = ("p5m", "p1h", "p6h", "p24h", "p3d", "p7d")
     notice_refresh_at = runtime_verify.find("b3_trader.market_notice_collector")
-    listing_cycle_at = runtime_verify.find("b3_trader.listing_history_research_cycle")
+    locked_cycle_at = runtime_verify.find("run-build39-listing-cycle-safe.py")
     supervisor_init_start = supervisor.find("def __init__(self) -> None:")
     supervisor_lazy_start = supervisor.find("def _run_listing_history_once")
     supervisor_init = (
@@ -128,8 +130,24 @@ def main() -> None:
             "self.legacy_url}/{clean_id}",
         )),
         "build39_runtime_refreshes_notices_first": (
-            notice_refresh_at >= 0 and listing_cycle_at >= 0 and notice_refresh_at < listing_cycle_at
+            notice_refresh_at >= 0 and locked_cycle_at >= 0 and notice_refresh_at < locked_cycle_at
         ),
+        "build39_runtime_cycle_uses_shared_lock": (
+            all(token in safe_runtime_runner for token in (
+                "ResearchWorkLock", "ListingHistoryResearchCycle", "MAX_CASES_PER_RUN",
+                "deferred_forward_research_work_lock_busy", '"network_fetches": False',
+                '"database_mutation": False', "raise SystemExit(75)",
+            ))
+            and all(token in runtime_verify for token in (
+                "run-build39-listing-cycle-safe.py", "$cycleCode -eq 75",
+                "disabled_by_forward_pipeline_dedicated_mode",
+                "No listing-history network or DB work was started",
+            ))
+        ),
+        "build39_shared_lock_cross_process": all(token in work_lock for token in (
+            "ResearchWorkLock", "LK_NBLCK", "LOCK_EX", "LOCK_NB",
+            "automatically if a process exits", "return False",
+        )),
         "build39_domestic_open_price_public_candle": all(token in domestic_price for token in (
             "DomesticListingPriceResolver", "BithumbClient", "UpbitClient", "candles_minutes",
             "opening_price_at_or_after", "OPEN_SEARCH_SECONDS", "response_count",
