@@ -15,6 +15,7 @@ FEATURE_VERSION = 1
 MAX_SIGNALS_PER_RUN = 240
 MAX_REACTIONS_PER_RUN = 720
 REACTION_RETENTION = 12000
+SOURCE_RETENTION_BARS = 400
 HORIZONS = {
     "15m": 15 * 60,
     "1h": 60 * 60,
@@ -31,6 +32,7 @@ ABSORPTION_DIRECTION = {
     "passive_buy_absorption_candidate": 1,
     "passive_sell_absorption_candidate": -1,
 }
+TERMINAL_WAIT_STATUSES = {"expired_missing_exact_reaction_path"}
 
 
 def _finite(value: Any) -> float | None:
@@ -50,6 +52,11 @@ class MarketFlowReactionStore:
     existing bounded 400-bar retention can cover a full day. Signals whose end
     timestamp is not aligned to the 5m source are skipped for 1d rather than
     approximated.
+
+    Pre-horizon rows are not reevaluated until their reaction_end_ts. Missing
+    exact paths are retried only while the source retention could still contain
+    the path; once the start is older than the bounded source retention they are
+    terminally marked expired instead of consuming every future cycle.
 
     The store records both flow-followthrough return and, for preregistered
     passive absorption candidates, hypothesis-directional return. It is research
@@ -148,20 +155,17 @@ class MarketFlowReactionStore:
         ).fetchall()
         return [dict(row) for row in rows]
 
-    def _existing_ready(self, signal: dict[str, Any], horizon_label: str) -> bool:
+    def _existing_state(self, signal: dict[str, Any], horizon_label: str) -> dict[str, Any] | None:
         row = self.conn.execute(
-            """SELECT data_ready FROM research_market_flow_reaction_mx
+            """SELECT data_ready,status,reaction_end_ts FROM research_market_flow_reaction_mx
                WHERE exchange=? AND market=? AND signal_window_label=?
                  AND signal_feature_ts=? AND horizon_label=?""",
             (
-                str(signal["exchange"]),
-                str(signal["market"]),
-                str(signal["window_label"]),
-                float(signal["feature_ts"]),
-                str(horizon_label),
+                str(signal["exchange"]),str(signal["market"]),str(signal["window_label"]),
+                float(signal["feature_ts"]),str(horizon_label),
             ),
         ).fetchone()
-        return bool(row and row["data_ready"])
+        return dict(row) if row else None
 
     def _reaction_price(
         self,
@@ -186,14 +190,18 @@ class MarketFlowReactionStore:
                WHERE exchange=? AND market=? AND timeframe=?
                  AND candle_ts>=? AND candle_ts<? AND is_closed=1
                ORDER BY candle_ts ASC""",
-            (str(signal["exchange"]), str(signal["market"]), timeframe, start, end),
+            (str(signal["exchange"]),str(signal["market"]),timeframe,start,end),
         ).fetchall()
-        if len(rows) != expected:
-            return "waiting_exact_closed_reaction_path", None, None, timeframe, interval
-        actual_ts = [float(row["candle_ts"] or 0.0) for row in rows]
         expected_ts = [start + offset * interval for offset in range(expected)]
-        if actual_ts != expected_ts:
-            return "waiting_exact_closed_reaction_path", None, None, timeframe, interval
+        actual_ts = [float(row["candle_ts"] or 0.0) for row in rows]
+        if len(rows) != expected or actual_ts != expected_ts:
+            retention_span = SOURCE_RETENTION_BARS * interval
+            status = (
+                "expired_missing_exact_reaction_path"
+                if now - start > retention_span
+                else "waiting_exact_closed_reaction_path"
+            )
+            return status, None, None, timeframe, interval
         endpoint_price = _finite(rows[-1]["close"])
         if endpoint_price is None or endpoint_price <= 0:
             return "invalid_endpoint_price", None, None, timeframe, interval
@@ -222,11 +230,7 @@ class MarketFlowReactionStore:
         ready = status == "ready" and endpoint_price is not None and endpoint_price > 0
         future_return = ((float(endpoint_price) / signal_price) - 1.0) * 100.0 if ready else None
         flow_followthrough = future_return * flow_direction if future_return is not None and flow_direction else None
-        hypothesis_return = (
-            future_return * hypothesis_direction
-            if future_return is not None and hypothesis_direction
-            else None
-        )
+        hypothesis_return = future_return * hypothesis_direction if future_return is not None and hypothesis_direction else None
         return {
             "exchange": str(signal["exchange"]),
             "market": str(signal["market"]),
@@ -236,9 +240,7 @@ class MarketFlowReactionStore:
             "signal_price": signal_price,
             "signal_delta_quote": delta_quote,
             "signal_delta_pct": _finite(signal.get("delta_pct")),
-            "signal_price_efficiency_bps_per_100m_quote": _finite(
-                signal.get("price_efficiency_bps_per_100m_quote")
-            ),
+            "signal_price_efficiency_bps_per_100m_quote": _finite(signal.get("price_efficiency_bps_per_100m_quote")),
             "flow_direction": flow_direction,
             "hypothesis_direction": hypothesis_direction,
             "horizon_label": str(horizon_label),
@@ -268,30 +270,24 @@ class MarketFlowReactionStore:
                    hypothesis_directional_return_pct,source,received_at,feature_version,schema_version
                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                ON CONFLICT(exchange,market,signal_window_label,signal_feature_ts,horizon_label) DO UPDATE SET
-                   signal_evidence_label=excluded.signal_evidence_label,
-                   signal_price=excluded.signal_price,
-                   signal_delta_quote=excluded.signal_delta_quote,
-                   signal_delta_pct=excluded.signal_delta_pct,
+                   signal_evidence_label=excluded.signal_evidence_label,signal_price=excluded.signal_price,
+                   signal_delta_quote=excluded.signal_delta_quote,signal_delta_pct=excluded.signal_delta_pct,
                    signal_price_efficiency_bps_per_100m_quote=excluded.signal_price_efficiency_bps_per_100m_quote,
-                   flow_direction=excluded.flow_direction,
-                   hypothesis_direction=excluded.hypothesis_direction,
-                   reaction_end_ts=excluded.reaction_end_ts,
-                   reaction_source_timeframe=excluded.reaction_source_timeframe,
+                   flow_direction=excluded.flow_direction,hypothesis_direction=excluded.hypothesis_direction,
+                   reaction_end_ts=excluded.reaction_end_ts,reaction_source_timeframe=excluded.reaction_source_timeframe,
                    reaction_source_interval_seconds=excluded.reaction_source_interval_seconds,
-                   data_ready=excluded.data_ready,status=excluded.status,
-                   endpoint_candle_ts=excluded.endpoint_candle_ts,endpoint_price=excluded.endpoint_price,
-                   future_return_pct=excluded.future_return_pct,
+                   data_ready=excluded.data_ready,status=excluded.status,endpoint_candle_ts=excluded.endpoint_candle_ts,
+                   endpoint_price=excluded.endpoint_price,future_return_pct=excluded.future_return_pct,
                    flow_followthrough_return_pct=excluded.flow_followthrough_return_pct,
                    hypothesis_directional_return_pct=excluded.hypothesis_directional_return_pct,
-                   received_at=excluded.received_at,feature_version=excluded.feature_version,
-                   schema_version=excluded.schema_version""",
+                   received_at=excluded.received_at,feature_version=excluded.feature_version,schema_version=excluded.schema_version""",
             (
                 row["exchange"],row["market"],row["signal_window_label"],row["signal_feature_ts"],
                 row["signal_evidence_label"],row["signal_price"],row["signal_delta_quote"],row["signal_delta_pct"],
                 row["signal_price_efficiency_bps_per_100m_quote"],row["flow_direction"],row["hypothesis_direction"],
                 row["horizon_label"],row["horizon_seconds"],row["reaction_start_ts"],row["reaction_end_ts"],
-                row["reaction_source_timeframe"],row["reaction_source_interval_seconds"],row["data_ready"],
-                row["status"],row["endpoint_candle_ts"],row["endpoint_price"],row["future_return_pct"],
+                row["reaction_source_timeframe"],row["reaction_source_interval_seconds"],row["data_ready"],row["status"],
+                row["endpoint_candle_ts"],row["endpoint_price"],row["future_return_pct"],
                 row["flow_followthrough_return_pct"],row["hypothesis_directional_return_pct"],
                 "price_flow_divergence+rest_ohlcv",row["received_at"],FEATURE_VERSION,SCHEMA_VERSION,
             ),
@@ -301,8 +297,7 @@ class MarketFlowReactionStore:
         rows = self.conn.execute(
             """SELECT exchange,market,signal_window_label,signal_evidence_label,horizon_label,
                       future_return_pct,flow_followthrough_return_pct,hypothesis_directional_return_pct
-               FROM research_market_flow_reaction_mx
-               WHERE data_ready=1"""
+               FROM research_market_flow_reaction_mx WHERE data_ready=1"""
         ).fetchall()
         grouped: dict[tuple[str, str, str, str, str], list[sqlite3.Row]] = defaultdict(list)
         for row in rows:
@@ -316,14 +311,8 @@ class MarketFlowReactionStore:
         written = 0
         for key, group in grouped.items():
             future = [float(row["future_return_pct"]) for row in group if row["future_return_pct"] is not None]
-            follow = [
-                float(row["flow_followthrough_return_pct"])
-                for row in group if row["flow_followthrough_return_pct"] is not None
-            ]
-            hypothesis = [
-                float(row["hypothesis_directional_return_pct"])
-                for row in group if row["hypothesis_directional_return_pct"] is not None
-            ]
+            follow = [float(row["flow_followthrough_return_pct"]) for row in group if row["flow_followthrough_return_pct"] is not None]
+            hypothesis = [float(row["hypothesis_directional_return_pct"]) for row in group if row["hypothesis_directional_return_pct"] is not None]
             self.conn.execute(
                 """INSERT INTO research_market_flow_reaction_stats_mx(
                        exchange,market,signal_window_label,signal_evidence_label,horizon_label,
@@ -333,13 +322,10 @@ class MarketFlowReactionStore:
                        updated_at,feature_version,schema_version
                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
-                    *key,
-                    len(future),
-                    statistics.fmean(future) if future else None,
+                    *key,len(future),statistics.fmean(future) if future else None,
                     statistics.fmean(follow) if follow else None,
                     (sum(1 for value in follow if value > 0) / len(follow) * 100.0) if follow else None,
-                    len(hypothesis),
-                    statistics.fmean(hypothesis) if hypothesis else None,
+                    len(hypothesis),statistics.fmean(hypothesis) if hypothesis else None,
                     (sum(1 for value in hypothesis if value > 0) / len(hypothesis) * 100.0) if hypothesis else None,
                     now,FEATURE_VERSION,SCHEMA_VERSION,
                 ),
@@ -366,16 +352,21 @@ class MarketFlowReactionStore:
         processed = 0
         ready_written = 0
         waiting_written = 0
+        terminal_expired = 0
         alignment_skipped = 0
+        deferred_existing = 0
         for signal in signals:
             for horizon_label in HORIZONS:
                 if processed >= MAX_REACTIONS_PER_RUN:
                     break
-                if self._existing_ready(signal, horizon_label):
-                    continue
-                status, endpoint_ts, endpoint_price, source_tf, source_interval = self._reaction_price(
-                    signal,horizon_label,now=stamp
-                )
+                existing = self._existing_state(signal, horizon_label)
+                if existing:
+                    if bool(existing.get("data_ready")) or str(existing.get("status") or "") in TERMINAL_WAIT_STATUSES:
+                        continue
+                    if str(existing.get("status") or "") == "waiting_horizon" and stamp < float(existing.get("reaction_end_ts") or 0.0):
+                        deferred_existing += 1
+                        continue
+                status, endpoint_ts, endpoint_price, source_tf, source_interval = self._reaction_price(signal,horizon_label,now=stamp)
                 if status == "unsupported_exact_alignment":
                     alignment_skipped += 1
                     continue
@@ -389,6 +380,8 @@ class MarketFlowReactionStore:
                     ready_written += 1
                 else:
                     waiting_written += 1
+                    if status == "expired_missing_exact_reaction_path":
+                        terminal_expired += 1
             if processed >= MAX_REACTIONS_PER_RUN:
                 break
 
@@ -402,6 +395,8 @@ class MarketFlowReactionStore:
             "reactions_processed": processed,
             "ready_written": ready_written,
             "waiting_written": waiting_written,
+            "terminal_expired_missing_path": terminal_expired,
+            "deferred_existing_pre_horizon": deferred_existing,
             "exact_alignment_skipped": alignment_skipped,
             "stats_written": stats_written,
             "rows_pruned": pruned,
@@ -424,10 +419,11 @@ class MarketFlowReactionStore:
                 "paper_only": True,"score_wired": False,"can_place_orders": False,
             }
         row_count = int(self.conn.execute("SELECT COUNT(*) FROM research_market_flow_reaction_mx").fetchone()[0])
-        ready_rows = int(self.conn.execute(
-            "SELECT COUNT(*) FROM research_market_flow_reaction_mx WHERE data_ready=1"
-        ).fetchone()[0])
+        ready_rows = int(self.conn.execute("SELECT COUNT(*) FROM research_market_flow_reaction_mx WHERE data_ready=1").fetchone()[0])
         waiting_rows = row_count - ready_rows
+        expired_rows = int(self.conn.execute(
+            "SELECT COUNT(*) FROM research_market_flow_reaction_mx WHERE status='expired_missing_exact_reaction_path'"
+        ).fetchone()[0])
         time_violations = int(self.conn.execute(
             """SELECT COUNT(*) FROM research_market_flow_reaction_mx
                WHERE ABS(reaction_end_ts-(signal_feature_ts+horizon_seconds))>0.001"""
@@ -454,22 +450,12 @@ class MarketFlowReactionStore:
         return {
             "ok": time_violations == 0 and source_violations == 0 and direction_violations == 0,
             "status": "ready" if ready_rows else "waiting_for_forward_horizons",
-            "table_exists": True,
-            "row_count": row_count,
-            "ready_rows": ready_rows,
-            "waiting_rows": waiting_rows,
-            "reaction_time_violations": time_violations,
-            "reaction_source_violations": source_violations,
+            "table_exists": True,"row_count": row_count,"ready_rows": ready_rows,"waiting_rows": waiting_rows,
+            "expired_missing_path_rows": expired_rows,
+            "reaction_time_violations": time_violations,"reaction_source_violations": source_violations,
             "hypothesis_direction_violations": direction_violations,
-            "latest_ready": latest,
-            "stats": stats,
-            "horizons": list(HORIZONS),
+            "latest_ready": latest,"stats": stats,"horizons": list(HORIZONS),
             "join_contract": "forward_only_exact_contiguous_closed_ohlcv_after_signal_window",
-            "paper_only": True,
-            "shadow_only": True,
-            "score_wired": False,
-            "can_place_orders": False,
-            "raw_cloud_projection": False,
-            "feature_version": FEATURE_VERSION,
-            "schema_version": SCHEMA_VERSION,
+            "paper_only": True,"shadow_only": True,"score_wired": False,"can_place_orders": False,
+            "raw_cloud_projection": False,"feature_version": FEATURE_VERSION,"schema_version": SCHEMA_VERSION,
         }
