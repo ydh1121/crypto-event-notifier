@@ -122,17 +122,17 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 ## 5. 가격·수급 Feature Store
 
 ### 5.1 다중 기간 가격 history
-- [ ] 1m/5m/15m/1h/4h/1d OHLCV의 bounded local history 수집
+- [x] 1m/5m/15m/1h/4h/1d OHLCV bounded local history 수집. 거래소·시장·timeframe별 최대 400 bar 보존, BTC/ETH 우선 + 나머지 universe 회전, 공개 API 429 bounded retry, Windows 실데이터 수집/감사 PASS
 - [x] 기존 `research_market_memory_mx`를 재사용해 completed prior-day D-1~D-5와 현재 기준 1/3/5/7/30일 누적수익률을 분리 계산·compact market-detail projection·섹터 Viewer 연결. 30일 미달/스테일 history는 null fail-closed로 유지하며 Build38 전용 CI와 전체 B3 regression PASS
-- [ ] BTC/ETH/도미넌스/시장 breadth 대비 상대강도 저장
-- [ ] cross-exchange price gap 및 국내 premium/discount 저장
+- [-] BTC/ETH 및 시장 breadth 대비 상대강도 저장·Windows runtime PASS. 1/3/7/30일 benchmark feature와 breadth coverage gate는 fail-closed로 누적 중이며 BTC dominance source는 별도 추가 필요
+- [x] cross-exchange price gap 및 국내 premium/discount 저장. 빗썸↔업비트는 symbol+공식명 exact identity와 1분 가격 freshness/skew gate를 적용하고, 해외 기준은 동일 verified provider-id + CoinGecko exact venue/pair + quote→KRW 환산을 통과한 Binance/OKX/Bybit만 사용. Windows runtime에서 BTC/ETH 실값·null/identity gate 위반 0 확인
 
 ### 5.2 순매수/순매도 · volume delta
-- [ ] public trade feed에서 aggressor side가 제공되는지 거래소별 검증
-- [ ] side 미제공 시 tick rule/orderbook 기반 추정값과 confidence를 별도 저장
-- [ ] 단위봉별 buy_volume, sell_volume, delta=`buy-sell`, delta_pct, CVD 누적
-- [ ] 1m/5m/15m/1h/4h/1d CVD/volume delta history
-- [ ] orderbook imbalance, spread, depth, slippage, bid/ask replenishment 속도
+- [x] 빗썸/업비트 public recent-trade feed의 aggressor side를 검증하고 거래소 제공 `ASK/BID`만 직접 저장하도록 고정. ticker/tick-rule 추정으로 side를 만들어내지 않음
+- [>] 현재 빗썸/업비트 source가 side를 직접 제공하므로 tick rule/orderbook 기반 side 추정은 사용하지 않는다. 향후 side 미제공 source를 추가할 때만 추정값+confidence 계약을 별도 구현
+- [-] public recent trade를 sequential-id dedupe해 buy_volume, sell_volume, delta=`buy-sell`, delta_pct와 local contiguous observation 기준 anchored observed CVD로 저장하는 기반 구현. 회당 시장/페이지 bound와 continuity gate를 고정했으며 전체 CI PASS, Windows 실데이터 coverage QA 대기
+- [ ] 1m/5m/15m/1h/4h/1d 완전 CVD/volume delta history. REST bounded observation의 continuity가 부족한 고빈도 시장은 완전 CVD로 승격하지 않고 WebSocket 연속수집 필요성을 실환경 coverage로 판단
+- [-] orderbook spread, top-5/all bid·ask quote depth와 imbalance 저장 구현. raw orderbook은 로컬 SQLite에만 유지하고 score/PAPER는 미연결. slippage 및 bid/ask replenishment 속도는 추가 구현 필요
 - [ ] price-flow divergence DB화
 - [ ] Viewer 테이블/상세에 순매수·순매도·delta·CVD 및 기간 비교 표시
 
