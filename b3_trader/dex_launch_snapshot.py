@@ -56,6 +56,45 @@ def _empty(*, path_exists: bool) -> dict[str, Any]:
     }
 
 
+def _compact_launch_provenance(
+    launch: dict[str, Any],
+    launch_reference: dict[str, Any],
+    feature_version: int,
+) -> dict[str, Any]:
+    source = (
+        launch.get("launch_price_provenance")
+        if isinstance(launch.get("launch_price_provenance"), dict)
+        else {}
+    )
+    if source:
+        return {
+            "status": str(source.get("status") or ""),
+            "observed_reference_ts": _num(source.get("observed_reference_ts")),
+            "observed_reference_price": _num(source.get("observed_reference_price")),
+            "observed_reference_volume_usd": _num(source.get("observed_reference_volume_usd")),
+            "historical_liquidity_verified": bool(source.get("historical_liquidity_verified")),
+            "validated_launch_price": _num(source.get("validated_launch_price")),
+            "validated_launch_at": _num(source.get("validated_launch_at")),
+            "source_limitation": str(source.get("source_limitation") or "")[:120],
+        }
+    # Feature v1 predates explicit launch-price provenance. Preserve the observed
+    # price for research display but fail closed on historical liquidity proof.
+    return {
+        "status": "legacy_feature_without_historical_liquidity_provenance",
+        "observed_reference_ts": _num(launch_reference.get("candle_ts")),
+        "observed_reference_price": _num(launch_reference.get("price")),
+        "observed_reference_volume_usd": _num(launch_reference.get("volume_usd")),
+        "historical_liquidity_verified": False,
+        "validated_launch_price": None,
+        "validated_launch_at": None,
+        "source_limitation": (
+            "feature_v1_predates_historical_liquidity_provenance"
+            if feature_version <= 1
+            else "historical_liquidity_provenance_missing"
+        ),
+    }
+
+
 def _compact_feature(payload: dict[str, Any], feature_version: int) -> dict[str, Any]:
     quality = payload.get("pool_quality") if isinstance(payload.get("pool_quality"), dict) else {}
     domestic = payload.get("domestic_listing_window") if isinstance(payload.get("domestic_listing_window"), dict) else {}
@@ -65,8 +104,9 @@ def _compact_feature(payload: dict[str, Any], feature_version: int) -> dict[str,
     launch_windows = launch.get("windows") if isinstance(launch.get("windows"), dict) else {}
     reference = domestic.get("reference") if isinstance(domestic.get("reference"), dict) else {}
     launch_reference = launch.get("reference") if isinstance(launch.get("reference"), dict) else {}
+    resolved_feature_version = int(feature_version or payload.get("version") or 0)
     return {
-        "feature_version": int(feature_version or payload.get("version") or 0),
+        "feature_version": resolved_feature_version,
         "pool_quality": {
             "reserve_usd": _num(quality.get("reserve_usd")),
             "volume_h24_usd": _num(quality.get("volume_h24_usd")),
@@ -85,7 +125,13 @@ def _compact_feature(payload: dict[str, Any], feature_version: int) -> dict[str,
         },
         "launch": {
             "status": str(launch.get("status") or ""),
+            # Observational OHLCV reference only. Use provenance.validated_launch_price
+            # when/if a historical-liquidity source can verify it.
             "reference_price": _num(launch_reference.get("price")),
+            "reference_volume_usd": _num(launch_reference.get("volume_usd")),
+            "provenance": _compact_launch_provenance(
+                launch, launch_reference, resolved_feature_version
+            ),
             "pool_age_days_at_domestic_listing": _num(launch.get("pool_age_days_at_domestic_listing")),
             "returns": {
                 key: _return(launch_windows.get(key), "return_from_launch_pct") for key in LAUNCH_WINDOWS
