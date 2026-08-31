@@ -17,11 +17,13 @@ on:
       - "b3_trader/listing_history_audit.py"
       - "b3_trader/domestic_listing_price.py"
       - "b3_trader/research_control.py"
+      - "b3_trader/research_work_lock.py"
       - "b3_trader/research_supervisor.py"
       - "b3_trader/tests/test_listing_*.py"
       - "b3_trader/tests/test_domestic_listing_price.py"
       - "cloudflare-pages/functions/api/coin-profile-identity.ts"
       - "scripts/check-listing-build39.py"
+      - "scripts/run-build39-listing-cycle-safe.py"
       - "scripts/verify-build39-runtime.ps1"
       - ".github/workflows/b3-listing-build39.yml"
   workflow_dispatch:
@@ -53,8 +55,10 @@ jobs:
           b3_trader/listing_history_audit.py
           b3_trader/domestic_listing_price.py
           b3_trader/research_control.py
+          b3_trader/research_work_lock.py
           b3_trader/research_supervisor.py
           scripts/check-listing-build39.py
+          scripts/run-build39-listing-cycle-safe.py
       - name: Listing-history tests
         run: python -m pytest -q b3_trader/tests/test_listing_*.py b3_trader/tests/test_domestic_listing_price.py
       - name: Build 39 modular contract
