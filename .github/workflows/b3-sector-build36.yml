@@ -46,7 +46,7 @@ jobs:
         run: |
           set -euo pipefail
           grep -q 'IdentitySafeCoinProfileEnricher' b3_trader/coin_profile_identity_safe.py
-          grep -q 'if not _identity_in_text(row, text)' b3_trader/coin_profile_identity_safe.py
+          grep -q 'if not _manual_identity_matches(row, text)' b3_trader/coin_profile_identity_safe.py
           grep -q 'coin-profile-identity-audit' b3_trader/coin_profile_identity_audit.py
           grep -q 'CoinProfileResearchCycleV36' b3_trader/research_supervisor.py
           grep -q 'identity_mismatch' cloudflare-pages/functions/api/coin-profile-backlog-v36.ts
