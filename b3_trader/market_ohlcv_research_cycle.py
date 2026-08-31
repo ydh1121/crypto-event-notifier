@@ -13,6 +13,7 @@ from .market_flow_collector import MarketFlowCollector
 from .market_flow_store import MarketFlowStore
 from .market_ohlcv_collector import MarketOhlcvCollector, TIMEFRAMES
 from .market_ohlcv_store import MarketOhlcvStore
+from .market_price_flow_divergence import MarketPriceFlowDivergenceStore
 from .market_relative_strength import BENCHMARK_MARKETS, MarketRelativeStrengthEngine
 from .research_control import atomic_json
 
@@ -75,6 +76,11 @@ class MarketOhlcvResearchCycle:
     continuity metadata, so partial observations cannot masquerade as complete
     CVD. Relative strength, conservative domestic exchange gap and verified
     foreign-reference premium remain shadow/read-only research features.
+
+    After the OHLCV refresh, local-only price-flow divergence evidence is joined
+    from completed OHLCV plus continuous WebSocket trade/orderbook windows. This
+    join adds no network requests and remains completely unwired from scoring,
+    PAPER decisions and live orders.
     """
 
     def __init__(
@@ -89,6 +95,7 @@ class MarketOhlcvResearchCycle:
         self.path = Path(path)
         self.store = store or MarketOhlcvStore(self.path)
         self.flow_store = MarketFlowStore(self.path)
+        self.price_flow_divergence = MarketPriceFlowDivergenceStore(self.path)
         self.adapters = adapters or {name: public_exchange(name) for name in EXCHANGES}
         self.collector = collector or MarketOhlcvCollector(self.store)
         self.flow_collector = MarketFlowCollector(self.flow_store)
@@ -99,6 +106,7 @@ class MarketOhlcvResearchCycle:
         self._owns_store = store is None
 
     def close(self) -> None:
+        self.price_flow_divergence.close()
         self.flow_store.close()
         if self._owns_store:
             self.store.close()
@@ -267,10 +275,26 @@ class MarketOhlcvResearchCycle:
             }
             next_premium_cursor = 0
 
+        try:
+            price_flow_result = self.price_flow_divergence.compute_pending(now=time.time())
+        except Exception as exc:
+            total_failures += 1
+            price_flow_result = {
+                "ok": False,
+                "status": "price_flow_divergence_error",
+                "candidates_scanned": 0,
+                "ready_written": 0,
+                "waiting_written": 0,
+                "error": f"{type(exc).__name__}: {exc}"[:300],
+                "paper_only": True,
+                "score_wired": False,
+                "can_place_orders": False,
+            }
+
         atomic_json(
             self.state_path,
             {
-                "version": 5,
+                "version": 6,
                 "updated_at": time.time(),
                 "cursors": next_cursors,
                 "premium_cursor": next_premium_cursor,
@@ -290,6 +314,11 @@ class MarketOhlcvResearchCycle:
                 "domestic_premium": {
                     "domestic_identity": "same_verified_provider_id",
                     "foreign_identity": "coingecko_exact_venue_pair",
+                    "score_wired": False,
+                },
+                "price_flow_divergence": {
+                    "join_contract": "exact_aligned_closed_ohlcv+continuous_ws_trade+continuous_ws_orderbook",
+                    "heuristic_version": 1,
                     "score_wired": False,
                 },
             },
@@ -328,6 +357,7 @@ class MarketOhlcvResearchCycle:
             },
             "cross_exchange_gap": gap_result,
             "domestic_premium": premium_result,
+            "price_flow_divergence": price_flow_result,
             "failures": total_failures,
             "exchanges": exchange_results,
             "elapsed_seconds": round(time.time() - started, 3),
