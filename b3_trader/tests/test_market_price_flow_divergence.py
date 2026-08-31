@@ -24,6 +24,8 @@ def _insert_window_pair(
     path: Path,
     *,
     feature_ts: float = FEATURE_TS,
+    window_label: str = "5m",
+    window_seconds: float = WINDOW_SECONDS,
     delta_pct: float = -60.0,
     delta_quote: float = -60_000_000.0,
     buy_quote: float = 20_000_000.0,
@@ -35,7 +37,7 @@ def _insert_window_pair(
     flow_continuity: int = 1,
     orderbook_continuity: int = 1,
 ) -> None:
-    start = feature_ts - WINDOW_SECONDS
+    start = feature_ts - window_seconds
     conn = sqlite3.connect(path)
     try:
         conn.execute(
@@ -46,7 +48,7 @@ def _insert_window_pair(
                    side_coverage_pct,source,received_at,feature_version
                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
-                "upbit","KRW-BTC","5m",WINDOW_SECONDS,feature_ts,start,feature_ts,
+                "upbit","KRW-BTC",window_label,window_seconds,feature_ts,start,feature_ts,
                 100,1.0,2.0,buy_quote,sell_quote,-1.0,delta_quote,delta_pct,-10_000_000.0,
                 start - 60.0,flow_continuity,100.0,"public_websocket_trade",feature_ts + 1.0,1,
             ),
@@ -61,7 +63,7 @@ def _insert_window_pair(
                    source,received_at,feature_version
                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
-                "upbit","KRW-BTC","5m",WINDOW_SECONDS,feature_ts,start,feature_ts,
+                "upbit","KRW-BTC",window_label,window_seconds,feature_ts,start,feature_ts,
                 200,2.0,4.0,100_000_000.0,100_000_000.0,0.0,
                 150_000_000.0,100_000_000.0,80_000_000.0,100_000_000.0,
                 bid_pairs,ask_pairs,bid_ratio,ask_ratio,500_000.0,266_666.0,
@@ -73,15 +75,22 @@ def _insert_window_pair(
         conn.close()
 
 
-def _insert_price(path: Path, *, open_price: float = 100.0, close_price: float = 99.9) -> None:
+def _insert_price(
+    path: Path,
+    *,
+    candle_ts: float = WINDOW_START,
+    timeframe: str = "5m",
+    open_price: float = 100.0,
+    close_price: float = 99.9,
+) -> None:
     store = MarketOhlcvStore(path)
     try:
         store.upsert_rows([
             {
                 "exchange": "upbit",
                 "market": "KRW-BTC",
-                "timeframe": "5m",
-                "candle_ts": WINDOW_START,
+                "timeframe": timeframe,
+                "candle_ts": candle_ts,
                 "open": open_price,
                 "high": max(open_price, close_price),
                 "low": min(open_price, close_price),
@@ -208,3 +217,61 @@ def test_positive_flow_with_small_price_response_and_ask_refill_is_sell_absorpti
     assert row["price_resilient_to_buy"] == 1
     assert row["passive_sell_absorption_candidate"] == 1
     assert row["evidence_label"] == "passive_sell_absorption_candidate"
+
+
+def test_4h_price_evidence_composes_exact_contiguous_closed_1h_candles(tmp_path: Path) -> None:
+    path = tmp_path / "market.db"
+    _prepare(path)
+    window_seconds = 4 * 60 * 60.0
+    start = FEATURE_TS - window_seconds
+    _insert_window_pair(path, window_label="4h", window_seconds=window_seconds)
+    for offset in range(4):
+        _insert_price(
+            path,
+            candle_ts=start + offset * 3600.0,
+            timeframe="1h",
+            open_price=100.0 + offset,
+            close_price=101.0 + offset,
+        )
+
+    store = MarketPriceFlowDivergenceStore(path)
+    try:
+        result = store.compute_pending(now=FEATURE_TS + 20.0)
+        audit = store.audit()
+    finally:
+        store.close()
+
+    assert result["ready_written"] == 1
+    row = audit["latest_ready"][0]
+    assert row["window_label"] == "4h"
+    assert row["price_candle_ts"] == start
+    assert row["price_open"] == 100.0
+    assert row["price_close"] == 104.0
+    assert audit["alignment_violations"] == 0
+
+
+def test_4h_price_evidence_waits_if_any_hour_is_missing(tmp_path: Path) -> None:
+    path = tmp_path / "market.db"
+    _prepare(path)
+    window_seconds = 4 * 60 * 60.0
+    start = FEATURE_TS - window_seconds
+    _insert_window_pair(path, window_label="4h", window_seconds=window_seconds)
+    for offset in (0, 1, 3):
+        _insert_price(
+            path,
+            candle_ts=start + offset * 3600.0,
+            timeframe="1h",
+            open_price=100.0 + offset,
+            close_price=101.0 + offset,
+        )
+
+    store = MarketPriceFlowDivergenceStore(path)
+    try:
+        result = store.compute_pending(now=FEATURE_TS + 20.0)
+        audit = store.audit()
+    finally:
+        store.close()
+
+    assert result["waiting_written"] == 1
+    assert audit["ready_rows"] == 0
+    assert audit["waiting_rows"] == 1
