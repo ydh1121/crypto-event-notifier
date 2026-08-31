@@ -7,7 +7,7 @@ const defaults={
   paperTab:'summary',paperSearch:'',paperFilter:'all',paperSort:'return_desc',paperRange:'24h',paperPortfolioRange:'24h',
   paperCompareSearch:'',paperCompareSort:'gap_desc',
   strategyMarket:'',strategyTab:'overview',strategyRange:'24h',strategyCoinMarket:'',strategyCoinSearch:'',
-  recordsExchange:'bithumb',recordsFilter:'all',recordsPeriod:'all',recordsSearch:''
+  recordsExchange:'bithumb',recordsFilter:'all',recordsPeriod:'all',recordsSearch:'',recordsStrategy:'all'
 };
 let saved={};try{saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}')}catch{}
 const state={user:null,snapshot:null,loading:true,error:null,ui:{...defaults,...saved}};
