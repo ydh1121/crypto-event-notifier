@@ -94,7 +94,7 @@ Build 65~71 DEX v2 forward validation track:
 - after readiness, Build 71 calculates only the preregistered event/asset-dedup Spearman, top/bottom quartile spread, asset-dedup chronological late-half and strong-negative core checks
 - the Build 65 primary level is `asset_dedup`; Build 72 is allowed only when every frozen criterion passes
 - Build 71 remains PAPER/shadow/read-only. It does not fit weights, select a trade threshold, mutate the DB, publish Cloudflare data, change strategy/position sizing, wire PAPER A/B or place orders
-- the latest Windows Build 69/70 runtime found 0 new notices, 0 forward cases and 0 labels; waiting is the correct current state
+- Windows HEAD `4f65082`에서 Build 71 contract/runtime PASS. Build 70은 0 event/0 unique asset, Build 71은 `waiting_for_forward_sample`, `validation_statistics_calculated=false`, `statistics=null`로 확인됨
 
 Validation:
 - Build 38 dedicated CI PASS
@@ -106,15 +106,15 @@ Validation:
 - Build 71 local full Python suite 255 tests, compileall, Build 65~71 contract chain and workflow YAML validation PASS
 - Build 71 code commit `5c8081d` dedicated forward-validation CI PASS
 - Build 71 code commit `5c8081d` full B3 trader CI PASS
+- Build 71 Windows runtime at HEAD `4f65082`: contract PASS, Build 70 ledger PASS, Build 71 runtime PASS with no early statistics
 - PR #1 remains Draft/unmerged
 
 Immediate next action:
-1. sync the final Build 71 HEAD on the Windows runtime and run the Build 71 contract plus runtime verifier once
-2. while Build 70 remains below 30 event/20 unique asset labels per core window, require Build 71 to stay `waiting_for_forward_sample` with no validation statistics
-3. when a new official KRW listing appears, run the bounded Build 69 pipeline once; Build 67 → Build 68 → Build 66 must remain one intake/maximum one enrichment/one score audit per invocation
-4. rerun Build 70 and Build 71 after labels mature; do not inspect or fit forward statistics before the frozen readiness gate opens
-5. only a real Build 71 forward PASS may open Build 72 implementation. A FAIL means retire v2 or preregister a new hypothesis with a new forward cutoff, not tune v2 on the consumed validation sample
-6. preserve the still-open Build 39 live CEX data QA, Viewer visual QA and actual-new-listing end-to-end profile/facet QA as parallel operational debt
+1. while Build 70 remains below 30 event/20 unique asset labels per core window, require Build 71 to stay `waiting_for_forward_sample` with no validation statistics
+2. when a new official KRW listing appears, run the bounded Build 69 pipeline once; Build 67 → Build 68 → Build 66 must remain one intake/maximum one enrichment/one score audit per invocation
+3. rerun Build 70 and Build 71 after labels mature; do not inspect or fit forward statistics before the frozen readiness gate opens
+4. only a real Build 71 forward PASS may open Build 72 implementation. A FAIL means retire v2 or preregister a new hypothesis with a new forward cutoff, not tune v2 on the consumed validation sample
+5. preserve the still-open Build 39 live CEX data QA, Viewer visual QA and actual-new-listing end-to-end profile/facet QA as parallel operational debt
 
 ## Hard boundary
 
@@ -228,7 +228,7 @@ Generated data remains local/ignored:
 - Viewer project-research completion count uses the same definition for numerator and unresolved count.
 - Build 38 lifecycle/notice/timing/termination PAPER gate and PAPER self-heal are live-verified.
 - Build 39 CEX listing-history foundation is source/CI complete; Windows live CEX data audit remains open.
-- Build 69/70 Windows runtime is verified at 0 forward cases, and Build 71 source/local validation is complete; actual forward sample readiness is the current DEX v2 operational gate.
+- Build 69/70 Windows runtime is verified at 0 forward cases, and Build 71 source/CI/Windows runtime validation is complete; actual forward sample readiness is the current DEX v2 operational gate.
 - Current work must preserve PAPER scanning and publisher health while adding new features.
 
 ## Safety constraints
