@@ -10,6 +10,7 @@ from .exchange_public import PublicExchangeAdapter, public_exchange
 from .market_cross_exchange_gap import MarketCrossExchangeGapEngine
 from .market_domestic_premium import MarketDomesticPremiumEngine
 from .market_flow_collector import MarketFlowCollector
+from .market_flow_reaction import MarketFlowReactionStore
 from .market_flow_store import MarketFlowStore
 from .market_ohlcv_collector import MarketOhlcvCollector, TIMEFRAMES
 from .market_ohlcv_store import MarketOhlcvStore
@@ -78,9 +79,10 @@ class MarketOhlcvResearchCycle:
     foreign-reference premium remain shadow/read-only research features.
 
     After the OHLCV refresh, local-only price-flow divergence evidence is joined
-    from completed OHLCV plus continuous WebSocket trade/orderbook windows. This
-    join adds no network requests and remains completely unwired from scoring,
-    PAPER decisions and live orders.
+    from completed OHLCV plus continuous WebSocket trade/orderbook windows. The
+    cycle then evaluates only forward candles that occur after each completed
+    divergence signal, producing 15m/1h/4h/1d reaction evidence and aggregate
+    coefficients. Neither stage is wired to scoring, PAPER decisions or orders.
     """
 
     def __init__(
@@ -96,6 +98,7 @@ class MarketOhlcvResearchCycle:
         self.store = store or MarketOhlcvStore(self.path)
         self.flow_store = MarketFlowStore(self.path)
         self.price_flow_divergence = MarketPriceFlowDivergenceStore(self.path)
+        self.flow_reaction = MarketFlowReactionStore(self.path)
         self.adapters = adapters or {name: public_exchange(name) for name in EXCHANGES}
         self.collector = collector or MarketOhlcvCollector(self.store)
         self.flow_collector = MarketFlowCollector(self.flow_store)
@@ -106,6 +109,7 @@ class MarketOhlcvResearchCycle:
         self._owns_store = store is None
 
     def close(self) -> None:
+        self.flow_reaction.close()
         self.price_flow_divergence.close()
         self.flow_store.close()
         if self._owns_store:
@@ -291,10 +295,27 @@ class MarketOhlcvResearchCycle:
                 "can_place_orders": False,
             }
 
+        try:
+            flow_reaction_result = self.flow_reaction.compute_pending(now=time.time())
+        except Exception as exc:
+            total_failures += 1
+            flow_reaction_result = {
+                "ok": False,
+                "status": "flow_reaction_error",
+                "signals_scanned": 0,
+                "reactions_processed": 0,
+                "ready_written": 0,
+                "waiting_written": 0,
+                "error": f"{type(exc).__name__}: {exc}"[:300],
+                "paper_only": True,
+                "score_wired": False,
+                "can_place_orders": False,
+            }
+
         atomic_json(
             self.state_path,
             {
-                "version": 6,
+                "version": 7,
                 "updated_at": time.time(),
                 "cursors": next_cursors,
                 "premium_cursor": next_premium_cursor,
@@ -319,6 +340,12 @@ class MarketOhlcvResearchCycle:
                 "price_flow_divergence": {
                     "join_contract": "exact_aligned_closed_ohlcv+continuous_ws_trade+continuous_ws_orderbook",
                     "heuristic_version": 1,
+                    "score_wired": False,
+                },
+                "flow_reaction": {
+                    "join_contract": "forward_only_exact_contiguous_closed_ohlcv_after_signal_window",
+                    "horizons": ["15m", "1h", "4h", "1d"],
+                    "feature_version": 1,
                     "score_wired": False,
                 },
             },
@@ -358,6 +385,7 @@ class MarketOhlcvResearchCycle:
             "cross_exchange_gap": gap_result,
             "domestic_premium": premium_result,
             "price_flow_divergence": price_flow_result,
+            "flow_reaction": flow_reaction_result,
             "failures": total_failures,
             "exchanges": exchange_results,
             "elapsed_seconds": round(time.time() - started, 3),
