@@ -8,6 +8,7 @@ from typing import Any
 from .auto_demo_v2 import DB_PATH
 from .exchange_public import PublicExchangeAdapter, public_exchange
 from .market_cross_exchange_gap import MarketCrossExchangeGapEngine
+from .market_domestic_premium import MarketDomesticPremiumEngine
 from .market_ohlcv_collector import MarketOhlcvCollector, TIMEFRAMES
 from .market_ohlcv_store import MarketOhlcvStore
 from .market_relative_strength import BENCHMARK_MARKETS, MarketRelativeStrengthEngine
@@ -16,6 +17,7 @@ from .research_control import atomic_json
 STATE_PATH = Path("b3_trader/data/research-platform/market-ohlcv-cycle-state.json")
 EXCHANGES = ("bithumb", "upbit")
 MAX_MARKETS_PER_EXCHANGE_PER_RUN = 8
+MAX_PREMIUM_MARKETS_PER_RUN = 1
 
 
 def _read_state(path: Path) -> dict[str, Any]:
@@ -51,14 +53,14 @@ def _pick_markets(markets: list[str], cursor: int) -> tuple[list[str], int]:
 
 
 class MarketOhlcvResearchCycle:
-    """PAPER-independent bounded history owner for KRW market OHLCV.
+    """PAPER-independent bounded market-history feature owner.
 
-    Each run keeps KRW-BTC and KRW-ETH fresh and rotates the remaining slots,
-    for at most eight markets per exchange. The collector bridges only the
-    missing window (up to 200 bars/request) and the store retains the newest 400
-    bars per market/timeframe. Latest-only relative-strength features and a
-    conservative Bithumb-vs-Upbit gap are then derived from local history. No
-    strategy, fill, position or order state is read or changed.
+    Each run keeps KRW-BTC and KRW-ETH fresh and rotates the remaining OHLCV
+    slots, for at most eight markets per exchange. It derives latest-only
+    relative strength and a conservative Bithumb-vs-Upbit gap locally. At most
+    one gap-ready common market is then passed through the existing verified
+    provider-id + exact foreign venue/pair gate for current premium research.
+    No strategy, fill, position or order state is read or changed.
     """
 
     def __init__(
@@ -76,6 +78,7 @@ class MarketOhlcvResearchCycle:
         self.collector = collector or MarketOhlcvCollector(self.store)
         self.relative_strength = MarketRelativeStrengthEngine(self.store.conn)
         self.cross_exchange_gap = MarketCrossExchangeGapEngine(self.store.conn)
+        self.domestic_premium = MarketDomesticPremiumEngine(self.store.conn)
         self.state_path = Path(state_path)
         self._owns_store = store is None
 
@@ -88,6 +91,7 @@ class MarketOhlcvResearchCycle:
         now = time.time()
         state = _read_state(self.state_path)
         cursors = state.get("cursors") if isinstance(state.get("cursors"), dict) else {}
+        premium_cursor = int(state.get("premium_cursor") or 0)
         next_cursors: dict[str, int] = {}
         exchange_results: dict[str, Any] = {}
         market_names: dict[str, dict[str, str]] = {}
@@ -176,17 +180,62 @@ class MarketOhlcvResearchCycle:
                 "can_place_orders": False,
             }
 
+        premium_candidates = [
+            str(row["market"])
+            for row in self.store.conn.execute(
+                """SELECT market FROM research_market_cross_exchange_gap_mx
+                   WHERE identity_verified=1 AND gap_ready=1 ORDER BY market ASC"""
+            ).fetchall()
+        ]
+        premium_picked, next_premium_cursor = _rotate(
+            premium_candidates,
+            premium_cursor,
+            MAX_PREMIUM_MARKETS_PER_RUN,
+        )
+        if premium_picked:
+            try:
+                premium_result = self.domestic_premium.collect_market(premium_picked[0], now=now)
+            except Exception as exc:
+                total_failures += 1
+                premium_result = {
+                    "ok": False,
+                    "status": "domestic_premium_error",
+                    "market": premium_picked[0],
+                    "error": f"{type(exc).__name__}: {exc}"[:300],
+                    "paper_only": True,
+                    "score_wired": False,
+                    "can_place_orders": False,
+                }
+        else:
+            premium_result = {
+                "ok": True,
+                "status": "waiting_for_gap_ready_market",
+                "market": "",
+                "verified_sources": 0,
+                "paper_only": True,
+                "score_wired": False,
+                "can_place_orders": False,
+            }
+            next_premium_cursor = 0
+
         atomic_json(
             self.state_path,
             {
-                "version": 3,
+                "version": 4,
                 "updated_at": time.time(),
                 "cursors": next_cursors,
+                "premium_cursor": next_premium_cursor,
                 "max_markets_per_exchange_per_run": MAX_MARKETS_PER_EXCHANGE_PER_RUN,
+                "max_premium_markets_per_run": MAX_PREMIUM_MARKETS_PER_RUN,
                 "benchmark_markets": list(BENCHMARK_MARKETS),
                 "cross_exchange_gap": {
                     "identity_basis": "symbol+official_name_exact",
                     "source_timeframe": "1m",
+                },
+                "domestic_premium": {
+                    "domestic_identity": "same_verified_provider_id",
+                    "foreign_identity": "coingecko_exact_venue_pair",
+                    "score_wired": False,
                 },
             },
         )
@@ -204,12 +253,14 @@ class MarketOhlcvResearchCycle:
             "timeframes": [spec.name for spec in TIMEFRAMES],
             "benchmark_markets": list(BENCHMARK_MARKETS),
             "max_markets_per_exchange_per_run": MAX_MARKETS_PER_EXCHANGE_PER_RUN,
+            "max_premium_markets_per_run": MAX_PREMIUM_MARKETS_PER_RUN,
             "markets_processed": total_processed,
             "requests": total_requests,
             "rows_written": total_written,
             "rows_pruned": total_pruned,
             "relative_strength_features_written": total_relative_features,
             "cross_exchange_gap": gap_result,
+            "domestic_premium": premium_result,
             "failures": total_failures,
             "exchanges": exchange_results,
             "elapsed_seconds": round(time.time() - started, 3),
