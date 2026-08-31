@@ -47,6 +47,7 @@ def main() -> None:
     cannot_place_orders = last_result.get("can_place_orders") is False
     database_scope_ok = str(last_result.get("database_scope") or "") in {
         "research_market_ohlcv_mx_only",
+        "market_history_research_tables_only",
         "",
     }
     expected_timeframes = {"1m", "5m", "15m", "1h", "4h", "1d"}
