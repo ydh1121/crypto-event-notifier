@@ -32,7 +32,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] 코인 프로필 전수조사 + identity integrity/backlog
 - [x] Cloudflare snapshot/detail 전송 및 bounded retention
 - [x] Build 38 lifecycle/notice/return-window 모듈 + PAPER self-heal + D1 write-budget 및 Windows runtime 검증
-- [x] Build 39 pre-KRW CEX listing-history 모듈/전용 CI 기반. 실데이터 품질 검증과 Viewer 투영은 진행 중
+- [x] Build 39 pre-KRW CEX listing-history 모듈/전용 CI/Windows 실데이터 QA/compact Viewer projection 완료. 최신 상장 사례의 아직 도달하지 않은 post-listing window는 계속 시간 누적
 
 ## 2. 기존 Viewer 잔여 작업 — 먼저 닫을 것
 
@@ -69,15 +69,16 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] 공식 KRW listing 공지만 stable notice-id case로 seed하고 Upbit USDT-only 공지는 KRW case에서 fail-closed 제외
 - [x] 실제 국내 open은 현재가가 아니라 `trade_open_at` 주변 빗썸/업비트 공개 1분봉 opening price로 해석
 - [x] additive local SQLite: `listing_history_cases`, `listing_history_sources`, `listing_history_candles`, `listing_history_features`
-- [-] 국내 상장 전 해외 CEX 가격 snapshot: T-7d, T-5d, T-3d, T-1d, T-6h, T-1h, 국내 open 계산 구현 완료. Windows 실데이터 coverage/정확도 QA 대기
-- [-] 국내 상장가 대비 해외 기준 premium/discount 및 T-window 상승폭 feature 구현 완료. 실제 최근 상장 표본 QA와 Viewer 표현 대기
-- [-] 해외 CEX 최초 상장일/첫 가격/국내 상장 전 ATH/ATL 저장 기반 구현. 최초시각/가격을 증명할 수 없는 거래소는 null 유지하며 실데이터 coverage QA 대기
+- [x] 국내 상장 전 해외 CEX 가격 snapshot: T-7d, T-5d, T-3d, T-1d, T-6h, T-1h, 국내 open 계산 및 Windows 실데이터 coverage/정확도 QA 완료. 상장 전 해외 거래기간이 짧은 사례는 오래된 T-window를 null 유지
+- [x] 국내 상장가 대비 해외 기준 premium/discount 및 T-window 상승폭 feature 구현 + 실제 최근 상장 표본 QA 완료. CAP/CC 등에서 currency-safe KRW 환산과 premium/discount 실값 확인
+- [x] 해외 CEX 최초 상장일/첫 가격/국내 상장 전 ATH/ATL 저장 및 provenance QA 완료. 거래소가 최초시각/가격을 증명하는 PROM/EURC 등은 저장하고 CAP/CC처럼 증명 불가한 source는 0을 유효값으로 오인하지 않고 null semantics 유지
 - [x] bounded T-8d 연구 window 첫 봉을 해외 최초상장가로 오인하지 않는 provenance fail-closed 규칙 및 테스트
-- [-] 국내 상장 후 5m/1h/6h/24h/3d/7d 반응 누적 로직 구현. 7일이 지나기 전에는 `tracking_postlisting`으로 유지하며 실제 시간 누적 대기
+- [-] 국내 상장 후 5m/1h/6h/24h/3d/7d 반응 누적 로직 구현 및 실데이터 검증 완료. CC/CAP 등 완료 사례에서 +5m~+7d 확인, PROM/EURC처럼 아직 7일이 지나지 않은 최신 사례는 `tracking_postlisting`으로 계속 누적
 - [x] `listing-history-research`를 PAPER와 독립된 15분 sidecar로 등록하고 회당 최대 3 case로 제한
 - [x] `listing_history_audit` read-only CLI + Build 39 modular contract + dedicated CI
-- [-] `scripts/verify-build39-runtime.ps1` 실환경 검증 대기. Build69 dedicated mode에서는 generic listing-history supervisor를 계속 비활성으로 유지하고, Pages deploy → lock-safe one-shot 최대 3 case → audit를 공용 `ResearchWorkLock` 아래에서만 실행하며 lock 경합 시 network/DB 0으로 exit 75 defer
-- [ ] compact listing-history feature를 Cloudflare Viewer에 투영. raw candle은 D1로 보내지 않는다.
+- [x] `scripts/verify-build39-runtime.ps1` 실환경 검증 완료. Build69 dedicated mode에서 generic listing-history supervisor를 계속 비활성으로 유지한 채 Pages deploy → official notice refresh → shared `ResearchWorkLock` one-shot 최대 3 case → audit PASS. lock 경합 시 network/DB 0으로 exit 75 defer
+- [x] compact listing-history feature를 Cloudflare Viewer에 투영. `listing_history_snapshot.py`에서 case/source/derived feature만 bounded projection하고 raw candle/OHLCV는 로컬 SQLite에만 유지하며 리서치 화면에서 국내 상장 전후 값을 표시
+- [x] CoinGecko venue 검증 public rate-limit 보강. exact coin-id×exchange-id×pair gate는 유지한 채 요청 간 최소 간격과 429 bounded backoff를 적용하고 전용/전체 CI PASS
 - [ ] DEX용 identity는 chain/contract 기반으로 별도 확장. CEX provider-id를 DEX identity로 재사용하지 않는다.
 
 ### 3.3 DEX 출발 코인
