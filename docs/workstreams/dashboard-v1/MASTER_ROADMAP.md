@@ -92,10 +92,12 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Build 66 forward-only v2 shadow scorer. pre-cutoff backscore, fitting, threshold, PAPER/order wiring 금지
 - [x] Build 67 최신 공식 빗썸/업비트 KRW 상장 공지 intake와 Build 68 회당 최대 1건 forward enrichment
 - [x] Build 69에서 Build 67 → Build 68 → Build 66을 회당 1회씩만 실행하는 bounded forward orchestrator 구현
+- [x] Build 69 전용 15분 scheduled process 구현. 정상 Windows launcher가 함께 시작·재시작·종료하며 generic listing/DEX historical supervisor와 Build 47 cursor는 전용 모드에서 비활성
 - [x] Build 70 event/asset-dedup core-label ledger와 30 event/20 unique asset readiness gate 구현
 - [x] Build 71 preregistered forward validation 구현. Build 70 준비 전 Spearman/spread/late-half 통계 호출 자체를 차단
 - [x] Build 71은 event/asset-dedup Spearman, 상·하위 quartile spread, 시간순 후반부, 강한 음의 core signal만 Build 65 기준으로 판정하며 PAPER A/B·주문·LIVE는 연결하지 않음
 - [-] 실제 forward 표본 누적 대기. 현재 0 event / 0 unique asset이며 p1h·p6h·p24h 각각 30 event / 20 unique asset label 전에는 Build 71 통계 검증 금지
+- [-] Build 69 scheduler Windows runtime 검증 대기. 서버가 꺼진 상태에서는 network/DB 작업이 0이며 다음 정상 서버 시작 후 status heartbeat·generic supervisor 비활성·첫 bounded no-op을 확인
 - [ ] Build 71이 실제 forward 표본에서 PASS한 경우에만 Build 72 parallel PAPER A/B 구현
 - [ ] Build 72 PASS 후 Build 73 walk-forward/운영 안정성 검증 및 candidate promotion review
 

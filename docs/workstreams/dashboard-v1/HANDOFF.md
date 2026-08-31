@@ -88,6 +88,10 @@ Build 65~71 DEX v2 forward validation track:
 - Build 66 scores only usable post-cutoff cases and never back-scores pre-cutoff cases as v2
 - Build 67 ingests current official Bithumb/Upbit KRW listing notices; Build 68 enriches at most one post-cutoff case per run
 - Build 69 composes one Build 67 intake, one bounded Build 68 enrichment and one Build 66 audit; it does not reactivate generic historical supervisors or Build 47 cursors
+- Build 69 now also owns a dedicated 15-minute scheduled process. `run-local.ps1` starts, restart-cycles and stops it with the normal server; server-off means zero scheduled network/DB work
+- normal launcher sets `DEX_FORWARD_PIPELINE_DEDICATED_MODE=true`, which forces the generic `listing-history-research` and `dex-launch-research` components off without mutating local control state
+- the scheduler, generic listing/DEX owners and `market-notice-watch` share a cross-process nonblocking work lock. Lock contention is a network-0/DB-0 deferred no-op, and a separate process lock prevents duplicate schedulers
+- each scheduled result is re-audited against the Build 69 one-intake/one-enrichment/one-score/max-one-case, pre-cutoff, Build 47, PAPER/order/Cloudflare/fitting safety envelope
 - Build 70 counts event and asset-dedup p1h/p6h/p24h label coverage and keeps statistical validation blocked until every core window has at least 30 event labels and 20 unique-asset labels
 - Build 71 is implemented as a read-only preregistered validator and reuses the exact Build 66 score snapshot passed through Build 70
 - before Build 70 readiness, Build 71 returns `waiting_for_forward_sample`, `validation_statistics_calculated=false` and `statistics=null`; correlation/spread/late-half functions are not called
@@ -107,14 +111,17 @@ Validation:
 - Build 71 code commit `5c8081d` dedicated forward-validation CI PASS
 - Build 71 code commit `5c8081d` full B3 trader CI PASS
 - Build 71 Windows runtime at HEAD `4f65082`: contract PASS, Build 70 ledger PASS, Build 71 runtime PASS with no early statistics
+- Build 69 scheduler local full Python suite 266 tests, server-off verifier, scheduler contract, Build 39/43 supervisor regression and Build 65~71 contract chain PASS
+- Build 69 scheduler Windows runtime remains explicitly pending because the server is off; no process or network call was started for source validation
 - PR #1 remains Draft/unmerged
 
 Immediate next action:
-1. while Build 70 remains below 30 event/20 unique asset labels per core window, require Build 71 to stay `waiting_for_forward_sample` with no validation statistics
-2. when a new official KRW listing appears, run the bounded Build 69 pipeline once; Build 67 → Build 68 → Build 66 must remain one intake/maximum one enrichment/one score audit per invocation
-3. rerun Build 70 and Build 71 after labels mature; do not inspect or fit forward statistics before the frozen readiness gate opens
-4. only a real Build 71 forward PASS may open Build 72 implementation. A FAIL means retire v2 or preregister a new hypothesis with a new forward cutoff, not tune v2 on the consumed validation sample
-5. preserve the still-open Build 39 live CEX data QA, Viewer visual QA and actual-new-listing end-to-end profile/facet QA as parallel operational debt
+1. after the scheduler commit/CI is available, pull the new HEAD and start the normal Windows launcher once; then require the scheduler runtime verifier to confirm a fresh heartbeat, one process lock and both generic historical components disabled
+2. leave the normal server on to let the 15-minute Build 69 process accumulate new official KRW listing samples automatically; manual Build 67 → 68 → 66 invocations are no longer the normal path
+3. while Build 70 remains below 30 event/20 unique asset labels per core window, require Build 71 to stay `waiting_for_forward_sample` with no validation statistics
+4. rerun Build 70 and Build 71 after labels mature; do not inspect or fit forward statistics before the frozen readiness gate opens
+5. only a real Build 71 forward PASS may open Build 72 implementation. A FAIL means retire v2 or preregister a new hypothesis with a new forward cutoff, not tune v2 on the consumed validation sample
+6. preserve the still-open Build 39 live CEX data QA, Viewer visual QA and actual-new-listing end-to-end profile/facet QA as parallel operational debt
 
 ## Hard boundary
 
@@ -229,6 +236,7 @@ Generated data remains local/ignored:
 - Build 38 lifecycle/notice/timing/termination PAPER gate and PAPER self-heal are live-verified.
 - Build 39 CEX listing-history foundation is source/CI complete; Windows live CEX data audit remains open.
 - Build 69/70 Windows runtime is verified at 0 forward cases, and Build 71 source/CI/Windows runtime validation is complete; actual forward sample readiness is the current DEX v2 operational gate.
+- Build 69 scheduled process is source-validated but its always-on Windows heartbeat is pending the next server start. Until then, the server-off verifier correctly reports `server_offline_runtime_pending` with network/DB 0.
 - Current work must preserve PAPER scanning and publisher health while adding new features.
 
 ## Safety constraints

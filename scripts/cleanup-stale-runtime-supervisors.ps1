@@ -8,6 +8,7 @@ if (-not (Test-Path $python)) {
 
 $expectedPython = [System.IO.Path]::GetFullPath($python)
 $moduleNames = @(
+  "b3_trader.forward_pipeline_scheduler",
   "b3_trader.research_supervisor",
   "b3_trader.paper_runtime_supervisor"
 )

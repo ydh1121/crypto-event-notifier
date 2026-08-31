@@ -45,7 +45,7 @@ def main() -> None:
     timing_fields = ("announcement_at", "deposit_at", "trade_open_at", "termination_at")
     checks = {
         "sector_build_38": 'crypto-sector-build" content="2026.08.27-38' in index,
-        "main_v14": '/modules/main.js?v=14' in index and 'sectors-v36.js?v=38' in main_js,
+        "main_v15": '/modules/main.js?v=15' in index and 'sectors-v36.js?v=38' in main_js,
         "continuity_shared": all(token in continuity for token in ("installSamePageInteractionContinuity", "captureScrollableAncestors", "data-preserve-scroll")),
         "continuity_installed_once": "installSamePageInteractionContinuity(root)" in main_js,
         "sector_scroll_anchor": 'data-preserve-scroll' in sector_page,
@@ -73,7 +73,12 @@ def main() -> None:
         "notice_domain_structured_timing": all(token in notice_domain for token in timing_fields) and "parse_notice_timing" in notice_domain,
         "notice_timing_pure_module": all(token in notice_timing for token in ("NoticeTiming", "parse_notice_timing", "DEPOSIT_LABELS", "TRADE_OPEN_LABELS", "TERMINATION_LABELS", "Date-only wording")),
         "notice_sources_separate": "BithumbNoticeSource" in notice_sources and "UpbitNoticeSource" in notice_sources and "get_with_retry" in notice_sources,
-        "notice_sources_detail_timing": "_upbit_detail_text" in notice_sources and 'f"{self.current_url}/{notice_id}"' in notice_sources and "detail_text=detail_text" in notice_sources,
+        "notice_sources_detail_timing": (
+            "_upbit_detail_text" in notice_sources
+            and "def _detail(self, *notice_ids" in notice_sources
+            and 'f"{self.current_url}/{clean_id}"' in notice_sources
+            and "detail_text=detail_text" in notice_sources
+        ),
         "notice_store_separate": "MarketNoticeStore" in notice_store and "market_lifecycle_notice_state" in notice_store,
         "notice_store_additive_timing": "_ensure_notice_timing_columns" in notice_store and all(token in notice_store for token in timing_fields),
         "notice_unknown_timestamp_fail_closed": "never allowed to become a current lifecycle override" in notice_store and "effective_at <= 0" in notice_store,

@@ -9,6 +9,7 @@ from .auto_demo_v2 import DB_PATH
 from .market_notice import MarketNotice
 from .market_notice_sources import default_notice_sources
 from .market_notice_store import MarketNoticeStore
+from .research_work_lock import ResearchWorkLock
 
 
 class NoticeSource(Protocol):
@@ -40,6 +41,25 @@ class MarketNoticeCollector:
         return self._store
 
     def run_once(self) -> dict[str, Any]:
+        with ResearchWorkLock() as work_lock:
+            if not work_lock.acquired:
+                return {
+                    "status": "deferred_forward_research_work_lock_busy",
+                    "paper_only": True,
+                    "can_place_orders": False,
+                    "network_fetches": False,
+                    "database_mutation": False,
+                    "sources_ok": 0,
+                    "sources_failed": 0,
+                    "received": 0,
+                    "inserted": 0,
+                    "state_updates": 0,
+                    "sources": {},
+                    "elapsed_seconds": 0.0,
+                }
+            return self._run_once_unlocked()
+
+    def _run_once_unlocked(self) -> dict[str, Any]:
         started = time.time()
         store = self._notice_store()
         source_results: dict[str, dict[str, Any]] = {}

@@ -17,6 +17,11 @@ $env:GIT_SYNC_INTERVAL_SECONDS = "15"
 $env:AUTO_DEMO_ENABLED = "true"
 $env:AUTO_DEMO_EMBEDDED_WORKER = "false"
 
+# Build 69 owns forward sample accumulation in a dedicated process. While this
+# launcher is active, the generic historical listing/DEX components stay off so
+# pre-cutoff work and the Build 47 cursor cannot overlap the forward pipeline.
+$env:DEX_FORWARD_PIPELINE_DEDICATED_MODE = "true"
+
 # Windows PowerShell 5.1 can surface stderr from a successful native command
 # (for example Git's normal "From https://..." fetch progress) as an ErrorRecord.
 # Capture native Git output and decide success from the exit code.
@@ -206,9 +211,20 @@ function Start-PaperRuntimeSupervisor {
   return $process
 }
 
+function Start-ForwardPipelineScheduler {
+  param([string]$PythonPath)
+  $statusPath = Join-Path $repo "b3_trader\data\research-platform\dex-forward-pipeline-scheduler-build69.json"
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $statusPath) | Out-Null
+  $process = Start-Process -FilePath $PythonPath -ArgumentList @("-m", "b3_trader.forward_pipeline_scheduler") -PassThru -WindowStyle Hidden
+  Write-Host "Build69 forward scheduler: ON (15m, max 1 case/run, PAPER/shadow-only)" -ForegroundColor Green
+  return $process
+}
+
 $researchSupervisor = $null
 $paperSupervisor = $null
+$forwardScheduler = $null
 try {
+  $forwardScheduler = Start-ForwardPipelineScheduler -PythonPath $python
   $researchSupervisor = Start-ResearchSupervisor -PythonPath $python
   $paperSupervisor = Start-PaperRuntimeSupervisor -PythonPath $python
   Write-Host "Starting Crypto Auto Trader..."
@@ -218,7 +234,10 @@ try {
     $code = $LASTEXITCODE
     if ($code -eq 0) { break }
     if ($code -eq 75) {
-      Write-Host "GitHub runtime update applied. Restarting trader and PAPER/research supervisors automatically..."
+      Write-Host "GitHub runtime update applied. Restarting trader and PAPER/research/forward supervisors automatically..."
+      if ($forwardScheduler -and -not $forwardScheduler.HasExited) {
+        Stop-Process -Id $forwardScheduler.Id -Force -ErrorAction SilentlyContinue
+      }
       if ($researchSupervisor -and -not $researchSupervisor.HasExited) {
         Stop-Process -Id $researchSupervisor.Id -Force -ErrorAction SilentlyContinue
       }
@@ -226,6 +245,7 @@ try {
         Stop-Process -Id $paperSupervisor.Id -Force -ErrorAction SilentlyContinue
       }
       Start-Sleep -Seconds 2
+      $forwardScheduler = Start-ForwardPipelineScheduler -PythonPath $python
       $researchSupervisor = Start-ResearchSupervisor -PythonPath $python
       $paperSupervisor = Start-PaperRuntimeSupervisor -PythonPath $python
       continue
@@ -234,6 +254,9 @@ try {
     Start-Sleep -Seconds 5
   }
 } finally {
+  if ($forwardScheduler -and -not $forwardScheduler.HasExited) {
+    Stop-Process -Id $forwardScheduler.Id -Force -ErrorAction SilentlyContinue
+  }
   if ($researchSupervisor -and -not $researchSupervisor.HasExited) {
     Stop-Process -Id $researchSupervisor.Id -Force -ErrorAction SilentlyContinue
   }

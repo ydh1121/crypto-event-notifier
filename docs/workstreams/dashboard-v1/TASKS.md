@@ -136,6 +136,8 @@ Viewer omission contract: `docs/VIEWER_REBUILD_CHECKLIST.md`
 - [-] Execute the remaining work in `MASTER_ROADMAP.md` dependency order; next after CEX live QA is compact Viewer projection, DEX-first history, then multi-facet/flow-CVD work
 - [x] Build 65~70 forward-only DEX v2 preregistration/scorer/intake/enrichment/orchestration/sample-ledger 구현. pre-cutoff와 Build 47 historical cursor는 격리하고 30 event/20 unique asset gate를 고정
 - [x] Build 71 preregistered forward validation 구현: Build 70 readiness 전 통계 미계산, 준비 후 event/asset-dedup Spearman·quartile spread·chronological late-half·strong-negative 기준만 계산
+- [x] Build 69 forward scheduler 구현: 별도 15분 process, 회당 Build 69 1회/최대 1 case, OS process/work lock, launcher start/restart/stop, server-off no-work, generic listing/DEX historical component 강제 비활성
+- [-] Build 69 scheduler Windows runtime은 서버가 꺼져 있어 대기. 새 HEAD pull 후 정상 launcher를 한 번 시작하고 heartbeat/process lock/generic component disabled/첫 bounded 결과를 검증
 - [-] 실제 신규 KRW 상장 forward 표본 누적. 현재 Build 70은 0 event / 0 unique asset이며 Build 71은 `waiting_for_forward_sample`이 정상 상태
 - [ ] 실제 표본에서 Build 71 PASS 후에만 Build 72 parallel PAPER A/B를 구현하고 기존 PAPER 신호/주문/position sizing은 그대로 유지
 
@@ -152,6 +154,7 @@ Viewer omission contract: `docs/VIEWER_REBUILD_CHECKLIST.md`
 - [x] Full B3 trader CI passes with Build 39 source/supervisor additions
 - [x] Build 69/70 Windows runtime: 공식 공지 조회 정상, 신규 forward 0건, enrichment/DB mutation 0건, sample readiness false 확인
 - [x] Build 71 local compile/unit/contract/Build 63·65~70 regression PASS; commit `5c8081d`의 전용 Build 71 CI와 전체 B3 trader CI 모두 PASS; Windows HEAD `4f65082`에서 Build 71 contract/runtime PASS 및 통계 미실행 대기 상태 확인
+- [x] Build 69 scheduler local source validation: full Python suite 266 tests, scheduler/server-off contract, Build 39/43 supervisor regressions, Build 65~71 contract chain PASS. Windows live runtime만 다음 서버 시작까지 보류
 - [x] PR #1 remains Draft and unmerged
 
 ## Completion condition

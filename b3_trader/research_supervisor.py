@@ -19,11 +19,17 @@ from .listing_history_research_cycle import ListingHistoryResearchCycle
 from .market_notice_collector import MarketNoticeCollector
 from .reference_components import ReferenceComponentWatcher
 from .research_control import COMPONENT_DEFINITIONS, STATUS_PATH, atomic_json, load_control
+from .research_work_lock import ResearchWorkLock
 from .research_warehouse import ResearchWarehouse
 from .strategy_lab_custom import ConfiguredStrategyLabRunner
 from .upbit_paper_runner import UpbitPaperResearchRunner
 
 LOG_PATH = Path("b3_trader/data/research-platform/supervisor.log")
+FORWARD_PIPELINE_DEDICATED_MODE_ENV = "DEX_FORWARD_PIPELINE_DEDICATED_MODE"
+FORWARD_PIPELINE_BLOCKED_COMPONENTS = {
+    "listing-history-research",
+    "dex-launch-research",
+}
 
 
 def _log(message: str) -> None:
@@ -76,6 +82,9 @@ class ResearchSupervisor:
         load_dotenv()
         self.stop_event = threading.Event()
         self.started_at = time.time()
+        self.forward_pipeline_dedicated_mode = str(
+            os.getenv(FORWARD_PIPELINE_DEDICATED_MODE_ENV, "false")
+        ).strip().lower() in {"1", "true", "yes", "on"}
         self.control = load_control()
         self.warehouse = ResearchWarehouse()
         self.reference_watcher = ReferenceComponentWatcher()
@@ -114,15 +123,54 @@ class ResearchSupervisor:
 
     def _run_listing_history_once(self) -> dict[str, Any]:
         """Create and use listing-history SQLite owners on this component thread."""
-        if self.listing_history_research is None:
-            self.listing_history_research = ListingHistoryResearchCycle()
-        return self.listing_history_research.run_once()
+        with ResearchWorkLock() as work_lock:
+            if not work_lock.acquired:
+                return self._research_work_lock_busy("listing-history-research")
+            if self.listing_history_research is None:
+                self.listing_history_research = ListingHistoryResearchCycle()
+            return self.listing_history_research.run_once()
 
     def _run_dex_launch_once(self) -> dict[str, Any]:
         """Create and use DEX-research SQLite owners on this component thread."""
-        if self.dex_launch_research is None:
-            self.dex_launch_research = DexLaunchResearchCycle()
-        return self.dex_launch_research.run_once()
+        with ResearchWorkLock() as work_lock:
+            if not work_lock.acquired:
+                return self._research_work_lock_busy("dex-launch-research")
+            if self.dex_launch_research is None:
+                self.dex_launch_research = DexLaunchResearchCycle()
+            return self.dex_launch_research.run_once()
+
+    @staticmethod
+    def _research_work_lock_busy(name: str) -> dict[str, Any]:
+        return {
+            "ok": True,
+            "status": "deferred_forward_research_work_lock_busy",
+            "component": name,
+            "paper_only": True,
+            "shadow_only": True,
+            "can_place_orders": False,
+            "network_fetches": False,
+            "database_mutation": False,
+        }
+
+    def _component_blocked_by_forward_mode(self, name: str) -> bool:
+        return bool(
+            self.forward_pipeline_dedicated_mode
+            and name in FORWARD_PIPELINE_BLOCKED_COMPONENTS
+        )
+
+    @staticmethod
+    def _forward_mode_blocked_result(name: str) -> dict[str, Any]:
+        return {
+            "ok": True,
+            "status": "disabled_by_forward_pipeline_dedicated_mode",
+            "component": name,
+            "paper_only": True,
+            "shadow_only": True,
+            "can_place_orders": False,
+            "network_fetches": False,
+            "database_mutation": False,
+            "build47_historical_cursor_read": False,
+        }
 
     def _close_component_resources(self, name: str) -> None:
         """Close thread-affine resources before their component thread exits."""
@@ -145,9 +193,18 @@ class ResearchSupervisor:
             cfg = components.get(name) or {}
             default_enabled = bool(definition.get("default_enabled", True))
             enabled = bool(cfg.get("enabled", default_enabled)) and global_enabled
+            blocked = self._component_blocked_by_forward_mode(name)
+            if blocked:
+                enabled = False
             minimum = float(definition["min_interval_seconds"])
             interval = max(minimum, float(cfg.get("interval_seconds") or definition["default_interval_seconds"]))
-            self.states[name] = ComponentState(name=name, enabled=enabled, interval_seconds=interval, status="starting" if enabled else "stopped")
+            self.states[name] = ComponentState(
+                name=name,
+                enabled=enabled,
+                interval_seconds=interval,
+                status="starting" if enabled else "stopped",
+                last_result=(self._forward_mode_blocked_result(name) if blocked else {}),
+            )
             self.wake_events[name] = threading.Event()
             self.force_run[name] = False
             self.last_run_nonce[name] = int(cfg.get("run_nonce") or 0)
@@ -177,6 +234,15 @@ class ResearchSupervisor:
                     "listing_history_shadow_only": True,
                     "dex_launch_public_sources_only": True,
                     "dex_launch_shadow_only": True,
+                    "forward_pipeline_dedicated_mode": self.forward_pipeline_dedicated_mode,
+                    "generic_listing_history_supervisor_enabled": bool(
+                        self.states.get("listing-history-research")
+                        and self.states["listing-history-research"].enabled
+                    ),
+                    "generic_dex_launch_supervisor_enabled": bool(
+                        self.states.get("dex-launch-research")
+                        and self.states["dex-launch-research"].enabled
+                    ),
                 },
             }
         atomic_json(STATUS_PATH, payload)
@@ -203,6 +269,9 @@ class ResearchSupervisor:
                 default_enabled = bool(definition.get("default_enabled", True))
                 minimum = float(definition["min_interval_seconds"])
                 state.enabled = bool(cfg.get("enabled", default_enabled)) and global_enabled
+                if self._component_blocked_by_forward_mode(name):
+                    state.enabled = False
+                    state.last_result = self._forward_mode_blocked_result(name)
                 state.interval_seconds = max(minimum, float(cfg.get("interval_seconds") or definition["default_interval_seconds"]))
                 nonce = int(cfg.get("run_nonce") or 0)
                 if nonce != self.last_run_nonce.get(name, 0):
