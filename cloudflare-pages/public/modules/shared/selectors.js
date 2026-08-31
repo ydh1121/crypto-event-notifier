@@ -23,6 +23,7 @@ export function paperStats(state,exchange='bithumb'){
 }
 export function holdings(state){const s=snapshot(state);if(!s?.private_visible)return[];return Array.isArray(s.private?.manual_holdings?.holdings)?s.private.manual_holdings.holdings.filter(x=>n(x.volume)>0):[]}
 export function holdingsSummary(state){const s=snapshot(state);return s?.private_visible?s.private?.manual_holdings:null}
+export function holdingsHistory(state){const s=snapshot(state);if(!s?.private_visible)return[];const points=s.private?.manual_holdings_history?.points;return Array.isArray(points)?points.map(v=>({ts:n(v?.[0]),invested_krw:n(v?.[1]),value_krw:n(v?.[2]),pnl_krw:n(v?.[3]),holding_count:n(v?.[4])})):[]}
 export function averagingPlans(state){const s=snapshot(state);if(!s?.private_visible)return{plans:[],storage:{}};const value=s.private?.manual_averaging_plans;return value&&typeof value==='object'?value:{plans:[],storage:{}}}
 export function averagingPlan(state,market){const source=averagingPlans(state),plans=Array.isArray(source.plans)?source.plans:[];return plans.find(row=>row.market===market)||{market,rows:[],updated_ts:null}}
 export function preferredExchangeFromHoldings(state){const list=holdings(state);if(!list.length)return'bithumb';const totals={bithumb:0,upbit:0};for(const item of list){const exchange=String(item.exchange||'bithumb').toLowerCase();if(exchange in totals)totals[exchange]+=Math.max(0,n(item.value_krw)||n(item.invested_krw))}return totals.upbit>totals.bithumb?'upbit':'bithumb'}
