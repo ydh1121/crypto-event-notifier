@@ -28,6 +28,9 @@ TIMEFRAMES = (
 MAX_FETCH_COUNT = 200
 MIN_FETCH_COUNT = 2
 REQUEST_GAP_SECONDS = 0.12
+MAX_SOURCE_ATTEMPTS = 3
+RATE_LIMIT_RETRY_SECONDS = 1.05
+MAX_RATE_LIMIT_RETRY_SECONDS = 3.0
 
 
 def _num(value: Any) -> float | None:
@@ -36,6 +39,28 @@ def _num(value: Any) -> float | None:
     except (TypeError, ValueError):
         return None
     return number if math.isfinite(number) else None
+
+
+def _http_status(exc: Exception) -> int:
+    response = getattr(exc, "response", None)
+    try:
+        return int(getattr(response, "status_code", 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _rate_limit_retry_delay(exc: Exception, attempt: int) -> float:
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None)
+    retry_after = None
+    if headers is not None:
+        try:
+            retry_after = _num(headers.get("Retry-After"))
+        except (AttributeError, TypeError):
+            retry_after = None
+    if retry_after is not None and retry_after > 0:
+        return min(MAX_RATE_LIMIT_RETRY_SECONDS, max(RATE_LIMIT_RETRY_SECONDS, retry_after))
+    return min(MAX_RATE_LIMIT_RETRY_SECONDS, RATE_LIMIT_RETRY_SECONDS * max(1, int(attempt)))
 
 
 def candle_ts(row: dict[str, Any]) -> float | None:
@@ -131,6 +156,18 @@ class MarketOhlcvCollector:
         missing = int(math.ceil(max(0.0, float(now) - float(latest_ts)) / max(1, int(seconds)))) + 2
         return max(MIN_FETCH_COUNT, min(MAX_FETCH_COUNT, missing))
 
+    def _fetch_once(
+        self,
+        adapter: PublicExchangeAdapter,
+        market: str,
+        spec: TimeframeSpec,
+        count: int,
+    ) -> list[dict[str, Any]]:
+        self._pace()
+        if spec.minute_unit is None:
+            return adapter.candles_days(market, count=count)
+        return adapter.candles_minutes(market, unit=spec.minute_unit, count=count)
+
     def collect_market(
         self,
         adapter: PublicExchangeAdapter,
@@ -143,6 +180,7 @@ class MarketOhlcvCollector:
             "exchange": adapter.exchange,
             "market": market,
             "requests": 0,
+            "rate_limit_retries": 0,
             "rows_written": 0,
             "rows_pruned": 0,
             "failures": 0,
@@ -151,13 +189,23 @@ class MarketOhlcvCollector:
         for spec in TIMEFRAMES:
             latest = self.store.latest_ts(adapter.exchange, market, spec.name)
             count = self.fetch_count(latest_ts=latest, now=collected_at, seconds=spec.seconds)
+            attempts = 0
+            rate_limit_retries = 0
             try:
-                self._pace()
-                if spec.minute_unit is None:
-                    raw = adapter.candles_days(market, count=count)
-                else:
-                    raw = adapter.candles_minutes(market, unit=spec.minute_unit, count=count)
-                result["requests"] += 1
+                raw: list[dict[str, Any]] = []
+                for attempt in range(1, MAX_SOURCE_ATTEMPTS + 1):
+                    attempts += 1
+                    result["requests"] += 1
+                    try:
+                        raw = self._fetch_once(adapter, market, spec, count)
+                        break
+                    except Exception as exc:
+                        if _http_status(exc) == 429 and attempt < MAX_SOURCE_ATTEMPTS:
+                            rate_limit_retries += 1
+                            result["rate_limit_retries"] += 1
+                            self.sleep_fn(_rate_limit_retry_delay(exc, attempt))
+                            continue
+                        raise
                 rows = normalize_candles(
                     raw if isinstance(raw, list) else [],
                     exchange=adapter.exchange,
@@ -172,6 +220,8 @@ class MarketOhlcvCollector:
                 result["timeframes"][spec.name] = {
                     "status": "collected" if rows else "no_candles",
                     "requested": count,
+                    "attempts": attempts,
+                    "rate_limit_retries": rate_limit_retries,
                     "received": len(raw) if isinstance(raw, list) else 0,
                     "stored": written,
                     "pruned": pruned,
@@ -183,6 +233,9 @@ class MarketOhlcvCollector:
                 result["timeframes"][spec.name] = {
                     "status": "source_error",
                     "requested": count,
+                    "attempts": attempts,
+                    "rate_limit_retries": rate_limit_retries,
+                    "http_status": _http_status(exc) or None,
                     "error": f"{type(exc).__name__}: {exc}"[:300],
                     "latest_before": latest,
                 }
