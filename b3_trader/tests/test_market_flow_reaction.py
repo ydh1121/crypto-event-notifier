@@ -164,3 +164,34 @@ def test_reaction_stats_separate_followthrough_from_absorption_hypothesis(tmp_pa
     assert round(float(row["mean_flow_followthrough_return_pct"]),6) == -2.0
     assert round(float(row["mean_hypothesis_directional_return_pct"]),6) == 2.0
     assert float(row["hypothesis_hit_rate_pct"]) == 100.0
+
+
+def test_pre_horizon_waiting_rows_are_deferred_until_target_time(tmp_path: Path) -> None:
+    path = tmp_path / "market.db"
+    _prepare(path); _insert_signal(path)
+    store = MarketFlowReactionStore(path)
+    try:
+        first = store.compute_pending(now=SIGNAL_TS+60.0)
+        second = store.compute_pending(now=SIGNAL_TS+120.0)
+    finally:
+        store.close()
+    assert first["reactions_processed"] == 4
+    assert first["waiting_written"] == 4
+    assert second["reactions_processed"] == 0
+    assert second["deferred_existing_pre_horizon"] == 4
+
+
+def test_old_missing_paths_become_terminal_and_do_not_starve_future_cycles(tmp_path: Path) -> None:
+    path = tmp_path / "market.db"
+    _prepare(path); _insert_signal(path)
+    store = MarketFlowReactionStore(path)
+    try:
+        first = store.compute_pending(now=SIGNAL_TS+24_001.0)
+        second = store.compute_pending(now=SIGNAL_TS+24_002.0)
+        audit = store.audit()
+    finally:
+        store.close()
+    assert first["terminal_expired_missing_path"] >= 3
+    assert audit["expired_missing_path_rows"] >= 3
+    assert second["reactions_processed"] == 0
+    assert second["deferred_existing_pre_horizon"] >= 1
