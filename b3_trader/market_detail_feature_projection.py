@@ -59,6 +59,31 @@ def _compact_cross_exchange_gap(source: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _compact_domestic_premium(source: dict[str, Any]) -> dict[str, Any]:
+    premium = source.get("domestic_premium") if isinstance(source.get("domestic_premium"), dict) else {}
+    return {
+        "feature_version": int(premium.get("feature_version") or 0),
+        "status": str(premium.get("status") or "not_available"),
+        "identity_verified": bool(premium.get("identity_verified")),
+        "provider": str(premium.get("provider") or ""),
+        "provider_id": str(premium.get("provider_id") or ""),
+        "bithumb_price_krw": premium.get("bithumb_price_krw"),
+        "upbit_price_krw": premium.get("upbit_price_krw"),
+        "reference_exchange": str(premium.get("reference_exchange") or ""),
+        "reference_market": str(premium.get("reference_market") or ""),
+        "reference_quote_asset": str(premium.get("reference_quote_asset") or ""),
+        "reference_price_krw": premium.get("reference_price_krw"),
+        "reference_source_ts": premium.get("reference_source_ts"),
+        "bithumb_premium_pct": premium.get("bithumb_premium_pct"),
+        "upbit_premium_pct": premium.get("upbit_premium_pct"),
+        "foreign_verified_sources": int(premium.get("foreign_verified_sources") or 0),
+        "foreign_price_gap_pct": premium.get("foreign_price_gap_pct"),
+        "received_at": premium.get("received_at"),
+        "paper_only": True,
+        "score_wired": False,
+    }
+
+
 def apply_market_feature_projection(source: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
     """Copy precomputed market features into a bounded Cloudflare detail payload."""
     returns = source.get("return_windows") if isinstance(source.get("return_windows"), dict) else {}
@@ -79,6 +104,7 @@ def apply_market_feature_projection(source: dict[str, Any], result: dict[str, An
     }
     result["relative_strength"] = _compact_relative_strength(source)
     result["cross_exchange_gap"] = _compact_cross_exchange_gap(source)
+    result["domestic_premium"] = _compact_domestic_premium(source)
     result["lifecycle_state"] = str(source.get("lifecycle_state") or "NORMAL")
-    result["version"] = max(7, int(result.get("version") or 0))
+    result["version"] = max(8, int(result.get("version") or 0))
     return result
