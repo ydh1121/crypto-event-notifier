@@ -117,3 +117,48 @@ def test_small_single_exchange_sample_stays_collecting(tmp_path: Path) -> None:
     assert row["observation_ready"] == 0
     assert row["promotion_ready"] == 0
     assert row["status"] == "collecting"
+
+
+def test_compute_auto_refreshes_family_dedup_after_confidence(tmp_path: Path) -> None:
+    path = tmp_path / "market.db"
+    _prepare(path)
+    for window in ("1m", "5m"):
+        _insert_ready(
+            path,
+            exchange="bithumb",
+            count=OBSERVATION_MIN_PER_VENUE,
+            window=window,
+            positive_ratio=0.65,
+        )
+        _insert_ready(
+            path,
+            exchange="upbit",
+            count=OBSERVATION_MIN_PER_VENUE,
+            window=window,
+            positive_ratio=0.60,
+        )
+
+    store = MarketFlowReliabilityStore(path)
+    try:
+        result = store.compute(now=1_900_000_000.0)
+    finally:
+        store.close()
+
+    assert result["family_dedup"]["ok"] is True
+    assert result["family_dedup"]["families_written"] == 1
+    assert result["family_dedup"]["members_written"] == 2
+    assert result["family_dedup"]["suppressed_correlated_members"] == 1
+
+    conn = sqlite3.connect(path)
+    try:
+        family = conn.execute(
+            "SELECT member_count,suppressed_member_count FROM research_market_flow_family_dedup_mx"
+        ).fetchone()
+        members = conn.execute(
+            "SELECT representative_member,effective_weight FROM research_market_flow_family_member_mx ORDER BY representative_member DESC"
+        ).fetchall()
+    finally:
+        conn.close()
+
+    assert family == (2, 1)
+    assert members == [(1, 1.0), (0, 0.0)]
