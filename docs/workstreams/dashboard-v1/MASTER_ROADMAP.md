@@ -82,7 +82,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] DEX identity는 CEX pair 매칭과 분리하고 verified CoinGecko identity에서 chain/platform + exact contract address를 가져온 뒤 GeckoTerminal network+contract source만 사용. ticker-only DEX 매칭 금지
 
 ### 3.3 DEX 출발 코인
-- [x] contract 기반 DEX pool 발견과 pool 생성 시점 수집. verified coin identity → chain/platform → exact contract → GeckoTerminal network/contract → pool 주소를 연결하고 primary accepted pool을 별도 선택
+- [x] contract 기반 DEX pool 발견과 pool 생성 시점 수집. verified coin identity → chain/platform → exact contract → GeckoTerminal network+contract → pool 주소를 연결하고 primary accepted pool을 별도 선택
 - [-] 최초 유효 유동성 시점과 `검증된 launch price`는 추가 증거가 필요. 현재 public OHLCV로 pool 생성 직후 최초 관측 가격·봉 거래량은 저장하지만 해당 시점의 historical pool reserve를 증명할 수 없어 feature v2에서 `historical_liquidity_verified=false`, `validated_launch_price=null`로 fail-closed 유지
 - [x] DEX 관측 최초가·pool 생성시점·현재 reserve/24h volume·국내 상장 전 T-7d/T-5d/T-3d/T-1d/T-6h/T-1h·국내 상장 후 +5m/+1h/+6h/+24h/+3d/+7d 반응을 로컬 SQLite feature로 저장하고 compact Viewer에 표시. raw DEX OHLCV는 전송하지 않음
 - [x] `DEX 관측 최초가 → 이후 DEX 반응` 및 `T-window → 국내 상장가` 수익률 feature 구현. 다만 `DEX 최초가 → 국내 상장가`를 유동성 검증 launch 수익률로 승격하지 않고 provenance 상태와 함께 관측 연구값으로만 취급
@@ -123,7 +123,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 ### 5.1 다중 기간 가격 history
 - [ ] 1m/5m/15m/1h/4h/1d OHLCV의 bounded local history 수집
-- [-] 기존 `research_market_memory_mx`를 재사용해 completed prior-day D-1~D-5 return window 구현/Viewer 연결 완료. 1/3/5/7/30일 누적수익률은 추가 필요
+- [x] 기존 `research_market_memory_mx`를 재사용해 completed prior-day D-1~D-5와 현재 기준 1/3/5/7/30일 누적수익률을 분리 계산·compact market-detail projection·섹터 Viewer 연결. 30일 미달/스테일 history는 null fail-closed로 유지하며 Build38 전용 CI와 전체 B3 regression PASS
 - [ ] BTC/ETH/도미넌스/시장 breadth 대비 상대강도 저장
 - [ ] cross-exchange price gap 및 국내 premium/discount 저장
 
