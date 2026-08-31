@@ -87,6 +87,18 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [ ] 극단적 저유동성 초기 체결은 launch price에서 제외하는 최소 liquidity/volume 기준
 - [ ] 신규상장 과열 위험은 초기에 정보 표시만 하고, 충분한 표본이 쌓인 뒤 empirical score로 승격
 
+### 3.4 DEX shadow score v2 forward 검증
+- [x] Build 65에서 v1을 폐기하고 v2 점수식·가중치·방향·2026-08-31 UTC cutoff·검증 기준을 사전등록
+- [x] Build 66 forward-only v2 shadow scorer. pre-cutoff backscore, fitting, threshold, PAPER/order wiring 금지
+- [x] Build 67 최신 공식 빗썸/업비트 KRW 상장 공지 intake와 Build 68 회당 최대 1건 forward enrichment
+- [x] Build 69에서 Build 67 → Build 68 → Build 66을 회당 1회씩만 실행하는 bounded forward orchestrator 구현
+- [x] Build 70 event/asset-dedup core-label ledger와 30 event/20 unique asset readiness gate 구현
+- [x] Build 71 preregistered forward validation 구현. Build 70 준비 전 Spearman/spread/late-half 통계 호출 자체를 차단
+- [x] Build 71은 event/asset-dedup Spearman, 상·하위 quartile spread, 시간순 후반부, 강한 음의 core signal만 Build 65 기준으로 판정하며 PAPER A/B·주문·LIVE는 연결하지 않음
+- [-] 실제 forward 표본 누적 대기. 현재 0 event / 0 unique asset이며 p1h·p6h·p24h 각각 30 event / 20 unique asset label 전에는 Build 71 통계 검증 금지
+- [ ] Build 71이 실제 forward 표본에서 PASS한 경우에만 Build 72 parallel PAPER A/B 구현
+- [ ] Build 72 PASS 후 Build 73 walk-forward/운영 안정성 검증 및 candidate promotion review
+
 ## 4. 분류체계 확장 — 단일 섹터에서 multi-facet으로
 
 기존 `canonical_sector`는 대표 사업분류로 유지하되 아래 facet을 병렬 저장한다.

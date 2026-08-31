@@ -134,6 +134,10 @@ Viewer omission contract: `docs/VIEWER_REBUILD_CHECKLIST.md`
 - [x] Verify Build 38 runtime/Pages/live official notice timing/PAPER self-heal after sync/restart; publishers healthy, PAPER fresh, asset registry valid, Viewer snapshot current
 - [-] Build 39 pre-KRW CEX foundation: official KRW listing planner, verified profile identity bridge, exact CoinGecko venue-pair verification, Binance/OKX/Bybit adapters, domestic opening-price resolver, additive SQLite store, T-7d~T-1h + post-7d features, bounded 15-minute sidecar, audit CLI and dedicated CI are implemented; live Windows data audit remains
 - [-] Execute the remaining work in `MASTER_ROADMAP.md` dependency order; next after CEX live QA is compact Viewer projection, DEX-first history, then multi-facet/flow-CVD work
+- [x] Build 65~70 forward-only DEX v2 preregistration/scorer/intake/enrichment/orchestration/sample-ledger 구현. pre-cutoff와 Build 47 historical cursor는 격리하고 30 event/20 unique asset gate를 고정
+- [x] Build 71 preregistered forward validation 구현: Build 70 readiness 전 통계 미계산, 준비 후 event/asset-dedup Spearman·quartile spread·chronological late-half·strong-negative 기준만 계산
+- [-] 실제 신규 KRW 상장 forward 표본 누적. 현재 Build 70은 0 event / 0 unique asset이며 Build 71은 `waiting_for_forward_sample`이 정상 상태
+- [ ] 실제 표본에서 Build 71 PASS 후에만 Build 72 parallel PAPER A/B를 구현하고 기존 PAPER 신호/주문/position sizing은 그대로 유지
 
 ## Validation status
 
@@ -146,6 +150,8 @@ Viewer omission contract: `docs/VIEWER_REBUILD_CHECKLIST.md`
 - [x] Cloudflare Pages JS syntax/typecheck passes with shared continuity/lifecycle modules
 - [x] Build 39 dedicated CI passes: listing-history compile/tests, modular contract and Cloudflare Pages typecheck
 - [x] Full B3 trader CI passes with Build 39 source/supervisor additions
+- [x] Build 69/70 Windows runtime: 공식 공지 조회 정상, 신규 forward 0건, enrichment/DB mutation 0건, sample readiness false 확인
+- [x] Build 71 local compile/unit/contract/Build 63·65~70 regression PASS; dedicated CI workflow 추가
 - [x] PR #1 remains Draft and unmerged
 
 ## Completion condition

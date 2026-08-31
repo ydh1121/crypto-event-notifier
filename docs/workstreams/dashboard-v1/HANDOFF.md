@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Local multi-asset PAPER monitor + beginner-facing dashboard + secure Cloudflare phone access + adaptive Bithumb-wide per-coin PAPER research + verified Build 38 market lifecycle foundation + Build 39 pre-KRW CEX listing-history source/CI foundation.
+Local multi-asset PAPER monitor + beginner-facing dashboard + secure Cloudflare phone access + adaptive Bithumb-wide per-coin PAPER research + verified Build 38 market lifecycle foundation + Build 39 pre-KRW CEX listing-history foundation + Build 65~71 DEX v2 forward-only validation track.
 
 ## Program roadmap
 
@@ -83,6 +83,19 @@ Build 39 pre-KRW CEX foundation completed in source/CI, live data QA pending:
 - `scripts/check-listing-build39.py` and dedicated `B3 listing Build 39` workflow enforce the modular/ticker-safety/PAPER-unwired contract
 - `scripts/verify-build39-runtime.ps1` performs contract → Pages deploy → one bounded live cycle → audit; `-StatusOnly` checks the supervisor component and accumulated DB state
 
+Build 65~71 DEX v2 forward validation track:
+- Build 65 retired the failed retrospective v1 hypothesis and froze v2 components, 0.60/0.40 weights, directions, `2026-08-31T00:00:00Z` cutoff and forward validation criteria before scoring
+- Build 66 scores only usable post-cutoff cases and never back-scores pre-cutoff cases as v2
+- Build 67 ingests current official Bithumb/Upbit KRW listing notices; Build 68 enriches at most one post-cutoff case per run
+- Build 69 composes one Build 67 intake, one bounded Build 68 enrichment and one Build 66 audit; it does not reactivate generic historical supervisors or Build 47 cursors
+- Build 70 counts event and asset-dedup p1h/p6h/p24h label coverage and keeps statistical validation blocked until every core window has at least 30 event labels and 20 unique-asset labels
+- Build 71 is implemented as a read-only preregistered validator and reuses the exact Build 66 score snapshot passed through Build 70
+- before Build 70 readiness, Build 71 returns `waiting_for_forward_sample`, `validation_statistics_calculated=false` and `statistics=null`; correlation/spread/late-half functions are not called
+- after readiness, Build 71 calculates only the preregistered event/asset-dedup Spearman, top/bottom quartile spread, asset-dedup chronological late-half and strong-negative core checks
+- the Build 65 primary level is `asset_dedup`; Build 72 is allowed only when every frozen criterion passes
+- Build 71 remains PAPER/shadow/read-only. It does not fit weights, select a trade threshold, mutate the DB, publish Cloudflare data, change strategy/position sizing, wire PAPER A/B or place orders
+- the latest Windows Build 69/70 runtime found 0 new notices, 0 forward cases and 0 labels; waiting is the correct current state
+
 Validation:
 - Build 38 dedicated CI PASS
 - Build 38 Windows runtime/PAPER self-heal/live official notice/Cloudflare publisher verification PASS
@@ -93,14 +106,12 @@ Validation:
 - PR #1 remains Draft/unmerged
 
 Immediate next action:
-1. keep the currently healthy Windows runtime unchanged until the final Build 39 HEAD is synced once
-2. sync the final Build 39 HEAD and run `scripts/verify-build39-runtime.ps1`; it deploys the new identity bridge before the first listing-history cycle
-3. inspect recent actual KRW listing cases with `listing_history_audit --rows 6`: case seeding, verified identity, exact foreign venue pair, domestic opening price, prelisting windows and source errors
-4. restart `start-trader-secure.bat` once because `research_supervisor.py` changed, then run `scripts/verify-build39-runtime.ps1 -StatusOnly`
-5. require `listing-history-research` to be healthy at 900 seconds and confirm existing PAPER/snapshot/detail components remain healthy
-6. only after live CEX data quality is confirmed, project compact listing-history features to the Viewer; never send raw listing candles to D1
-7. then implement DEX-first pool/launch history using chain+contract identity and minimum liquidity/volume thresholds
-8. keep sector-scroll/D-5 mobile/desktop visual QA and actual-new-listing end-to-end profile/facet QA open until observed in the browser/live event
+1. sync the final Build 71 HEAD on the Windows runtime and run the Build 71 contract plus runtime verifier once
+2. while Build 70 remains below 30 event/20 unique asset labels per core window, require Build 71 to stay `waiting_for_forward_sample` with no validation statistics
+3. when a new official KRW listing appears, run the bounded Build 69 pipeline once; Build 67 → Build 68 → Build 66 must remain one intake/maximum one enrichment/one score audit per invocation
+4. rerun Build 70 and Build 71 after labels mature; do not inspect or fit forward statistics before the frozen readiness gate opens
+5. only a real Build 71 forward PASS may open Build 72 implementation. A FAIL means retire v2 or preregister a new hypothesis with a new forward cutoff, not tune v2 on the consumed validation sample
+6. preserve the still-open Build 39 live CEX data QA, Viewer visual QA and actual-new-listing end-to-end profile/facet QA as parallel operational debt
 
 ## Hard boundary
 
@@ -213,7 +224,8 @@ Generated data remains local/ignored:
 - Current cadence is snapshot 60 seconds and market detail 300 seconds; unchanged detail rows are skipped and bounded batches protect D1 write budget.
 - Viewer project-research completion count uses the same definition for numerator and unresolved count.
 - Build 38 lifecycle/notice/timing/termination PAPER gate and PAPER self-heal are live-verified.
-- Build 39 CEX listing-history foundation is source/CI complete; Windows live CEX data audit is the current operational gate.
+- Build 39 CEX listing-history foundation is source/CI complete; Windows live CEX data audit remains open.
+- Build 69/70 Windows runtime is verified at 0 forward cases, and Build 71 source/local validation is complete; actual forward sample readiness is the current DEX v2 operational gate.
 - Current work must preserve PAPER scanning and publisher health while adding new features.
 
 ## Safety constraints
