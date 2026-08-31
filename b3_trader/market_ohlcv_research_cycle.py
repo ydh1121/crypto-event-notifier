@@ -52,6 +52,16 @@ def _pick_markets(markets: list[str], cursor: int) -> tuple[list[str], int]:
     return picked[:MAX_MARKETS_PER_EXCHANGE_PER_RUN], next_cursor
 
 
+def _premium_candidate_order(market: str) -> tuple[int, str]:
+    """Seed verified runtime evidence with BTC/ETH before rotating other markets."""
+    value = str(market).upper()
+    if value == "KRW-BTC":
+        return (0, value)
+    if value == "KRW-ETH":
+        return (1, value)
+    return (2, value)
+
+
 class MarketOhlcvResearchCycle:
     """PAPER-independent bounded market-history feature owner.
 
@@ -180,13 +190,16 @@ class MarketOhlcvResearchCycle:
                 "can_place_orders": False,
             }
 
-        premium_candidates = [
-            str(row["market"])
-            for row in self.store.conn.execute(
-                """SELECT market FROM research_market_cross_exchange_gap_mx
-                   WHERE identity_verified=1 AND gap_ready=1 ORDER BY market ASC"""
-            ).fetchall()
-        ]
+        premium_candidates = sorted(
+            [
+                str(row["market"])
+                for row in self.store.conn.execute(
+                    """SELECT market FROM research_market_cross_exchange_gap_mx
+                       WHERE identity_verified=1 AND gap_ready=1"""
+                ).fetchall()
+            ],
+            key=_premium_candidate_order,
+        )
         premium_picked, next_premium_cursor = _rotate(
             premium_candidates,
             premium_cursor,
