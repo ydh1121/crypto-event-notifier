@@ -36,11 +36,11 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 ## 2. 기존 Viewer 잔여 작업 — 먼저 닫을 것
 
-- [ ] 실제 보유자산 평가액/손익 history 저장 및 chart
-- [ ] 기록의 전략 필터
-- [ ] 판단상태 변경 기록 별도 탭/필터
-- [ ] 시스템 이벤트 기록 별도 탭/필터
-- [ ] GitHub Actions CI 상태를 Viewer 시스템 화면에 표시
+- [x] 실제 보유자산 평가액/손익 history 저장 및 chart. 기존 전시장 가격을 재사용해 5분 간격 로컬 SQLite 평가 snapshot을 누적하고 private Viewer에 평가액/손익 차트를 표시하며 가격 coverage가 불완전한 시점은 기록하지 않음
+- [x] 기록의 전략 필터. fill/feedback payload에 strategy 식별값을 보존하고 Viewer에서 전략별 필터 지원
+- [x] 판단상태 변경 기록 별도 필터. 기존 분석 snapshot의 실제 action transition만 bounded journal로 투영
+- [x] 시스템 이벤트 기록 별도 필터. 기존 journal event를 allowlist 기반 안전 필드만 bounded projection
+- [x] GitHub Actions CI 상태를 Viewer 시스템 화면에 표시. 공개 GitHub API read-only 조회 + 5분 캐시, 토큰/쓰기 없음
 - [-] 섹터 순위/코인 선택 및 기타 master-detail 선택 시 현재 스크롤 위치 보존. 공통 `ui-continuity.js` 구현 완료, 실제 브라우저 QA 대기
 - [-] 섹터 코인 표 `D-5 / D-4 / D-3 / D-2 / D-1 / 24H` 표시 구현 완료. 실제 runtime 데이터/모바일 우선순위 QA 대기
 - [ ] 390px / 430px 집중 모바일 QA를 마지막 통합 QA에 유지하되 각 단계에서도 회귀 확인
@@ -76,7 +76,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [-] 국내 상장 후 5m/1h/6h/24h/3d/7d 반응 누적 로직 구현. 7일이 지나기 전에는 `tracking_postlisting`으로 유지하며 실제 시간 누적 대기
 - [x] `listing-history-research`를 PAPER와 독립된 15분 sidecar로 등록하고 회당 최대 3 case로 제한
 - [x] `listing_history_audit` read-only CLI + Build 39 modular contract + dedicated CI
-- [-] `scripts/verify-build39-runtime.ps1`로 Pages identity bridge 배포 → bounded live cycle → audit → supervisor health 실환경 검증 대기
+- [-] `scripts/verify-build39-runtime.ps1` 실환경 검증 대기. Build69 dedicated mode에서는 generic listing-history supervisor를 계속 비활성으로 유지하고, Pages deploy → lock-safe one-shot 최대 3 case → audit를 공용 `ResearchWorkLock` 아래에서만 실행하며 lock 경합 시 network/DB 0으로 exit 75 defer
 - [ ] compact listing-history feature를 Cloudflare Viewer에 투영. raw candle은 D1로 보내지 않는다.
 - [ ] DEX용 identity는 chain/contract 기반으로 별도 확장. CEX provider-id를 DEX identity로 재사용하지 않는다.
 
@@ -97,7 +97,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] Build 71 preregistered forward validation 구현. Build 70 준비 전 Spearman/spread/late-half 통계 호출 자체를 차단
 - [x] Build 71은 event/asset-dedup Spearman, 상·하위 quartile spread, 시간순 후반부, 강한 음의 core signal만 Build 65 기준으로 판정하며 PAPER A/B·주문·LIVE는 연결하지 않음
 - [-] 실제 forward 표본 누적 대기. 현재 0 event / 0 unique asset이며 p1h·p6h·p24h 각각 30 event / 20 unique asset label 전에는 Build 71 통계 검증 금지
-- [-] Build 69 scheduler Windows runtime 검증 대기. 서버가 꺼진 상태에서는 network/DB 작업이 0이며 다음 정상 서버 시작 후 status heartbeat·generic supervisor 비활성·첫 bounded no-op을 확인
+- [x] Build 69 scheduler Windows runtime 검증 완료. `runtime_verified`, fresh heartbeat/process lock, 900초 주기, generic listing/DEX supervisor 비활성, 첫 bounded `waiting_no_forward_cases`, failures 0, safety violations 0 확인
 - [ ] Build 71이 실제 forward 표본에서 PASS한 경우에만 Build 72 parallel PAPER A/B 구현
 - [ ] Build 72 PASS 후 Build 73 walk-forward/운영 안정성 검증 및 candidate promotion review
 
@@ -313,12 +313,12 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 
 ## 15. 실제 보유자산·기록·운영 완성
 
-- [ ] 실제 보유자산 valuation/PnL snapshot을 시간축으로 SQLite에 누적
-- [ ] 보유 포트폴리오 equity/PnL history chart
-- [ ] 기록 payload에 strategy 식별값 포함
-- [ ] 판단 상태 변화 event journal
-- [ ] system event journal: Git sync, Cloudflare, DB backup, publisher failure/recovery 등
-- [ ] GitHub Actions 최신 branch CI 상태를 안전한 read-only summary로 Viewer에 표시
+- [x] 실제 보유자산 valuation/PnL snapshot을 시간축으로 SQLite에 누적. 5분 최소 간격, 90일 로컬 retention, 불완전 가격 coverage는 기록 제외
+- [x] 보유 포트폴리오 equity/PnL history chart. private Viewer에서 최근 7일 bounded history + 기간 필터 표시
+- [x] 기록 payload에 strategy 식별값 포함
+- [x] 판단 상태 변화 event journal. 기존 snapshot의 market별 action transition을 bounded projection
+- [-] system event journal: 기존 PAPER/분석 안전 이벤트의 bounded Viewer projection은 완료. Git sync, Cloudflare, DB backup, publisher failure/recovery 등 운영 전반의 생산자 연결은 추가 필요
+- [x] GitHub Actions 최신 branch CI 상태를 안전한 read-only summary로 Viewer에 표시
 - [ ] 데이터 source health/freshness/rate-limit/error dashboard
 - [ ] D1/SQLite/Drive storage growth budget와 retention monitor
 
