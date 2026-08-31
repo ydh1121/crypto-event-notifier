@@ -7,6 +7,7 @@ from typing import Any
 
 from .auto_demo_v2 import DB_PATH
 from .exchange_public import PublicExchangeAdapter, public_exchange
+from .market_cross_exchange_gap import MarketCrossExchangeGapEngine
 from .market_ohlcv_collector import MarketOhlcvCollector, TIMEFRAMES
 from .market_ohlcv_store import MarketOhlcvStore
 from .market_relative_strength import BENCHMARK_MARKETS, MarketRelativeStrengthEngine
@@ -55,9 +56,9 @@ class MarketOhlcvResearchCycle:
     Each run keeps KRW-BTC and KRW-ETH fresh and rotates the remaining slots,
     for at most eight markets per exchange. The collector bridges only the
     missing window (up to 200 bars/request) and the store retains the newest 400
-    bars per market/timeframe. Latest-only relative-strength features are then
-    derived from local 1d history. No strategy, fill, position or order state is
-    read or changed.
+    bars per market/timeframe. Latest-only relative-strength features and a
+    conservative Bithumb-vs-Upbit gap are then derived from local history. No
+    strategy, fill, position or order state is read or changed.
     """
 
     def __init__(
@@ -74,6 +75,7 @@ class MarketOhlcvResearchCycle:
         self.adapters = adapters or {name: public_exchange(name) for name in EXCHANGES}
         self.collector = collector or MarketOhlcvCollector(self.store)
         self.relative_strength = MarketRelativeStrengthEngine(self.store.conn)
+        self.cross_exchange_gap = MarketCrossExchangeGapEngine(self.store.conn)
         self.state_path = Path(state_path)
         self._owns_store = store is None
 
@@ -88,6 +90,7 @@ class MarketOhlcvResearchCycle:
         cursors = state.get("cursors") if isinstance(state.get("cursors"), dict) else {}
         next_cursors: dict[str, int] = {}
         exchange_results: dict[str, Any] = {}
+        market_names: dict[str, dict[str, str]] = {}
         total_requests = 0
         total_written = 0
         total_pruned = 0
@@ -99,11 +102,14 @@ class MarketOhlcvResearchCycle:
             adapter = self.adapters.get(exchange)
             if adapter is None:
                 exchange_results[exchange] = {"status": "adapter_missing", "processed": 0, "failures": 1}
+                market_names[exchange] = {}
                 total_failures += 1
                 next_cursors[exchange] = int(cursors.get(exchange) or 0)
                 continue
             try:
-                markets = sorted({row.market for row in adapter.krw_markets() if str(row.market).startswith("KRW-")})
+                market_rows = [row for row in adapter.krw_markets() if str(row.market).startswith("KRW-")]
+                markets = sorted({row.market for row in market_rows})
+                market_names[exchange] = {str(row.market): str(row.name or "") for row in market_rows}
             except Exception as exc:
                 exchange_results[exchange] = {
                     "status": "market_list_error",
@@ -111,6 +117,7 @@ class MarketOhlcvResearchCycle:
                     "failures": 1,
                     "error": f"{type(exc).__name__}: {exc}"[:300],
                 }
+                market_names[exchange] = {}
                 total_failures += 1
                 next_cursors[exchange] = int(cursors.get(exchange) or 0)
                 continue
@@ -150,14 +157,37 @@ class MarketOhlcvResearchCycle:
                 "relative_strength": relative,
             }
 
+        try:
+            gap_result = self.cross_exchange_gap.compute(
+                bithumb_names=market_names.get("bithumb", {}),
+                upbit_names=market_names.get("upbit", {}),
+                now=now,
+            )
+        except Exception as exc:
+            total_failures += 1
+            gap_result = {
+                "ok": False,
+                "status": "cross_exchange_gap_error",
+                "rows_written": 0,
+                "gap_ready_rows": 0,
+                "error": f"{type(exc).__name__}: {exc}"[:300],
+                "paper_only": True,
+                "score_wired": False,
+                "can_place_orders": False,
+            }
+
         atomic_json(
             self.state_path,
             {
-                "version": 2,
+                "version": 3,
                 "updated_at": time.time(),
                 "cursors": next_cursors,
                 "max_markets_per_exchange_per_run": MAX_MARKETS_PER_EXCHANGE_PER_RUN,
                 "benchmark_markets": list(BENCHMARK_MARKETS),
+                "cross_exchange_gap": {
+                    "identity_basis": "symbol+official_name_exact",
+                    "source_timeframe": "1m",
+                },
             },
         )
         return {
@@ -179,6 +209,7 @@ class MarketOhlcvResearchCycle:
             "rows_written": total_written,
             "rows_pruned": total_pruned,
             "relative_strength_features_written": total_relative_features,
+            "cross_exchange_gap": gap_result,
             "failures": total_failures,
             "exchanges": exchange_results,
             "elapsed_seconds": round(time.time() - started, 3),
