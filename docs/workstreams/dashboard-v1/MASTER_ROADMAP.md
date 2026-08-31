@@ -79,14 +79,16 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred
 - [x] `scripts/verify-build39-runtime.ps1` 실환경 검증 완료. Build69 dedicated mode에서 generic listing-history supervisor를 계속 비활성으로 유지한 채 Pages deploy → official notice refresh → shared `ResearchWorkLock` one-shot 최대 3 case → audit PASS. lock 경합 시 network/DB 0으로 exit 75 defer
 - [x] compact listing-history feature를 Cloudflare Viewer에 투영. `listing_history_snapshot.py`에서 case/source/derived feature만 bounded projection하고 raw candle/OHLCV는 로컬 SQLite에만 유지하며 리서치 화면에서 국내 상장 전후 값을 표시
 - [x] CoinGecko venue 검증 public rate-limit 보강. exact coin-id×exchange-id×pair gate는 유지한 채 요청 간 최소 간격과 429 bounded backoff를 적용하고 전용/전체 CI PASS
-- [ ] DEX용 identity는 chain/contract 기반으로 별도 확장. CEX provider-id를 DEX identity로 재사용하지 않는다.
+- [x] DEX identity는 CEX pair 매칭과 분리하고 verified CoinGecko identity에서 chain/platform + exact contract address를 가져온 뒤 GeckoTerminal network+contract source만 사용. ticker-only DEX 매칭 금지
 
 ### 3.3 DEX 출발 코인
-- [ ] contract 기반 DEX pool/최초 유동성 생성 시점 확인
-- [ ] 최초 유효 유동성 시점, 초기 가격, 초기 liquidity, 국내 상장 직전 가격 기록
-- [ ] `DEX 최초가 → 국내 상장가`, `T-7d/T-3d/T-1d → 국내 상장가` 상승률 표시
-- [ ] 극단적 저유동성 초기 체결은 launch price에서 제외하는 최소 liquidity/volume 기준
-- [ ] 신규상장 과열 위험은 초기에 정보 표시만 하고, 충분한 표본이 쌓인 뒤 empirical score로 승격
+- [x] contract 기반 DEX pool 발견과 pool 생성 시점 수집. verified coin identity → chain/platform → exact contract → GeckoTerminal network/contract → pool 주소를 연결하고 primary accepted pool을 별도 선택
+- [-] 최초 유효 유동성 시점과 `검증된 launch price`는 추가 증거가 필요. 현재 public OHLCV로 pool 생성 직후 최초 관측 가격·봉 거래량은 저장하지만 해당 시점의 historical pool reserve를 증명할 수 없어 feature v2에서 `historical_liquidity_verified=false`, `validated_launch_price=null`로 fail-closed 유지
+- [x] DEX 관측 최초가·pool 생성시점·현재 reserve/24h volume·국내 상장 전 T-7d/T-5d/T-3d/T-1d/T-6h/T-1h·국내 상장 후 +5m/+1h/+6h/+24h/+3d/+7d 반응을 로컬 SQLite feature로 저장하고 compact Viewer에 표시. raw DEX OHLCV는 전송하지 않음
+- [x] `DEX 관측 최초가 → 이후 DEX 반응` 및 `T-window → 국내 상장가` 수익률 feature 구현. 다만 `DEX 최초가 → 국내 상장가`를 유동성 검증 launch 수익률로 승격하지 않고 provenance 상태와 함께 관측 연구값으로만 취급
+- [-] 극단적 저유동성 초기 체결 방어는 2단계. 현재 pool 선택에는 최소 reserve/24h volume gate를 적용하고, launch 시점 historical liquidity를 증명할 수 없는 최초봉은 Viewer에서 `관측값 · 유동성 미검증`으로 표시해 validated launch price로 사용하지 않는다. historical reserve source 확보 전에는 launch-time liquidity threshold PASS를 선언하지 않음
+- [x] DEX compact Cloudflare projection/Viewer는 exact contract·primary pool·derived feature·launch provenance만 전달하고 raw candle은 로컬 SQLite에 유지. Build44 전용 CI와 전체 B3 regression PASS
+- [x] 신규상장/DEX 과열 위험은 정보·shadow 단계로 제한. Build65 v2 사전등록 → Build66 forward-only shadow score → Build70/71 최소 30 event·20 unique asset gate를 통과하기 전 PAPER A/B·주문·LIVE 승격 금지
 
 ### 3.4 DEX shadow score v2 forward 검증
 - [x] Build 65에서 v1을 폐기하고 v2 점수식·가중치·방향·2026-08-31 UTC cutoff·검증 기준을 사전등록
