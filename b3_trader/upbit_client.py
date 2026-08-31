@@ -84,3 +84,15 @@ class UpbitClient:
             params["to"] = to
         data = self._get(f"/v1/candles/minutes/{int(unit)}", params)
         return data if isinstance(data, list) else []
+
+    def candles_days(
+        self,
+        market: str,
+        count: int = 120,
+        to: str | None = None,
+    ) -> list[dict[str, Any]]:
+        params: dict[str, Any] = {"market": market, "count": max(1, min(200, int(count)))}
+        if to:
+            params["to"] = to
+        data = self._get("/v1/candles/days", params)
+        return data if isinstance(data, list) else []
