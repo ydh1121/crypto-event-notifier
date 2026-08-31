@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .auto_demo_v2 import DB_PATH
+from .market_flow_promotion_gate import MarketFlowPromotionGateStore
 
 SCHEMA_VERSION = 1
 FEATURE_VERSION = 1
@@ -45,9 +46,14 @@ class MarketFlowReliabilityStore:
 
     This layer evaluates forward reaction evidence without changing the signal
     heuristic. It deliberately separates an early directional watch from a
-    promotion-ready result. Promotion requires larger per-venue and pooled
-    samples plus positive cross-venue direction and a 95% Wilson lower bound
-    above chance. No result from this table is wired to score, PAPER or orders.
+    promotion-ready discovery result. Discovery promotion requires larger
+    per-venue and pooled samples plus positive cross-venue direction and a 95%
+    Wilson lower bound above chance.
+
+    Whenever that discovery threshold is first reached, the forward-only OOS
+    promotion gate freezes a signal timestamp cutoff and accepts only strictly
+    later reactions for final validation. Neither layer is wired to score, PAPER
+    decisions, strategy mutation or orders.
     """
 
     def __init__(self, path: Path | str = DB_PATH) -> None:
@@ -205,8 +211,15 @@ class MarketFlowReliabilityStore:
             promotion_ready_rows += 1 if promotion_ready else 0
 
         self.conn.commit()
+
+        promotion_gate = MarketFlowPromotionGateStore(self.path)
+        try:
+            promotion_gate_result = promotion_gate.compute(now=stamp)
+        finally:
+            promotion_gate.close()
+
         return {
-            "ok": True,
+            "ok": bool(promotion_gate_result.get("ok", True)),
             "status": "computed" if grouped else "waiting_for_absorption_reactions",
             "groups_written": len(grouped),
             "observation_ready_rows": observation_ready_rows,
@@ -218,6 +231,7 @@ class MarketFlowReliabilityStore:
                 "promotion_min_pooled": PROMOTION_MIN_POOLED,
                 "promotion_wilson_lower_pct": PROMOTION_WILSON_LOWER_PCT,
             },
+            "promotion_gate": promotion_gate_result,
             "paper_only": True,
             "shadow_only": True,
             "score_wired": False,
