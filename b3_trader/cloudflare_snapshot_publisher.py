@@ -26,6 +26,9 @@ RECENT_FEEDBACK_LIMIT = 60
 RECENT_DECISION_LIMIT = 80
 RECENT_SYSTEM_EVENT_LIMIT = 80
 DECISION_SCAN_LIMIT = 4000
+MANUAL_HOLDINGS_SNAPSHOT_INTERVAL_SECONDS = 300
+MANUAL_HOLDINGS_RETENTION_SECONDS = 90 * 86400
+MANUAL_HOLDINGS_VIEWER_HISTORY_LIMIT = 2016
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -127,7 +130,10 @@ def _journal_path(journal_db: str) -> Path:
 def _manual_holdings(journal_db: str, price_by_market: dict[str, float]) -> dict[str, Any]:
     path = _journal_path(journal_db)
     if not path.exists():
-        return {"holdings": [], "invested_krw": 0.0, "value_krw": 0.0, "pnl_krw": 0.0}
+        return {
+            "holdings": [], "invested_krw": 0.0, "value_krw": 0.0, "pnl_krw": 0.0,
+            "holding_count": 0, "priced_holding_count": 0, "valuation_complete": True,
+        }
     conn = sqlite3.connect(str(path), timeout=10)
     conn.row_factory = sqlite3.Row
     try:
@@ -135,7 +141,10 @@ def _manual_holdings(journal_db: str, price_by_market: dict[str, float]) -> dict
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='manual_holdings' LIMIT 1"
         ).fetchone()
         if not exists:
-            return {"holdings": [], "invested_krw": 0.0, "value_krw": 0.0, "pnl_krw": 0.0}
+            return {
+                "holdings": [], "invested_krw": 0.0, "value_krw": 0.0, "pnl_krw": 0.0,
+                "holding_count": 0, "priced_holding_count": 0, "valuation_complete": True,
+            }
         rows = conn.execute(
             "SELECT market,volume,avg_price,updated_ts FROM manual_holdings ORDER BY market"
         ).fetchall()
@@ -145,6 +154,8 @@ def _manual_holdings(journal_db: str, price_by_market: dict[str, float]) -> dict
     items: list[dict[str, Any]] = []
     invested_total = 0.0
     value_total = 0.0
+    holding_count = 0
+    priced_holding_count = 0
     for source in rows:
         row = dict(source)
         volume = max(0.0, _number(row.get("volume")))
@@ -154,6 +165,10 @@ def _manual_holdings(journal_db: str, price_by_market: dict[str, float]) -> dict
         value = volume * current_price if current_price > 0 else 0.0
         pnl = value - invested if current_price > 0 else 0.0
         pnl_pct = pnl / invested * 100.0 if invested > 0 and current_price > 0 else 0.0
+        if volume > 0:
+            holding_count += 1
+            if current_price > 0:
+                priced_holding_count += 1
         invested_total += invested
         value_total += value
         items.append(
@@ -164,11 +179,113 @@ def _manual_holdings(journal_db: str, price_by_market: dict[str, float]) -> dict
                 "unrealized_pnl_pct": round(pnl_pct, 4), "updated_ts": row.get("updated_ts"),
             }
         )
+    valuation_complete = holding_count == priced_holding_count
     return {
         "holdings": items,
         "invested_krw": round(invested_total, 2),
         "value_krw": round(value_total, 2),
-        "pnl_krw": round(value_total - invested_total, 2),
+        "pnl_krw": round(value_total - invested_total, 2) if valuation_complete else 0.0,
+        "holding_count": holding_count,
+        "priced_holding_count": priced_holding_count,
+        "valuation_complete": valuation_complete,
+    }
+
+
+def _record_manual_holdings_snapshot(
+    journal_db: str,
+    summary: dict[str, Any],
+    *,
+    now: float | None = None,
+) -> bool:
+    if int(summary.get("holding_count") or 0) <= 0 or not bool(summary.get("valuation_complete")):
+        return False
+    path = _journal_path(journal_db)
+    if not path.exists():
+        return False
+    stamp = float(now if now is not None else time.time())
+    conn = sqlite3.connect(str(path), timeout=10)
+    try:
+        with conn:
+            conn.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS manual_holdings_value_snapshots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts REAL NOT NULL,
+                    invested_krw REAL NOT NULL,
+                    value_krw REAL NOT NULL,
+                    pnl_krw REAL NOT NULL,
+                    holding_count INTEGER NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_manual_holdings_value_snapshots_ts
+                ON manual_holdings_value_snapshots(ts);
+                """
+            )
+            latest = conn.execute(
+                "SELECT ts FROM manual_holdings_value_snapshots ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            if latest and stamp - _number(latest[0]) < MANUAL_HOLDINGS_SNAPSHOT_INTERVAL_SECONDS:
+                return False
+            conn.execute(
+                "INSERT INTO manual_holdings_value_snapshots"
+                "(ts,invested_krw,value_krw,pnl_krw,holding_count) VALUES (?,?,?,?,?)",
+                (
+                    stamp,
+                    _number(summary.get("invested_krw")),
+                    _number(summary.get("value_krw")),
+                    _number(summary.get("pnl_krw")),
+                    int(summary.get("holding_count") or 0),
+                ),
+            )
+            conn.execute(
+                "DELETE FROM manual_holdings_value_snapshots WHERE ts < ?",
+                (stamp - MANUAL_HOLDINGS_RETENTION_SECONDS,),
+            )
+        return True
+    except sqlite3.Error:
+        return False
+    finally:
+        conn.close()
+
+
+def _manual_holdings_history(
+    journal_db: str,
+    *,
+    limit: int = MANUAL_HOLDINGS_VIEWER_HISTORY_LIMIT,
+) -> dict[str, Any]:
+    path = _journal_path(journal_db)
+    if not path.exists():
+        return {"interval_seconds": MANUAL_HOLDINGS_SNAPSHOT_INTERVAL_SECONDS, "retention_days": 90, "points": []}
+    conn = sqlite3.connect(str(path), timeout=10)
+    conn.row_factory = sqlite3.Row
+    try:
+        exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='manual_holdings_value_snapshots' LIMIT 1"
+        ).fetchone()
+        if not exists:
+            return {"interval_seconds": MANUAL_HOLDINGS_SNAPSHOT_INTERVAL_SECONDS, "retention_days": 90, "points": []}
+        rows = conn.execute(
+            "SELECT ts,invested_krw,value_krw,pnl_krw,holding_count "
+            "FROM manual_holdings_value_snapshots ORDER BY id DESC LIMIT ?",
+            (max(1, min(int(limit), MANUAL_HOLDINGS_VIEWER_HISTORY_LIMIT)),),
+        ).fetchall()
+    except sqlite3.Error:
+        return {"interval_seconds": MANUAL_HOLDINGS_SNAPSHOT_INTERVAL_SECONDS, "retention_days": 90, "points": []}
+    finally:
+        conn.close()
+    points = [
+        [
+            round(_number(row["ts"]), 3),
+            round(_number(row["invested_krw"]), 2),
+            round(_number(row["value_krw"]), 2),
+            round(_number(row["pnl_krw"]), 2),
+            int(row["holding_count"] or 0),
+        ]
+        for row in reversed(rows)
+    ]
+    return {
+        "interval_seconds": MANUAL_HOLDINGS_SNAPSHOT_INTERVAL_SECONDS,
+        "retention_days": 90,
+        "points": points,
     }
 
 
@@ -421,6 +538,8 @@ class CloudflareSnapshotPublisher:
         recent_upbit = _recent_scoped_records("upbit")
         strategy_lab = read_strategy_lab_snapshot(DEMO_DB_PATH)
         journal_records = _journal_records(self.settings.journal_db)
+        manual_holdings = _manual_holdings(self.settings.journal_db, price_by_market)
+        _record_manual_holdings_snapshot(self.settings.journal_db, manual_holdings)
         public_payload = {
             "version": 3,
             "paper_only": True,
@@ -453,7 +572,8 @@ class CloudflareSnapshotPublisher:
         }
         private_payload: dict[str, Any] = {}
         if _bool_env("CLOUDFLARE_PUBLISH_PRIVATE_HOLDINGS", False):
-            private_payload["manual_holdings"] = _manual_holdings(self.settings.journal_db, price_by_market)
+            private_payload["manual_holdings"] = manual_holdings
+            private_payload["manual_holdings_history"] = _manual_holdings_history(self.settings.journal_db)
         source_ts = max(
             _number(public_payload.get("source_updated_at")),
             _number(public_payload.get("multi_exchange_updated_at")),
