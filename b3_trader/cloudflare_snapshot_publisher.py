@@ -23,6 +23,9 @@ MAX_RANKING_ROWS = 5000
 MAX_BODY_BYTES = 1_800_000
 RECENT_FILL_LIMIT = 80
 RECENT_FEEDBACK_LIMIT = 60
+RECENT_DECISION_LIMIT = 80
+RECENT_SYSTEM_EVENT_LIMIT = 80
+DECISION_SCAN_LIMIT = 4000
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -116,10 +119,13 @@ def _exchange_payload(demo: dict[str, Any], exchange: str, strategy: str = "adap
     }
 
 
-def _manual_holdings(journal_db: str, price_by_market: dict[str, float]) -> dict[str, Any]:
+def _journal_path(journal_db: str) -> Path:
     path = Path(journal_db)
-    if not path.is_absolute():
-        path = REPO_ROOT / path
+    return path if path.is_absolute() else REPO_ROOT / path
+
+
+def _manual_holdings(journal_db: str, price_by_market: dict[str, float]) -> dict[str, Any]:
+    path = _journal_path(journal_db)
     if not path.exists():
         return {"holdings": [], "invested_krw": 0.0, "value_krw": 0.0, "pnl_krw": 0.0}
     conn = sqlite3.connect(str(path), timeout=10)
@@ -166,6 +172,97 @@ def _manual_holdings(journal_db: str, price_by_market: dict[str, float]) -> dict
     }
 
 
+def _safe_system_event_payload(kind: str, encoded: Any) -> dict[str, Any]:
+    payload = _json_object(encoded)
+    result: dict[str, Any] = {}
+    for key in ("market", "reason", "error"):
+        value = payload.get(key)
+        if value not in (None, ""):
+            result[key] = str(value)[:160]
+    for key in ("fills", "open_positions"):
+        if key in payload:
+            result[key] = int(_number(payload.get(key)))
+    for key in ("cash_krw", "price", "order_krw", "spread_bps", "estimated_slippage_bps"):
+        if key in payload:
+            result[key] = round(_number(payload.get(key)), 6)
+    reasons = payload.get("reasons")
+    if isinstance(reasons, list):
+        result["reasons"] = [str(value)[:120] for value in reasons[:4]]
+    result["kind"] = str(kind)[:80]
+    return result
+
+
+def _journal_records(journal_db: str) -> dict[str, Any]:
+    empty = {"decision_changes": [], "system_events": [], "updated_at": 0.0}
+    path = _journal_path(journal_db)
+    if not path.exists():
+        return empty
+    conn = sqlite3.connect(str(path), timeout=10)
+    conn.row_factory = sqlite3.Row
+    try:
+        tables = {
+            str(row["name"])
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        }
+        decision_changes: list[dict[str, Any]] = []
+        if "snapshots" in tables:
+            rows = conn.execute(
+                "SELECT ts,market,price,regime_score,entry_score,action "
+                "FROM snapshots ORDER BY id DESC LIMIT ?",
+                (DECISION_SCAN_LIMIT,),
+            ).fetchall()
+            previous_by_market: dict[str, str] = {}
+            for source in reversed(rows):
+                market = str(source["market"] or "")
+                action = str(source["action"] or "")
+                previous = previous_by_market.get(market)
+                if previous is not None and action and action != previous:
+                    decision_changes.append(
+                        {
+                            "exchange": "bithumb",
+                            "ts": _number(source["ts"]),
+                            "market": market,
+                            "symbol": market.removeprefix("KRW-"),
+                            "from_action": previous,
+                            "to_action": action,
+                            "price": round(_number(source["price"]), 12),
+                            "regime_score": round(_number(source["regime_score"]), 3),
+                            "entry_score": round(_number(source["entry_score"]), 3),
+                        }
+                    )
+                if action:
+                    previous_by_market[market] = action
+            decision_changes = list(reversed(decision_changes[-RECENT_DECISION_LIMIT:]))
+
+        system_events: list[dict[str, Any]] = []
+        if "events" in tables:
+            rows = conn.execute(
+                "SELECT ts,kind,payload_json FROM events ORDER BY id DESC LIMIT ?",
+                (RECENT_SYSTEM_EVENT_LIMIT,),
+            ).fetchall()
+            system_events = [
+                {
+                    "ts": _number(row["ts"]),
+                    **_safe_system_event_payload(str(row["kind"] or "event"), row["payload_json"]),
+                }
+                for row in rows
+            ]
+        latest = max(
+            [0.0]
+            + [_number(row.get("ts")) for row in decision_changes]
+            + [_number(row.get("ts")) for row in system_events]
+        )
+        return {
+            "decision_changes": decision_changes,
+            "system_events": system_events,
+            "updated_at": latest,
+        }
+    except sqlite3.Error:
+        return empty
+    finally:
+        conn.close()
+
+
 def _records_payload(
     fill_rows: list[sqlite3.Row],
     feedback_rows: list[sqlite3.Row],
@@ -173,10 +270,11 @@ def _records_payload(
     feedback_count: int,
     *,
     exchange: str,
+    strategy: str = "adaptive",
 ) -> dict[str, Any]:
     fills = [
         {
-            "exchange": exchange,
+            "exchange": exchange, "strategy": strategy,
             "ts": _number(row["ts"]), "market": row["market"], "symbol": row["symbol"],
             "side": row["side"], "price": round(_number(row["price"]), 12),
             "krw": round(_number(row["krw"]), 2), "realized_pnl": round(_number(row["realized_pnl"]), 2),
@@ -190,7 +288,7 @@ def _records_payload(
         after = _json_object(row["profile_after_json"])
         feedback.append(
             {
-                "exchange": exchange,
+                "exchange": exchange, "strategy": strategy,
                 "ts": _number(row["ts"]), "market": row["market"],
                 "outcome_return_pct": round(_number(row["outcome_return_pct"]), 4),
                 "realized_pnl": round(_number(row["realized_pnl"]), 2),
@@ -208,13 +306,14 @@ def _records_payload(
         )
     latest = max([0.0] + [_number(row.get("ts")) for row in fills] + [_number(row.get("ts")) for row in feedback])
     return {
+        "strategy": strategy,
         "fills": fills, "feedback": feedback, "fill_count": fill_count,
         "feedback_count": feedback_count, "updated_at": latest,
     }
 
 
 def _recent_research_records(path: Path = DEMO_DB_PATH) -> dict[str, Any]:
-    empty = {"fills": [], "feedback": [], "fill_count": 0, "feedback_count": 0, "updated_at": 0.0}
+    empty = {"strategy": "adaptive", "fills": [], "feedback": [], "fill_count": 0, "feedback_count": 0, "updated_at": 0.0}
     if not path.exists():
         return empty
     conn = sqlite3.connect(str(path), timeout=10)
@@ -233,7 +332,10 @@ def _recent_research_records(path: Path = DEMO_DB_PATH) -> dict[str, Any]:
         ).fetchall()
         fill_count = int(conn.execute("SELECT COUNT(*) FROM research_fills").fetchone()[0])
         feedback_count = int(conn.execute("SELECT COUNT(*) FROM research_feedback").fetchone()[0])
-        return _records_payload(fill_rows, feedback_rows, fill_count, feedback_count, exchange="bithumb")
+        return _records_payload(
+            fill_rows, feedback_rows, fill_count, feedback_count,
+            exchange="bithumb", strategy="adaptive",
+        )
     except sqlite3.Error:
         return empty
     finally:
@@ -241,7 +343,7 @@ def _recent_research_records(path: Path = DEMO_DB_PATH) -> dict[str, Any]:
 
 
 def _recent_scoped_records(exchange: str, strategy: str = "adaptive", path: Path = DEMO_DB_PATH) -> dict[str, Any]:
-    empty = {"fills": [], "feedback": [], "fill_count": 0, "feedback_count": 0, "updated_at": 0.0}
+    empty = {"strategy": strategy, "fills": [], "feedback": [], "fill_count": 0, "feedback_count": 0, "updated_at": 0.0}
     if not path.exists():
         return empty
     conn = sqlite3.connect(str(path), timeout=10)
@@ -266,7 +368,10 @@ def _recent_scoped_records(exchange: str, strategy: str = "adaptive", path: Path
         feedback_count = int(conn.execute(
             "SELECT COUNT(*) FROM research_feedback_mx WHERE exchange=? AND strategy=?", (exchange, strategy)
         ).fetchone()[0])
-        return _records_payload(fill_rows, feedback_rows, fill_count, feedback_count, exchange=exchange)
+        return _records_payload(
+            fill_rows, feedback_rows, fill_count, feedback_count,
+            exchange=exchange, strategy=strategy,
+        )
     except sqlite3.Error:
         return empty
     finally:
@@ -315,6 +420,7 @@ class CloudflareSnapshotPublisher:
         )
         recent_upbit = _recent_scoped_records("upbit")
         strategy_lab = read_strategy_lab_snapshot(DEMO_DB_PATH)
+        journal_records = _journal_records(self.settings.journal_db)
         public_payload = {
             "version": 3,
             "paper_only": True,
@@ -339,6 +445,7 @@ class CloudflareSnapshotPublisher:
             "leaderboard": leaderboard,
             "research_node": platform_snapshot(),
             "recent_records": recent_bithumb,
+            "journal_records": journal_records,
             "strategy_lab": strategy_lab,
             # Phase 3 contract. New UI can switch/compare without breaking old readers.
             "exchanges": {"bithumb": bithumb, "upbit": upbit},
@@ -348,8 +455,10 @@ class CloudflareSnapshotPublisher:
         if _bool_env("CLOUDFLARE_PUBLISH_PRIVATE_HOLDINGS", False):
             private_payload["manual_holdings"] = _manual_holdings(self.settings.journal_db, price_by_market)
         source_ts = max(
-            _number(public_payload.get("source_updated_at")), _number(public_payload.get("multi_exchange_updated_at")),
+            _number(public_payload.get("source_updated_at")),
+            _number(public_payload.get("multi_exchange_updated_at")),
             _number(strategy_lab.get("updated_at")),
+            _number(journal_records.get("updated_at")),
         )
         return {"source_ts": source_ts, "public": public_payload, "private": private_payload}
 
@@ -390,6 +499,8 @@ class CloudflareSnapshotPublisher:
                 for name, payload in exchanges.items() if isinstance(payload, dict)
             },
             "strategy_lab_experiments": len(lab.get("experiments") or []),
+            "journal_decision_changes": len((snapshot["public"].get("journal_records") or {}).get("decision_changes") or []),
+            "journal_system_events": len((snapshot["public"].get("journal_records") or {}).get("system_events") or []),
             "source_ts": snapshot.get("source_ts"), "private_holdings_enabled": bool(snapshot.get("private")),
             "remote": result if isinstance(result, dict) else {},
         }
