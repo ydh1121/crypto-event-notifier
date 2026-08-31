@@ -52,6 +52,13 @@ def main() -> None:
             and '"p5m_exact_minute"' in projection
             and '"pool_age_days_at_domestic_listing"' in projection
         ),
+        "build44_launch_price_provenance_compact": (
+            '"provenance"' in projection
+            and '"historical_liquidity_verified"' in projection
+            and '"validated_launch_price"' in projection
+            and '"observed_reference_volume_usd"' in projection
+            and "dex_launch_candles" not in projection
+        ),
         "build44_projection_before_budget": (
             "from .dex_launch_snapshot import build_dex_launch_snapshot" in lifecycle
             and 'public["dex_launch"] = build_dex_launch_snapshot(DEMO_DB_PATH)' in lifecycle
@@ -66,7 +73,9 @@ def main() -> None:
             "installDexLaunchResearchPanel" in panel
             and "data-dex-launch-panel" in panel
             and "raw_candles_included===false" in panel
-            and "raw OHLCV" in panel
+            and "COMPACT · NO RAW CANDLES" in panel
+            and "historical_liquidity_verified" in panel
+            and "validated_launch_price" in panel
             and "getMarketDetail" not in panel
             and "fetch(" not in panel
             and "installDexLaunchResearchPanel({store,root})" in main_js
