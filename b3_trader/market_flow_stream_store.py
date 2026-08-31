@@ -24,8 +24,10 @@ WINDOWS: tuple[tuple[str, int], ...] = (
 class MarketFlowStreamStore:
     """Thread-affine SQLite store for continuous public WebSocket trade flow.
 
-    Raw trades share the existing REST dedupe key. Minute buckets are separate so
-    1d flow windows do not depend on the raw-trade retention cap.
+    Raw trades still share the existing REST dedupe key, but WebSocket continuity
+    uses its own seen table. This prevents a race where REST stores a trade first
+    and the same WebSocket trade is then incorrectly omitted from stream CVD.
+    Minute buckets are separate so 1d flow windows do not depend on raw retention.
     """
 
     def __init__(self, path: Path | str = DB_PATH) -> None:
@@ -58,6 +60,18 @@ class MarketFlowStreamStore:
             );
             CREATE INDEX IF NOT EXISTS idx_research_market_trade_flow_mx_time
             ON research_market_trade_flow_mx(exchange,market,trade_ts DESC);
+
+            CREATE TABLE IF NOT EXISTS research_market_flow_stream_seen_mx(
+                exchange TEXT NOT NULL,
+                market TEXT NOT NULL,
+                sequential_id TEXT NOT NULL,
+                trade_ts REAL NOT NULL,
+                received_at REAL NOT NULL,
+                schema_version INTEGER NOT NULL DEFAULT 1,
+                PRIMARY KEY(exchange,market,sequential_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_market_flow_stream_seen_time
+            ON research_market_flow_stream_seen_mx(exchange,market,trade_ts DESC);
 
             CREATE TABLE IF NOT EXISTS research_market_flow_stream_session_mx(
                 exchange TEXT NOT NULL,
@@ -148,6 +162,10 @@ class MarketFlowStreamStore:
                        ON CONFLICT(exchange,market) DO UPDATE SET
                            process_started_at=excluded.process_started_at,
                            connected_since=excluded.connected_since,
+                           last_trade_ts=0,
+                           last_received_at=0,
+                           messages_seen=0,
+                           inserts=0,
                            reconnects=excluded.reconnects,
                            connected=1,
                            session_cvd_quote=0,
@@ -182,6 +200,7 @@ class MarketFlowStreamStore:
         now = float(received_at or time.time())
         inserted = 0
         observed = 0
+        raw_inserts = 0
         minute_delta: dict[tuple[str, str, float], dict[str, float]] = {}
         session_delta: dict[tuple[str, str], dict[str, float]] = {}
         with self.conn:
@@ -202,7 +221,18 @@ class MarketFlowStreamStore:
                 if not sequential_id or trade_ts <= 0 or price <= 0 or volume <= 0:
                     continue
                 observed += 1
-                cursor = self.conn.execute(
+
+                stream_cursor = self.conn.execute(
+                    """INSERT OR IGNORE INTO research_market_flow_stream_seen_mx(
+                           exchange,market,sequential_id,trade_ts,received_at,schema_version
+                       ) VALUES(?,?,?,?,?,?)""",
+                    (exchange, market, sequential_id, trade_ts, now, SCHEMA_VERSION),
+                )
+                if int(stream_cursor.rowcount or 0) <= 0:
+                    continue
+                inserted += 1
+
+                raw_cursor = self.conn.execute(
                     """INSERT OR IGNORE INTO research_market_trade_flow_mx(
                            exchange,market,sequential_id,trade_ts,trade_price,trade_volume,
                            quote_volume,aggressor_side,side_source,received_at,schema_version
@@ -221,9 +251,9 @@ class MarketFlowStreamStore:
                         SCHEMA_VERSION,
                     ),
                 )
-                if int(cursor.rowcount or 0) <= 0:
-                    continue
-                inserted += 1
+                if int(raw_cursor.rowcount or 0) > 0:
+                    raw_inserts += 1
+
                 bucket = self._minute_bucket(trade_ts)
                 key = (exchange, market, bucket)
                 agg = minute_delta.setdefault(
@@ -311,7 +341,7 @@ class MarketFlowStreamStore:
                         market,
                     ),
                 )
-        return {"observed": observed, "inserted": inserted}
+        return {"observed": observed, "inserted": inserted, "raw_inserts": raw_inserts}
 
     def session(self, exchange: str, market: str) -> dict[str, Any]:
         row = self.conn.execute(
@@ -396,6 +426,10 @@ class MarketFlowStreamStore:
                     "DELETE FROM research_market_flow_stream_minute_mx WHERE exchange=? AND market=? AND bucket_ts<?",
                     (exchange, market, cutoff),
                 )
+                self.conn.execute(
+                    "DELETE FROM research_market_flow_stream_seen_mx WHERE exchange=? AND market=? AND trade_ts<?",
+                    (exchange, market, cutoff),
+                )
         return written
 
     def _prune_window(self, exchange: str, market: str, label: str) -> None:
@@ -412,6 +446,7 @@ class MarketFlowStreamStore:
 
     def audit(self) -> dict[str, Any]:
         tables = {
+            "seen": "research_market_flow_stream_seen_mx",
             "sessions": "research_market_flow_stream_session_mx",
             "minutes": "research_market_flow_stream_minute_mx",
             "windows": "research_market_flow_window_feature_mx",
@@ -446,11 +481,13 @@ class MarketFlowStreamStore:
             "ok": True,
             "status": "ready" if counts["sessions"] > 0 else "empty",
             "tables_ready": True,
+            "stream_seen_rows": counts["seen"],
             "session_rows": counts["sessions"],
             "minute_rows": counts["minutes"],
             "window_rows": counts["windows"],
             "invalid_side_rows": invalid_side,
             "non_exchange_side_rows": non_exchange_side,
+            "stream_dedupe_independent_of_rest": True,
             "sessions": sessions,
             "latest_windows": latest_windows,
             "windows": [label for label, _ in WINDOWS],
