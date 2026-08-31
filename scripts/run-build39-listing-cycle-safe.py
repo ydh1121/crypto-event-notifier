@@ -56,10 +56,11 @@ def main() -> None:
     print("=== BUILD 39 LOCKED LISTING-HISTORY QA ===")
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     if not payload.get("ok"):
-        raise SystemExit("BUILD39_LOCKED_LISTING_CYCLE=FAIL")
+        print("BUILD39_LOCKED_LISTING_CYCLE=FAIL")
+        raise SystemExit(1)
     if payload.get("status") == "deferred_forward_research_work_lock_busy":
         print("BUILD39_LOCKED_LISTING_CYCLE=DEFERRED")
-        return
+        raise SystemExit(75)
     print("BUILD39_LOCKED_LISTING_CYCLE=PASS")
 
 
