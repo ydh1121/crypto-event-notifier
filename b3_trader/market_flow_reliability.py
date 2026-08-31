@@ -10,6 +10,7 @@ from typing import Any
 
 from .auto_demo_v2 import DB_PATH
 from .market_flow_promotion_gate import MarketFlowPromotionGateStore
+from .market_flow_regime_confidence import MarketFlowRegimeConfidenceStore
 
 SCHEMA_VERSION = 1
 FEATURE_VERSION = 1
@@ -52,8 +53,10 @@ class MarketFlowReliabilityStore:
 
     Whenever that discovery threshold is first reached, the forward-only OOS
     promotion gate freezes a signal timestamp cutoff and accepts only strictly
-    later reactions for final validation. Neither layer is wired to score, PAPER
-    decisions, strategy mutation or orders.
+    later reactions for final validation. A separate shadow regime-confidence
+    ledger then summarizes evidence maturity without aggregating correlated
+    multi-timeframe rows. None of these layers is wired to score, PAPER decisions,
+    strategy mutation or orders.
     """
 
     def __init__(self, path: Path | str = DB_PATH) -> None:
@@ -218,8 +221,14 @@ class MarketFlowReliabilityStore:
         finally:
             promotion_gate.close()
 
+        regime_confidence = MarketFlowRegimeConfidenceStore(self.path)
+        try:
+            regime_confidence_result = regime_confidence.compute(now=stamp)
+        finally:
+            regime_confidence.close()
+
         return {
-            "ok": bool(promotion_gate_result.get("ok", True)),
+            "ok": bool(promotion_gate_result.get("ok", True)) and bool(regime_confidence_result.get("ok", True)),
             "status": "computed" if grouped else "waiting_for_absorption_reactions",
             "groups_written": len(grouped),
             "observation_ready_rows": observation_ready_rows,
@@ -232,6 +241,7 @@ class MarketFlowReliabilityStore:
                 "promotion_wilson_lower_pct": PROMOTION_WILSON_LOWER_PCT,
             },
             "promotion_gate": promotion_gate_result,
+            "regime_confidence": regime_confidence_result,
             "paper_only": True,
             "shadow_only": True,
             "score_wired": False,
