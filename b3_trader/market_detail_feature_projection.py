@@ -38,6 +38,27 @@ def _compact_relative_strength(source: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _compact_cross_exchange_gap(source: dict[str, Any]) -> dict[str, Any]:
+    gap = source.get("cross_exchange_gap") if isinstance(source.get("cross_exchange_gap"), dict) else {}
+    return {
+        "feature_version": int(gap.get("feature_version") or 0),
+        "identity_verified": bool(gap.get("identity_verified")),
+        "identity_basis": str(gap.get("identity_basis") or ""),
+        "gap_ready": bool(gap.get("gap_ready")),
+        "bithumb_price": gap.get("bithumb_price"),
+        "upbit_price": gap.get("upbit_price"),
+        "bithumb_source_ts": gap.get("bithumb_source_ts"),
+        "upbit_source_ts": gap.get("upbit_source_ts"),
+        "source_skew_seconds": gap.get("source_skew_seconds"),
+        "upbit_vs_bithumb_pct": gap.get("upbit_vs_bithumb_pct"),
+        "absolute_gap_pct": gap.get("absolute_gap_pct"),
+        "source_timeframe": str(gap.get("source_timeframe") or "1m"),
+        "received_at": gap.get("received_at"),
+        "paper_only": True,
+        "score_wired": False,
+    }
+
+
 def apply_market_feature_projection(source: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
     """Copy precomputed market features into a bounded Cloudflare detail payload."""
     returns = source.get("return_windows") if isinstance(source.get("return_windows"), dict) else {}
@@ -57,6 +78,7 @@ def apply_market_feature_projection(source: dict[str, Any], result: dict[str, An
         "cum_30d_pct": returns.get("cum_30d_pct"),
     }
     result["relative_strength"] = _compact_relative_strength(source)
+    result["cross_exchange_gap"] = _compact_cross_exchange_gap(source)
     result["lifecycle_state"] = str(source.get("lifecycle_state") or "NORMAL")
-    result["version"] = max(6, int(result.get("version") or 0))
+    result["version"] = max(7, int(result.get("version") or 0))
     return result
