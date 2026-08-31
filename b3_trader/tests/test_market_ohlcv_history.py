@@ -9,12 +9,20 @@ from b3_trader.market_ohlcv_store import MarketOhlcvStore
 
 
 class FakeAdapter:
-    def __init__(self, exchange: str, markets: int = 10) -> None:
+    def __init__(self, exchange: str, markets: int = 10, *, include_benchmarks: bool = False) -> None:
         self.exchange = exchange
-        self._markets = [
+        base = [
             PublicMarket(exchange=exchange, market=f"KRW-C{index:02d}", symbol=f"C{index:02d}", name=f"Coin {index}")
             for index in range(markets)
         ]
+        if include_benchmarks:
+            base.extend(
+                [
+                    PublicMarket(exchange=exchange, market="KRW-BTC", symbol="BTC", name="Bitcoin"),
+                    PublicMarket(exchange=exchange, market="KRW-ETH", symbol="ETH", name="Ethereum"),
+                ]
+            )
+        self._markets = base
         self.minute_calls: list[tuple[str, int, int]] = []
         self.day_calls: list[tuple[str, int]] = []
 
@@ -125,7 +133,7 @@ def test_cycle_rotates_eight_markets_per_exchange_and_six_timeframes(tmp_path: P
         result = cycle.run_once()
         assert result["paper_only"] is True
         assert result["can_place_orders"] is False
-        assert result["database_scope"] == "research_market_ohlcv_mx_only"
+        assert result["database_scope"] == "market_history_research_tables_only"
         assert result["markets_processed"] == 16
         assert result["requests"] == 96
         assert result["failures"] == 0
@@ -139,5 +147,35 @@ def test_cycle_rotates_eight_markets_per_exchange_and_six_timeframes(tmp_path: P
         assert second["markets_processed"] == 16
         second_markets = [row["market"] for row in second["exchanges"]["bithumb"]["markets"]]
         assert second_markets[:2] == ["KRW-C08", "KRW-C09"]
+    finally:
+        store.close()
+
+
+def test_cycle_prioritizes_btc_eth_inside_same_eight_market_cap(tmp_path: Path) -> None:
+    store = MarketOhlcvStore(tmp_path / "ohlcv.sqlite3")
+    clock = iter(float(index) for index in range(1000))
+    collector = MarketOhlcvCollector(
+        store,
+        sleep_fn=lambda _seconds: None,
+        monotonic_fn=lambda: next(clock),
+    )
+    bithumb = FakeAdapter("bithumb", markets=10, include_benchmarks=True)
+    upbit = FakeAdapter("upbit", markets=10, include_benchmarks=True)
+    cycle = MarketOhlcvResearchCycle(
+        tmp_path / "ohlcv.sqlite3",
+        store=store,
+        adapters={"bithumb": bithumb, "upbit": upbit},
+        collector=collector,
+        state_path=tmp_path / "state.json",
+    )
+    try:
+        result = cycle.run_once()
+        assert result["markets_processed"] == 16
+        for exchange in ("bithumb", "upbit"):
+            picked = [row["market"] for row in result["exchanges"][exchange]["markets"]]
+            assert picked[:2] == ["KRW-BTC", "KRW-ETH"]
+            assert len(picked) == 8
+            assert result["exchanges"][exchange]["benchmarks_prioritized"] == ["KRW-BTC", "KRW-ETH"]
+            assert result["exchanges"][exchange]["relative_strength"]["status"] == "computed"
     finally:
         store.close()
