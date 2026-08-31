@@ -50,12 +50,13 @@ class MarketOhlcvResearchCycle:
         *,
         store: MarketOhlcvStore | None = None,
         adapters: dict[str, PublicExchangeAdapter] | None = None,
+        collector: MarketOhlcvCollector | None = None,
         state_path: Path | str = STATE_PATH,
     ) -> None:
         self.path = Path(path)
         self.store = store or MarketOhlcvStore(self.path)
         self.adapters = adapters or {name: public_exchange(name) for name in EXCHANGES}
-        self.collector = MarketOhlcvCollector(self.store)
+        self.collector = collector or MarketOhlcvCollector(self.store)
         self.state_path = Path(state_path)
         self._owns_store = store is None
 
