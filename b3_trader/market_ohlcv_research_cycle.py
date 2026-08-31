@@ -9,6 +9,8 @@ from .auto_demo_v2 import DB_PATH
 from .exchange_public import PublicExchangeAdapter, public_exchange
 from .market_cross_exchange_gap import MarketCrossExchangeGapEngine
 from .market_domestic_premium import MarketDomesticPremiumEngine
+from .market_flow_collector import MarketFlowCollector
+from .market_flow_store import MarketFlowStore
 from .market_ohlcv_collector import MarketOhlcvCollector, TIMEFRAMES
 from .market_ohlcv_store import MarketOhlcvStore
 from .market_relative_strength import BENCHMARK_MARKETS, MarketRelativeStrengthEngine
@@ -17,6 +19,7 @@ from .research_control import atomic_json
 STATE_PATH = Path("b3_trader/data/research-platform/market-ohlcv-cycle-state.json")
 EXCHANGES = ("bithumb", "upbit")
 MAX_MARKETS_PER_EXCHANGE_PER_RUN = 8
+MAX_FLOW_MARKETS_PER_EXCHANGE_PER_RUN = 4
 MAX_PREMIUM_MARKETS_PER_RUN = 1
 
 
@@ -63,14 +66,15 @@ def _premium_candidate_order(market: str) -> tuple[int, str]:
 
 
 class MarketOhlcvResearchCycle:
-    """PAPER-independent bounded market-history feature owner.
+    """PAPER-independent bounded market-history/flow feature owner.
 
     Each run keeps KRW-BTC and KRW-ETH fresh and rotates the remaining OHLCV
-    slots, for at most eight markets per exchange. It derives latest-only
-    relative strength and a conservative Bithumb-vs-Upbit gap locally. At most
-    one gap-ready common market is then passed through the existing verified
-    provider-id + exact foreign venue/pair gate for current premium research.
-    No strategy, fill, position or order state is read or changed.
+    slots, for at most eight markets per exchange. Up to four of those markets
+    also receive bounded public recent-trade/orderbook observation. Trade flow
+    only accepts exchange-provided aggressor side and retains explicit REST
+    continuity metadata, so partial observations cannot masquerade as complete
+    CVD. Relative strength, conservative domestic exchange gap and verified
+    foreign-reference premium remain shadow/read-only research features.
     """
 
     def __init__(
@@ -84,8 +88,10 @@ class MarketOhlcvResearchCycle:
     ) -> None:
         self.path = Path(path)
         self.store = store or MarketOhlcvStore(self.path)
+        self.flow_store = MarketFlowStore(self.path)
         self.adapters = adapters or {name: public_exchange(name) for name in EXCHANGES}
         self.collector = collector or MarketOhlcvCollector(self.store)
+        self.flow_collector = MarketFlowCollector(self.flow_store)
         self.relative_strength = MarketRelativeStrengthEngine(self.store.conn)
         self.cross_exchange_gap = MarketCrossExchangeGapEngine(self.store.conn)
         self.domestic_premium = MarketDomesticPremiumEngine(self.store.conn)
@@ -93,6 +99,7 @@ class MarketOhlcvResearchCycle:
         self._owns_store = store is None
 
     def close(self) -> None:
+        self.flow_store.close()
         if self._owns_store:
             self.store.close()
 
@@ -111,6 +118,10 @@ class MarketOhlcvResearchCycle:
         total_failures = 0
         total_processed = 0
         total_relative_features = 0
+        total_flow_requests = 0
+        total_flow_rows_inserted = 0
+        total_flow_failures = 0
+        total_flow_processed = 0
 
         for exchange in EXCHANGES:
             adapter = self.adapters.get(exchange)
@@ -138,9 +149,33 @@ class MarketOhlcvResearchCycle:
 
             picked, cursor = _pick_markets(markets, int(cursors.get(exchange) or 0))
             next_cursors[exchange] = cursor
+            flow_picked = set(picked[:MAX_FLOW_MARKETS_PER_EXCHANGE_PER_RUN])
             market_results: list[dict[str, Any]] = []
             for market in picked:
                 outcome = self.collector.collect_market(adapter, market, now=now)
+                if market in flow_picked:
+                    try:
+                        flow = self.flow_collector.collect_market(adapter, market, now=time.time())
+                    except Exception as exc:
+                        flow = {
+                            "ok": False,
+                            "status": "flow_observation_error",
+                            "exchange": exchange,
+                            "market": market,
+                            "requests": 0,
+                            "rows_inserted": 0,
+                            "failures": 1,
+                            "error": f"{type(exc).__name__}: {exc}"[:300],
+                            "paper_only": True,
+                            "shadow_only": True,
+                            "score_wired": False,
+                            "can_place_orders": False,
+                        }
+                    outcome["flow"] = flow
+                    total_flow_requests += int(flow.get("requests") or 0)
+                    total_flow_rows_inserted += int(flow.get("rows_inserted") or 0)
+                    total_flow_failures += int(flow.get("failures") or 0)
+                    total_flow_processed += 1
                 market_results.append(outcome)
                 total_requests += int(outcome.get("requests") or 0)
                 total_written += int(outcome.get("rows_written") or 0)
@@ -165,6 +200,7 @@ class MarketOhlcvResearchCycle:
                 "status": "collected" if picked else "no_markets",
                 "universe": len(markets),
                 "processed": len(picked),
+                "flow_processed": len(flow_picked),
                 "cursor": cursor,
                 "benchmarks_prioritized": [market for market in BENCHMARK_MARKETS if market in picked],
                 "markets": market_results,
@@ -234,13 +270,19 @@ class MarketOhlcvResearchCycle:
         atomic_json(
             self.state_path,
             {
-                "version": 4,
+                "version": 5,
                 "updated_at": time.time(),
                 "cursors": next_cursors,
                 "premium_cursor": next_premium_cursor,
                 "max_markets_per_exchange_per_run": MAX_MARKETS_PER_EXCHANGE_PER_RUN,
+                "max_flow_markets_per_exchange_per_run": MAX_FLOW_MARKETS_PER_EXCHANGE_PER_RUN,
                 "max_premium_markets_per_run": MAX_PREMIUM_MARKETS_PER_RUN,
                 "benchmark_markets": list(BENCHMARK_MARKETS),
+                "market_flow": {
+                    "aggressor_side": "exchange_provided_only",
+                    "cvd_scope": "local_contiguous_observation",
+                    "score_wired": False,
+                },
                 "cross_exchange_gap": {
                     "identity_basis": "symbol+official_name_exact",
                     "source_timeframe": "1m",
@@ -266,12 +308,24 @@ class MarketOhlcvResearchCycle:
             "timeframes": [spec.name for spec in TIMEFRAMES],
             "benchmark_markets": list(BENCHMARK_MARKETS),
             "max_markets_per_exchange_per_run": MAX_MARKETS_PER_EXCHANGE_PER_RUN,
+            "max_flow_markets_per_exchange_per_run": MAX_FLOW_MARKETS_PER_EXCHANGE_PER_RUN,
             "max_premium_markets_per_run": MAX_PREMIUM_MARKETS_PER_RUN,
             "markets_processed": total_processed,
             "requests": total_requests,
             "rows_written": total_written,
             "rows_pruned": total_pruned,
             "relative_strength_features_written": total_relative_features,
+            "market_flow": {
+                "processed": total_flow_processed,
+                "requests": total_flow_requests,
+                "rows_inserted": total_flow_rows_inserted,
+                "failures": total_flow_failures,
+                "aggressor_side": "exchange_provided_only",
+                "cvd_scope": "local_contiguous_observation",
+                "paper_only": True,
+                "score_wired": False,
+                "can_place_orders": False,
+            },
             "cross_exchange_gap": gap_result,
             "domestic_premium": premium_result,
             "failures": total_failures,
