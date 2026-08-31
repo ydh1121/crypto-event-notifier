@@ -36,8 +36,11 @@ def main() -> None:
     plan = text(ROOT / "docs" / "VIEWER_BUILD36_PLAN.md")
 
     checks = {
-        "sector_build_36_or_newer": any(f'crypto-sector-build" content="2026.08.27-{v}' in index for v in (36, 37)),
-        "sector_v36_entry": "./pages/sectors-v36.js?v=36" in main_js,
+        "sector_build_36_or_newer": any(
+            f'crypto-sector-build" content="2026.08.27-{v}' in index
+            for v in (36, 37, 38)
+        ),
+        "sector_v36_entry": "./pages/sectors-v36.js?v=38" in main_js,
         "sector_search": "data-sector-search" in page and "섹터 · 코인명 · 영문명 · 티커 검색" in page,
         "sector_filter_chips": all(token in page for token in ("조사완료", "추가조사", "상승", "하락", "미분류")),
         "sector_korean_primary": "profile.business_summary_ko||profile.description_ko||''" in page,
@@ -45,7 +48,11 @@ def main() -> None:
         "sector_mobile_no_forced_table": "min-width:0!important" in css and "grid-template-columns:repeat(3,minmax(0,1fr))" in css and "min-width:650px" not in css,
         "identity_safe_enricher": all(token in identity for token in ("IdentitySafeCoinProfileEnricher", "row_matches_candidate", "_read_manual_pdf_checked", "project_name_matches")),
         "strict_cmc_cg": "if not matched" in identity and "and row_matches_candidate(row, item.get(\"name\"))" in identity,
-        "manual_pdf_identity": "if not _identity_in_text(row, text)" in identity,
+        "manual_pdf_identity": (
+            "if not _manual_identity_matches(row, text)" in identity
+            and "if not intro_text or not _manual_intro_identity_matches(row, intro_text)"
+            in identity
+        ),
         "supervisor_v36": "CoinProfileResearchCycleV36" in supervisor,
         "identity_audit_backlog": all(token in backlog for token in ("identity_mismatch", "exchangeMarketNames", "identity_mismatch_by_exchange", "audit_scope")),
         "identity_audit_api": all(token in audit_api for token in ("cached_english_name", "official_english_name", "audit_scope", "mismatches")),
@@ -66,7 +73,7 @@ def main() -> None:
     if url:
         for name, path in {
             "index": "/",
-            "page": "/modules/pages/sectors-v36.js?v=36",
+            "page": "/modules/pages/sectors-v36.js?v=38",
             "css": "/modules/styles/build36.css?v=1",
         }.items():
             try:
