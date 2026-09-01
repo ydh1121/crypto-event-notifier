@@ -14,7 +14,39 @@ from b3_trader.market_flow_full_cost_edge import MarketFlowFullCostEdgeStore
 from b3_trader.market_orderbook_ladder import MarketOrderbookLadderStore
 
 
-def verify(*, require_ladder_data: bool, require_full_cost: bool) -> tuple[bool, dict]:
+def _max_received_at(conn, table: str) -> float:
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+        (table,),
+    ).fetchone()
+    if not exists:
+        return 0.0
+    row = conn.execute(f"SELECT COALESCE(MAX(received_at),0) FROM {table}").fetchone()
+    return float(row[0] or 0.0) if row else 0.0
+
+
+def _automatic_code_contract() -> bool:
+    path = ROOT / "b3_trader" / "market_flow_reliability.py"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    markers = [
+        "cost_edge_result = self._compute_shadow_stage(",
+        "full_cost_result = self._compute_shadow_stage(",
+        "event_cluster_result = self._compute_shadow_stage(",
+        "event_reliability_result = self._compute_shadow_stage(",
+    ]
+    positions = [text.find(marker) for marker in markers]
+    return all(position >= 0 for position in positions) and positions == sorted(positions)
+
+
+def verify(
+    *,
+    require_ladder_data: bool,
+    require_full_cost: bool,
+    require_automatic_cycle: bool,
+) -> tuple[bool, dict]:
     fee_store = MarketFeeScheduleStore()
     ladder_store = MarketOrderbookLadderStore()
     full_store = MarketFlowFullCostEdgeStore()
@@ -22,10 +54,19 @@ def verify(*, require_ladder_data: bool, require_full_cost: bool) -> tuple[bool,
         fee = fee_store.audit()
         ladder = ladder_store.audit()
         full = full_store.audit()
+        raw_reliability_ts = _max_received_at(full_store.conn, "research_market_flow_reliability_mx")
+        full_cost_ts = _max_received_at(full_store.conn, "research_market_flow_full_cost_edge_mx")
     finally:
         full_store.close()
         ladder_store.close()
         fee_store.close()
+
+    automatic_code_contract = _automatic_code_contract()
+    automatic_capture = (
+        raw_reliability_ts > 0.0
+        and full_cost_ts > 0.0
+        and abs(raw_reliability_ts - full_cost_ts) <= 0.000001
+    )
 
     checks = {
         "fee_catalog_ready": bool(fee.get("ok")) and int(fee.get("catalog_rows") or 0) >= 3,
@@ -48,15 +89,50 @@ def verify(*, require_ladder_data: bool, require_full_cost: bool) -> tuple[bool,
         "score_unwired": full.get("score_wired") is False,
         "cannot_place_orders": full.get("can_place_orders") is False,
         "raw_cloud_projection_disabled": full.get("raw_cloud_projection") is False,
+        "automatic_cycle_code_contract": automatic_code_contract,
+        "automatic_full_cost_captured_latest_reliability": automatic_capture,
     }
     if require_ladder_data:
         checks["ladder_data_present"] = int(ladder.get("row_count") or 0) > 0
     if require_full_cost:
         checks["full_cost_data_present"] = int(full.get("full_cost_ready_rows") or 0) > 0
-    ok = all(checks.values())
+    required = [
+        "fee_catalog_ready",
+        "upbit_fee_profile_resolves",
+        "bithumb_fee_profile_fail_closed_or_selected",
+        "fee_forward_only_no_historical_backfill",
+        "ladder_tables_ready",
+        "ladder_contract_clean",
+        "ladder_prior_only",
+        "ladder_historical_backfill_disabled",
+        "full_cost_audit_ok",
+        "full_cost_readiness_contract_clean",
+        "full_cost_formula_contract_clean",
+        "full_cost_future_ladder_contract_clean",
+        "no_wiring_columns",
+        "paper_only",
+        "shadow_only",
+        "score_unwired",
+        "cannot_place_orders",
+        "raw_cloud_projection_disabled",
+    ]
+    if require_ladder_data:
+        required.append("ladder_data_present")
+    if require_full_cost:
+        required.append("full_cost_data_present")
+    if require_automatic_cycle:
+        required.extend([
+            "automatic_cycle_code_contract",
+            "automatic_full_cost_captured_latest_reliability",
+        ])
+    ok = all(bool(checks[name]) for name in required)
     return ok, {
         "status": "runtime_verified" if ok else "runtime_failed",
         "checks": checks,
+        "automatic_pipeline_received_at": {
+            "raw_reliability": raw_reliability_ts,
+            "full_cost_edge": full_cost_ts,
+        },
         "fee_audit": fee,
         "ladder_audit": ladder,
         "full_cost_audit": full,
@@ -69,6 +145,8 @@ def verify(*, require_ladder_data: bool, require_full_cost: bool) -> tuple[bool,
             "cost_lookup_max_age_seconds": 5.0,
             "historical_ladder_backfill_forbidden": True,
             "full_cost_is_not_probability_or_trading_score": True,
+            "full_cost_runs_automatically_after_spread_cost_edge": True,
+            "full_cost_is_not_yet_used_by_event_reliability": True,
         },
         "read_only_except_schema_open": True,
     }
@@ -78,10 +156,12 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--require-ladder-data", action="store_true")
     parser.add_argument("--require-full-cost", action="store_true")
+    parser.add_argument("--require-automatic-cycle", action="store_true")
     args = parser.parse_args()
     ok, payload = verify(
         require_ladder_data=bool(args.require_ladder_data),
         require_full_cost=bool(args.require_full_cost),
+        require_automatic_cycle=bool(args.require_automatic_cycle),
     )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     if not ok:
