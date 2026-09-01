@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -9,17 +11,35 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from b3_trader.auto_demo_v2 import DB_PATH
 from b3_trader.market_flow_regime_stability import (
     HISTORY_BUCKET_SECONDS,
     MIN_CONTIGUOUS_BUCKETS,
     STABILITY_WINDOW_BUCKETS,
     MarketFlowRegimeStabilityStore,
 )
+from b3_trader.market_flow_reliability import MarketFlowReliabilityStore
+
+
+def _max_value(table: str, column: str) -> float:
+    conn = sqlite3.connect(str(DB_PATH))
+    try:
+        exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+            (table,),
+        ).fetchone()
+        if not exists:
+            return 0.0
+        row = conn.execute(f"SELECT COALESCE(MAX({column}),0) FROM {table}").fetchone()
+        return float(row[0] or 0.0) if row else 0.0
+    finally:
+        conn.close()
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--require-data", action="store_true")
+    parser.add_argument("--require-automatic-cycle", action="store_true")
     args = parser.parse_args()
 
     store = MarketFlowRegimeStabilityStore()
@@ -27,6 +47,25 @@ def main() -> None:
         audit = store.audit()
     finally:
         store.close()
+
+    reliability_source = inspect.getsource(MarketFlowReliabilityStore.compute)
+    automatic_code_contract = (
+        "regime_history.capture" in reliability_source
+        and "regime_stability.compute" in reliability_source
+        and '"regime_stability": regime_stability_result' in reliability_source
+        and reliability_source.index("regime_history.capture")
+        < reliability_source.index("regime_stability.compute")
+    )
+    latest_history_recorded_at = _max_value(
+        "research_market_flow_family_history_mx", "recorded_at"
+    )
+    latest_stability_received_at = _max_value(
+        "research_market_flow_regime_stability_mx", "received_at"
+    )
+    automatic_state_captured = (
+        latest_history_recorded_at > 0
+        and latest_stability_received_at + 0.000001 >= latest_history_recorded_at
+    )
 
     thresholds = audit.get("thresholds") if isinstance(audit.get("thresholds"), dict) else {}
     checks = {
@@ -48,6 +87,8 @@ def main() -> None:
         "cannot_modify_strategy": audit.get("can_modify_strategy") is False,
         "raw_cloud_projection_disabled": audit.get("raw_cloud_projection") is False,
         "data_present": int(audit.get("row_count") or 0) > 0,
+        "automatic_cycle_code_contract": automatic_code_contract,
+        "automatic_stability_captured_latest_history": automatic_state_captured,
     }
     required = [
         "table_ready","audit_ok","history_bucket_exact","minimum_history_exact",
@@ -59,11 +100,20 @@ def main() -> None:
     ]
     if args.require_data:
         required.append("data_present")
+    if args.require_automatic_cycle:
+        required.extend([
+            "automatic_cycle_code_contract",
+            "automatic_stability_captured_latest_history",
+        ])
 
     ok = all(bool(checks[name]) for name in required)
     payload = {
         "status": "runtime_verified" if ok else "runtime_verification_failed",
         "checks": checks,
+        "automatic_refresh_evidence": {
+            "latest_family_history_recorded_at": latest_history_recorded_at,
+            "latest_stability_received_at": latest_stability_received_at,
+        },
         "audit": audit,
         "expected_current_semantics": {
             "exact_15m_contiguous_history_only": True,
@@ -72,6 +122,7 @@ def main() -> None:
             "oos_mixed_overrides_numeric_confidence_as_hard_degradation": True,
             "started_oos_gate_with_current_base_loss_is_soft_degradation": True,
             "stability_is_not_probability_or_trading_score": True,
+            "automatic_order_is_history_then_stability": True,
         },
         "read_only": True,
     }
