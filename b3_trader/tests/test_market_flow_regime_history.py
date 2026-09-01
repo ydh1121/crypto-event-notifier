@@ -173,3 +173,57 @@ def test_history_contract_is_shadow_only_and_not_probability(tmp_path: Path) -> 
         assert audit["raw_cloud_projection"] is False
     finally:
         store.close()
+
+
+def test_legacy_history_oos_rows_backfill_gate_started_without_deleting_history(tmp_path: Path) -> None:
+    path = tmp_path / "market.db"
+    store = MarketFlowRegimeHistoryStore(path)
+    try:
+        store.conn.execute(
+            """INSERT INTO research_market_flow_regime_confidence_history_mx(
+                   snapshot_ts,market,signal_window_label,signal_evidence_label,regime_label,horizon_label,
+                   reliability_status,promotion_gate_status,base_gate_started,
+                   evidence_confidence_pct,confidence_band,source_received_at,recorded_at,schema_version
+               ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                BASE,"KRW-ETH","1m","passive_sell_absorption_candidate","distribution_candidate","15m",
+                "mixed_cross_exchange","oos_mixed",0,55.0,"oos_mixed",BASE,BASE,1,
+            ),
+        )
+        store.conn.execute(
+            """INSERT INTO research_market_flow_family_history_mx(
+                   snapshot_ts,market,regime_label,horizon_label,family_key,member_count,
+                   representative_signal_window_label,representative_signal_evidence_label,
+                   representative_confidence_pct,representative_confidence_band,
+                   representative_base_gate_started,raw_confidence_sum_pct,
+                   effective_family_confidence_pct,inflation_avoided_pct,
+                   source_received_at,recorded_at,schema_version
+               ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                BASE,"KRW-ETH","distribution_candidate","15m","KRW-ETH|distribution_candidate|15m",1,
+                "1m","passive_sell_absorption_candidate",55.0,"oos_mixed",0,55.0,55.0,0.0,BASE,BASE,1,
+            ),
+        )
+        store.conn.commit()
+    finally:
+        store.close()
+
+    migrated = MarketFlowRegimeHistoryStore(path)
+    try:
+        confidence = migrated.conn.execute(
+            "SELECT base_gate_started,schema_version FROM research_market_flow_regime_confidence_history_mx"
+        ).fetchone()
+        family = migrated.conn.execute(
+            "SELECT representative_base_gate_started,schema_version FROM research_market_flow_family_history_mx"
+        ).fetchone()
+        assert int(confidence["base_gate_started"]) == 1
+        assert int(confidence["schema_version"]) == 2
+        assert int(family["representative_base_gate_started"]) == 1
+        assert int(family["schema_version"]) == 2
+        audit = migrated.audit()
+        assert audit["ok"] is True
+        assert audit["base_gate_semantics_violations"] == 0
+        assert audit["confidence_row_count"] == 1
+        assert audit["family_row_count"] == 1
+    finally:
+        migrated.close()
