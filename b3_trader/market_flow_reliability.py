@@ -13,6 +13,7 @@ from .market_flow_family_dedup import MarketFlowFamilyDedupStore
 from .market_flow_promotion_gate import MarketFlowPromotionGateStore
 from .market_flow_regime_confidence import MarketFlowRegimeConfidenceStore
 from .market_flow_regime_history import MarketFlowRegimeHistoryStore
+from .market_flow_regime_stability import MarketFlowRegimeStabilityStore
 
 SCHEMA_VERSION = 1
 FEATURE_VERSION = 1
@@ -59,9 +60,10 @@ class MarketFlowReliabilityStore:
     ledger then summarizes evidence maturity. A conservative family dedup layer
     keeps one representative per market/regime/reaction-horizon and fully
     attenuates nested-timeframe siblings so correlated descriptions cannot be
-    double-counted. Finally, a bounded 15-minute history captures the confidence
-    and representative-family snapshots for longitudinal research. None of these
-    layers is wired to score, PAPER decisions, strategy mutation or orders.
+    double-counted. A bounded 15-minute history captures confidence and family
+    snapshots, then a longitudinal stability/degradation layer classifies whether
+    those family states are holding or deteriorating. None of these layers is
+    wired to score, PAPER decisions, strategy mutation or orders.
     """
 
     def __init__(self, path: Path | str = DB_PATH) -> None:
@@ -244,12 +246,19 @@ class MarketFlowReliabilityStore:
         finally:
             regime_history.close()
 
+        regime_stability = MarketFlowRegimeStabilityStore(self.path)
+        try:
+            regime_stability_result = regime_stability.compute(now=stamp)
+        finally:
+            regime_stability.close()
+
         return {
             "ok": (
                 bool(promotion_gate_result.get("ok", True))
                 and bool(regime_confidence_result.get("ok", True))
                 and bool(family_dedup_result.get("ok", True))
                 and bool(regime_history_result.get("ok", True))
+                and bool(regime_stability_result.get("ok", True))
             ),
             "status": "computed" if grouped else "waiting_for_absorption_reactions",
             "groups_written": len(grouped),
@@ -266,6 +275,7 @@ class MarketFlowReliabilityStore:
             "regime_confidence": regime_confidence_result,
             "family_dedup": family_dedup_result,
             "regime_history": regime_history_result,
+            "regime_stability": regime_stability_result,
             "paper_only": True,
             "shadow_only": True,
             "score_wired": False,
