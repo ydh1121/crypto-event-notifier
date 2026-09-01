@@ -9,7 +9,7 @@ from typing import Any
 
 from .auto_demo_v2 import DB_PATH
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 FEATURE_VERSION = 1
 CORRELATION_POLICY = (
     "same_market+same_regime+same_horizon+nested_signal_windows_"
@@ -38,17 +38,16 @@ BAND_RANK = {
 class MarketFlowFamilyDedupStore:
     """Conservative multi-timeframe family deduplication for flow regimes.
 
-    The confidence ledger deliberately keeps 1m/5m/15m/1h/etc. evidence rows
-    separate. This layer groups rows only when market, regime direction and
-    reaction horizon are identical. Because nested-timeframe reaction paths can
-    overlap heavily, v1 does not estimate empirical correlation from those paths.
-    Instead it performs full attenuation: the strongest validated member is the
-    representative with effective weight 1.0 and every sibling is retained for
-    audit with effective weight 0.0.
+    Rows are grouped only when market, regime direction and reaction horizon are
+    identical. One representative receives effective weight 1.0 and correlated
+    sibling windows receive 0.0. `base_gate_started` is propagated separately
+    from current `base_promotion_ready` so a frozen forward OOS cohort keeps its
+    lifecycle identity even when the expanding discovery sample later falls back
+    under the current promotion threshold.
 
-    Accumulation and distribution are never netted against each other. Different
-    reaction horizons are never merged. The family result is evidence maturity,
-    not a probability or trading score, and is not wired to PAPER or orders.
+    Accumulation and distribution are never netted, different reaction horizons
+    are never merged, and the family output is evidence maturity rather than a
+    probability or trading score. It is not wired to PAPER, strategy or orders.
     """
 
     def __init__(self, path: Path | str = DB_PATH) -> None:
@@ -61,6 +60,14 @@ class MarketFlowFamilyDedupStore:
 
     def close(self) -> None:
         self.conn.close()
+
+    def _ensure_column(self, table: str, column: str, ddl: str) -> None:
+        columns = {
+            str(row[1])
+            for row in self.conn.execute(f"PRAGMA table_info({table})").fetchall()
+        }
+        if column not in columns:
+            self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
     def _ensure_schema(self) -> None:
         self.conn.executescript(
@@ -77,6 +84,7 @@ class MarketFlowFamilyDedupStore:
                 representative_confidence_band TEXT NOT NULL,
                 representative_pooled_sample_count INTEGER NOT NULL DEFAULT 0,
                 representative_cross_exchange_direction_consistent INTEGER NOT NULL DEFAULT 0,
+                representative_base_gate_started INTEGER NOT NULL DEFAULT 0,
                 representative_base_promotion_ready INTEGER NOT NULL DEFAULT 0,
                 representative_final_candidate_ready INTEGER NOT NULL DEFAULT 0,
                 suppressed_member_count INTEGER NOT NULL DEFAULT 0,
@@ -91,7 +99,7 @@ class MarketFlowFamilyDedupStore:
                 received_at REAL NOT NULL,
                 source TEXT NOT NULL DEFAULT 'market_flow_regime_confidence',
                 feature_version INTEGER NOT NULL DEFAULT 1,
-                schema_version INTEGER NOT NULL DEFAULT 1,
+                schema_version INTEGER NOT NULL DEFAULT 2,
                 PRIMARY KEY(market,regime_label,horizon_label)
             );
             CREATE INDEX IF NOT EXISTS idx_market_flow_family_dedup_rep
@@ -111,6 +119,7 @@ class MarketFlowFamilyDedupStore:
                 confidence_band TEXT NOT NULL,
                 pooled_sample_count INTEGER NOT NULL DEFAULT 0,
                 cross_exchange_direction_consistent INTEGER NOT NULL DEFAULT 0,
+                base_gate_started INTEGER NOT NULL DEFAULT 0,
                 base_promotion_ready INTEGER NOT NULL DEFAULT 0,
                 final_candidate_ready INTEGER NOT NULL DEFAULT 0,
                 validation_rank INTEGER NOT NULL DEFAULT 0,
@@ -122,7 +131,7 @@ class MarketFlowFamilyDedupStore:
                 received_at REAL NOT NULL,
                 source TEXT NOT NULL DEFAULT 'market_flow_regime_confidence',
                 feature_version INTEGER NOT NULL DEFAULT 1,
-                schema_version INTEGER NOT NULL DEFAULT 1,
+                schema_version INTEGER NOT NULL DEFAULT 2,
                 PRIMARY KEY(market,regime_label,horizon_label,signal_window_label,signal_evidence_label)
             );
             CREATE INDEX IF NOT EXISTS idx_market_flow_family_member_rep
@@ -130,6 +139,16 @@ class MarketFlowFamilyDedupStore:
                 representative_member DESC,evidence_confidence_pct DESC,market,regime_label,horizon_label
             );
             """
+        )
+        self._ensure_column(
+            "research_market_flow_family_dedup_mx",
+            "representative_base_gate_started",
+            "INTEGER NOT NULL DEFAULT 0",
+        )
+        self._ensure_column(
+            "research_market_flow_family_member_mx",
+            "base_gate_started",
+            "INTEGER NOT NULL DEFAULT 0",
         )
         self.conn.commit()
 
@@ -142,7 +161,8 @@ class MarketFlowFamilyDedupStore:
         rows = self.conn.execute(
             """SELECT market,signal_window_label,signal_evidence_label,regime_label,horizon_label,
                       reliability_status,promotion_gate_status,pooled_sample_count,
-                      cross_exchange_direction_consistent,base_promotion_ready,final_candidate_ready,
+                      cross_exchange_direction_consistent,base_gate_started,
+                      base_promotion_ready,final_candidate_ready,
                       evidence_confidence_pct,confidence_band
                FROM research_market_flow_regime_confidence_mx"""
         ).fetchall()
@@ -152,7 +172,7 @@ class MarketFlowFamilyDedupStore:
     def _validation_rank(row: dict[str, Any]) -> int:
         if int(row.get("final_candidate_ready") or 0) == 1:
             return 5
-        if int(row.get("base_promotion_ready") or 0) == 1:
+        if int(row.get("base_gate_started") or 0) == 1 or int(row.get("base_promotion_ready") or 0) == 1:
             return 4
         if int(row.get("cross_exchange_direction_consistent") or 0) == 1:
             return 3
@@ -212,18 +232,20 @@ class MarketFlowFamilyDedupStore:
                        representative_confidence_pct,representative_confidence_band,
                        representative_pooled_sample_count,
                        representative_cross_exchange_direction_consistent,
-                       representative_base_promotion_ready,representative_final_candidate_ready,
+                       representative_base_gate_started,representative_base_promotion_ready,
+                       representative_final_candidate_ready,
                        suppressed_member_count,suppressed_windows_json,
                        raw_confidence_sum_pct,effective_family_confidence_pct,inflation_avoided_pct,
                        correlation_policy,aggregation_method,empirical_correlation_estimated,
                        probability_interpretation,received_at,source,feature_version,schema_version
-                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, ?,0,0,?,'market_flow_regime_confidence',?,?)""",
+                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, ?,?,0,0,?,'market_flow_regime_confidence',?,?)""",
                 (
                     market,regime,horizon,family_key,len(members),
                     representative_window,representative_evidence,representative_confidence,
                     str(representative.get("confidence_band") or "collecting"),
                     int(representative.get("pooled_sample_count") or 0),
                     int(representative.get("cross_exchange_direction_consistent") or 0),
+                    int(representative.get("base_gate_started") or 0),
                     int(representative.get("base_promotion_ready") or 0),
                     int(representative.get("final_candidate_ready") or 0),
                     suppressed_count,json.dumps(sorted(suppressed),ensure_ascii=False),
@@ -239,17 +261,19 @@ class MarketFlowFamilyDedupStore:
                     """INSERT INTO research_market_flow_family_member_mx(
                            market,regime_label,horizon_label,signal_window_label,signal_evidence_label,
                            evidence_confidence_pct,confidence_band,pooled_sample_count,
-                           cross_exchange_direction_consistent,base_promotion_ready,final_candidate_ready,
+                           cross_exchange_direction_consistent,base_gate_started,
+                           base_promotion_ready,final_candidate_ready,
                            validation_rank,representative_member,suppressed_correlated_member,
                            effective_weight,effective_confidence_contribution_pct,
                            correlation_policy,received_at,source,feature_version,schema_version
-                       ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'market_flow_regime_confidence',?,?)""",
+                       ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'market_flow_regime_confidence',?,?)""",
                     (
                         market,regime,horizon,str(member["signal_window_label"]),
                         str(member["signal_evidence_label"]),confidence,
                         str(member.get("confidence_band") or "collecting"),
                         int(member.get("pooled_sample_count") or 0),
                         int(member.get("cross_exchange_direction_consistent") or 0),
+                        int(member.get("base_gate_started") or 0),
                         int(member.get("base_promotion_ready") or 0),
                         int(member.get("final_candidate_ready") or 0),
                         self._validation_rank(member),1 if is_rep else 0,0 if is_rep else 1,
@@ -282,6 +306,7 @@ class MarketFlowFamilyDedupStore:
                 "suppressed_sibling_weight": 0.0,
                 "opposite_regimes_never_netted": True,
                 "different_horizons_never_merged": True,
+                "base_gate_started_propagated": True,
             },
             "paper_only": True,
             "shadow_only": True,
@@ -356,6 +381,14 @@ class MarketFlowFamilyDedupStore:
                    WHERE m.market=s.market AND m.regime_label=s.regime_label AND m.horizon_label=s.horizon_label
                )"""
         ).fetchone()[0])
+        gate_lifecycle_mismatches = int(self.conn.execute(
+            """SELECT COUNT(*) FROM research_market_flow_family_dedup_mx s
+               WHERE representative_base_gate_started!=(
+                   SELECT m.base_gate_started FROM research_market_flow_family_member_mx m
+                   WHERE m.market=s.market AND m.regime_label=s.regime_label AND m.horizon_label=s.horizon_label
+                     AND m.representative_member=1 LIMIT 1
+               )"""
+        ).fetchone()[0])
         columns = {
             str(row[1])
             for table in ("research_market_flow_family_dedup_mx","research_market_flow_family_member_mx")
@@ -369,6 +402,7 @@ class MarketFlowFamilyDedupStore:
         rows = [dict(row) for row in self.conn.execute(
             """SELECT * FROM research_market_flow_family_dedup_mx
                ORDER BY representative_final_candidate_ready DESC,
+                        representative_base_gate_started DESC,
                         effective_family_confidence_pct DESC,market,regime_label,horizon_label
                LIMIT 40"""
         ).fetchall()]
@@ -383,6 +417,7 @@ class MarketFlowFamilyDedupStore:
             and suppression_violations == 0
             and summary_violations == 0
             and count_mismatches == 0
+            and gate_lifecycle_mismatches == 0
             and not suspicious_wiring_columns
         )
         return {
@@ -397,6 +432,7 @@ class MarketFlowFamilyDedupStore:
             "suppression_contract_violations": suppression_violations,
             "summary_contract_violations": summary_violations,
             "member_count_mismatches": count_mismatches,
+            "base_gate_lifecycle_mismatches": gate_lifecycle_mismatches,
             "wiring_columns": suspicious_wiring_columns,
             "rows": rows,
             "members": members,
