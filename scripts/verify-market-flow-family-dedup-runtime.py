@@ -46,6 +46,7 @@ def main() -> None:
         "suppression_contract_clean": int(audit.get("suppression_contract_violations") or 0) == 0,
         "summary_contract_clean": int(audit.get("summary_contract_violations") or 0) == 0,
         "member_count_contract_clean": int(audit.get("member_count_mismatches") or 0) == 0,
+        "base_gate_lifecycle_clean": int(audit.get("base_gate_lifecycle_mismatches") or 0) == 0,
         "correlation_policy_exact": audit.get("correlation_policy") == CORRELATION_POLICY,
         "aggregation_method_exact": audit.get("aggregation_method") == AGGREGATION_METHOD,
         "empirical_correlation_not_claimed": audit.get("empirical_correlation_estimated") is False,
@@ -57,8 +58,9 @@ def main() -> None:
         "summary_table_ready","member_table_ready","audit_ok","paper_only","shadow_only",
         "cannot_place_orders","cannot_modify_strategy","score_unwired","raw_cloud_projection_disabled",
         "representative_contract_clean","weight_contract_clean","suppression_contract_clean",
-        "summary_contract_clean","member_count_contract_clean","correlation_policy_exact",
-        "aggregation_method_exact","empirical_correlation_not_claimed","not_probability",
+        "summary_contract_clean","member_count_contract_clean","base_gate_lifecycle_clean",
+        "correlation_policy_exact","aggregation_method_exact","empirical_correlation_not_claimed",
+        "not_probability",
     ]
     if args.require_data:
         required.append("data_present")
@@ -76,6 +78,7 @@ def main() -> None:
             "correlated_sibling_members_have_weight_zero": True,
             "opposite_regimes_are_not_netted": True,
             "different_reaction_horizons_are_not_merged": True,
+            "base_gate_started_is_propagated_independently_from_current_base_ready": True,
             "effective_family_confidence_is_not_a_probability_or_trading_score": True,
         },
         "read_only": True,
