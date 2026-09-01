@@ -12,6 +12,7 @@ from .auto_demo_v2 import DB_PATH
 from .market_flow_family_dedup import MarketFlowFamilyDedupStore
 from .market_flow_promotion_gate import MarketFlowPromotionGateStore
 from .market_flow_regime_confidence import MarketFlowRegimeConfidenceStore
+from .market_flow_regime_history import MarketFlowRegimeHistoryStore
 
 SCHEMA_VERSION = 1
 FEATURE_VERSION = 1
@@ -55,11 +56,12 @@ class MarketFlowReliabilityStore:
     Whenever that discovery threshold is first reached, the forward-only OOS
     promotion gate freezes a signal timestamp cutoff and accepts only strictly
     later reactions for final validation. A separate shadow regime-confidence
-    ledger then summarizes evidence maturity. Finally, a conservative family
-    dedup layer keeps one representative per market/regime/reaction-horizon and
-    fully attenuates nested-timeframe siblings so correlated descriptions cannot
-    be double-counted. None of these layers is wired to score, PAPER decisions,
-    strategy mutation or orders.
+    ledger then summarizes evidence maturity. A conservative family dedup layer
+    keeps one representative per market/regime/reaction-horizon and fully
+    attenuates nested-timeframe siblings so correlated descriptions cannot be
+    double-counted. Finally, a bounded 15-minute history captures the confidence
+    and representative-family snapshots for longitudinal research. None of these
+    layers is wired to score, PAPER decisions, strategy mutation or orders.
     """
 
     def __init__(self, path: Path | str = DB_PATH) -> None:
@@ -236,11 +238,18 @@ class MarketFlowReliabilityStore:
         finally:
             family_dedup.close()
 
+        regime_history = MarketFlowRegimeHistoryStore(self.path)
+        try:
+            regime_history_result = regime_history.capture(now=stamp)
+        finally:
+            regime_history.close()
+
         return {
             "ok": (
                 bool(promotion_gate_result.get("ok", True))
                 and bool(regime_confidence_result.get("ok", True))
                 and bool(family_dedup_result.get("ok", True))
+                and bool(regime_history_result.get("ok", True))
             ),
             "status": "computed" if grouped else "waiting_for_absorption_reactions",
             "groups_written": len(grouped),
@@ -256,6 +265,7 @@ class MarketFlowReliabilityStore:
             "promotion_gate": promotion_gate_result,
             "regime_confidence": regime_confidence_result,
             "family_dedup": family_dedup_result,
+            "regime_history": regime_history_result,
             "paper_only": True,
             "shadow_only": True,
             "score_wired": False,
