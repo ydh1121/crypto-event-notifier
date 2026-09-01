@@ -14,6 +14,7 @@ import websocket
 
 from .market_flow_orderbook_stream_store import MarketFlowOrderbookStreamStore
 from .market_flow_stream_store import MarketFlowStreamStore
+from .market_orderbook_ladder import MarketOrderbookLadderStore
 from .research_control import atomic_json
 from .research_work_lock import ResearchWorkLock
 
@@ -106,12 +107,21 @@ def normalize_stream_orderbook(exchange: str, row: dict[str, Any], received_at: 
             break
     if not parsed:
         return None
-    best_ask = min(value[0] for value in parsed)
-    best_bid = max(value[1] for value in parsed)
+    ask_levels = sorted(
+        ({"price": ask_price, "size": ask_size} for ask_price, _, ask_size, _ in parsed),
+        key=lambda value: value["price"],
+    )
+    bid_levels = sorted(
+        ({"price": bid_price, "size": bid_size} for _, bid_price, _, bid_size in parsed),
+        key=lambda value: value["price"],
+        reverse=True,
+    )
+    best_ask = float(ask_levels[0]["price"])
+    best_bid = float(bid_levels[0]["price"])
     if best_ask <= best_bid:
         return None
-    bid_depth = sum(bid_price * bid_size for _, bid_price, _, bid_size in parsed)
-    ask_depth = sum(ask_price * ask_size for ask_price, _, ask_size, _ in parsed)
+    bid_depth = sum(float(level["price"]) * float(level["size"]) for level in bid_levels)
+    ask_depth = sum(float(level["price"]) * float(level["size"]) for level in ask_levels)
     total_depth = bid_depth + ask_depth
     mid = (best_bid + best_ask) / 2.0
     spread_bps = ((best_ask - best_bid) / mid * 10_000.0) if mid > 0 else 0.0
@@ -126,6 +136,8 @@ def normalize_stream_orderbook(exchange: str, row: dict[str, Any], received_at: 
         "ask_depth_top5_quote": ask_depth,
         "spread_bps": spread_bps,
         "imbalance_pct": imbalance_pct,
+        "bid_levels": bid_levels,
+        "ask_levels": ask_levels,
         "received_at": float(received_at),
     }
 
@@ -186,6 +198,7 @@ class StreamWorker:
         self.process_started_at = process_started_at
         self.store: MarketFlowStreamStore | None = None
         self.orderbook_store: MarketFlowOrderbookStreamStore | None = None
+        self.ladder_store: MarketOrderbookLadderStore | None = None
         self.app: websocket.WebSocketApp | None = None
         self.buffer: list[dict[str, Any]] = []
         self.last_flush_at = 0.0
@@ -259,6 +272,10 @@ class StreamWorker:
             result = self.orderbook_store.insert_snapshot(row, received_at=received_at)
             if result.get("accepted"):
                 self._increment("orderbook_samples")
+                if self.ladder_store:
+                    ladder_result = self.ladder_store.insert_snapshot(row, received_at=received_at)
+                    if ladder_result.get("accepted") and ladder_result.get("updated"):
+                        self._increment("ladder_samples")
                 self._update(last_orderbook_ts=float(row["source_ts"]))
             return
         row = normalize_stream_trade(self.exchange, payload, received_at)
@@ -298,6 +315,7 @@ class StreamWorker:
     def run(self) -> None:
         self.store = MarketFlowStreamStore()
         self.orderbook_store = MarketFlowOrderbookStreamStore()
+        self.ladder_store = MarketOrderbookLadderStore()
         backoff = 1.0
         try:
             while not self.stop_event.is_set():
@@ -337,6 +355,9 @@ class StreamWorker:
             if self.orderbook_store:
                 self.orderbook_store.close()
                 self.orderbook_store = None
+            if self.ladder_store:
+                self.ladder_store.close()
+                self.ladder_store = None
             self._update(connected=False, status="stopped")
 
     def stop(self) -> None:
@@ -372,6 +393,7 @@ class MarketFlowStreamService:
                 "rows_inserted": 0,
                 "orderbook_messages": 0,
                 "orderbook_samples": 0,
+                "ladder_samples": 0,
                 "parse_errors": 0,
                 "reconnects": 0,
                 "last_error": "",
@@ -421,7 +443,7 @@ class MarketFlowStreamService:
             "can_modify_strategy": False,
             "raw_cloud_projection": False,
             "cvd_scope": "websocket_contiguous_session",
-            "orderbook_scope": "sampled_top5_same_best_price_replenishment_proxy",
+            "orderbook_scope": "sampled_top5_same_best_price_replenishment_proxy+forward_minute_ladder",
         }
 
     def _write_status(self, *, running: bool) -> None:
