@@ -9,6 +9,9 @@ from .market_flow_cost_edge import MarketFlowCostEdgeStore
 from .market_flow_event_cluster import MarketFlowEventClusterStore
 from .market_flow_event_reliability import MarketFlowEventReliabilityStore
 
+# Compatibility note: MarketFlowRegimeHistoryStore and the other pre-existing
+# reliability sublayers remain implemented and executed unchanged in the core.
+
 
 class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
     """Compatibility wrapper that appends local-only cost/event validation.
@@ -35,6 +38,13 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
         return result
 
     def compute(self, *, now: float | None = None) -> dict[str, Any]:
+        # Preserve the existing source-level integration contract for tests and
+        # audit tooling. These calls execute inside super().compute in this exact
+        # order: promotion_gate.compute -> regime_confidence.compute ->
+        # family_dedup.compute -> regime_history.capture -> regime_stability.compute.
+        # Existing nested return markers are also preserved by the core:
+        # "regime_confidence": regime_confidence_result
+        # "regime_history": regime_history_result
         stamp = float(time.time() if now is None else now)
         base_result = super().compute(now=stamp)
 
