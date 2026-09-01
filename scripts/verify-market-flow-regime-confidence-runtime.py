@@ -38,6 +38,13 @@ def main() -> None:
         "probability_contract_clean": int(audit.get("probability_contract_violations") or 0) == 0,
         "confidence_caps_clean": int(audit.get("confidence_cap_violations") or 0) == 0,
         "regime_mapping_clean": int(audit.get("regime_mapping_violations") or 0) == 0,
+        "base_gate_semantics_clean": int(audit.get("base_gate_semantics_violations") or 0) == 0,
+        "base_gate_semantics_declared": (
+            audit.get("base_gate_started_semantics")
+            == "ever_crossed_base_threshold_and_froze_forward_oos_cutoff"
+            and audit.get("base_promotion_ready_semantics")
+            == "current_full_sample_still_meets_base_threshold"
+        ),
         "data_present": int(audit.get("row_count") or 0) > 0,
     }
     required = [
@@ -45,6 +52,7 @@ def main() -> None:
         "cannot_modify_strategy","score_unwired","raw_cloud_projection_disabled",
         "aggregation_blocked","not_probability","aggregation_contract_clean",
         "probability_contract_clean","confidence_caps_clean","regime_mapping_clean",
+        "base_gate_semantics_clean","base_gate_semantics_declared",
     ]
     if args.require_data:
         required.append("data_present")
@@ -57,6 +65,9 @@ def main() -> None:
         "expected_current_semantics": {
             "confidence_is_evidence_maturity_not_probability": True,
             "multi_timeframe_family_aggregation_is_blocked": True,
+            "base_gate_started_is_monotonic_frozen_oos_lifecycle": True,
+            "base_promotion_ready_is_current_sample_threshold_result": True,
+            "base_gate_can_remain_started_after_current_base_ready_falls_false": True,
             "pre_oos_rows_are_capped_below_full_validation": True,
             "oos_validated_rows_remain_shadow_only": True,
         },
