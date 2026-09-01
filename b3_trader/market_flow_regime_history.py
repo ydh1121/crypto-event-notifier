@@ -8,7 +8,7 @@ from typing import Any
 
 from .auto_demo_v2 import DB_PATH
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 FEATURE_VERSION = 1
 HISTORY_BUCKET_SECONDS = 15 * 60
 HISTORY_RETENTION_DAYS = 90
@@ -18,10 +18,12 @@ HISTORY_RETENTION_SECONDS = HISTORY_RETENTION_DAYS * 24 * 60 * 60
 class MarketFlowRegimeHistoryStore:
     """Bounded shadow history for flow regime confidence and dedup families.
 
-    Current-state confidence/family tables remain authoritative snapshots. This
-    store records 15-minute research snapshots so evidence maturity and family
-    representative changes can be inspected over time without wiring those
-    values to PAPER, strategy mutation, score or orders.
+    Current-state confidence/family tables remain authoritative. History stores
+    15-minute snapshots for 90 days. `base_gate_started` is the monotonic fact
+    that the group once crossed the discovery threshold and froze a forward OOS
+    cutoff; `base_promotion_ready` remains the current-sample threshold result.
+    Keeping both avoids rewriting the OOS cohort when the expanding discovery
+    sample later moves back below the threshold.
     """
 
     def __init__(self, path: Path | str = DB_PATH) -> None:
@@ -39,6 +41,14 @@ class MarketFlowRegimeHistoryStore:
     def _bucket_ts(value: float) -> float:
         return float(math.floor(float(value) / HISTORY_BUCKET_SECONDS) * HISTORY_BUCKET_SECONDS)
 
+    def _ensure_column(self, table: str, column: str, ddl: str) -> None:
+        columns = {
+            str(row[1])
+            for row in self.conn.execute(f"PRAGMA table_info({table})").fetchall()
+        }
+        if column not in columns:
+            self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+
     def _ensure_schema(self) -> None:
         self.conn.executescript(
             """
@@ -51,6 +61,7 @@ class MarketFlowRegimeHistoryStore:
                 horizon_label TEXT NOT NULL,
                 reliability_status TEXT NOT NULL,
                 promotion_gate_status TEXT,
+                base_gate_started INTEGER NOT NULL DEFAULT 0,
                 bithumb_sample_count INTEGER NOT NULL DEFAULT 0,
                 upbit_sample_count INTEGER NOT NULL DEFAULT 0,
                 pooled_sample_count INTEGER NOT NULL DEFAULT 0,
@@ -69,7 +80,7 @@ class MarketFlowRegimeHistoryStore:
                 source TEXT NOT NULL DEFAULT 'market_flow_regime_confidence',
                 probability_interpretation INTEGER NOT NULL DEFAULT 0,
                 feature_version INTEGER NOT NULL DEFAULT 1,
-                schema_version INTEGER NOT NULL DEFAULT 1,
+                schema_version INTEGER NOT NULL DEFAULT 2,
                 PRIMARY KEY(snapshot_ts,market,signal_window_label,signal_evidence_label,horizon_label)
             );
             CREATE INDEX IF NOT EXISTS idx_market_flow_regime_confidence_history_lookup
@@ -90,6 +101,7 @@ class MarketFlowRegimeHistoryStore:
                 representative_confidence_band TEXT NOT NULL,
                 representative_pooled_sample_count INTEGER NOT NULL DEFAULT 0,
                 representative_cross_exchange_direction_consistent INTEGER NOT NULL DEFAULT 0,
+                representative_base_gate_started INTEGER NOT NULL DEFAULT 0,
                 representative_base_promotion_ready INTEGER NOT NULL DEFAULT 0,
                 representative_final_candidate_ready INTEGER NOT NULL DEFAULT 0,
                 suppressed_member_count INTEGER NOT NULL DEFAULT 0,
@@ -101,7 +113,7 @@ class MarketFlowRegimeHistoryStore:
                 source TEXT NOT NULL DEFAULT 'market_flow_family_dedup',
                 probability_interpretation INTEGER NOT NULL DEFAULT 0,
                 feature_version INTEGER NOT NULL DEFAULT 1,
-                schema_version INTEGER NOT NULL DEFAULT 1,
+                schema_version INTEGER NOT NULL DEFAULT 2,
                 PRIMARY KEY(snapshot_ts,market,regime_label,horizon_label)
             );
             CREATE INDEX IF NOT EXISTS idx_market_flow_family_history_lookup
@@ -109,6 +121,16 @@ class MarketFlowRegimeHistoryStore:
                 market,regime_label,horizon_label,snapshot_ts DESC
             );
             """
+        )
+        self._ensure_column(
+            "research_market_flow_regime_confidence_history_mx",
+            "base_gate_started",
+            "INTEGER NOT NULL DEFAULT 0",
+        )
+        self._ensure_column(
+            "research_market_flow_family_history_mx",
+            "representative_base_gate_started",
+            "INTEGER NOT NULL DEFAULT 0",
         )
         self.conn.commit()
 
@@ -127,7 +149,8 @@ class MarketFlowRegimeHistoryStore:
             dict(row)
             for row in self.conn.execute(
                 """SELECT market,signal_window_label,signal_evidence_label,regime_label,horizon_label,
-                          reliability_status,promotion_gate_status,bithumb_sample_count,upbit_sample_count,
+                          reliability_status,promotion_gate_status,base_gate_started,
+                          bithumb_sample_count,upbit_sample_count,
                           pooled_sample_count,pooled_wilson_lower_pct,oos_bithumb_sample_count,
                           oos_upbit_sample_count,oos_pooled_sample_count,oos_pooled_wilson_lower_pct,
                           cross_exchange_direction_consistent,base_promotion_ready,final_candidate_ready,
@@ -147,6 +170,7 @@ class MarketFlowRegimeHistoryStore:
                           representative_confidence_pct,representative_confidence_band,
                           representative_pooled_sample_count,
                           representative_cross_exchange_direction_consistent,
+                          representative_base_gate_started,
                           representative_base_promotion_ready,representative_final_candidate_ready,
                           suppressed_member_count,raw_confidence_sum_pct,
                           effective_family_confidence_pct,inflation_avoided_pct,received_at
@@ -164,17 +188,19 @@ class MarketFlowRegimeHistoryStore:
             self.conn.execute(
                 """INSERT OR REPLACE INTO research_market_flow_regime_confidence_history_mx(
                        snapshot_ts,market,signal_window_label,signal_evidence_label,regime_label,horizon_label,
-                       reliability_status,promotion_gate_status,bithumb_sample_count,upbit_sample_count,
+                       reliability_status,promotion_gate_status,base_gate_started,
+                       bithumb_sample_count,upbit_sample_count,
                        pooled_sample_count,pooled_wilson_lower_pct,oos_bithumb_sample_count,
                        oos_upbit_sample_count,oos_pooled_sample_count,oos_pooled_wilson_lower_pct,
                        cross_exchange_direction_consistent,base_promotion_ready,final_candidate_ready,
                        evidence_confidence_pct,confidence_band,source_received_at,recorded_at,source,
                        probability_interpretation,feature_version,schema_version
-                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'market_flow_regime_confidence',0,?,?)""",
+                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'market_flow_regime_confidence',0,?,?)""",
                 (
                     bucket,str(row["market"]),str(row["signal_window_label"]),
                     str(row["signal_evidence_label"]),str(row["regime_label"]),str(row["horizon_label"]),
                     str(row["reliability_status"]),row.get("promotion_gate_status"),
+                    int(row.get("base_gate_started") or 0),
                     int(row.get("bithumb_sample_count") or 0),int(row.get("upbit_sample_count") or 0),
                     int(row.get("pooled_sample_count") or 0),row.get("pooled_wilson_lower_pct"),
                     int(row.get("oos_bithumb_sample_count") or 0),int(row.get("oos_upbit_sample_count") or 0),
@@ -194,11 +220,12 @@ class MarketFlowRegimeHistoryStore:
                        representative_confidence_pct,representative_confidence_band,
                        representative_pooled_sample_count,
                        representative_cross_exchange_direction_consistent,
+                       representative_base_gate_started,
                        representative_base_promotion_ready,representative_final_candidate_ready,
                        suppressed_member_count,raw_confidence_sum_pct,effective_family_confidence_pct,
                        inflation_avoided_pct,source_received_at,recorded_at,source,
                        probability_interpretation,feature_version,schema_version
-                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'market_flow_family_dedup',0,?,?)""",
+                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'market_flow_family_dedup',0,?,?)""",
                 (
                     bucket,str(row["market"]),str(row["regime_label"]),str(row["horizon_label"]),
                     str(row["family_key"]),int(row.get("member_count") or 0),
@@ -207,6 +234,7 @@ class MarketFlowRegimeHistoryStore:
                     str(row.get("representative_confidence_band") or "collecting"),
                     int(row.get("representative_pooled_sample_count") or 0),
                     int(row.get("representative_cross_exchange_direction_consistent") or 0),
+                    int(row.get("representative_base_gate_started") or 0),
                     int(row.get("representative_base_promotion_ready") or 0),
                     int(row.get("representative_final_candidate_ready") or 0),
                     int(row.get("suppressed_member_count") or 0),
@@ -238,6 +266,7 @@ class MarketFlowRegimeHistoryStore:
             "family_rows_written": len(family_rows),
             "confidence_rows_pruned": int(confidence_pruned or 0),
             "family_rows_pruned": int(family_pruned or 0),
+            "base_gate_lifecycle_persisted": True,
             "paper_only": True,
             "shadow_only": True,
             "score_wired": False,
@@ -284,6 +313,13 @@ class MarketFlowRegimeHistoryStore:
                  +
                  (SELECT COUNT(*) FROM research_market_flow_family_history_mx WHERE probability_interpretation!=0)"""
         ).fetchone()[0])
+        gate_semantics_violations = int(self.conn.execute(
+            """SELECT COUNT(*) FROM research_market_flow_regime_confidence_history_mx WHERE
+                   (base_gate_started=0 AND promotion_gate_status IS NOT NULL)
+                OR (base_gate_started=1 AND promotion_gate_status IS NULL)
+                OR (confidence_band IN ('base_validated_oos_collecting','oos_mixed','oos_validated_shadow')
+                    AND base_gate_started!=1)"""
+        ).fetchone()[0])
         latest_confidence = [dict(row) for row in self.conn.execute(
             """SELECT * FROM research_market_flow_regime_confidence_history_mx
                ORDER BY snapshot_ts DESC,evidence_confidence_pct DESC LIMIT 20"""
@@ -311,6 +347,7 @@ class MarketFlowRegimeHistoryStore:
             confidence_bucket_violations == 0
             and family_bucket_violations == 0
             and probability_violations == 0
+            and gate_semantics_violations == 0
             and retention_violations == 0
         )
         return {
@@ -326,9 +363,12 @@ class MarketFlowRegimeHistoryStore:
             "confidence_bucket_violations": confidence_bucket_violations,
             "family_bucket_violations": family_bucket_violations,
             "probability_contract_violations": probability_violations,
+            "base_gate_semantics_violations": gate_semantics_violations,
             "retention_contract_violations": retention_violations,
             "latest_confidence": latest_confidence,
             "latest_families": latest_families,
+            "base_gate_started_semantics": "ever_crossed_base_threshold_and_froze_forward_oos_cutoff",
+            "base_promotion_ready_semantics": "current_full_sample_still_meets_base_threshold",
             "paper_only": True,
             "shadow_only": True,
             "score_wired": False,
