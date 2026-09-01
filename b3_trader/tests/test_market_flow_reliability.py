@@ -119,7 +119,7 @@ def test_small_single_exchange_sample_stays_collecting(tmp_path: Path) -> None:
     assert row["status"] == "collecting"
 
 
-def test_compute_auto_refreshes_family_dedup_after_confidence(tmp_path: Path) -> None:
+def test_compute_auto_refreshes_family_dedup_history_and_stability(tmp_path: Path) -> None:
     path = tmp_path / "market.db"
     _prepare(path)
     for window in ("1m", "5m"):
@@ -148,6 +148,10 @@ def test_compute_auto_refreshes_family_dedup_after_confidence(tmp_path: Path) ->
     assert result["family_dedup"]["families_written"] == 1
     assert result["family_dedup"]["members_written"] == 2
     assert result["family_dedup"]["suppressed_correlated_members"] == 1
+    assert result["regime_history"]["ok"] is True
+    assert result["regime_history"]["family_rows_written"] == 1
+    assert result["regime_stability"]["ok"] is True
+    assert result["regime_stability"]["families_written"] == 1
 
     conn = sqlite3.connect(path)
     try:
@@ -157,8 +161,12 @@ def test_compute_auto_refreshes_family_dedup_after_confidence(tmp_path: Path) ->
         members = conn.execute(
             "SELECT representative_member,effective_weight FROM research_market_flow_family_member_mx ORDER BY representative_member DESC"
         ).fetchall()
+        stability = conn.execute(
+            "SELECT history_ready,stability_window_ready,score_wired,can_place_orders FROM research_market_flow_regime_stability_mx"
+        ).fetchone()
     finally:
         conn.close()
 
     assert family == (2, 1)
     assert members == [(1, 1.0), (0, 0.0)]
+    assert stability == (0, 0, 0, 0)
