@@ -132,6 +132,29 @@ class MarketFlowRegimeHistoryStore:
             "representative_base_gate_started",
             "INTEGER NOT NULL DEFAULT 0",
         )
+
+        # v1 history did not persist the monotonic gate lifecycle bit. Recover it
+        # only from already-persisted OOS facts; never infer it from sample counts.
+        self.conn.execute(
+            """UPDATE research_market_flow_regime_confidence_history_mx
+               SET base_gate_started=1, schema_version=?
+               WHERE base_gate_started=0 AND (
+                   promotion_gate_status IS NOT NULL
+                   OR confidence_band IN (
+                       'base_validated_oos_collecting','oos_mixed','oos_validated_shadow'
+                   )
+               )""",
+            (SCHEMA_VERSION,),
+        )
+        self.conn.execute(
+            """UPDATE research_market_flow_family_history_mx
+               SET representative_base_gate_started=1, schema_version=?
+               WHERE representative_base_gate_started=0
+                 AND representative_confidence_band IN (
+                     'base_validated_oos_collecting','oos_mixed','oos_validated_shadow'
+                 )""",
+            (SCHEMA_VERSION,),
+        )
         self.conn.commit()
 
     def _table_exists(self, table: str) -> bool:
