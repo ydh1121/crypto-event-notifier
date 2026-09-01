@@ -79,16 +79,21 @@ def test_reliability_compute_auto_runs_cost_cluster_and_event_reliability(tmp_pa
     assert result["cost_edge"]["ok"] is True
     assert result["cost_edge"]["reaction_rows"] == 1
     assert result["cost_edge"]["orderbook_friction_ready_rows"] == 1
+    assert result["full_cost_edge"]["ok"] is True
+    assert result["full_cost_edge"]["source_rows"] == 1
+    assert result["full_cost_edge"]["full_cost_ready_rows"] == 0
     assert result["event_cluster"]["ok"] is True
     assert result["event_cluster"]["events_written"] == 1
     assert result["event_reliability"]["ok"] is True
     assert result["event_reliability"]["groups_written"] == 1
     assert result["event_reliability"]["promotion_ready_rows"] == 0
     assert result["post_reliability_pipeline"]["order"] == [
-        "cost_edge","event_cluster","event_reliability"
+        "cost_edge","full_cost_edge","event_cluster","event_reliability"
     ]
     assert result["post_reliability_pipeline"]["network_fetches"] is False
-    assert result["post_reliability_pipeline"]["full_transaction_cost_ready"] is False
+    assert result["post_reliability_pipeline"]["spread_only_event_pipeline"] is True
+    assert result["post_reliability_pipeline"]["forward_only_full_transaction_cost_observation"] is True
+    assert result["post_reliability_pipeline"]["full_cost_event_reliability_wired"] is False
     assert result["post_reliability_pipeline"]["event_promotion_wired_to_score"] is False
     assert result["post_reliability_pipeline"]["can_place_orders"] is False
 
@@ -99,6 +104,7 @@ def test_reliability_compute_auto_runs_cost_cluster_and_event_reliability(tmp_pa
             for table in (
                 "research_market_flow_reliability_mx",
                 "research_market_flow_cost_edge_mx",
+                "research_market_flow_full_cost_edge_mx",
                 "research_market_flow_event_cluster_mx",
                 "research_market_flow_event_reliability_mx",
             )
@@ -106,4 +112,4 @@ def test_reliability_compute_auto_runs_cost_cluster_and_event_reliability(tmp_pa
     finally:
         conn.close()
 
-    assert timestamps == [stamp, stamp, stamp, stamp]
+    assert timestamps == [stamp, stamp, stamp, stamp, stamp]
