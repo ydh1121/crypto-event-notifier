@@ -113,7 +113,7 @@ def test_opposite_regimes_and_different_horizons_never_merge(tmp_path: Path) -> 
     _prepare(path)
     t0 = 1_800_000_000.0
     _insert_cost(path,signal_ts=t0,end_ts=t0 + 900,direction=1,horizon="15m",adjusted=0.10)
-    _insert_cost(path,signal_ts=t0,end_ts=t0 + 900,direction=-1,horizon="15m",adjusted=0.20)
+    _insert_cost(path,exchange="upbit",signal_ts=t0,end_ts=t0 + 900,direction=-1,horizon="15m",adjusted=0.20)
     _insert_cost(path,signal_ts=t0,end_ts=t0 + 3600,direction=1,horizon="1h",adjusted=0.30)
 
     store = MarketFlowEventClusterStore(path)
