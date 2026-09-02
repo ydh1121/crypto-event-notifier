@@ -127,5 +127,8 @@ def test_due_drain_upgrades_matured_signal_outside_latest_scan(tmp_path: Path) -
 
 def test_reliability_wrapper_drains_due_reactions_before_core_aggregation() -> None:
     source = inspect.getsource(MarketFlowReliabilityStore.compute)
-    assert "MarketFlowReactionDueStore" in source
-    assert source.index("MarketFlowReactionDueStore") < source.index("super().compute")
+    due_call = "reaction_due_result = self._compute_reaction_due_stage"
+    base_call = "base_result = super().compute"
+    assert due_call in source
+    assert base_call in source
+    assert source.index(due_call) < source.index(base_call)

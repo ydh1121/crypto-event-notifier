@@ -36,6 +36,19 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
     """
 
     @staticmethod
+    def _compute_reaction_due_stage(path, stamp: float) -> dict[str, Any]:
+        store = MarketFlowReactionDueStore(path)
+        try:
+            result = store.compute(now=stamp)
+        finally:
+            store.close()
+        if not bool(result.get("ok", False)):
+            raise RuntimeError(
+                f"market_flow_reaction_due failed: {result.get('status') or 'unknown_status'}"
+            )
+        return result
+
+    @staticmethod
     def _compute_shadow_stage(store_cls: type, path, stamp: float, stage_name: str) -> dict[str, Any]:
         store = store_cls(path)
         try:
@@ -50,20 +63,12 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
 
     def compute(self, *, now: float | None = None) -> dict[str, Any]:
         # Preserve the existing source-level integration contract for tests and
-        # audit tooling. These calls execute inside super().compute in this exact
-        # order: promotion_gate.compute -> regime_confidence.compute ->
-        # family_dedup.compute -> regime_history.capture -> regime_stability.compute.
-        # Existing nested return markers are also preserved by the core:
-        # "regime_confidence": regime_confidence_result
-        # "regime_history": regime_history_result
+        # audit tooling. The core reliability chain keeps its original order:
+        # promotion gate -> regime confidence -> family dedup -> regime history
+        # -> regime stability. Existing nested return markers are preserved.
         stamp = float(time.time() if now is None else now)
 
-        reaction_due_result = self._compute_shadow_stage(
-            MarketFlowReactionDueStore,
-            self.path,
-            stamp,
-            "market_flow_reaction_due",
-        )
+        reaction_due_result = self._compute_reaction_due_stage(self.path, stamp)
         base_result = super().compute(now=stamp)
 
         cost_edge_result = self._compute_shadow_stage(
