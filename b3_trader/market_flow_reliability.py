@@ -9,6 +9,8 @@ from .market_flow_cost_edge import MarketFlowCostEdgeStore
 from .market_flow_event_cluster import MarketFlowEventClusterStore
 from .market_flow_event_reliability import MarketFlowEventReliabilityStore
 from .market_flow_full_cost_edge import MarketFlowFullCostEdgeStore
+from .market_flow_full_cost_event_cluster import MarketFlowFullCostEventClusterStore
+from .market_flow_full_cost_event_reliability import MarketFlowFullCostEventReliabilityStore
 
 # Compatibility note: MarketFlowRegimeHistoryStore and the other pre-existing
 # reliability sublayers remain implemented and executed unchanged in the core.
@@ -20,9 +22,8 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
     The original raw-reaction reliability/OOS/confidence/dedup/history/stability
     implementation lives unchanged in ``market_flow_reliability_core``. After
     that chain completes, this wrapper deterministically recomputes spread-only
-    cost edge, forward-only full transaction cost edge, fixed-anchor event
-    clusters, and clustered spread-only event reliability. The full-cost layer
-    is observational only and is not yet used by event clustering/reliability.
+    cost edge, forward-only full transaction cost edge, the existing spread-only
+    event pipeline, and the separate forward full-cost event validation pipeline.
     All post-validation layers remain shadow research only and completely
     unwired from score, PAPER decisions, strategy mutation, and order placement.
     """
@@ -75,18 +76,40 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
             stamp,
             "market_flow_event_reliability",
         )
+        full_cost_event_cluster_result = self._compute_shadow_stage(
+            MarketFlowFullCostEventClusterStore,
+            self.path,
+            stamp,
+            "market_flow_full_cost_event_cluster",
+        )
+        full_cost_event_reliability_result = self._compute_shadow_stage(
+            MarketFlowFullCostEventReliabilityStore,
+            self.path,
+            stamp,
+            "market_flow_full_cost_event_reliability",
+        )
 
         result = dict(base_result)
         result["cost_edge"] = cost_edge_result
         result["full_cost_edge"] = full_cost_result
         result["event_cluster"] = event_cluster_result
         result["event_reliability"] = event_reliability_result
+        result["full_cost_event_cluster"] = full_cost_event_cluster_result
+        result["full_cost_event_reliability"] = full_cost_event_reliability_result
         result["post_reliability_pipeline"] = {
-            "order": ["cost_edge", "full_cost_edge", "event_cluster", "event_reliability"],
+            "order": [
+                "cost_edge",
+                "full_cost_edge",
+                "event_cluster",
+                "event_reliability",
+                "full_cost_event_cluster",
+                "full_cost_event_reliability",
+            ],
             "network_fetches": False,
             "spread_only_event_pipeline": True,
             "forward_only_full_transaction_cost_observation": True,
-            "full_cost_event_reliability_wired": False,
+            "full_cost_event_validation_pipeline": True,
+            "full_cost_event_promotion_wired_to_score": False,
             "event_promotion_wired_to_score": False,
             "paper_only": True,
             "shadow_only": True,
@@ -100,6 +123,8 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
                 full_cost_result,
                 event_cluster_result,
                 event_reliability_result,
+                full_cost_event_cluster_result,
+                full_cost_event_reliability_result,
             )
         )
         return result
