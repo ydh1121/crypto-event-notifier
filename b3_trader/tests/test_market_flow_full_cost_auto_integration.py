@@ -38,15 +38,22 @@ def test_reliability_wrapper_runs_full_cost_between_spread_cost_and_event_cluste
         "market_flow_full_cost_edge",
         "market_flow_event_cluster",
         "market_flow_event_reliability",
+        "market_flow_full_cost_event_cluster",
+        "market_flow_full_cost_event_reliability",
     ]
     assert result["full_cost_edge"]["ok"] is True
+    assert result["full_cost_event_cluster"]["ok"] is True
+    assert result["full_cost_event_reliability"]["ok"] is True
     assert result["post_reliability_pipeline"]["order"] == [
         "cost_edge",
         "full_cost_edge",
         "event_cluster",
         "event_reliability",
+        "full_cost_event_cluster",
+        "full_cost_event_reliability",
     ]
     assert result["post_reliability_pipeline"]["forward_only_full_transaction_cost_observation"] is True
-    assert result["post_reliability_pipeline"]["full_cost_event_reliability_wired"] is False
+    assert result["post_reliability_pipeline"]["full_cost_event_validation_pipeline"] is True
+    assert result["post_reliability_pipeline"]["full_cost_event_promotion_wired_to_score"] is False
     assert result["post_reliability_pipeline"]["event_promotion_wired_to_score"] is False
     assert result["post_reliability_pipeline"]["can_place_orders"] is False
