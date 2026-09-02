@@ -11,6 +11,7 @@ from .market_flow_event_reliability import MarketFlowEventReliabilityStore
 from .market_flow_full_cost_edge import MarketFlowFullCostEdgeStore
 from .market_flow_full_cost_event_cluster import MarketFlowFullCostEventClusterStore
 from .market_flow_full_cost_event_reliability import MarketFlowFullCostEventReliabilityStore
+from .market_flow_reaction_due import MarketFlowReactionDueStore
 
 # Compatibility note: MarketFlowRegimeHistoryStore and the other pre-existing
 # reliability sublayers remain implemented and executed unchanged in the core.
@@ -19,13 +20,19 @@ from .market_flow_full_cost_event_reliability import MarketFlowFullCostEventReli
 class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
     """Compatibility wrapper that appends local-only cost/event validation.
 
+    Before reliability aggregation, a bounded local-only due-reaction drain
+    revisits already registered waiting rows whose horizons have matured after
+    their source signal aged out of the newest-signal scan. It preserves the
+    original exact contiguous forward-OHLCV contract and performs no network
+    fetches.
+
     The original raw-reaction reliability/OOS/confidence/dedup/history/stability
     implementation lives unchanged in ``market_flow_reliability_core``. After
     that chain completes, this wrapper deterministically recomputes spread-only
     cost edge, forward-only full transaction cost edge, the existing spread-only
     event pipeline, and the separate forward full-cost event validation pipeline.
-    All post-validation layers remain shadow research only and completely
-    unwired from score, PAPER decisions, strategy mutation, and order placement.
+    All validation layers remain shadow research only and completely unwired
+    from score, PAPER decisions, strategy mutation, and order placement.
     """
 
     @staticmethod
@@ -50,6 +57,13 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
         # "regime_confidence": regime_confidence_result
         # "regime_history": regime_history_result
         stamp = float(time.time() if now is None else now)
+
+        reaction_due_result = self._compute_shadow_stage(
+            MarketFlowReactionDueStore,
+            self.path,
+            stamp,
+            "market_flow_reaction_due",
+        )
         base_result = super().compute(now=stamp)
 
         cost_edge_result = self._compute_shadow_stage(
@@ -90,12 +104,24 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
         )
 
         result = dict(base_result)
+        result["reaction_due"] = reaction_due_result
         result["cost_edge"] = cost_edge_result
         result["full_cost_edge"] = full_cost_result
         result["event_cluster"] = event_cluster_result
         result["event_reliability"] = event_reliability_result
         result["full_cost_event_cluster"] = full_cost_event_cluster_result
         result["full_cost_event_reliability"] = full_cost_event_reliability_result
+        result["pre_reliability_pipeline"] = {
+            "order": ["reaction_due"],
+            "network_fetches": False,
+            "forward_only_due_reaction_drain": True,
+            "newest_signal_scan_preserved": True,
+            "score_wired": False,
+            "paper_only": True,
+            "shadow_only": True,
+            "can_place_orders": False,
+            "can_modify_strategy": False,
+        }
         result["post_reliability_pipeline"] = {
             "order": [
                 "cost_edge",
@@ -119,6 +145,7 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
         result["ok"] = bool(base_result.get("ok", True)) and all(
             bool(stage.get("ok", False))
             for stage in (
+                reaction_due_result,
                 cost_edge_result,
                 full_cost_result,
                 event_cluster_result,
