@@ -5,6 +5,7 @@ from typing import Any
 
 from . import market_flow_reliability_core as _core
 from .market_flow_reliability_core import *  # noqa: F401,F403 - preserve public compatibility surface
+from .market_flow_absorption_consensus_v2 import MarketFlowAbsorptionConsensusV2Store
 from .market_flow_cost_edge import MarketFlowCostEdgeStore
 from .market_flow_event_cluster import MarketFlowEventClusterStore
 from .market_flow_event_reliability import MarketFlowEventReliabilityStore
@@ -19,13 +20,14 @@ from .market_flow_reaction_due import MarketFlowReactionDueStore
 
 
 class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
-    """Compatibility wrapper that appends local-only cost/event validation.
+    """Compatibility wrapper that appends local-only forward validation layers.
 
     Before reliability aggregation, a bounded local-only due-reaction drain
     revisits already registered waiting rows whose horizons have matured after
-    their source signal aged out of the newest-signal scan. It preserves the
-    original exact contiguous forward-OHLCV contract and performs no network
-    fetches.
+    their source signal aged out of the newest-signal scan. A separate v2
+    absorption-consensus layer also records only post-activation exact 5m
+    Bithumb+Upbit agreement over the frozen v1 heuristic. Neither stage performs
+    network fetches or changes v1 evidence.
 
     The original raw-reaction reliability/OOS/confidence/dedup/history/stability
     implementation lives unchanged in ``market_flow_reliability_core``. After
@@ -47,6 +49,20 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
         if not bool(result.get("ok", False)):
             raise RuntimeError(
                 f"market_flow_reaction_due failed: {result.get('status') or 'unknown_status'}"
+            )
+        return result
+
+    @staticmethod
+    def _compute_absorption_consensus_v2_stage(path, stamp: float) -> dict[str, Any]:
+        store = MarketFlowAbsorptionConsensusV2Store(path)
+        try:
+            result = store.compute(now=stamp)
+        finally:
+            store.close()
+        if not bool(result.get("ok", False)):
+            raise RuntimeError(
+                "market_flow_absorption_consensus_v2 failed: "
+                f"{result.get('status') or 'unknown_status'}"
             )
         return result
 
@@ -74,6 +90,10 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
         stamp = float(time.time() if now is None else now)
 
         reaction_due_result = self._compute_reaction_due_stage(self.path, stamp)
+        absorption_consensus_v2_result = self._compute_absorption_consensus_v2_stage(
+            self.path,
+            stamp,
+        )
         base_result = super().compute(now=stamp)
 
         cost_edge_result = self._compute_shadow_stage(
@@ -121,6 +141,7 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
 
         result = dict(base_result)
         result["reaction_due"] = reaction_due_result
+        result["absorption_consensus_v2"] = absorption_consensus_v2_result
         result["cost_edge"] = cost_edge_result
         result["full_cost_edge"] = full_cost_result
         result["full_cost_notional_sensitivity"] = full_cost_notional_sensitivity_result
@@ -129,10 +150,13 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
         result["full_cost_event_cluster"] = full_cost_event_cluster_result
         result["full_cost_event_reliability"] = full_cost_event_reliability_result
         result["pre_reliability_pipeline"] = {
-            "order": ["reaction_due"],
+            "order": ["reaction_due", "absorption_consensus_v2"],
             "network_fetches": False,
             "forward_only_due_reaction_drain": True,
             "newest_signal_scan_preserved": True,
+            "forward_only_absorption_consensus_v2": True,
+            "absorption_consensus_v2_historical_backfill": False,
+            "absorption_consensus_v2_v1_threshold_retuning": False,
             "score_wired": False,
             "paper_only": True,
             "shadow_only": True,
@@ -165,6 +189,7 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
             bool(stage.get("ok", False))
             for stage in (
                 reaction_due_result,
+                absorption_consensus_v2_result,
                 cost_edge_result,
                 full_cost_result,
                 full_cost_notional_sensitivity_result,
