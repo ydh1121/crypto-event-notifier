@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -9,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from b3_trader.auto_demo_v2 import DB_PATH
 from b3_trader.market_flow_full_cost_event_cluster import (
     CLUSTER_POLICY,
     REPRESENTATIVE_POLICY,
@@ -26,12 +28,38 @@ from b3_trader.market_flow_full_cost_event_reliability import (
 )
 
 
+def _max_received_at(conn: sqlite3.Connection, table: str) -> float:
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+    ).fetchone()
+    if not exists:
+        return 0.0
+    row = conn.execute(f"SELECT COALESCE(MAX(received_at),0) FROM {table}").fetchone()
+    return float(row[0] or 0.0) if row else 0.0
+
+
+def _automatic_code_contract() -> bool:
+    path = ROOT / "b3_trader" / "market_flow_reliability.py"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    markers = [
+        "full_cost_result = self._compute_shadow_stage(",
+        "full_cost_event_cluster_result = self._compute_shadow_stage(",
+        "full_cost_event_reliability_result = self._compute_shadow_stage(",
+    ]
+    positions = [text.find(marker) for marker in markers]
+    return all(position >= 0 for position in positions) and positions == sorted(positions)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--require-source", action="store_true")
     parser.add_argument("--require-event", action="store_true")
     parser.add_argument("--require-cross-exchange", action="store_true")
     parser.add_argument("--require-observation", action="store_true")
+    parser.add_argument("--require-automatic-cycle", action="store_true")
     args = parser.parse_args()
 
     cluster_store = MarketFlowFullCostEventClusterStore()
@@ -42,6 +70,21 @@ def main() -> None:
     finally:
         reliability_store.close()
         cluster_store.close()
+
+    conn = sqlite3.connect(str(DB_PATH), timeout=10)
+    try:
+        full_cost_ts = _max_received_at(conn, "research_market_flow_full_cost_edge_mx")
+        full_cost_cluster_ts = _max_received_at(conn, "research_market_flow_full_cost_event_cluster_mx")
+        full_cost_reliability_ts = _max_received_at(conn, "research_market_flow_full_cost_event_reliability_mx")
+    finally:
+        conn.close()
+
+    automatic_code_contract = _automatic_code_contract()
+    automatic_timestamps = [full_cost_ts, full_cost_cluster_ts, full_cost_reliability_ts]
+    automatic_capture = (
+        all(value > 0.0 for value in automatic_timestamps)
+        and max(automatic_timestamps) - min(automatic_timestamps) <= 0.000001
+    )
 
     source_members = int(cluster.get("member_count") or 0)
     event_count = int(cluster.get("event_count") or 0)
@@ -89,6 +132,8 @@ def main() -> None:
         "event_present": event_count > 0,
         "cross_exchange_present": cross_count > 0,
         "observation_present": observation_count > 0,
+        "automatic_cycle_code_contract": automatic_code_contract,
+        "automatic_full_cost_event_validation_captured_latest_pipeline": automatic_capture,
     }
 
     required = [
@@ -109,11 +154,21 @@ def main() -> None:
         required.append("cross_exchange_present")
     if args.require_observation:
         required.append("observation_present")
+    if args.require_automatic_cycle:
+        required.extend([
+            "automatic_cycle_code_contract",
+            "automatic_full_cost_event_validation_captured_latest_pipeline",
+        ])
 
     ok = all(bool(checks[name]) for name in required)
     payload = {
         "status": "runtime_verified" if ok else "runtime_verification_failed",
         "checks": checks,
+        "automatic_pipeline_received_at": {
+            "full_cost_edge": full_cost_ts,
+            "full_cost_event_cluster": full_cost_cluster_ts,
+            "full_cost_event_reliability": full_cost_reliability_ts,
+        },
         "cluster_audit": cluster,
         "reliability_audit": reliability,
         "expected_current_semantics": {
@@ -129,6 +184,9 @@ def main() -> None:
             "promotion_threshold_cross_exchange_events": PROMOTION_MIN_CROSS_EXCHANGE_EVENTS,
             "both_wilson_lower_bounds_must_exceed_chance": True,
             "full_cost_reliability_is_not_probability_or_trading_score": True,
+            "automatic_order": [
+                "full_cost_edge","full_cost_event_cluster","full_cost_event_reliability"
+            ],
         },
         "read_only": True,
     }
