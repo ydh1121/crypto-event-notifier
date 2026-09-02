@@ -82,6 +82,8 @@ def test_reliability_compute_auto_runs_cost_cluster_and_event_reliability(tmp_pa
     assert result["full_cost_edge"]["ok"] is True
     assert result["full_cost_edge"]["source_rows"] == 1
     assert result["full_cost_edge"]["full_cost_ready_rows"] == 0
+    assert result["full_cost_notional_sensitivity"]["ok"] is True
+    assert result["full_cost_notional_sensitivity"]["source_full_cost_rows"] == 0
     assert result["event_cluster"]["ok"] is True
     assert result["event_cluster"]["events_written"] == 1
     assert result["event_reliability"]["ok"] is True
@@ -92,12 +94,14 @@ def test_reliability_compute_auto_runs_cost_cluster_and_event_reliability(tmp_pa
     assert result["full_cost_event_reliability"]["ok"] is True
     assert result["full_cost_event_reliability"]["groups_written"] == 0
     assert result["post_reliability_pipeline"]["order"] == [
-        "cost_edge","full_cost_edge","event_cluster","event_reliability",
+        "cost_edge","full_cost_edge","full_cost_notional_sensitivity",
+        "event_cluster","event_reliability",
         "full_cost_event_cluster","full_cost_event_reliability"
     ]
     assert result["post_reliability_pipeline"]["network_fetches"] is False
     assert result["post_reliability_pipeline"]["spread_only_event_pipeline"] is True
     assert result["post_reliability_pipeline"]["forward_only_full_transaction_cost_observation"] is True
+    assert result["post_reliability_pipeline"]["paper_notional_sensitivity_observation"] is True
     assert result["post_reliability_pipeline"]["full_cost_event_validation_pipeline"] is True
     assert result["post_reliability_pipeline"]["full_cost_event_promotion_wired_to_score"] is False
     assert result["post_reliability_pipeline"]["event_promotion_wired_to_score"] is False
