@@ -11,6 +11,7 @@ from .market_flow_event_reliability import MarketFlowEventReliabilityStore
 from .market_flow_full_cost_edge import MarketFlowFullCostEdgeStore
 from .market_flow_full_cost_event_cluster import MarketFlowFullCostEventClusterStore
 from .market_flow_full_cost_event_reliability import MarketFlowFullCostEventReliabilityStore
+from .market_flow_full_cost_notional_sensitivity import MarketFlowFullCostNotionalSensitivityStore
 from .market_flow_reaction_due import MarketFlowReactionDueStore
 
 # Compatibility note: MarketFlowRegimeHistoryStore and the other pre-existing
@@ -29,10 +30,11 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
     The original raw-reaction reliability/OOS/confidence/dedup/history/stability
     implementation lives unchanged in ``market_flow_reliability_core``. After
     that chain completes, this wrapper deterministically recomputes spread-only
-    cost edge, forward-only full transaction cost edge, the existing spread-only
-    event pipeline, and the separate forward full-cost event validation pipeline.
-    All validation layers remain shadow research only and completely unwired
-    from score, PAPER decisions, strategy mutation, and order placement.
+    cost edge, forward-only full transaction cost edge, PAPER-relevant notional
+    sensitivity, the existing spread-only event pipeline, and the separate
+    forward full-cost event validation pipeline. All validation layers remain
+    shadow research only and completely unwired from score, PAPER decisions,
+    strategy mutation, and order placement.
     """
 
     @staticmethod
@@ -86,6 +88,12 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
             stamp,
             "market_flow_full_cost_edge",
         )
+        full_cost_notional_sensitivity_result = self._compute_shadow_stage(
+            MarketFlowFullCostNotionalSensitivityStore,
+            self.path,
+            stamp,
+            "market_flow_full_cost_notional_sensitivity",
+        )
         event_cluster_result = self._compute_shadow_stage(
             MarketFlowEventClusterStore,
             self.path,
@@ -115,6 +123,7 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
         result["reaction_due"] = reaction_due_result
         result["cost_edge"] = cost_edge_result
         result["full_cost_edge"] = full_cost_result
+        result["full_cost_notional_sensitivity"] = full_cost_notional_sensitivity_result
         result["event_cluster"] = event_cluster_result
         result["event_reliability"] = event_reliability_result
         result["full_cost_event_cluster"] = full_cost_event_cluster_result
@@ -134,6 +143,7 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
             "order": [
                 "cost_edge",
                 "full_cost_edge",
+                "full_cost_notional_sensitivity",
                 "event_cluster",
                 "event_reliability",
                 "full_cost_event_cluster",
@@ -142,6 +152,7 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
             "network_fetches": False,
             "spread_only_event_pipeline": True,
             "forward_only_full_transaction_cost_observation": True,
+            "paper_notional_sensitivity_observation": True,
             "full_cost_event_validation_pipeline": True,
             "full_cost_event_promotion_wired_to_score": False,
             "event_promotion_wired_to_score": False,
@@ -156,6 +167,7 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
                 reaction_due_result,
                 cost_edge_result,
                 full_cost_result,
+                full_cost_notional_sensitivity_result,
                 event_cluster_result,
                 event_reliability_result,
                 full_cost_event_cluster_result,
