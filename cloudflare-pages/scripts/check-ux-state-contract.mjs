@@ -15,14 +15,17 @@ const paper=read('public/modules/pages/paper.js');
 const strategy=read('public/modules/pages/strategy.js');
 const sectorTable=read('public/modules/pages/sector-coin-table.js');
 const shell=read('public/modules/styles/shell.css');
+const amountUx=read('public/modules/shared/amount-input-ux.js');
 
 check('sector owns its main-nav active state',index.includes('data-route="sectors"')&&!router.includes("sectors:'research'")&&!router.includes("sectors: 'research'"));
 check('strategy route remains under performance workspace',router.includes("strategy:'paper'")||router.includes("strategy: 'paper'"));
 check('strategy overview state is explicit',store.includes('strategyOverviewExperiment'));
-check('strategy coin-performance state is separate',store.includes('strategyCoinExperiment'));
-check('strategy coin tab has visible experiment selector',strategy.includes('data-strategy-coin-experiment'));
-check('strategy coin tab does not use hidden overview selection',strategy.includes('ensureCoinExperiment')&&!/function coinPerformance\([^)]*\)[\s\S]{0,240}ensureOverviewSelected/.test(strategy));
-check('strategy coin sort is explicit',store.includes('strategyCoinSort')&&strategy.includes('data-strategy-coin-sort'));
+check('strategy selection drives inline coin breakdown',strategy.includes('id="strategyBreakdown"')&&strategy.includes('renderBreakdown(chosen)')&&strategy.includes('data-strategy-coin-experiment="${esc(key(chosen))}"'));
+check('separate strategy coin tab is retired',!strategy.includes('data-strategy-tab="coins"'));
+check('strategy row selection rerenders full selected journey',/const row=e\.target\.closest\('\[data-strategy-key\]'\);[\s\S]{0,500}renderOverview\(/.test(strategy));
+check('strategy overview status counts use displayed rows',strategy.includes('const states=rows.map(row=>candidateLabel(row,criteria)[1])'));
+check('strategy breakdown sort and search are visible',strategy.includes('data-strategy-coin-sort')&&strategy.includes('data-strategy-breakdown-search'));
+check('strategy matrix search is isolated from breakdown search',strategy.includes("matrixSearch=''")&&strategy.includes('data-strategy-matrix-search'));
 check('paper has execution-strategy filter state',store.includes('paperStrategyFilter'));
 check('paper has visible execution-strategy filter',paper.includes('data-paper-strategy'));
 check('paper strategy filter uses execution row strategy',paper.includes('paperStrategy(store.get(),ex,r)'));
@@ -32,6 +35,9 @@ check('assets route does not leak stale research exchange',router.includes("if(n
 check('sector sort exposes pressed state',sectorTable.includes('aria-pressed='));
 check('mobile primary nav exposes all items without hidden horizontal discovery',shell.includes('grid-template-columns:repeat(3,1fr)'));
 check('performance journey labels are user-facing',main.includes("['paper','가상매매']")&&main.includes("['strategy','전략 비교']"));
+check('averaging amount presets exceed one million',amountUx.includes("[100_000_000,'1억원']")&&amountUx.includes("[10_000_000,'1,000만원']"));
+check('averaging amount input has no one-million cap',amountUx.includes("input.removeAttribute('max')")&&amountUx.includes("input.setAttribute('placeholder','예: 10000000')"));
+check('amount presets trigger existing calculator input flow',amountUx.includes("dispatchEvent(new Event('input',{bubbles:true}))")&&main.includes('installAmountInputUx(root)'));
 
 if(fail.length){
   console.error('VIEWER_UX_STATE_CONTRACT=FAIL');
