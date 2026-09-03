@@ -3,6 +3,8 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+import pytest
+
 from b3_trader.intelligence_event import normalize_intelligence_event
 from b3_trader.intelligence_event_store import IntelligenceEventStore
 from b3_trader.intelligence_reaction_builder import IntelligenceReactionBuilder
@@ -114,7 +116,7 @@ def test_builder_aligns_closed_1m_path_forward_only_and_refreshes_memory() -> No
     assert row["end_delay_seconds"] == 20
     assert row["provider_id"] == "upbit:public_rest:1m"
     assert row["exchange"] == "upbit"
-    assert row["forward_return_pct"] == 15.0
+    assert row["forward_return_pct"] == pytest.approx(15.0)
 
 
 def test_builder_rejects_missing_candle_inside_reaction_path() -> None:
