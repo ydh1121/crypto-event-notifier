@@ -76,3 +76,38 @@ export function buildHoldingBudgetSchedule({row=null,plan={},totalBudget=0}={}){
     usesEstimatedPrices:rows.some(item=>item.priceSource==='estimated_step')
   };
 }
+
+export function buildProfitProtectionGuidance({holding=null,plan={}}={}){
+  const avg=Math.max(0,n(holding?.avg_price)||n(plan?.position_avg_price));
+  const current=Math.max(0,n(holding?.current_price)||n(plan?.current_price));
+  const targetPrice=Math.max(0,n(plan?.target_price));
+  const targetPct=Math.max(0,n(plan?.target_profit_pct));
+  const trailArmPct=Math.max(0,n(plan?.trail_arm_pct));
+  const trailGivebackPct=Math.max(0,n(plan?.trail_giveback_pct));
+  const trailingStopPrice=Math.max(0,n(plan?.trailing_stop_price));
+  const peakGainPct=n(plan?.peak_gain_pct);
+  const firstProtectionPrice=avg>0&&trailArmPct>0?avg*(1+trailArmPct/100):0;
+  const breakEvenPrice=avg;
+
+  const stage1Reached=firstProtectionPrice>0&&current>=firstProtectionPrice;
+  const stage2Reached=targetPrice>0&&current>=targetPrice;
+  const trailingActive=trailingStopPrice>0;
+  return{
+    breakEvenPrice,current,targetPrice,targetPct,trailArmPct,trailGivebackPct,trailingStopPrice,peakGainPct,
+    stages:[
+      {
+        key:'protect',label:'1차 수익보호',price:firstProtectionPrice,reached:stage1Reached,
+        action:'수익이 생기기 시작한 구간입니다. 본전선 이상으로 보호 기준을 올릴지 검토합니다.'
+      },
+      {
+        key:'target',label:'2차 목표가',price:targetPrice,reached:stage2Reached,
+        action:'현재 PAPER의 동적 목표가입니다. 이 가격에 도달하면 가상전략은 매도 조건을 확인합니다.'
+      },
+      {
+        key:'trail',label:'최종 고점보호',price:trailingStopPrice,reached:trailingActive,
+        action:trailingActive?`현재 고점 기준 보호가격입니다. 고점에서 약 ${trailGivebackPct.toFixed(2)}% 밀리면 정리 조건을 확인합니다.`:`수익이 충분히 난 뒤 고점 추적 보호가 활성화됩니다. 활성 기준은 평균단가 대비 약 ${trailArmPct.toFixed(2)}% 상승입니다.`
+      }
+    ],
+    note:'현재 PAPER는 분할매도 비중을 계산하지 않습니다. 임의의 30/30/40 같은 매도 비중은 만들지 않고 가격·보호 조건만 보여줍니다.'
+  };
+}
