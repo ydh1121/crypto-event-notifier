@@ -105,4 +105,9 @@ def test_reliability_wrapper_runs_consensus_v2_as_forward_pre_stage(
         "market_flow_event_reliability",
         "market_flow_full_cost_event_cluster",
         "market_flow_full_cost_event_reliability",
+        "market_flow_absorption_consensus_v2_oos_comparator",
     ]
+    assert result["post_reliability_pipeline"]["v1_v2_oos_comparator_separate_activation"] is True
+    assert result["post_reliability_pipeline"]["v1_v2_oos_comparator_reference_notional_krw"] == 750000.0
+    assert result["post_reliability_pipeline"]["v1_v2_oos_comparator_historical_backfill"] is False
+    assert result["post_reliability_pipeline"]["v1_v2_oos_comparator_winner_selection"] is False

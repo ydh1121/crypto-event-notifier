@@ -7,6 +7,9 @@ from . import market_flow_reliability_core as _core
 from .market_flow_reliability_core import *  # noqa: F401,F403 - preserve public compatibility surface
 from .market_flow_absorption_consensus_v2 import MarketFlowAbsorptionConsensusV2Store
 from .market_flow_absorption_consensus_v2_forward import MarketFlowAbsorptionConsensusV2ForwardStore
+from .market_flow_absorption_consensus_v2_oos_comparator import (
+    MarketFlowAbsorptionConsensusV2OosComparatorStore,
+)
 from .market_flow_cost_edge import MarketFlowCostEdgeStore
 from .market_flow_event_cluster import MarketFlowEventClusterStore
 from .market_flow_event_reliability import MarketFlowEventReliabilityStore
@@ -36,14 +39,16 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
     stored only in v2-specific tables and remains completely separate from v1
     reaction/reliability tables.
 
+    After v1 750K notional sensitivity has refreshed, a third independent
+    comparator activation preregisters the calendar window used to compare v1
+    and v2. Pre-comparator outcomes are retained as context only. The comparator
+    uses cross-exchange 750K full-cost events, reports descriptive deltas, and
+    never selects a winner.
+
     The original raw-reaction reliability/OOS/confidence/dedup/history/stability
-    implementation lives unchanged in ``market_flow_reliability_core``. After
-    that chain completes, this wrapper deterministically recomputes spread-only
-    cost edge, forward-only full transaction cost edge, PAPER-relevant notional
-    sensitivity, the existing spread-only event pipeline, and the separate
-    forward full-cost event validation pipeline. All validation layers remain
-    shadow research only and completely unwired from score, PAPER decisions,
-    strategy mutation, and order placement.
+    implementation lives unchanged in ``market_flow_reliability_core``. All
+    appended validation layers remain shadow research only and completely
+    unwired from score, PAPER decisions, strategy mutation, and order placement.
     """
 
     @staticmethod
@@ -101,37 +106,22 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
         return result
 
     def compute(self, *, now: float | None = None) -> dict[str, Any]:
-        # Preserve the existing source-level integration contract for tests and
-        # audit tooling. These calls execute inside super().compute in this exact
-        # order: promotion_gate.compute -> regime_confidence.compute ->
-        # family_dedup.compute -> regime_history.capture -> regime_stability.compute.
-        # Existing nested return markers are also preserved by the core:
-        # "regime_confidence": regime_confidence_result
-        # "regime_history": regime_history_result
         stamp = float(time.time() if now is None else now)
 
         reaction_due_result = self._compute_reaction_due_stage(self.path, stamp)
         absorption_consensus_v2_result = self._compute_absorption_consensus_v2_stage(
-            self.path,
-            stamp,
+            self.path, stamp
         )
         absorption_consensus_v2_forward_result = self._compute_absorption_consensus_v2_forward_stage(
-            self.path,
-            stamp,
+            self.path, stamp
         )
         base_result = super().compute(now=stamp)
 
         cost_edge_result = self._compute_shadow_stage(
-            MarketFlowCostEdgeStore,
-            self.path,
-            stamp,
-            "market_flow_cost_edge",
+            MarketFlowCostEdgeStore, self.path, stamp, "market_flow_cost_edge"
         )
         full_cost_result = self._compute_shadow_stage(
-            MarketFlowFullCostEdgeStore,
-            self.path,
-            stamp,
-            "market_flow_full_cost_edge",
+            MarketFlowFullCostEdgeStore, self.path, stamp, "market_flow_full_cost_edge"
         )
         full_cost_notional_sensitivity_result = self._compute_shadow_stage(
             MarketFlowFullCostNotionalSensitivityStore,
@@ -140,16 +130,10 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
             "market_flow_full_cost_notional_sensitivity",
         )
         event_cluster_result = self._compute_shadow_stage(
-            MarketFlowEventClusterStore,
-            self.path,
-            stamp,
-            "market_flow_event_cluster",
+            MarketFlowEventClusterStore, self.path, stamp, "market_flow_event_cluster"
         )
         event_reliability_result = self._compute_shadow_stage(
-            MarketFlowEventReliabilityStore,
-            self.path,
-            stamp,
-            "market_flow_event_reliability",
+            MarketFlowEventReliabilityStore, self.path, stamp, "market_flow_event_reliability"
         )
         full_cost_event_cluster_result = self._compute_shadow_stage(
             MarketFlowFullCostEventClusterStore,
@@ -163,6 +147,12 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
             stamp,
             "market_flow_full_cost_event_reliability",
         )
+        absorption_consensus_v2_oos_comparator_result = self._compute_shadow_stage(
+            MarketFlowAbsorptionConsensusV2OosComparatorStore,
+            self.path,
+            stamp,
+            "market_flow_absorption_consensus_v2_oos_comparator",
+        )
 
         result = dict(base_result)
         result["reaction_due"] = reaction_due_result
@@ -175,6 +165,7 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
         result["event_reliability"] = event_reliability_result
         result["full_cost_event_cluster"] = full_cost_event_cluster_result
         result["full_cost_event_reliability"] = full_cost_event_reliability_result
+        result["absorption_consensus_v2_oos_comparator"] = absorption_consensus_v2_oos_comparator_result
         result["pre_reliability_pipeline"] = {
             "order": [
                 "reaction_due",
@@ -206,12 +197,17 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
                 "event_reliability",
                 "full_cost_event_cluster",
                 "full_cost_event_reliability",
+                "market_flow_absorption_consensus_v2_oos_comparator",
             ],
             "network_fetches": False,
             "spread_only_event_pipeline": True,
             "forward_only_full_transaction_cost_observation": True,
             "paper_notional_sensitivity_observation": True,
             "full_cost_event_validation_pipeline": True,
+            "v1_v2_oos_comparator_separate_activation": True,
+            "v1_v2_oos_comparator_reference_notional_krw": 750000.0,
+            "v1_v2_oos_comparator_historical_backfill": False,
+            "v1_v2_oos_comparator_winner_selection": False,
             "full_cost_event_promotion_wired_to_score": False,
             "event_promotion_wired_to_score": False,
             "paper_only": True,
@@ -232,6 +228,7 @@ class MarketFlowReliabilityStore(_core.MarketFlowReliabilityStore):
                 event_reliability_result,
                 full_cost_event_cluster_result,
                 full_cost_event_reliability_result,
+                absorption_consensus_v2_oos_comparator_result,
             )
         )
         return result
