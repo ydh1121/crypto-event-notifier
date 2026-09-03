@@ -1,6 +1,6 @@
 import{combinedPaper,paperStats,rowsFor,findMarket,commonExchangeRows,exchangePublic}from'../shared/selectors.js';
 import{pageHead,loading,empty,exchangeToggle,paperKpis}from'../shared/components.js';
-import{n,money,pct,price,tone,esc,stateLabel}from'../shared/format.js';
+import{n,money,pct,price,tone,esc,stateLabel,normalizeCapital}from'../shared/format.js';
 import{rangeControl,priceFillChart,simpleLineChart}from'../shared/charts.js';
 import{getMarketDetail}from'../services/market-detail.js';
 import{scopeBanner,strategyLabel}from'../shared/viewer-context.js?v=46';
@@ -35,8 +35,8 @@ export function createPaperPage({store}){
   function renderSummary(){
     const box=root?.querySelector('#paperBody');
     if(!box)return;
-    const state=store.get(),cp=combinedPaper(state),rate=cp.start?cp.pnl/cp.start*100:0,b=paperStats(state,'bithumb'),u=paperStats(state,'upbit');
-    box.innerHTML=`<section class="paper-combined"><div class="paper-combined-main"><span>빗썸 + 업비트 현재 실행 가상매매 증감</span><b class="${tone(cp.pnl)}">${cp.pnl>=0?'+':''}${money(cp.pnl)}</b><small>${pct(rate)} · ${cp.markets.toLocaleString('ko-KR')}개 독립 가상계좌 합산</small></div><div class="paper-combined-side"><span><small>시작 가상자금</small><b>${money(cp.start)}</b></span><span><small>현재 평가액</small><b>${money(cp.equity)}</b></span><span><small>현재 보유</small><b>${cp.active}개</b></span></div></section><div class="exchange-paper-grid"><article><header><h3>빗썸</h3><span>${strategyLabel(b.strategy||'adaptive')} · ${n(b.market_count)}개 계좌</span></header>${paperKpis(b)}</article><article><header><h3>업비트</h3><span>${strategyLabel(u.strategy||'adaptive')} · ${n(u.market_count)}개 계좌</span></header>${paperKpis(u)}</article></div><section class="paper-next"><div><h3>왜 전략 비교 숫자와 다를 수 있나요?</h3><p>이 화면은 실제로 실행 중인 가상매매 계좌입니다. ‘전략 비교’는 별도의 시험 계좌이므로 금액과 수익률이 직접 일치하지 않습니다.</p></div><div><button data-paper-tab="coins">코인별 보기</button><button data-paper-tab="compare">거래소별 보기</button></div></section>`;
+    const state=store.get(),cp=combinedPaper(state),rate=cp.start?cp.pnl/cp.start*100:0,normalized=normalizeCapital(cp.start,cp.equity,10000000,rate),b=paperStats(state,'bithumb'),u=paperStats(state,'upbit');
+    box.innerHTML=`<section class="paper-combined"><div class="paper-combined-main"><span>1,000만원 기준 가상매매 성과</span><b class="${tone(normalized.pnl)}">${normalized.pnl>=0?'+':''}${money(normalized.pnl)}</b><small>${pct(normalized.returnPct)} · 빗썸+업비트 ${cp.markets.toLocaleString('ko-KR')}개 독립 가상계좌 성과를 동일 자금으로 환산</small></div><div class="paper-combined-side"><span><small>기준금액</small><b>${money(normalized.base)}</b></span><span><small>환산 평가액</small><b>${money(normalized.equity)}</b></span><span><small>현재 가상 보유</small><b>${cp.active}개</b></span></div></section><div class="exchange-paper-grid"><article><header><h3>빗썸</h3><span>${strategyLabel(b.strategy||'adaptive')} · ${n(b.market_count)}개 계좌</span></header>${paperKpis(b)}</article><article><header><h3>업비트</h3><span>${strategyLabel(u.strategy||'adaptive')} · ${n(u.market_count)}개 계좌</span></header>${paperKpis(u)}</article></div><section class="paper-next"><div><h3>왜 전략 비교 숫자와 다를 수 있나요?</h3><p>이 화면은 실제로 실행 중인 가상매매 계좌입니다. ‘전략 비교’는 별도의 시험 계좌이므로 금액과 수익률이 직접 일치하지 않습니다.</p></div><div><button data-paper-tab="coins">코인별 보기</button><button data-paper-tab="compare">거래소별 보기</button></div></section>`;
   }
 
   function executionStrategies(all,ex){return[...new Set(all.map(r=>paperStrategy(store.get(),ex,r)).filter(Boolean))].sort((a,b)=>a.localeCompare(b))}

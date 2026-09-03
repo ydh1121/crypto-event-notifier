@@ -1,6 +1,6 @@
 import{strategyLab,strategyRows,strategyEquityHistory,strategyCoinMatrix,strategyCoinRows,paperPortfolioHistory,combinedPaper,paperStats}from'../shared/selectors.js';
 import{pageHead,loading,empty,exchangeToggle}from'../shared/components.js';
-import{n,money,pct,tone,esc}from'../shared/format.js';
+import{n,money,pct,tone,esc,normalizeCapital}from'../shared/format.js';
 import{rangeControl,simpleLineChart}from'../shared/charts.js';
 import{scopeBanner}from'../shared/viewer-context.js?v=46';
 
@@ -37,7 +37,7 @@ export function createStrategyPage({store}){
     const candidate=states.filter(x=>x==='candidate').length;
     const warming=states.filter(x=>x==='warming').length;
     const stopped=states.filter(x=>x==='rejected'||x==='paused').length;
-    return`<section class="strategy-overview-summary"><b>${ex==='upbit'?'업비트':'빗썸'} 시험 전략 ${rows.length}개</b><span>후보 통과 ${candidate}</span><span>검증 중 ${warming}</span><span>미충족 · 중지 ${stopped}</span></section>`;
+    return`<section class="strategy-overview-summary"><b>${ex==='upbit'?'업비트':'빗썸'} 시험 전략 ${rows.length}개</b><span>후보 통과 ${candidate}</span><span>검증 중 ${warming}</span><span>미충족 · 중지 ${stopped}</span></section><p class="strategy-sort-note">현재 정렬: 수익률 높은 순 · 추천 순위가 아니라 비교를 위한 정렬입니다.</p>`;
   }
 
   function render(){
@@ -68,9 +68,9 @@ export function createStrategyPage({store}){
     const box=root?.querySelector('#strategyBody');
     if(!box)return;
     const chosen=ensureOverviewSelected(rows),selectedKey=key(chosen);
-    box.innerHTML=`${overviewKpis(rows,criteria,ex)}<section class="strategy-workspace"><div class="strategy-table"><div class="strategy-row columns"><span>전략</span><span>수익률</span><span>최대 하락</span><span>손익비</span><span>거래</span><span>승률</span><span>검증</span></div>${rows.map((r,i)=>{
+    box.innerHTML=`${overviewKpis(rows,criteria,ex)}<section class="strategy-workspace"><div class="strategy-table"><div class="strategy-row columns"><span>전략</span><span>수익률</span><span>최대 하락</span><span>손익비</span><span>거래</span><span>승률</span><span>검증</span></div>${rows.map(r=>{
       const[cLabel,cStatus]=candidateLabel(r,criteria),pf=n(r.profit_factor)>=999?'∞':n(r.profit_factor).toFixed(2);
-      return`<button class="strategy-row ${key(r)===selectedKey?'selected':''}" data-strategy-key="${esc(key(r))}" aria-pressed="${key(r)===selectedKey?'true':'false'}"><span><i>${i+1}</i><b>${esc(r.label||r.style)}</b><small>${esc(r.description||'설명 없음')} · 실험 ID ${esc(r.experiment_id||'-')}</small></span><span class="${tone(r.return_pct)}">${pct(r.return_pct)}</span><span class="${tone(r.max_drawdown_pct)}">${pct(r.max_drawdown_pct)}</span><span>${pf}</span><span>${n(r.closed_trades)}회</span><span>${n(r.win_rate_pct).toFixed(1)}%</span><span><em class="status-badge ${cStatus}">${esc(cLabel)}</em><small>검증 ${n(r.candidate?.passed_gates)}/${n(r.candidate?.total_gates)}</small></span></button>`;
+      return`<button class="strategy-row ${key(r)===selectedKey?'selected':''}" data-strategy-key="${esc(key(r))}" aria-pressed="${key(r)===selectedKey?'true':'false'}"><span><b>${esc(r.label||r.style)}</b><small>${esc(r.description||'설명 없음')}</small></span><span class="${tone(r.return_pct)}">${pct(r.return_pct)}</span><span class="${tone(r.max_drawdown_pct)}">${pct(r.max_drawdown_pct)}</span><span>${pf}</span><span>${n(r.closed_trades)}회</span><span>${n(r.win_rate_pct).toFixed(1)}%</span><span><em class="status-badge ${cStatus}">${esc(cLabel)}</em><small>검증 ${n(r.candidate?.passed_gates)}/${n(r.candidate?.total_gates)}</small></span></button>`;
     }).join('')}</div><aside id="strategyDetail" class="strategy-detail"></aside></section><section id="strategyBreakdown"></section><section id="strategyEvidence"></section>`;
     renderSummary(chosen,criteria);
     renderBreakdown(chosen);
@@ -80,8 +80,8 @@ export function createStrategyPage({store}){
   function renderSummary(r,criteria){
     const box=root?.querySelector('#strategyDetail');
     if(!box||!r)return;
-    const c=r.candidate||{},[label,status]=candidateLabel(r,criteria);
-    box.innerHTML=`<header><span>지금 선택한 전략</span><h3>${esc(r.label||r.style)}</h3><p>${esc(r.description||'전략 설명 없음')}</p><small class="strategy-experiment-ref">실험 ID · ${esc(r.experiment_id||'-')}</small><em class="status-badge ${status}">${esc(label)}</em></header><div class="strategy-detail-kpis"><span><small>전체 수익률</small><b class="${tone(r.return_pct)}">${pct(r.return_pct)}</b></span><span><small>가상 평가액</small><b>${money(r.total_equity_krw)}</b></span><span><small>최대 하락폭</small><b class="${tone(r.max_drawdown_pct)}">${pct(r.max_drawdown_pct)}</b></span><span><small>번 돈 ÷ 잃은 돈</small><b>${n(r.profit_factor)>=999?'∞':n(r.profit_factor).toFixed(2)}</b></span><span><small>완료 거래</small><b>${n(r.closed_trades)}회</b></span><span><small>승률</small><b>${n(r.win_rate_pct).toFixed(1)}%</b></span><span><small>거래당 평균 결과</small><b>${pct(r.expectancy_pct)}</b></span><span><small>수익 종목 비율</small><b>${pct(n(c.profitable_market_share)*100)}</b></span></div><p class="strategy-detail-next">아래에서 이 전략이 각 코인에서 얼마나 벌고 잃었는지 전체 내역을 바로 확인할 수 있습니다.</p>`;
+    const c=r.candidate||{},[label,status]=candidateLabel(r,criteria),normalized=normalizeCapital(r.initial_capital_krw,r.total_equity_krw,10000000,r.return_pct);
+    box.innerHTML=`<header><span>지금 선택한 전략</span><h3>${esc(r.label||r.style)}</h3><p>${esc(r.description||'전략 설명 없음')}</p><em class="status-badge ${status}">${esc(label)}</em></header><div class="strategy-detail-kpis"><span><small>전체 수익률</small><b class="${tone(r.return_pct)}">${pct(r.return_pct)}</b></span><span><small>1,000만원 기준 평가액</small><b>${money(normalized.equity)}</b></span><span><small>최대 하락폭</small><b class="${tone(r.max_drawdown_pct)}">${pct(r.max_drawdown_pct)}</b></span><span><small>번 돈 ÷ 잃은 돈</small><b>${n(r.profit_factor)>=999?'∞':n(r.profit_factor).toFixed(2)}</b></span><span><small>완료 거래</small><b>${n(r.closed_trades)}회</b></span><span><small>승률</small><b>${n(r.win_rate_pct).toFixed(1)}%</b></span><span><small>거래당 평균 결과</small><b>${pct(r.expectancy_pct)}</b></span><span><small>수익 종목 비율</small><b>${pct(n(c.profitable_market_share)*100)}</b></span></div><p class="strategy-detail-next">1,000만원을 같은 수익률로 운용했다고 가정한 환산값입니다. 아래에서 이 전략이 각 코인에서 얼마나 벌고 잃었는지 확인할 수 있습니다.</p>`;
   }
 
   function breakdownItems(chosen){
@@ -157,8 +157,8 @@ export function createStrategyPage({store}){
   function renderPaperBenchmark(){
     const box=root?.querySelector('#strategyBody');
     if(!box)return;
-    const state=store.get(),cp=combinedPaper(state),b=paperStats(state,'bithumb'),u=paperStats(state,'upbit'),range=ui().strategyRange||'24h',combined=paperPortfolioHistory(state,'combined'),bh=paperPortfolioHistory(state,'bithumb'),uh=paperPortfolioHistory(state,'upbit'),latest=combined[combined.length-1]||{};
-    box.innerHTML=`<section class="strategy-paper-head"><div><span>현재 실행 중인 가상매매 · Adaptive</span><h3>현재 실행 방식의 성적</h3><p>시험 전략을 선택해도 이 화면은 바뀌지 않습니다. 실제 실행 PAPER 기준선만 보여줍니다.</p></div>${rangeControl('data-strategy-range',range)}</section><section class="strategy-paper-kpis"><span><small>전체 평가액</small><b>${money(cp.equity)}</b></span><span><small>전체 증감</small><b class="${tone(cp.pnl)}">${cp.pnl>=0?'+':''}${money(cp.pnl)}</b></span><span><small>현재 하락폭</small><b class="${tone(latest.drawdown_pct)}">${pct(latest.drawdown_pct)}</b></span><span><small>현재 보유</small><b>${n(cp.active)}개</b></span><span><small>빗썸 증감</small><b class="${tone(b.pnl)}">${b.pnl>=0?'+':''}${money(b.pnl)}</b></span><span><small>업비트 증감</small><b class="${tone(u.pnl)}">${u.pnl>=0?'+':''}${money(u.pnl)}</b></span></section><section class="strategy-paper-charts">${simpleLineChart('Adaptive 가상계좌 자산곡선',combined,'equity_krw',{range,className:'primary',suffix:'원'})}${simpleLineChart('Adaptive 가상계좌 하락폭',combined,'drawdown_pct',{range,className:'sell',suffix:'%'})}${simpleLineChart('빗썸 Adaptive 수익률',bh,'return_pct',{range,className:'regime',suffix:'%'})}${simpleLineChart('업비트 Adaptive 수익률',uh,'return_pct',{range,className:'entry',suffix:'%'})}</section>`;
+    const state=store.get(),cp=combinedPaper(state),normalized=normalizeCapital(cp.start,cp.equity,10000000,cp.start?cp.pnl/cp.start*100:0),b=paperStats(state,'bithumb'),u=paperStats(state,'upbit'),range=ui().strategyRange||'24h',combined=paperPortfolioHistory(state,'combined'),bh=paperPortfolioHistory(state,'bithumb'),uh=paperPortfolioHistory(state,'upbit'),latest=combined[combined.length-1]||{};
+    box.innerHTML=`<section class="strategy-paper-head"><div><span>현재 실행 중인 가상매매 · Adaptive</span><h3>현재 실행 방식의 성적</h3><p>시험 전략을 선택해도 이 화면은 바뀌지 않습니다. 현재 실행 가상매매 기준선만 보여줍니다.</p></div>${rangeControl('data-strategy-range',range)}</section><section class="strategy-paper-kpis"><span><small>1,000만원 기준 평가액</small><b>${money(normalized.equity)}</b></span><span><small>1,000만원 기준 증감</small><b class="${tone(normalized.pnl)}">${normalized.pnl>=0?'+':''}${money(normalized.pnl)}</b></span><span><small>현재 하락폭</small><b class="${tone(latest.drawdown_pct)}">${pct(latest.drawdown_pct)}</b></span><span><small>현재 보유</small><b>${n(cp.active)}개</b></span><span><small>빗썸 수익률</small><b class="${tone(b.returnPct)}">${pct(b.returnPct)}</b></span><span><small>업비트 수익률</small><b class="${tone(u.returnPct)}">${pct(u.returnPct)}</b></span></section><section class="strategy-paper-charts">${simpleLineChart('Adaptive 가상계좌 자산곡선',combined,'equity_krw',{range,className:'primary',suffix:'원'})}${simpleLineChart('Adaptive 가상계좌 하락폭',combined,'drawdown_pct',{range,className:'sell',suffix:'%'})}${simpleLineChart('빗썸 Adaptive 수익률',bh,'return_pct',{range,className:'regime',suffix:'%'})}${simpleLineChart('업비트 Adaptive 수익률',uh,'return_pct',{range,className:'entry',suffix:'%'})}</section>`;
   }
 
   const click=e=>{
