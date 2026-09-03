@@ -38,27 +38,36 @@ No page-specific `scrollTop` copy/paste and no broad DOM `MutationObserver` cont
 
 Primary target user is a Korean crypto buyer/seller in their 60s who is not expected to interpret developer, quant or internal research terminology.
 
-Completed in the first Build 48 pass:
-- `cloudflare-pages/public/index.html` now enables `data-reader-baseline="senior"` and loads `senior-default.css` last so older density rules cannot shrink the default interface again
+Completed in the current Build 48 pass:
+- `cloudflare-pages/public/index.html` enables `data-reader-baseline="senior"` and loads `senior-default.css` last so older density rules cannot shrink the default interface again
 - common body/menu/meta copy is raised toward a 13~16px hierarchy; routine controls target at least 44px and key inputs 48px
 - existing `content-priority.css` remains authoritative for visual order; it already pushes coin-finder listing research, holdings history and sector research material behind the primary user task flow even when source render order is older
-- combined and per-exchange current PAPER results now present a normalized 10,000,000 KRW comparison instead of leading with the sum of many independent virtual accounts
+- combined and per-exchange current PAPER results present a normalized 10,000,000 KRW comparison instead of leading with the sum of many independent virtual accounts
 - strategy detail uses the same 10,000,000 KRW normalized comparison basis while underlying strategy/PAPER source calculations remain unchanged
-- numeric strategy ranking was removed from the default list; the UI explicitly states `수익률 높은 순` is a sort order and not a recommendation rank
-- experiment IDs were removed from the default strategy list/detail summary; research IDs remain available only in deeper evidence/comparison surfaces
+- numeric strategy ranking was removed from the default list; `수익률 높은 순` is explicitly described as a sort order rather than a recommendation rank
+- experiment IDs were removed from the default strategy list/detail summary; research IDs remain only in deeper evidence/comparison surfaces
+- `shared/holding-plan.js` converts the existing PAPER `trade_plan` into ordinary-language holding guidance without creating new trade logic
+- the default holdings flow now answers `지금 물타기해도 될까?` first, then shows next review price, remaining/total rounds, stop-adding level, target reference and current PAPER suggested weight
+- because actual holding exchange is not yet stored, the Viewer requires an explicit Bithumb/Upbit reference selection before presenting holding-plan prices rather than guessing an exchange
+- the user can enter a total additional-buy budget; the first round uses the current real PAPER `next_add_price`, later rows are explicitly labeled estimates based on the current `add_step_pct`, and no row is generated at/below the PAPER hard stop
+- the holding plan states stop conditions: no remaining rounds, sell/error state, hard-stop boundary, or weakened conditions on the next strategy recalculation
+- profit protection is shown as three price/condition stages using existing PAPER fields only: first protection activation, dynamic target, and trailing high-water protection; no arbitrary 30/30/40 partial-sell ratio is invented
+- a persistent global `간편 보기 / 상세 보기` mode is implemented. `간편 보기` is the default and hides specialist research scores, deep charts, secondary calculators and internal evidence while `상세 보기` restores the existing surfaces without deleting data
+- Records now defaults to `내 매매·판단` with buy/sell/decision changes only; `시스템·학습` is a separate persisted scope for learning adjustments, errors and safety blocks
+- high-frequency holding/Records copy has been moved toward ordinary Korean while technical evidence remains available in detail/internal views
 
 Still open in this UX pass:
-- material US macro schedule / US market index / news context requires a real data/source contract; do not fake placeholder current-event data
-- averaging-down must advance from arithmetic calculator to a bounded decision plan with wait/buy state, next review price, remaining budget, max rounds, per-round price/amount and stop-adding condition
-- profit-taking needs staged first/second/final exits plus break-even/profit-protection rules
-- holding-specific plan prices must identify or let the user choose the actual holding exchange
-- simple/detail mode should hide specialist research evidence by default without deleting it
-- user trade/decision history should be separated from system/learning logs
-- terminology, non-color state cues and desktop/phone screenshot QA remain open
+- material US macro schedule / major US market index / material news must consume the existing Phase 5 calendar/news data contract; do not create a Viewer-only collector or fake current-event placeholders
+- persist actual holding exchange in local holdings data so the reference exchange can be preselected automatically
+- staged profit protection deliberately has no partial-sell percentages until a real allocation/execution policy is defined
+- complete remaining terminology cleanup where it does not damage technical accuracy
+- add consistent non-color state cues (`▲/▼`, 수익/손실, explicit status text)
+- desktop and current-phone screenshot/interaction QA remains required
 
 Validation note:
-- Build 48 source changes are intentionally Viewer-only and do not alter PAPER order logic, strategy selection logic, DEX forward-validation rules or live-trading boundaries
-- GitHub Actions for the latest Build 48 head must be checked before marking Viewer validation complete
+- Build 48 source changes remain Viewer-only and do not alter PAPER order logic, strategy selection logic, DEX forward-validation rules or live-trading boundaries
+- commit `8686fb8` completed 28 GitHub Actions with no failure/queued/in-progress result
+- the newer simple/detail + Records split head must complete its own Actions before Build 48 code validation is marked closed
 
 ## Current market-intelligence implementation status
 
@@ -139,16 +148,18 @@ Validation:
 - Build 71 Windows runtime at HEAD `4f65082`: contract PASS, Build 70 ledger PASS, Build 71 runtime PASS with no early statistics
 - Build 69 scheduler local full Python suite 266 tests, server-off verifier, scheduler contract, Build 39/43 supervisor regression and Build 65~71 contract chain PASS
 - Build 69 scheduler Windows runtime remains explicitly pending because the server is off; no process or network call was started for source validation
-- Build 48 Viewer CI/visual validation is pending on the latest branch head
+- Build 48 baseline through `8686fb8`: 28 GitHub Actions completed with no failure/queued/in-progress result
+- Build 48 simple/detail + Records split latest-head CI/visual validation remains pending
 - PR #1 remains Draft/unmerged
 
 Immediate next action:
-1. verify the latest Build 48 Viewer head through GitHub Actions/static Viewer checks, then perform desktop + phone screenshot QA before closing the readability pass
-2. leave the normal server on to let the 15-minute Build 69 process accumulate new official KRW listing samples automatically; manual Build 67 → 68 → 66 invocations are no longer the normal path
-3. while Build 70 remains below 30 event/20 unique asset labels per core window, require Build 71 to stay `waiting_for_forward_sample` with no validation statistics
-4. rerun Build 70 and Build 71 after labels mature; do not inspect or fit forward statistics before the frozen readiness gate opens
-5. only a real Build 71 forward PASS may open Build 72 implementation. A FAIL means retire v2 or preregister a new hypothesis with a new forward cutoff, not tune v2 on the consumed validation sample
-6. preserve the still-open Build 39 live CEX data QA, Viewer visual QA and actual-new-listing end-to-end profile/facet QA as parallel operational debt
+1. finish GitHub Actions for the latest Build 48 head, then perform desktop + phone screenshot QA of senior typography, holding plan, simple/detail toggle and Records split
+2. add consistent non-color state cues after visual QA identifies the high-frequency surfaces that still rely on red/green alone
+3. persist actual holding exchange in local holdings data; until then keep explicit user reference-exchange selection fail-safe
+4. connect US macro/index/news context only through the existing Phase 5 data contract
+5. leave the normal server on to let the 15-minute Build 69 process accumulate new official KRW listing samples automatically; manual Build 67 → 68 → 66 invocations are no longer the normal path
+6. while Build 70 remains below 30 event/20 unique asset labels per core window, require Build 71 to stay `waiting_for_forward_sample` with no validation statistics
+7. only a real Build 71 forward PASS may open Build 72 implementation; a FAIL means retire v2 or preregister a new hypothesis with a new forward cutoff, not tune v2 on the consumed validation sample
 
 ## Hard boundary
 
