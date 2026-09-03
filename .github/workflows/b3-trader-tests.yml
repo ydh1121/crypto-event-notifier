@@ -124,27 +124,37 @@ jobs:
           set -euo pipefail
           for file in \
             public/index.html public/modules/main.js public/modules/core/router.js public/modules/core/store.js \
-            public/modules/shared/selectors.js public/modules/shared/charts.js \
+            public/modules/shared/selectors.js public/modules/shared/charts.js public/modules/shared/viewer-context.js \
             public/modules/pages/dashboard.js public/modules/pages/research.js public/modules/pages/assets.js \
-            public/modules/pages/paper.js public/modules/pages/strategy.js public/modules/pages/sectors.js \
-            public/modules/pages/records.js public/modules/pages/system.js public/modules/services/coin-profile.js public/modules/services/sectors.js \
+            public/modules/pages/paper.js public/modules/pages/strategy.js public/modules/pages/sectors-v36.js \
+            public/modules/pages/sector-coin-table.js public/modules/pages/records.js public/modules/pages/system.js \
+            public/modules/services/coin-profile.js public/modules/services/sectors.js \
             public/modules/styles/strategy.css public/modules/styles/sectors.css public/modules/styles/records-system.css \
-            public/modules/styles/exchange-ui.css public/modules/styles/build32.css \
+            public/modules/styles/exchange-ui.css public/modules/styles/build32.css public/modules/styles/viewer-context.css \
             functions/api/sector-summary.ts functions/api/coin-profile.ts functions/api/ingest-coin-profiles.ts \
             functions/api/coin-profile-backlog.ts functions/lib/coin-taxonomy.ts \
             migrations/0004_coin_profile_cache.sql migrations/0005_coin_profile_evidence.sql; do
             test -s "$file"
           done
-          grep -Eq 'crypto-viewer-build" content="2026\.08\.27-(3[5-9]|[4-9][0-9]|[1-9][0-9]{2,})' public/index.html
+          grep -Eq 'crypto-viewer-build" content="20[0-9]{2}\.[0-9]{2}\.[0-9]{2}-[1-9][0-9]*"' public/index.html
           grep -Eq 'type="module" src="/modules/main\.js\?v=(1[2-9]|[2-9][0-9]+)"' public/index.html
           grep -q '/modules/styles/records-system.css?v=5' public/index.html
+          grep -q '/modules/styles/viewer-context.css?v=45' public/index.html
+          grep -q 'data-route="system"' public/index.html
           grep -q 'system.js?v=35' public/modules/main.js
-          grep -q '프로젝트별 설명 수집 중' public/modules/pages/sectors.js
-          grep -q 'profile.business_summary_ko' public/modules/pages/sectors.js
-          ! grep -q "chosen?.sector_business||''" public/modules/pages/sectors.js
-          grep -q '근거 출처' public/modules/pages/sectors.js
-          grep -q 'match_confidence' public/modules/pages/sectors.js
-          grep -q '프로젝트 조사' public/modules/pages/sectors.js
+          grep -q 'paper.js?v=45' public/modules/main.js
+          grep -q 'strategy.js?v=45' public/modules/main.js
+          grep -q 'sectors-v36.js?v=45' public/modules/main.js
+          grep -q '프로젝트별 설명 확인 중' public/modules/pages/sectors-v36.js
+          grep -q 'profile.business_summary_ko' public/modules/pages/sectors-v36.js
+          ! grep -q "chosen?.sector_business||''" public/modules/pages/sectors-v36.js
+          grep -q '근거 출처' public/modules/pages/sectors-v36.js
+          grep -q 'match_confidence' public/modules/pages/sectors-v36.js
+          grep -q '프로젝트 조사' public/modules/pages/sectors-v36.js
+          grep -q 'return24h' public/modules/pages/sector-coin-table.js
+          grep -q 'return7d' public/modules/pages/sector-coin-table.js
+          grep -q 'return30d' public/modules/pages/sector-coin-table.js
+          grep -q 'sector-coin-expanded' public/modules/pages/sector-coin-table.js
           grep -q 'business_summary_ko' functions/api/ingest-coin-profiles.ts
           grep -q 'evidence_json' functions/api/ingest-coin-profiles.ts
           grep -q 'env.DB.batch' functions/api/ingest-coin-profiles.ts
@@ -159,10 +169,14 @@ jobs:
           grep -q 'strategyEquityHistory' public/modules/shared/selectors.js
           grep -q 'strategyCoinRows' public/modules/shared/selectors.js
           grep -q 'paperPortfolioHistory' public/modules/shared/selectors.js
+          grep -q 'EXECUTION PAPER' public/modules/shared/viewer-context.js
+          grep -q 'SHADOW STRATEGY LAB' public/modules/shared/viewer-context.js
+          grep -q '실행 전략' public/modules/pages/paper.js
           grep -q '전략 equity curve' public/modules/pages/strategy.js
+          grep -q 'experiment_id' public/modules/pages/strategy.js
           grep -q '코인별 성과' public/modules/pages/strategy.js
           grep -q '코인 × 전략' public/modules/pages/strategy.js
-          grep -q '전체 PAPER equity / drawdown' public/modules/pages/strategy.js
+          grep -q 'Adaptive 기준계좌 equity / drawdown' public/modules/pages/strategy.js
           grep -q 'SQLite · Drive 백업' public/modules/pages/system.js
           grep -q 'BUY_CANDIDATE 알림' public/modules/pages/system.js
           grep -q '휴대폰 · 원격 접속' public/modules/pages/system.js
