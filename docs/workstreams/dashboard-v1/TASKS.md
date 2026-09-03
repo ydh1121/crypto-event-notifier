@@ -152,13 +152,14 @@ Target user: a Korean crypto buyer/seller in their 60s who is not a developer, q
 - [x] Normalize per-exchange PAPER KPI money and selected-strategy evaluation money to a 10,000,000 KRW comparison basis
 - [x] Remove numeric strategy ranking from the default strategy list and state explicitly that the current order is a return sort, not a recommendation rank
 - [x] Remove experiment ID from the default strategy list/detail summary; retain research identifiers only where advanced comparison evidence needs them
-- [ ] Add user-facing US macro schedule / major US market index / material-news context without inventing or stale-caching event data
-- [ ] Turn averaging-down from a calculator into a decision plan: wait/buy state, next review price, remaining budget, max rounds, per-round price/amount and stop-adding condition
-- [ ] Add staged profit-taking guidance: first/second/final take-profit plus break-even/profit-protection conditions
-- [ ] Show or let the user select the actual holding exchange before presenting holding-specific plan prices
-- [ ] Add global simple/detail mode so research scores, order-book/volatility data, lifecycle/internal ids and other specialist evidence stay collapsed by default
-- [ ] Separate user trade/decision history from system/learning logs in the default Records view
-- [ ] Continue copy cleanup from PAPER/research/sector/opportunity/regime/entry/drawdown terminology to ordinary Korean where it does not damage technical accuracy
+- [ ] Add user-facing US macro schedule / major US market index / material-news context without inventing or stale-caching event data; consume the existing Phase 5 data contract rather than creating a Viewer-only collector
+- [x] Turn averaging-down from a calculator into a bounded decision plan: wait/buy/stop state, next review price, remaining/max rounds, user-entered remaining budget, per-round amount, first PAPER review price, explicitly estimated later prices and stop-adding conditions
+- [-] Add staged profit-taking guidance: first profit-protection level, dynamic PAPER target and final trailing protection are shown; do not invent partial-sell percentages until a real execution/allocation policy exists
+- [x] Require the user to select Bithumb/Upbit reference before holding-specific plan prices because actual holding exchange is not yet persisted
+- [ ] Persist the actual holding exchange in local holdings data so the Viewer can preselect it instead of asking every session/coin
+- [x] Add global simple/detail mode; default simple mode hides specialist research scores, deep charts, internal evidence and secondary calculators without deleting data, and detailed mode restores the existing surfaces
+- [x] Separate user trade/decision history from system/learning logs in the default Records view; `내 매매·판단` is the default and `시스템·학습` is a separate persisted scope
+- [-] Continue copy cleanup from PAPER/research/sector/opportunity/regime/entry/drawdown terminology to ordinary Korean where it does not damage technical accuracy; holding-plan and Records high-frequency copy has been converted
 - [ ] Add non-color state cues consistently (`▲/▼`, 수익/손실, 상태 text) and complete screenshot QA on desktop + phone
 
 ## Validation status
@@ -176,7 +177,8 @@ Target user: a Korean crypto buyer/seller in their 60s who is not a developer, q
 - [x] Build 71 local compile/unit/contract/Build 63·65~70 regression PASS; commit `5c8081d`의 전용 Build 71 CI와 전체 B3 trader CI 모두 PASS; Windows HEAD `4f65082`에서 Build 71 contract/runtime PASS 및 통계 미실행 대기 상태 확인
 - [x] Build 69 scheduler local source validation: full Python suite 266 tests, scheduler/server-off contract, Build 39/43 supervisor regressions, Build 65~71 contract chain PASS
 - [x] Build 69 scheduler Windows live runtime PASS: scheduler running/fresh, process lock acquired, PAPER/shadow-only, order/PAPER-A-B/live unwired, research supervisor fresh, generic historical listing/DEX disabled, first cycle `attempts=1 / successes=1 / failures=0`, no safety violations
-- [-] Build 48 senior-default Viewer CI / visual regression validation in progress
+- [x] Build 48 senior-default baseline through commit `8686fb8`: 28 GitHub Actions completed with no failure/queued/in-progress result
+- [-] Build 48 simple/detail + Records split latest-head CI and desktop/phone visual regression validation in progress
 - [x] PR #1 remains Draft and unmerged
 
 ## Completion condition
