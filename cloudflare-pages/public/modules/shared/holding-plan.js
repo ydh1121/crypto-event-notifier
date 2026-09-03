@@ -49,7 +49,7 @@ export function buildHoldingPlanGuidance({row=null,plan={}}={}){
 
 export function buildHoldingBudgetSchedule({row=null,plan={},totalBudget=0}={}){
   const guide=buildHoldingPlanGuidance({row,plan});
-  const budget=Math.max(0,n(totalBudget));
+  const budget=Math.max(0,Math.round(n(totalBudget)));
   const remaining=Math.min(8,guide.remainingEntries);
   const firstPrice=Math.max(0,guide.nextPrice);
   const step=Math.max(0,guide.addStepPct)/100;
@@ -63,7 +63,8 @@ export function buildHoldingBudgetSchedule({row=null,plan={},totalBudget=0}={}){
   }
   if(!candidates.length)return{rows:[],budget,remainingEntries:remaining,allocatedBudget:0,unallocatedBudget:budget,usesEstimatedPrices:false};
 
-  const unit=Math.floor(budget/candidates.length/1000)*1000;
+  const rawUnit=Math.floor(budget/candidates.length);
+  const unit=rawUnit>=1000?Math.floor(rawUnit/1000)*1000:rawUnit;
   let allocated=0;
   const rows=candidates.map((candidate,index)=>{
     const amount=index===candidates.length-1?Math.max(0,budget-allocated):unit;
