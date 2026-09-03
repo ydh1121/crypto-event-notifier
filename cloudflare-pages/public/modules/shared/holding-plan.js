@@ -46,3 +46,32 @@ export function buildHoldingPlanGuidance({row=null,plan={}}={}){
     note:String(plan?.plan_note||'가격 하나만으로 주문하지 않고 시장 상태를 함께 다시 확인합니다.')
   };
 }
+
+export function buildHoldingBudgetSchedule({row=null,plan={},totalBudget=0}={}){
+  const guide=buildHoldingPlanGuidance({row,plan});
+  const budget=Math.max(0,n(totalBudget));
+  const remaining=Math.min(8,guide.remainingEntries);
+  const firstPrice=Math.max(0,guide.nextPrice);
+  const step=Math.max(0,guide.addStepPct)/100;
+  if(!budget||!remaining||!firstPrice)return{rows:[],budget,remainingEntries:remaining,allocatedBudget:0,unallocatedBudget:budget,usesEstimatedPrices:false};
+
+  const candidates=[];
+  for(let index=0;index<remaining;index+=1){
+    const estimatedPrice=index===0?firstPrice:firstPrice*Math.pow(Math.max(0.01,1-step),index);
+    if(guide.stopPrice>0&&estimatedPrice<=guide.stopPrice)break;
+    candidates.push({round:index+1,price:estimatedPrice,priceSource:index===0?'paper_next':'estimated_step'});
+  }
+  if(!candidates.length)return{rows:[],budget,remainingEntries:remaining,allocatedBudget:0,unallocatedBudget:budget,usesEstimatedPrices:false};
+
+  const unit=Math.floor(budget/candidates.length/1000)*1000;
+  let allocated=0;
+  const rows=candidates.map((candidate,index)=>{
+    const amount=index===candidates.length-1?Math.max(0,budget-allocated):unit;
+    allocated+=amount;
+    return{...candidate,amount_krw:amount};
+  });
+  return{
+    rows,budget,remainingEntries:remaining,allocatedBudget:allocated,unallocatedBudget:Math.max(0,budget-allocated),
+    usesEstimatedPrices:rows.some(item=>item.priceSource==='estimated_step')
+  };
+}
