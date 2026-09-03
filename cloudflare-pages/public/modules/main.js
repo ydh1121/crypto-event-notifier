@@ -7,14 +7,14 @@ import{age,esc}from'./shared/format.js';
 import{installSectorImeGuard}from'./shared/sector-ime-guard.js?v=37';
 import{installTableSortEnhancer}from'./shared/table-sort-enhancer.js?v=37';
 import{installSamePageInteractionContinuity}from'./shared/ui-continuity.js?v=38';
-import{createHomePage}from'./pages/home.js?v=46';
+import{createHomePage}from'./pages/home.js?v=47';
 import{createDashboardPage}from'./pages/dashboard.js';
 import{createResearchPage}from'./pages/research.js?v=40';
 import{installDexLaunchResearchPanel}from'./pages/dex-launch-panel.js?v=44';
 import{createAssetsPage}from'./pages/assets.js';
-import{createPaperPage}from'./pages/paper.js?v=45';
-import{createStrategyPage}from'./pages/strategy.js?v=45';
-import{createSectorsPage}from'./pages/sectors-v36.js?v=45';
+import{createPaperPage}from'./pages/paper.js?v=46';
+import{createStrategyPage}from'./pages/strategy.js?v=46';
+import{createSectorsPage}from'./pages/sectors-v36.js?v=46';
 import{createRecordsPage}from'./pages/records.js';
 import{createSystemPage}from'./pages/system.js?v=35';
 installSectorImeGuard();installTableSortEnhancer();
@@ -22,7 +22,7 @@ const root=document.getElementById('pageRoot'),nav=document.getElementById('main
 installSamePageInteractionContinuity(root);installDexLaunchResearchPanel({store,root});
 let router=null;
 const pages={dashboard:()=>createHomePage({store,navigate:n=>router.go(n)}),'dashboard-detail':()=>createDashboardPage({store,navigate:n=>router.go(n)}),research:()=>createResearchPage({store}),assets:()=>createAssetsPage({store}),paper:()=>createPaperPage({store}),strategy:()=>createStrategyPage({store}),sectors:()=>createSectorsPage({store,navigate:n=>router.go(n)}),records:()=>createRecordsPage({store}),system:()=>createSystemPage({store})};
-const GROUPS={dashboard:[['dashboard','오늘 보기'],['dashboard-detail','상세 현황']],'dashboard-detail':[['dashboard','오늘 보기'],['dashboard-detail','상세 현황']],paper:[['paper','매매 성적'],['strategy','전략 비교']],strategy:[['paper','매매 성적'],['strategy','전략 비교']]};
+const GROUPS={dashboard:[['dashboard','오늘 보기'],['dashboard-detail','상세 현황']],'dashboard-detail':[['dashboard','오늘 보기'],['dashboard-detail','상세 현황']],paper:[['paper','가상매매'],['strategy','전략 비교']],strategy:[['paper','가상매매'],['strategy','전략 비교']]};
 function renderJourneyNav(name){if(root)root.dataset.pageRoute=name;if(!journeyNav)return;const items=GROUPS[name]||[];journeyNav.classList.toggle('hidden',!items.length);journeyNav.innerHTML=items.map(([route,label])=>`<button data-journey-route="${route}" class="${route===name?'active':''}">${label}</button>`).join('')}
 journeyNav?.addEventListener('click',e=>{const b=e.target.closest('[data-journey-route]');if(b)router.go(b.dataset.journeyRoute)});
 router=createRouter({store,root,nav,pages,onChange:renderJourneyNav});

@@ -131,6 +131,7 @@ jobs:
             public/modules/services/coin-profile.js public/modules/services/sectors.js \
             public/modules/styles/strategy.css public/modules/styles/sectors.css public/modules/styles/records-system.css \
             public/modules/styles/exchange-ui.css public/modules/styles/build32.css public/modules/styles/viewer-context.css \
+            scripts/check-ux-state-contract.mjs \
             functions/api/sector-summary.ts functions/api/coin-profile.ts functions/api/ingest-coin-profiles.ts \
             functions/api/coin-profile-backlog.ts functions/lib/coin-taxonomy.ts \
             migrations/0004_coin_profile_cache.sql migrations/0005_coin_profile_evidence.sql; do
@@ -141,10 +142,11 @@ jobs:
           grep -q '/modules/styles/records-system.css?v=5' public/index.html
           grep -q '/modules/styles/viewer-context.css?v=45' public/index.html
           grep -q 'data-route="system"' public/index.html
+          grep -q 'data-route="sectors"' public/index.html
           grep -q 'system.js?v=35' public/modules/main.js
-          grep -q 'paper.js?v=45' public/modules/main.js
-          grep -q 'strategy.js?v=45' public/modules/main.js
-          grep -q 'sectors-v36.js?v=45' public/modules/main.js
+          grep -q 'paper.js?v=46' public/modules/main.js
+          grep -q 'strategy.js?v=46' public/modules/main.js
+          grep -q 'sectors-v36.js?v=46' public/modules/main.js
           grep -q '프로젝트별 설명 확인 중' public/modules/pages/sectors-v36.js
           grep -q 'profile.business_summary_ko' public/modules/pages/sectors-v36.js
           ! grep -q "chosen?.sector_business||''" public/modules/pages/sectors-v36.js
@@ -155,6 +157,7 @@ jobs:
           grep -q 'return7d' public/modules/pages/sector-coin-table.js
           grep -q 'return30d' public/modules/pages/sector-coin-table.js
           grep -q 'sector-coin-expanded' public/modules/pages/sector-coin-table.js
+          grep -q 'aria-pressed' public/modules/pages/sector-coin-table.js
           grep -q 'business_summary_ko' functions/api/ingest-coin-profiles.ts
           grep -q 'evidence_json' functions/api/ingest-coin-profiles.ts
           grep -q 'env.DB.batch' functions/api/ingest-coin-profiles.ts
@@ -169,14 +172,16 @@ jobs:
           grep -q 'strategyEquityHistory' public/modules/shared/selectors.js
           grep -q 'strategyCoinRows' public/modules/shared/selectors.js
           grep -q 'paperPortfolioHistory' public/modules/shared/selectors.js
-          grep -q 'EXECUTION PAPER' public/modules/shared/viewer-context.js
-          grep -q 'SHADOW STRATEGY LAB' public/modules/shared/viewer-context.js
+          grep -q '현재 실행 가상매매' public/modules/shared/viewer-context.js
+          grep -q '전략 비교용 가상계좌' public/modules/shared/viewer-context.js
           grep -q '실행 전략' public/modules/pages/paper.js
-          grep -q '전략 equity curve' public/modules/pages/strategy.js
+          grep -q 'data-paper-strategy' public/modules/pages/paper.js
+          grep -q '전략 자산곡선' public/modules/pages/strategy.js
           grep -q 'experiment_id' public/modules/pages/strategy.js
           grep -q '코인별 성과' public/modules/pages/strategy.js
           grep -q '코인 × 전략' public/modules/pages/strategy.js
-          grep -q 'Adaptive 기준계좌 equity / drawdown' public/modules/pages/strategy.js
+          grep -q 'data-strategy-coin-experiment' public/modules/pages/strategy.js
+          grep -q '현재 실행 방식의 성적' public/modules/pages/strategy.js
           grep -q 'SQLite · Drive 백업' public/modules/pages/system.js
           grep -q 'BUY_CANDIDATE 알림' public/modules/pages/system.js
           grep -q '휴대폰 · 원격 접속' public/modules/pages/system.js
@@ -190,6 +195,7 @@ jobs:
           test -s ../docs/VIEWER_BUILD34_PLAN.md
           test -s ../docs/VIEWER_BUILD35_PLAN.md
           test -s ../docs/VIEWER_REBUILD_CHECKLIST.md
+          test -s ../docs/VIEWER_UX_STATE_AUDIT_2026-09-03.md
           grep -q '전체 코인 사업·섹터 전수조사' ../docs/VIEWER_BUILD32_PLAN.md
           grep -q 'Strategy / PAPER Performance Analytics' ../docs/VIEWER_BUILD33_PLAN.md
           grep -q 'Operations Visibility' ../docs/VIEWER_BUILD34_PLAN.md

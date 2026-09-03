@@ -2,20 +2,20 @@ import{patchPreservingUi}from'../shared/ui-continuity.js';
 const ROUTES=new Set(['dashboard','dashboard-detail','research','assets','paper','strategy','sectors','records','system']);
 const NAV_PARENT={
   'dashboard-detail':'dashboard',
-  sectors:'research',
   strategy:'paper',
 };
-function routeContext(ui,name){
+export function navRouteFor(name){return NAV_PARENT[name]||name}
+export function routeContextFor(ui,name){
   if(name==='research')return{exchange:ui.researchExchange,market:ui.researchMarket};
   if(name==='sectors')return{exchange:ui.sectorExchange,market:ui.sectorCoinMarket};
   if(name==='paper')return{exchange:ui.paperExchange,market:ui.paperMarket};
-  if(name==='strategy')return{exchange:ui.strategyExchange,market:ui.strategyCoinMarket};
-  if(name==='assets')return{exchange:ui.researchExchange,market:ui.assetMarket};
+  if(name==='strategy')return{exchange:ui.strategyExchange,market:ui.strategyTab==='matrix'?ui.strategyCoinMarket:''};
+  if(name==='assets')return{exchange:'',market:ui.assetMarket};
   return{exchange:'',market:''};
 }
 function carryContext(store,from,to){
   if(!from||from===to)return;
-  const ui=store.get().ui,ctx=routeContext(ui,from),patch={};
+  const ui=store.get().ui,ctx=routeContextFor(ui,from),patch={};
   if(to==='research'){
     if(ctx.exchange)patch.researchExchange=ctx.exchange;
     if(ctx.market)patch.researchMarket=ctx.market;
@@ -35,7 +35,7 @@ function carryContext(store,from,to){
 }
 export function createRouter({store,root,nav,pages,onChange}){
   let current=null,currentName='';
-  function syncNav(name){const active=NAV_PARENT[name]||name;nav?.querySelectorAll('[data-route]').forEach(b=>b.classList.toggle('active',b.dataset.route===active))}
+  function syncNav(name){const active=navRouteFor(name);nav?.querySelectorAll('[data-route]').forEach(b=>b.classList.toggle('active',b.dataset.route===active))}
   function go(name,{replace=false}={}){
     if(!ROUTES.has(name))name='dashboard';
     if(currentName===name){patchPreservingUi(root,()=>current?.render?.(),{scrollSelectors:['[data-preserve-scroll]']});syncNav(name);onChange?.(name);return}

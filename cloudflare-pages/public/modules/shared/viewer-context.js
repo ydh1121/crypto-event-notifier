@@ -14,8 +14,8 @@ export function strategyLabel(value){
 
 export function scopeBanner(kind,{strategy='adaptive'}={}){
   if(kind==='strategy'){
-    return`<section class="viewer-scope viewer-scope-shadow"><div><span>SHADOW STRATEGY LAB</span><strong>전략 연구는 독립 Shadow PAPER 실험계좌입니다.</strong><p>PAPER 메뉴의 실행 계좌와 자금·체결·수익률 범위가 다릅니다. experiment_id가 같은 데이터끼리만 직접 비교합니다.</p></div><em>연구 전용 · 실행전략 미변경</em></section>`;
+    return`<section class="viewer-scope viewer-scope-shadow"><div><span>전략 비교용 가상계좌</span><strong>전략마다 따로 시험한 결과입니다.</strong><p>‘가상매매’ 메뉴의 현재 실행 계좌와는 다른 계좌입니다. 이 화면 안에서 같은 전략·같은 실험끼리만 비교합니다.</p></div><em>연구용 · 실제 주문 없음</em></section>`;
   }
   const label=strategyLabel(strategy);
-  return`<section class="viewer-scope viewer-scope-paper"><div><span>EXECUTION PAPER</span><strong>${esc(label)} 실행 PAPER 계좌</strong><p>이 화면의 계좌·체결·수익은 현재 실행 PAPER 전략 기준입니다. 전략 연구의 Shadow 실험계좌와는 별도입니다.</p></div><em>${esc(label)} · PAPER ONLY</em></section>`;
+  return`<section class="viewer-scope viewer-scope-paper"><div><span>현재 실행 가상매매</span><strong>${esc(label)} 방식 성적</strong><p>이 화면은 현재 실행 중인 가상매매 방식의 계좌·체결·수익을 보여줍니다. 전략 비교용 시험계좌와는 별도입니다.</p></div><em>${esc(label)} · 가상매매</em></section>`;
 }
