@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-reader-baseline="senior">
+<html lang="ko" data-reader-baseline="senior" data-reader-mode="simple">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -29,6 +29,7 @@
   <link rel="stylesheet" href="/modules/styles/viewer-context.css?v=45">
   <link rel="stylesheet" href="/modules/styles/home-journey.css?v=46">
   <link rel="stylesheet" href="/modules/styles/content-priority.css?v=1">
+  <link rel="stylesheet" href="/modules/styles/reader-mode.css?v=1">
   <link rel="stylesheet" href="/modules/styles/senior-default.css?v=48">
 </head>
 <body>
@@ -41,10 +42,10 @@
     <header class="app-header"><div class="app-header-inner">
       <div class="brand"><strong>Crypto Research</strong><span>읽기 전용 · PAPER</span></div>
       <nav id="mainNav" class="main-nav" aria-label="주요 화면"><button data-route="dashboard" class="active">홈</button><button data-route="research">코인 찾기</button><button data-route="sectors">섹터</button><button data-route="assets">내 코인</button><button data-route="paper">매매 성적</button><button data-route="records">기록</button></nav>
-      <div class="header-tools"><button id="systemStatusBtn" data-route="system" class="utility-status neutral">● 연결 확인</button><button id="userMenuBtn" class="user-menu"><span>사용자</span><small>조회</small></button><button id="logoutBtn" class="logout">로그아웃</button></div>
+      <div class="header-tools"><div id="readerModeControl" class="reader-mode-control" role="group" aria-label="화면 정보량"><button type="button" data-reader-mode="simple" class="active" aria-pressed="true">간편 보기</button><button type="button" data-reader-mode="detail" aria-pressed="false">상세 보기</button></div><button id="systemStatusBtn" data-route="system" class="utility-status neutral">● 연결 확인</button><button id="userMenuBtn" class="user-menu"><span>사용자</span><small>조회</small></button><button id="logoutBtn" class="logout">로그아웃</button></div>
     </div><nav id="journeyNav" class="journey-nav hidden" aria-label="현재 작업의 상세 화면"></nav></header>
     <main id="pageRoot" class="app-main"></main>
   </section>
-  <script type="module" src="/modules/main.js?v=49"></script>
+  <script type="module" src="/modules/main.js?v=50"></script>
 </body>
 </html>
