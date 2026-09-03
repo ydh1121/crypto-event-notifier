@@ -188,7 +188,7 @@ jobs:
           grep -q 'componentDiagnostics' public/modules/pages/system.js
           grep -q 'operations-grid' public/modules/styles/records-system.css
           grep -q 'component-diagnostic' public/modules/styles/records-system.css
-          grep -q '물타기 계산기' public/modules/pages/assets.js
+          grep -q '내 금액으로 분할 계획 계산' public/modules/pages/assets.js
           grep -q 'DB 원본을 수정하지 않습니다' public/modules/pages/assets.js
           test -s ../docs/VIEWER_BUILD32_PLAN.md
           test -s ../docs/VIEWER_BUILD33_PLAN.md
