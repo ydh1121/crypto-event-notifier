@@ -194,6 +194,85 @@ html[data-reader-baseline="senior"] .avg-remove{
   min-height:44px;
 }
 
+/* PAPER: headline conclusions and account context must remain readable before detailed evidence. */
+html[data-reader-baseline="senior"] .paper-combined-main span,
+html[data-reader-baseline="senior"] .paper-combined-main small,
+html[data-reader-baseline="senior"] .paper-combined-side small,
+html[data-reader-baseline="senior"] .exchange-paper-grid header span,
+html[data-reader-baseline="senior"] .paper-strategy-filter>div:first-child small,
+html[data-reader-baseline="senior"] .paper-master-head,
+html[data-reader-baseline="senior"] .paper-detail-hero span,
+html[data-reader-baseline="senior"] .paper-detail-hero small,
+html[data-reader-baseline="senior"] .paper-detail-kpis small,
+html[data-reader-baseline="senior"] .trade-plan-panel small,
+html[data-reader-baseline="senior"] .compare-head>span,
+html[data-reader-baseline="senior"] .compare-row small,
+html[data-reader-baseline="senior"] .compare-columns{
+  font-size:13px;
+}
+
+html[data-reader-baseline="senior"] .exchange-paper-grid h3,
+html[data-reader-baseline="senior"] .paper-next h3,
+html[data-reader-baseline="senior"] .paper-strategy-filter>div:first-child b,
+html[data-reader-baseline="senior"] .compare-head h3{
+  font-size:16px;
+}
+
+html[data-reader-baseline="senior"] .paper-next p,
+html[data-reader-baseline="senior"] .compare-head p,
+html[data-reader-baseline="senior"] .compare-row,
+html[data-reader-baseline="senior"] .trade-plan-panel b{
+  font-size:14px;
+}
+
+html[data-reader-baseline="senior"] .paper-next button,
+html[data-reader-baseline="senior"] .compare-toolbar button{
+  min-height:44px;
+  font-size:14px;
+}
+
+/* Strategy: numeric rank was removed in Build 48, so the old nested rank grid must not reserve a phantom column. */
+html[data-reader-baseline="senior"] .strategy-row>span:first-child{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+
+html[data-reader-baseline="senior"] .strategy-row{
+  font-size:14px;
+}
+
+html[data-reader-baseline="senior"] .strategy-row.columns,
+html[data-reader-baseline="senior"] .strategy-row small,
+html[data-reader-baseline="senior"] .strategy-detail header span,
+html[data-reader-baseline="senior"] .strategy-detail-kpis small,
+html[data-reader-baseline="senior"] .strategy-analytics-head span,
+html[data-reader-baseline="senior"] .strategy-analytics-controls label>span,
+html[data-reader-baseline="senior"] .strategy-coin-row small,
+html[data-reader-baseline="senior"] .strategy-matrix-detail>header span,
+html[data-reader-baseline="senior"] .strategy-matrix-detail>header small,
+html[data-reader-baseline="senior"] .strategy-matrix-row small,
+html[data-reader-baseline="senior"] .strategy-paper-head span,
+html[data-reader-baseline="senior"] .strategy-paper-kpis small{
+  font-size:13px;
+}
+
+html[data-reader-baseline="senior"] .strategy-detail header p,
+html[data-reader-baseline="senior"] .strategy-analytics-head p,
+html[data-reader-baseline="senior"] .strategy-matrix-toolbar p,
+html[data-reader-baseline="senior"] .strategy-coin-row,
+html[data-reader-baseline="senior"] .strategy-matrix-row,
+html[data-reader-baseline="senior"] .strategy-paper-head p{
+  font-size:14px;
+}
+
+html[data-reader-baseline="senior"] .gate-panel summary{
+  min-height:44px;
+  display:flex;
+  align-items:center;
+  font-size:15px;
+}
+
 /* Research-history material is secondary, but must still be legible when opened/scrolled to. */
 html[data-reader-baseline="senior"] .listing-history-head p,
 html[data-reader-baseline="senior"] .listing-history-head>span,
