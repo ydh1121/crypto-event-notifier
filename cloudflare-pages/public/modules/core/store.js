@@ -1,6 +1,6 @@
 const STORAGE_KEY='cryptoViewerUiV6';
 const defaults={
-  route:'dashboard',
+  route:'dashboard',readerMode:'simple',
   researchExchange:'bithumb',paperExchange:'bithumb',strategyExchange:'bithumb',sectorExchange:'bithumb',
   researchMarket:'',assetMarket:'',assetHistoryRange:'7d',paperMarket:'',sectorSelected:'',sectorRange:'24h',sectorCoinMarket:'',sectorCoinSort:'turnover_desc',
   researchSearch:'',researchFilter:'all',researchRange:'24h',
@@ -11,6 +11,7 @@ const defaults={
 };
 let saved={};try{saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}')}catch{}
 const state={user:null,snapshot:null,loading:true,error:null,ui:{...defaults,...saved}};
+if(!['simple','detail'].includes(String(state.ui.readerMode)))state.ui.readerMode='simple';
 const listeners=new Set();
 let exchangeDefaultApplied=false;
 function persist(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state.ui))}catch{}}
