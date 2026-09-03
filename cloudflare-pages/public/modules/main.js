@@ -22,8 +22,8 @@ const root=document.getElementById('pageRoot'),nav=document.getElementById('main
 installSamePageInteractionContinuity(root);installDexLaunchResearchPanel({store,root});
 let router=null;
 const pages={dashboard:()=>createHomePage({store,navigate:n=>router.go(n)}),'dashboard-detail':()=>createDashboardPage({store,navigate:n=>router.go(n)}),research:()=>createResearchPage({store}),assets:()=>createAssetsPage({store}),paper:()=>createPaperPage({store}),strategy:()=>createStrategyPage({store}),sectors:()=>createSectorsPage({store,navigate:n=>router.go(n)}),records:()=>createRecordsPage({store}),system:()=>createSystemPage({store})};
-const GROUPS={dashboard:[['dashboard','오늘 보기'],['dashboard-detail','상세 현황']],'dashboard-detail':[['dashboard','오늘 보기'],['dashboard-detail','상세 현황']],research:[['research','코인 보기'],['sectors','섹터별 보기']],sectors:[['research','코인 보기'],['sectors','섹터별 보기']],paper:[['paper','매매 성적'],['strategy','전략 비교']],strategy:[['paper','매매 성적'],['strategy','전략 비교']]};
-function renderJourneyNav(name){if(!journeyNav)return;const items=GROUPS[name]||[];journeyNav.classList.toggle('hidden',!items.length);journeyNav.innerHTML=items.map(([route,label])=>`<button data-journey-route="${route}" class="${route===name?'active':''}">${label}</button>`).join('')}
+const GROUPS={dashboard:[['dashboard','오늘 보기'],['dashboard-detail','상세 현황']],'dashboard-detail':[['dashboard','오늘 보기'],['dashboard-detail','상세 현황']],paper:[['paper','매매 성적'],['strategy','전략 비교']],strategy:[['paper','매매 성적'],['strategy','전략 비교']]};
+function renderJourneyNav(name){if(root)root.dataset.pageRoute=name;if(!journeyNav)return;const items=GROUPS[name]||[];journeyNav.classList.toggle('hidden',!items.length);journeyNav.innerHTML=items.map(([route,label])=>`<button data-journey-route="${route}" class="${route===name?'active':''}">${label}</button>`).join('')}
 journeyNav?.addEventListener('click',e=>{const b=e.target.closest('[data-journey-route]');if(b)router.go(b.dataset.journeyRoute)});
 router=createRouter({store,root,nav,pages,onChange:renderJourneyNav});
 const poller=createSnapshotPoller({store,onUnauthorized:()=>auth.showAuth()});
