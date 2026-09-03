@@ -141,6 +141,26 @@ Viewer omission contract: `docs/VIEWER_REBUILD_CHECKLIST.md`
 - [-] 실제 신규 KRW 상장 forward 표본 누적. 현재 Build 70은 0 event / 0 unique asset이며 Build 71은 `waiting_for_forward_sample`이 정상 상태
 - [ ] 실제 표본에서 Build 71 PASS 후에만 Build 72 parallel PAPER A/B를 구현하고 기존 PAPER 신호/주문/position sizing은 그대로 유지
 
+## K. Build 48 senior-default UX pass
+
+Target user: a Korean crypto buyer/seller in their 60s who is not a developer, quant or professional technical analyst.
+
+- [x] Add a final `senior-default.css` readability layer and make it the default Viewer baseline
+- [x] Raise primary body/menu/control/meta text toward a 13~16px minimum hierarchy and make routine controls/inputs 44~48px high
+- [x] Preserve the existing content-priority layer that already moves coin-finder listing history, holdings history and sector research material behind the primary task flow
+- [x] Replace combined PAPER headline totals with a 10,000,000 KRW normalized result while preserving the underlying independent-account calculations
+- [x] Normalize per-exchange PAPER KPI money and selected-strategy evaluation money to a 10,000,000 KRW comparison basis
+- [x] Remove numeric strategy ranking from the default strategy list and state explicitly that the current order is a return sort, not a recommendation rank
+- [x] Remove experiment ID from the default strategy list/detail summary; retain research identifiers only where advanced comparison evidence needs them
+- [ ] Add user-facing US macro schedule / major US market index / material-news context without inventing or stale-caching event data
+- [ ] Turn averaging-down from a calculator into a decision plan: wait/buy state, next review price, remaining budget, max rounds, per-round price/amount and stop-adding condition
+- [ ] Add staged profit-taking guidance: first/second/final take-profit plus break-even/profit-protection conditions
+- [ ] Show or let the user select the actual holding exchange before presenting holding-specific plan prices
+- [ ] Add global simple/detail mode so research scores, order-book/volatility data, lifecycle/internal ids and other specialist evidence stay collapsed by default
+- [ ] Separate user trade/decision history from system/learning logs in the default Records view
+- [ ] Continue copy cleanup from PAPER/research/sector/opportunity/regime/entry/drawdown terminology to ordinary Korean where it does not damage technical accuracy
+- [ ] Add non-color state cues consistently (`▲/▼`, 수익/손실, 상태 text) and complete screenshot QA on desktop + phone
+
 ## Validation status
 
 - [x] Current adaptive research implementation passed Python tests + module compile
@@ -156,6 +176,7 @@ Viewer omission contract: `docs/VIEWER_REBUILD_CHECKLIST.md`
 - [x] Build 71 local compile/unit/contract/Build 63·65~70 regression PASS; commit `5c8081d`의 전용 Build 71 CI와 전체 B3 trader CI 모두 PASS; Windows HEAD `4f65082`에서 Build 71 contract/runtime PASS 및 통계 미실행 대기 상태 확인
 - [x] Build 69 scheduler local source validation: full Python suite 266 tests, scheduler/server-off contract, Build 39/43 supervisor regressions, Build 65~71 contract chain PASS
 - [x] Build 69 scheduler Windows live runtime PASS: scheduler running/fresh, process lock acquired, PAPER/shadow-only, order/PAPER-A-B/live unwired, research supervisor fresh, generic historical listing/DEX disabled, first cycle `attempts=1 / successes=1 / failures=0`, no safety violations
+- [-] Build 48 senior-default Viewer CI / visual regression validation in progress
 - [x] PR #1 remains Draft and unmerged
 
 ## Completion condition
