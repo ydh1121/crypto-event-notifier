@@ -16,7 +16,7 @@ import{createAssetsPage}from'./pages/assets.js?v=48';
 import{createPaperPage}from'./pages/paper.js?v=46';
 import{createStrategyPage}from'./pages/strategy.js?v=46.2';
 import{createSectorsPage}from'./pages/sectors-v36.js?v=46';
-import{createRecordsPage}from'./pages/records.js';
+import{createRecordsPage}from'./pages/records.js?v=48';
 import{createSystemPage}from'./pages/system.js?v=35';
 installSectorImeGuard();installTableSortEnhancer();
 const root=document.getElementById('pageRoot'),nav=document.getElementById('mainNav'),journeyNav=document.getElementById('journeyNav'),readerModeControl=document.getElementById('readerModeControl');
