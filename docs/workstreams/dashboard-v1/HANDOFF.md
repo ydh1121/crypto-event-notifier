@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Local multi-asset PAPER monitor + beginner-facing dashboard + secure Cloudflare phone access + adaptive Bithumb-wide per-coin PAPER research + verified Build 38 market lifecycle foundation + Build 39 pre-KRW CEX listing-history foundation + Build 65~71 DEX v2 forward-only validation track.
+Local multi-asset PAPER monitor + beginner-facing dashboard + secure Cloudflare phone access + adaptive Bithumb-wide per-coin PAPER research + verified Build 38 market lifecycle foundation + Build 39 pre-KRW CEX listing-history foundation + Build 65~71 DEX v2 forward-only validation track + Build 48 senior-default Viewer UX pass.
 
 ## Program roadmap
 
@@ -33,6 +33,32 @@ UI continuity is owned by:
 - `cloudflare-pages/public/modules/shared/ui-continuity.js`
 
 No page-specific `scrollTop` copy/paste and no broad DOM `MutationObserver` continuity workaround.
+
+## Build 48 senior-default Viewer UX pass
+
+Primary target user is a Korean crypto buyer/seller in their 60s who is not expected to interpret developer, quant or internal research terminology.
+
+Completed in the first Build 48 pass:
+- `cloudflare-pages/public/index.html` now enables `data-reader-baseline="senior"` and loads `senior-default.css` last so older density rules cannot shrink the default interface again
+- common body/menu/meta copy is raised toward a 13~16px hierarchy; routine controls target at least 44px and key inputs 48px
+- existing `content-priority.css` remains authoritative for visual order; it already pushes coin-finder listing research, holdings history and sector research material behind the primary user task flow even when source render order is older
+- combined and per-exchange current PAPER results now present a normalized 10,000,000 KRW comparison instead of leading with the sum of many independent virtual accounts
+- strategy detail uses the same 10,000,000 KRW normalized comparison basis while underlying strategy/PAPER source calculations remain unchanged
+- numeric strategy ranking was removed from the default list; the UI explicitly states `수익률 높은 순` is a sort order and not a recommendation rank
+- experiment IDs were removed from the default strategy list/detail summary; research IDs remain available only in deeper evidence/comparison surfaces
+
+Still open in this UX pass:
+- material US macro schedule / US market index / news context requires a real data/source contract; do not fake placeholder current-event data
+- averaging-down must advance from arithmetic calculator to a bounded decision plan with wait/buy state, next review price, remaining budget, max rounds, per-round price/amount and stop-adding condition
+- profit-taking needs staged first/second/final exits plus break-even/profit-protection rules
+- holding-specific plan prices must identify or let the user choose the actual holding exchange
+- simple/detail mode should hide specialist research evidence by default without deleting it
+- user trade/decision history should be separated from system/learning logs
+- terminology, non-color state cues and desktop/phone screenshot QA remain open
+
+Validation note:
+- Build 48 source changes are intentionally Viewer-only and do not alter PAPER order logic, strategy selection logic, DEX forward-validation rules or live-trading boundaries
+- GitHub Actions for the latest Build 48 head must be checked before marking Viewer validation complete
 
 ## Current market-intelligence implementation status
 
@@ -113,10 +139,11 @@ Validation:
 - Build 71 Windows runtime at HEAD `4f65082`: contract PASS, Build 70 ledger PASS, Build 71 runtime PASS with no early statistics
 - Build 69 scheduler local full Python suite 266 tests, server-off verifier, scheduler contract, Build 39/43 supervisor regression and Build 65~71 contract chain PASS
 - Build 69 scheduler Windows runtime remains explicitly pending because the server is off; no process or network call was started for source validation
+- Build 48 Viewer CI/visual validation is pending on the latest branch head
 - PR #1 remains Draft/unmerged
 
 Immediate next action:
-1. after the scheduler commit/CI is available, pull the new HEAD and start the normal Windows launcher once; then require the scheduler runtime verifier to confirm a fresh heartbeat, one process lock and both generic historical components disabled
+1. verify the latest Build 48 Viewer head through GitHub Actions/static Viewer checks, then perform desktop + phone screenshot QA before closing the readability pass
 2. leave the normal server on to let the 15-minute Build 69 process accumulate new official KRW listing samples automatically; manual Build 67 → 68 → 66 invocations are no longer the normal path
 3. while Build 70 remains below 30 event/20 unique asset labels per core window, require Build 71 to stay `waiting_for_forward_sample` with no validation statistics
 4. rerun Build 70 and Build 71 after labels mature; do not inspect or fit forward statistics before the frozen readiness gate opens
