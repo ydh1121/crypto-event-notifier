@@ -1,0 +1,233 @@
+/* Build 48 senior-default readability layer.
+   Primary comprehension baseline: a Korean crypto user in their 60s.
+   Keep this file last in the stylesheet order so older density rules cannot shrink primary UI again. */
+
+html[data-reader-baseline="senior"]{
+  --fs-caption:13px;
+  --fs-meta:14px;
+  --fs-row:15px;
+  --fs-body:16px;
+  --fs-section:18px;
+}
+
+html[data-reader-baseline="senior"] body{
+  line-height:1.55;
+}
+
+html[data-reader-baseline="senior"] .brand span{
+  font-size:13px;
+  letter-spacing:.035em;
+}
+
+html[data-reader-baseline="senior"] .main-nav button{
+  min-height:44px;
+  padding:10px 14px;
+  font-size:15px;
+}
+
+html[data-reader-baseline="senior"] .utility-status,
+html[data-reader-baseline="senior"] .user-menu,
+html[data-reader-baseline="senior"] .logout{
+  min-height:44px;
+  padding:9px 12px;
+  font-size:14px;
+}
+
+html[data-reader-baseline="senior"] .user-menu small{
+  font-size:13px;
+}
+
+html[data-reader-baseline="senior"] .page-head-v6 p{
+  font-size:15px;
+}
+
+html[data-reader-baseline="senior"] .segmented button,
+html[data-reader-baseline="senior"] .chip-row button,
+html[data-reader-baseline="senior"] .soft-button,
+html[data-reader-baseline="senior"] .subnav button,
+html[data-reader-baseline="senior"] .paper-toolbar button,
+html[data-reader-baseline="senior"] .paper-toolbar select,
+html[data-reader-baseline="senior"] .history-toolbar button,
+html[data-reader-baseline="senior"] .range-control button,
+html[data-reader-baseline="senior"] .direct-presets button,
+html[data-reader-baseline="senior"] .avg-actions button{
+  min-height:44px;
+  font-size:14px;
+}
+
+html[data-reader-baseline="senior"] .segmented button,
+html[data-reader-baseline="senior"] .chip-row button{
+  padding:9px 12px;
+}
+
+html[data-reader-baseline="senior"] .chip-row button span{
+  font-size:13px;
+}
+
+html[data-reader-baseline="senior"] .kpi>span,
+html[data-reader-baseline="senior"] .kpi small,
+html[data-reader-baseline="senior"] .master-row small,
+html[data-reader-baseline="senior"] .asset-row small,
+html[data-reader-baseline="senior"] .paper-row small,
+html[data-reader-baseline="senior"] .event-row small,
+html[data-reader-baseline="senior"] .learning-item small,
+html[data-reader-baseline="senior"] .mini-chart header span,
+html[data-reader-baseline="senior"] .inline-holding small,
+html[data-reader-baseline="senior"] .paper-inline small,
+html[data-reader-baseline="senior"] .plan-grid small{
+  font-size:13px;
+}
+
+html[data-reader-baseline="senior"] .score-line span,
+html[data-reader-baseline="senior"] .score-line b,
+html[data-reader-baseline="senior"] .score-line strong,
+html[data-reader-baseline="senior"] .event-row,
+html[data-reader-baseline="senior"] .learning-item{
+  font-size:14px;
+}
+
+html[data-reader-baseline="senior"] .master-row strong,
+html[data-reader-baseline="senior"] .paper-row strong{
+  font-size:15px;
+}
+
+html[data-reader-baseline="senior"] .search,
+html[data-reader-baseline="senior"] .paper-toolbar input,
+html[data-reader-baseline="senior"] .paper-toolbar select,
+html[data-reader-baseline="senior"] .calculator-field input,
+html[data-reader-baseline="senior"] input[type="search"],
+html[data-reader-baseline="senior"] input[type="number"],
+html[data-reader-baseline="senior"] select{
+  min-height:48px;
+  font-size:16px;
+}
+
+html[data-reader-baseline="senior"] .status-badge{
+  font-size:13px;
+  padding:6px 9px;
+}
+
+html[data-reader-baseline="senior"] .local-management-note h3{
+  font-size:16px;
+}
+
+html[data-reader-baseline="senior"] .local-management-note p{
+  font-size:14px;
+}
+
+html[data-reader-baseline="senior"] .local-management-note>span{
+  font-size:13px;
+}
+
+/* Research / coin-finder: decision text stays primary; supporting metadata remains readable. */
+html[data-reader-baseline="senior"] .market-pulse span,
+html[data-reader-baseline="senior"] .filter-basis,
+html[data-reader-baseline="senior"] .decision-hero span,
+html[data-reader-baseline="senior"] .price-stack span{
+  font-size:14px;
+}
+
+html[data-reader-baseline="senior"] .decision-hero p{
+  font-size:16px;
+  line-height:1.6;
+}
+
+html[data-reader-baseline="senior"] .deep-section summary{
+  min-height:44px;
+  display:flex;
+  align-items:center;
+  font-size:15px;
+}
+
+/* Holdings / averaging-down workspace. */
+html[data-reader-baseline="senior"] .allocation-panel.compact h3,
+html[data-reader-baseline="senior"] .asset-list-head h3,
+html[data-reader-baseline="senior"] .asset-research-sides h3,
+html[data-reader-baseline="senior"] .calculator-head h3{
+  font-size:16px;
+}
+
+html[data-reader-baseline="senior"] .allocation-panel.compact header span,
+html[data-reader-baseline="senior"] .asset-list-head span,
+html[data-reader-baseline="senior"] .allocation-row small,
+html[data-reader-baseline="senior"] .asset-row>strong small,
+html[data-reader-baseline="senior"] .asset-detail-hero span,
+html[data-reader-baseline="senior"] .asset-detail-grid small,
+html[data-reader-baseline="senior"] .asset-research-sides header span,
+html[data-reader-baseline="senior"] .decision-mini small,
+html[data-reader-baseline="senior"] .paper-mini>span,
+html[data-reader-baseline="senior"] .paper-mini small,
+html[data-reader-baseline="senior"] .research-plan-mini small,
+html[data-reader-baseline="senior"] .calculator-field span,
+html[data-reader-baseline="senior"] .direct-result-card small,
+html[data-reader-baseline="senior"] .avg-summary small,
+html[data-reader-baseline="senior"] .calculator-note,
+html[data-reader-baseline="senior"] .avg-storage,
+html[data-reader-baseline="senior"] .avg-round,
+html[data-reader-baseline="senior"] .avg-after{
+  font-size:13px;
+}
+
+html[data-reader-baseline="senior"] .allocation-row b,
+html[data-reader-baseline="senior"] .allocation-row strong,
+html[data-reader-baseline="senior"] .asset-row>strong,
+html[data-reader-baseline="senior"] .asset-detail-hero p,
+html[data-reader-baseline="senior"] .decision-mini b,
+html[data-reader-baseline="senior"] .research-plan-mini b,
+html[data-reader-baseline="senior"] .direct-result-card b,
+html[data-reader-baseline="senior"] .avg-summary b{
+  font-size:14px;
+}
+
+html[data-reader-baseline="senior"] .direct-presets button{
+  padding:9px 11px;
+}
+
+html[data-reader-baseline="senior"] .avg-row .calculator-field input{
+  min-height:46px;
+  font-size:16px;
+}
+
+html[data-reader-baseline="senior"] .avg-remove{
+  width:44px;
+  height:44px;
+  min-height:44px;
+}
+
+/* Research-history material is secondary, but must still be legible when opened/scrolled to. */
+html[data-reader-baseline="senior"] .listing-history-head p,
+html[data-reader-baseline="senior"] .listing-history-head>span,
+html[data-reader-baseline="senior"] .listing-history-summary small,
+html[data-reader-baseline="senior"] .listing-metrics small,
+html[data-reader-baseline="senior"] .listing-source-head small,
+html[data-reader-baseline="senior"] .listing-case-card>header span,
+html[data-reader-baseline="senior"] .listing-case-card>header small,
+html[data-reader-baseline="senior"] .listing-case-card>header strong,
+html[data-reader-baseline="senior"] .listing-source-head b,
+html[data-reader-baseline="senior"] .listing-metrics b,
+html[data-reader-baseline="senior"] .listing-no-source{
+  font-size:13px;
+}
+
+@media(max-width:980px){
+  html[data-reader-baseline="senior"] .main-nav button{
+    min-height:46px;
+    font-size:14px;
+  }
+}
+
+@media(max-width:620px){
+  html[data-reader-baseline="senior"] .main-nav button{
+    min-height:48px;
+    padding:10px 8px;
+    font-size:14px;
+  }
+
+  html[data-reader-baseline="senior"] .page-head-v6 h2{
+    font-size:25px;
+  }
+
+  html[data-reader-baseline="senior"] .app-main{
+    padding-bottom:104px;
+  }
+}
