@@ -41,6 +41,7 @@ def test_reliability_wrapper_runs_full_cost_between_spread_cost_and_event_cluste
         "market_flow_event_reliability",
         "market_flow_full_cost_event_cluster",
         "market_flow_full_cost_event_reliability",
+        "market_flow_absorption_consensus_v2_oos_comparator",
     ]
     assert result["full_cost_edge"]["ok"] is True
     assert result["full_cost_notional_sensitivity"]["ok"] is True
@@ -54,6 +55,7 @@ def test_reliability_wrapper_runs_full_cost_between_spread_cost_and_event_cluste
         "event_reliability",
         "full_cost_event_cluster",
         "full_cost_event_reliability",
+        "market_flow_absorption_consensus_v2_oos_comparator",
     ]
     assert result["post_reliability_pipeline"]["forward_only_full_transaction_cost_observation"] is True
     assert result["post_reliability_pipeline"]["paper_notional_sensitivity_observation"] is True

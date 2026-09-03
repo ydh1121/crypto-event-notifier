@@ -96,7 +96,8 @@ def test_reliability_compute_auto_runs_cost_cluster_and_event_reliability(tmp_pa
     assert result["post_reliability_pipeline"]["order"] == [
         "cost_edge","full_cost_edge","full_cost_notional_sensitivity",
         "event_cluster","event_reliability",
-        "full_cost_event_cluster","full_cost_event_reliability"
+        "full_cost_event_cluster","full_cost_event_reliability",
+        "market_flow_absorption_consensus_v2_oos_comparator"
     ]
     assert result["post_reliability_pipeline"]["network_fetches"] is False
     assert result["post_reliability_pipeline"]["spread_only_event_pipeline"] is True
