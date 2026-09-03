@@ -82,7 +82,11 @@ _CFTC_REGULATION_TERMS = (
 _CFTC_POLICY_TERMS = (
     "no-action",
     "policy statement",
-    "advisory",
+    "issues advisory",
+    "releases advisory",
+    "publishes advisory",
+    "staff advisory",
+    "market advisory",
     "guidance",
     "interpretation",
 )
