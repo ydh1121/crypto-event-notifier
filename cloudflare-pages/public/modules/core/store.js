@@ -7,11 +7,12 @@ const defaults={
   paperTab:'summary',paperSearch:'',paperFilter:'all',paperStrategyFilter:'all',paperSort:'return_desc',paperRange:'24h',paperPortfolioRange:'24h',
   paperCompareSearch:'',paperCompareSort:'gap_desc',
   strategyMarket:'',strategyTab:'overview',strategyRange:'24h',strategyOverviewExperiment:'',strategyCoinExperiment:'',strategyCoinSort:'return_desc',strategyCoinMarket:'',strategyCoinSearch:'',
-  recordsExchange:'bithumb',recordsFilter:'all',recordsPeriod:'all',recordsSearch:'',recordsStrategy:'all'
+  recordsExchange:'bithumb',recordsScope:'user',recordsFilter:'all',recordsPeriod:'all',recordsSearch:'',recordsStrategy:'all'
 };
 let saved={};try{saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}')}catch{}
 const state={user:null,snapshot:null,loading:true,error:null,ui:{...defaults,...saved}};
 if(!['simple','detail'].includes(String(state.ui.readerMode)))state.ui.readerMode='simple';
+if(!['user','system'].includes(String(state.ui.recordsScope)))state.ui.recordsScope='user';
 const listeners=new Set();
 let exchangeDefaultApplied=false;
 function persist(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state.ui))}catch{}}
