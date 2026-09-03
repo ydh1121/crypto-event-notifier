@@ -11,9 +11,9 @@ import{createDashboardPage}from'./pages/dashboard.js';
 import{createResearchPage}from'./pages/research.js?v=40';
 import{installDexLaunchResearchPanel}from'./pages/dex-launch-panel.js?v=44';
 import{createAssetsPage}from'./pages/assets.js';
-import{createPaperPage}from'./pages/paper.js';
-import{createStrategyPage}from'./pages/strategy.js';
-import{createSectorsPage}from'./pages/sectors-v36.js?v=38';
+import{createPaperPage}from'./pages/paper.js?v=45';
+import{createStrategyPage}from'./pages/strategy.js?v=45';
+import{createSectorsPage}from'./pages/sectors-v36.js?v=45';
 import{createRecordsPage}from'./pages/records.js';
 import{createSystemPage}from'./pages/system.js?v=35';
 

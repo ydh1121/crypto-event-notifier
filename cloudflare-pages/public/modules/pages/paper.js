@@ -1,24 +1,184 @@
-import{combinedPaper,paperStats,rowsFor,findMarket,commonExchangeRows}from'../shared/selectors.js';
+import{combinedPaper,paperStats,rowsFor,findMarket,commonExchangeRows,exchangePublic}from'../shared/selectors.js';
 import{pageHead,loading,empty,exchangeToggle,paperKpis}from'../shared/components.js';
 import{n,money,pct,price,tone,esc,stateLabel}from'../shared/format.js';
 import{rangeControl,priceFillChart,simpleLineChart}from'../shared/charts.js';
 import{getMarketDetail}from'../services/market-detail.js';
+import{scopeBanner,strategyLabel}from'../shared/viewer-context.js';
+
+function paperStrategy(state,exchange,row=null,detail=null){
+  const pub=exchangePublic(state,exchange);
+  return String(detail?.data?.strategy||detail?.strategy||row?.strategy||pub?.strategy||'adaptive').toLowerCase();
+}
+
 export function createPaperPage({store}){
   let root=null,unsub=null,seq=0,lastDetail=null,lastDetailKey='';
   const ui=()=>store.get().ui;
-  function render(){if(!root)return;const state=store.get();if(!state.snapshot){root.innerHTML=pageHead('PAPER','가상매매 검증 결과를 요약·코인별·거래소 비교로 나눠 봅니다.')+loading('PAPER 데이터를 불러오는 중입니다.');return}root.innerHTML=`${pageHead('PAPER','가상매매 검증 결과를 요약·코인별·거래소 비교로 나눠 봅니다.')}<nav class="subnav"><button data-paper-tab="summary" class="${ui().paperTab==='summary'?'active':''}">요약</button><button data-paper-tab="coins" class="${ui().paperTab==='coins'?'active':''}">코인별 성과</button><button data-paper-tab="compare" class="${ui().paperTab==='compare'?'active':''}">거래소 비교</button></nav><section id="paperBody"></section>`;renderTab()}
-  function renderTab(){if(ui().paperTab==='coins')renderCoins();else if(ui().paperTab==='compare')renderCompare();else renderSummary()}
-  function renderSummary(){const box=root?.querySelector('#paperBody');if(!box)return;const state=store.get(),cp=combinedPaper(state),rate=cp.start?cp.pnl/cp.start*100:0,b=paperStats(state,'bithumb'),u=paperStats(state,'upbit');box.innerHTML=`<section class="paper-combined"><div class="paper-combined-main"><span>빗썸 + 업비트 전체 PAPER 증감</span><b class="${tone(cp.pnl)}">${cp.pnl>=0?'+':''}${money(cp.pnl)}</b><small>${pct(rate)} · ${cp.markets.toLocaleString('ko-KR')}개 독립 계좌 합산</small></div><div class="paper-combined-side"><span><small>시작 연구자금</small><b>${money(cp.start)}</b></span><span><small>현재 평가액</small><b>${money(cp.equity)}</b></span><span><small>현재 보유</small><b>${cp.active}개</b></span></div></section><div class="exchange-paper-grid"><article><header><h3>빗썸</h3><span>${n(b.market_count)}개 계좌</span></header>${paperKpis(b)}</article><article><header><h3>업비트</h3><span>${n(u.market_count)}개 계좌</span></header>${paperKpis(u)}</article></div><section class="paper-next"><div><h3>더 자세히 보기</h3><p>코인별 결과는 ‘코인별 성과’, 같은 종목의 거래소 차이는 ‘거래소 비교’에서 확인합니다.</p></div><div><button data-paper-tab="coins">코인별 성과</button><button data-paper-tab="compare">거래소 비교</button></div></section>`}
-  function filteredRows(){let list=[...rowsFor(store.get(),ui().paperExchange)],q=String(ui().paperSearch||'').toLowerCase(),f=ui().paperFilter;if(q)list=list.filter(r=>`${r.symbol||''} ${r.name||''} ${r.market||''}`.toLowerCase().includes(q));if(f==='holding')list=list.filter(r=>r.has_position);if(f==='completed')list=list.filter(r=>!r.has_position&&n(r.closed_trades)>0);if(f==='profit')list=list.filter(r=>n(r.return_pct)>0);if(f==='loss')list=list.filter(r=>n(r.return_pct)<0);const sorters={return_desc:(a,b)=>n(b.return_pct)-n(a.return_pct),return_asc:(a,b)=>n(a.return_pct)-n(b.return_pct),trades_desc:(a,b)=>n(b.closed_trades)-n(a.closed_trades),win_desc:(a,b)=>n(b.win_rate_pct)-n(a.win_rate_pct),position_desc:(a,b)=>n(b.position_value_krw)-n(a.position_value_krw),opportunity_desc:(a,b)=>n(b.opportunity_score)-n(a.opportunity_score)};list.sort(sorters[ui().paperSort]||sorters.return_desc);return list}
-  function ensurePaperMarket(){const list=filteredRows();let m=ui().paperMarket;if(!list.some(r=>r.market===m))m=list[0]?.market||'';if(m!==ui().paperMarket)store.setUi({paperMarket:m},{scope:'paper'});return m}
-  function renderCoins(){const box=root?.querySelector('#paperBody');if(!box)return;const ex=ui().paperExchange,all=rowsFor(store.get(),ex),list=filteredRows(),selected=ensurePaperMarket(),counts={all:all.length,holding:all.filter(r=>r.has_position).length,completed:all.filter(r=>!r.has_position&&n(r.closed_trades)>0).length,profit:all.filter(r=>n(r.return_pct)>0).length,loss:all.filter(r=>n(r.return_pct)<0).length};box.innerHTML=`<section class="paper-toolbar"><div>${exchangeToggle(ex,'data-paper-exchange')}</div><input data-paper-search type="search" value="${esc(ui().paperSearch)}" placeholder="코인 검색"><select data-paper-sort><option value="return_desc" ${ui().paperSort==='return_desc'?'selected':''}>수익률 높은 순</option><option value="return_asc" ${ui().paperSort==='return_asc'?'selected':''}>수익률 낮은 순</option><option value="trades_desc" ${ui().paperSort==='trades_desc'?'selected':''}>거래 많은 순</option><option value="win_desc" ${ui().paperSort==='win_desc'?'selected':''}>승률 높은 순</option><option value="position_desc" ${ui().paperSort==='position_desc'?'selected':''}>보유금액 큰 순</option><option value="opportunity_desc" ${ui().paperSort==='opportunity_desc'?'selected':''}>기회점수 높은 순</option></select><button data-paper-reset>전체 보기</button></section><div class="chip-row paper-filter"><button data-paper-filter="all" class="${ui().paperFilter==='all'?'active':''}">전체 ${counts.all}</button><button data-paper-filter="holding" class="${ui().paperFilter==='holding'?'active':''}">보유 ${counts.holding}</button><button data-paper-filter="completed" class="${ui().paperFilter==='completed'?'active':''}">매매완료 ${counts.completed}</button><button data-paper-filter="profit" class="${ui().paperFilter==='profit'?'active':''}">수익 ${counts.profit}</button><button data-paper-filter="loss" class="${ui().paperFilter==='loss'?'active':''}">손실 ${counts.loss}</button></div><section class="paper-workspace"><aside class="paper-master"><div class="paper-master-head"><span>${list.length}개 표시</span><small>${ex==='upbit'?'업비트':'빗썸'}</small></div><div id="paperList"></div></aside><section id="paperDetail" class="paper-detail"></section></section>`;renderPaperList(list,selected);renderPaperDetail(selected)}
-  function renderPaperList(list,selected){const box=root?.querySelector('#paperList');if(!box)return;box.innerHTML=list.length?list.slice(0,180).map(r=>`<button data-paper-market="${esc(r.market)}" class="paper-row ${r.market===selected?'selected':''}"><span><b>${esc(r.symbol||r.market)}</b><small>${esc(stateLabel(r))} · ${n(r.closed_trades)}회</small></span><strong class="${tone(r.return_pct)}">${pct(r.return_pct)}</strong></button>`).join(''):empty('조건에 맞는 코인이 없습니다.')}
-  async function renderPaperDetail(market){const box=root?.querySelector('#paperDetail');if(!box)return;const ex=ui().paperExchange,row=findMarket(store.get(),ex,market);if(!row){seq++;lastDetail=null;lastDetailKey='';box.innerHTML=empty('조건에 맞는 코인을 선택하세요.');return}const id=++seq,key=`${ex}|${market}`;box.innerHTML=`<article class="paper-detail-hero"><div><span>${ex==='upbit'?'업비트':'빗썸'} · 독립 PAPER 계좌</span><h3>${esc(row.symbol||market)}</h3><p>${esc(stateLabel(row))}</p></div><div><span>전체 수익률</span><b class="${tone(row.return_pct)}">${pct(row.return_pct)}</b><small>평가액 ${money(row.equity_krw)}</small></div></article><div class="paper-detail-kpis"><span><small>남은 현금</small><b>${money(row.cash_krw)}</b></span><span><small>현재 보유금액</small><b>${money(row.position_value_krw)}</b></span><span><small>평균 매수가</small><b>${row.position_avg_price?price(row.position_avg_price):'-'}</b></span><span><small>미실현 손익</small><b class="${tone(row.unrealized_pnl_krw)}">${n(row.unrealized_pnl_krw)>=0?'+':''}${money(row.unrealized_pnl_krw)}</b></span><span><small>실현 손익</small><b class="${tone(row.realized_pnl_krw)}">${n(row.realized_pnl_krw)>=0?'+':''}${money(row.realized_pnl_krw)}</b></span><span><small>완료 거래 / 승률</small><b>${n(row.closed_trades)}회 · ${n(row.win_rate_pct).toFixed(1)}%</b></span></div><section id="paperDeep">${loading('매매 계획과 체결 이력을 불러오는 중입니다.')}</section>`;try{const detail=await getMarketDetail(ex,market);if(id!==seq||ui().paperMarket!==market)return;lastDetail=detail;lastDetailKey=key;renderPaperDeep(detail)}catch(err){if(id===seq){lastDetail=null;lastDetailKey='';const d=root?.querySelector('#paperDeep');if(d)d.innerHTML=empty('상세 PAPER 데이터를 불러오지 못했습니다.',err.message)}}}
-  function renderPaperDeep(detail){const box=root?.querySelector('#paperDeep');if(!box)return;if(!detail){box.innerHTML=empty('상세 데이터가 아직 순회에 도착하지 않았습니다.');return}const data=detail.data||{},plan=data.trade_plan||{},fills=Array.isArray(data.fills)?data.fills:[],feedback=Array.isArray(data.feedback)?data.feedback:[],memory=Array.isArray(data.market_memory)?data.market_memory:[],eq=Array.isArray(data.equity_history)?data.equity_history:[],range=ui().paperRange||'24h';box.innerHTML=`<section class="trade-plan-panel"><header><h3>현재 매매 계획</h3><span>조회 전용</span></header><div><span><small>다음 추가매수/진입</small><b>${price(n(plan.next_add_price)||n(plan.expected_entry_price))}</b></span><span><small>목표가</small><b>${price(plan.target_price)}</b></span><span><small>손절 기준</small><b>${price(plan.hard_stop_price)}</b></span><span><small>분할 진행</small><b>${n(plan.completed_entries)} / ${n(plan.expected_total_entries)}</b></span><span><small>남은 분할</small><b>${n(plan.remaining_entries)}회</b></span><span><small>제안 비중</small><b>${n(plan.suggested_weight_pct).toFixed(2)}%</b></span></div></section><section class="paper-history"><div class="history-toolbar"><div><h3>가격 · 체결 · 가상계좌</h3><p>가격 위에 PAPER 매수·매도 체결을 표시합니다.</p></div>${rangeControl('data-paper-range',range)}</div><div class="history-stack">${priceFillChart(memory,fills,{range,title:'가격 · PAPER 체결'})}${simpleLineChart('선택 코인 가상계좌 자산곡선',eq,'equity_krw',{range,className:'primary',suffix:'원'})}</div></section><div class="detail-columns"><section><header><h3>최근 체결</h3></header>${fills.slice(0,10).map(f=>`<div class="event-row"><b>${f.side==='buy'?'매수':'매도'}</b><span>${price(f.price)}</span><strong class="${tone(f.realized_pnl)}">${f.side==='sell'?`${n(f.realized_pnl)>=0?'+':''}${money(f.realized_pnl)}`:money(f.krw)}</strong></div>`).join('')||'<p class="muted">체결 없음</p>'}</section><section><header><h3>최근 학습</h3></header>${feedback.slice(0,8).map(f=>`<div class="learning-item"><b class="${tone(f.outcome_return_pct)}">${pct(f.outcome_return_pct)}</b><span>${esc(f.note||'학습 기준 조정')}</span></div>`).join('')||'<p class="muted">학습 기록 없음</p>'}</section></div>`}
-  function compareRows(){const q=String(ui().paperCompareSearch||'').trim().toLowerCase(),sort=ui().paperCompareSort||'gap_desc';let list=commonExchangeRows(store.get()).map(x=>({...x,gap:n(x.b.return_pct)-n(x.u.return_pct),oppGap:n(x.b.opportunity_score)-n(x.u.opportunity_score)}));if(q)list=list.filter(x=>`${x.market} ${x.b.symbol||''} ${x.b.name||''} ${x.u.name||''}`.toLowerCase().includes(q));const sorters={gap_desc:(a,b)=>Math.abs(b.gap)-Math.abs(a.gap),bithumb_desc:(a,b)=>n(b.b.return_pct)-n(a.b.return_pct),upbit_desc:(a,b)=>n(b.u.return_pct)-n(a.u.return_pct),opp_desc:(a,b)=>Math.abs(b.oppGap)-Math.abs(a.oppGap),symbol:(a,b)=>String(a.b.symbol||a.market).localeCompare(String(b.b.symbol||b.market),'ko')};list.sort(sorters[sort]||sorters.gap_desc);return list}
-  function renderCompare(){const box=root?.querySelector('#paperBody');if(!box)return;const allCount=commonExchangeRows(store.get()).length,list=compareRows();box.innerHTML=`<section class="compare-head"><div><h3>같은 코인, 거래소별 PAPER 결과</h3><p>동일 KRW 종목의 독립 PAPER 계좌 성과를 나란히 비교합니다.</p></div><span>공통 ${allCount}종목 · 현재 ${list.length}종목</span></section><section class="compare-toolbar"><input data-compare-search type="search" value="${esc(ui().paperCompareSearch||'')}" placeholder="공통 코인 검색"><select data-compare-sort><option value="gap_desc" ${ui().paperCompareSort==='gap_desc'?'selected':''}>수익률 차이 큰 순</option><option value="opp_desc" ${ui().paperCompareSort==='opp_desc'?'selected':''}>기회점수 차이 큰 순</option><option value="bithumb_desc" ${ui().paperCompareSort==='bithumb_desc'?'selected':''}>빗썸 수익률 높은 순</option><option value="upbit_desc" ${ui().paperCompareSort==='upbit_desc'?'selected':''}>업비트 수익률 높은 순</option><option value="symbol" ${ui().paperCompareSort==='symbol'?'selected':''}>코인 이름순</option></select><button data-compare-reset>전체 보기</button></section><div class="compare-table"><div class="compare-row compare-columns"><span>코인</span><span>빗썸</span><span>업비트</span><span>차이</span></div>${list.length?list.slice(0,286).map(x=>`<div class="compare-row"><span><b>${esc(x.b.symbol||x.market.replace(/^KRW-/,''))}</b><small>${esc(x.b.name||x.u.name||'')}</small></span><span><b class="${tone(x.b.return_pct)}">${pct(x.b.return_pct)}</b><small>기회 ${n(x.b.opportunity_score).toFixed(0)}</small></span><span><b class="${tone(x.u.return_pct)}">${pct(x.u.return_pct)}</b><small>기회 ${n(x.u.opportunity_score).toFixed(0)}</small></span><span><b class="${tone(x.gap)}">${pct(x.gap)}</b><small>빗썸-업비트</small></span></div>`).join(''):empty('조건에 맞는 공통 코인이 없습니다.')}</div>`}
-  const click=e=>{const t=e.target.closest('[data-paper-tab]');if(t){store.setUi({paperTab:t.dataset.paperTab},{scope:'paper'});render();return}const ex=e.target.closest('[data-paper-exchange]');if(ex){lastDetail=null;lastDetailKey='';store.setUi({paperExchange:ex.dataset.paperExchange,paperMarket:''},{scope:'paper'});renderCoins();return}const f=e.target.closest('[data-paper-filter]');if(f){store.setUi({paperFilter:f.dataset.paperFilter},{scope:'paper'});renderCoins();return}const m=e.target.closest('[data-paper-market]');if(m){store.setUi({paperMarket:m.dataset.paperMarket},{scope:'paper'});renderCoins();return}const range=e.target.closest('[data-paper-range]');if(range&&lastDetail&&lastDetailKey===`${ui().paperExchange}|${ui().paperMarket}`){store.setUi({paperRange:range.dataset.paperRange},{scope:'paper-range'});renderPaperDeep(lastDetail);return}if(e.target.closest('[data-paper-reset]')){store.setUi({paperFilter:'all',paperSearch:'',paperSort:'return_desc'},{scope:'paper'});renderCoins();return}if(e.target.closest('[data-compare-reset]')){store.setUi({paperCompareSearch:'',paperCompareSort:'gap_desc'},{scope:'paper'});renderCompare()}};
-  const input=e=>{if(e.target.matches('[data-paper-search]')){store.setUi({paperSearch:e.target.value},{scope:'paper-search'});const list=filteredRows(),selected=ensurePaperMarket();renderPaperList(list,selected);renderPaperDetail(selected);return}if(e.target.matches('[data-compare-search]')){store.setUi({paperCompareSearch:e.target.value},{scope:'paper'});renderCompare()}};
-  const change=e=>{if(e.target.matches('[data-paper-sort]')){store.setUi({paperSort:e.target.value},{scope:'paper'});renderCoins();return}if(e.target.matches('[data-compare-sort]')){store.setUi({paperCompareSort:e.target.value},{scope:'paper'});renderCompare()}};
-  return{mount(r){root=r;root.addEventListener('click',click);root.addEventListener('input',input);root.addEventListener('change',change);unsub=store.subscribe((_,m)=>{if(m.type==='snapshot')render()})},render,destroy(){seq++;lastDetail=null;lastDetailKey='';unsub?.();root?.removeEventListener('click',click);root?.removeEventListener('input',input);root?.removeEventListener('change',change);root=null}};
+
+  function render(){
+    if(!root)return;
+    const state=store.get();
+    if(!state.snapshot){
+      root.innerHTML=pageHead('PAPER','가상매매 검증 결과를 요약·코인별·거래소 비교로 나눠 봅니다.')+loading('PAPER 데이터를 불러오는 중입니다.');
+      return;
+    }
+    const strategy=paperStrategy(state,ui().paperExchange||'bithumb');
+    root.innerHTML=`${pageHead('PAPER','실행 PAPER 계좌의 결과를 요약·코인별·거래소 비교로 나눠 봅니다.')}${scopeBanner('paper',{strategy})}<nav class="subnav"><button data-paper-tab="summary" class="${ui().paperTab==='summary'?'active':''}">요약</button><button data-paper-tab="coins" class="${ui().paperTab==='coins'?'active':''}">코인별 성과</button><button data-paper-tab="compare" class="${ui().paperTab==='compare'?'active':''}">거래소 비교</button></nav><section id="paperBody"></section>`;
+    renderTab();
+  }
+
+  function renderTab(){
+    if(ui().paperTab==='coins')renderCoins();
+    else if(ui().paperTab==='compare')renderCompare();
+    else renderSummary();
+  }
+
+  function renderSummary(){
+    const box=root?.querySelector('#paperBody');
+    if(!box)return;
+    const state=store.get(),cp=combinedPaper(state),rate=cp.start?cp.pnl/cp.start*100:0,b=paperStats(state,'bithumb'),u=paperStats(state,'upbit');
+    box.innerHTML=`<section class="paper-combined"><div class="paper-combined-main"><span>빗썸 + 업비트 Adaptive 실행 PAPER 증감</span><b class="${tone(cp.pnl)}">${cp.pnl>=0?'+':''}${money(cp.pnl)}</b><small>${pct(rate)} · ${cp.markets.toLocaleString('ko-KR')}개 독립 계좌 합산</small></div><div class="paper-combined-side"><span><small>시작 연구자금</small><b>${money(cp.start)}</b></span><span><small>현재 평가액</small><b>${money(cp.equity)}</b></span><span><small>현재 보유</small><b>${cp.active}개</b></span></div></section><div class="exchange-paper-grid"><article><header><h3>빗썸</h3><span>${strategyLabel(b.strategy||'adaptive')} · ${n(b.market_count)}개 계좌</span></header>${paperKpis(b)}</article><article><header><h3>업비트</h3><span>${strategyLabel(u.strategy||'adaptive')} · ${n(u.market_count)}개 계좌</span></header>${paperKpis(u)}</article></div><section class="paper-next"><div><h3>성과 범위</h3><p>이 화면은 실행 PAPER 계좌입니다. ‘전략 연구’의 Shadow 실험계좌는 별도 계좌이므로 숫자가 직접 일치하지 않습니다.</p></div><div><button data-paper-tab="coins">코인별 성과</button><button data-paper-tab="compare">거래소 비교</button></div></section>`;
+  }
+
+  function filteredRows(){
+    let list=[...rowsFor(store.get(),ui().paperExchange)],q=String(ui().paperSearch||'').toLowerCase(),f=ui().paperFilter;
+    if(q)list=list.filter(r=>`${r.symbol||''} ${r.name||''} ${r.market||''}`.toLowerCase().includes(q));
+    if(f==='holding')list=list.filter(r=>r.has_position);
+    if(f==='completed')list=list.filter(r=>!r.has_position&&n(r.closed_trades)>0);
+    if(f==='profit')list=list.filter(r=>n(r.return_pct)>0);
+    if(f==='loss')list=list.filter(r=>n(r.return_pct)<0);
+    const sorters={
+      return_desc:(a,b)=>n(b.return_pct)-n(a.return_pct),
+      return_asc:(a,b)=>n(a.return_pct)-n(b.return_pct),
+      trades_desc:(a,b)=>n(b.closed_trades)-n(a.closed_trades),
+      win_desc:(a,b)=>n(b.win_rate_pct)-n(a.win_rate_pct),
+      position_desc:(a,b)=>n(b.position_value_krw)-n(a.position_value_krw),
+      opportunity_desc:(a,b)=>n(b.opportunity_score)-n(a.opportunity_score)
+    };
+    list.sort(sorters[ui().paperSort]||sorters.return_desc);
+    return list;
+  }
+
+  function ensurePaperMarket(){
+    const list=filteredRows();
+    let m=ui().paperMarket;
+    if(!list.some(r=>r.market===m))m=list[0]?.market||'';
+    if(m!==ui().paperMarket)store.setUi({paperMarket:m},{scope:'paper'});
+    return m;
+  }
+
+  function renderCoins(){
+    const box=root?.querySelector('#paperBody');
+    if(!box)return;
+    const ex=ui().paperExchange,all=rowsFor(store.get(),ex),list=filteredRows(),selected=ensurePaperMarket(),counts={
+      all:all.length,
+      holding:all.filter(r=>r.has_position).length,
+      completed:all.filter(r=>!r.has_position&&n(r.closed_trades)>0).length,
+      profit:all.filter(r=>n(r.return_pct)>0).length,
+      loss:all.filter(r=>n(r.return_pct)<0).length
+    };
+    box.innerHTML=`<section class="paper-toolbar"><div>${exchangeToggle(ex,'data-paper-exchange')}</div><input data-paper-search type="search" value="${esc(ui().paperSearch)}" placeholder="코인 검색"><select data-paper-sort><option value="return_desc" ${ui().paperSort==='return_desc'?'selected':''}>수익률 높은 순</option><option value="return_asc" ${ui().paperSort==='return_asc'?'selected':''}>수익률 낮은 순</option><option value="trades_desc" ${ui().paperSort==='trades_desc'?'selected':''}>거래 많은 순</option><option value="win_desc" ${ui().paperSort==='win_desc'?'selected':''}>승률 높은 순</option><option value="position_desc" ${ui().paperSort==='position_desc'?'selected':''}>보유금액 큰 순</option><option value="opportunity_desc" ${ui().paperSort==='opportunity_desc'?'selected':''}>기회점수 높은 순</option></select><button data-paper-reset>전체 보기</button></section><div class="chip-row paper-filter"><button data-paper-filter="all" class="${ui().paperFilter==='all'?'active':''}">전체 ${counts.all}</button><button data-paper-filter="holding" class="${ui().paperFilter==='holding'?'active':''}">보유 ${counts.holding}</button><button data-paper-filter="completed" class="${ui().paperFilter==='completed'?'active':''}">매매완료 ${counts.completed}</button><button data-paper-filter="profit" class="${ui().paperFilter==='profit'?'active':''}">수익 ${counts.profit}</button><button data-paper-filter="loss" class="${ui().paperFilter==='loss'?'active':''}">손실 ${counts.loss}</button></div><section class="paper-workspace"><aside class="paper-master"><div class="paper-master-head"><span>${list.length}개 표시</span><small>${strategyLabel(paperStrategy(store.get(),ex))} · ${ex==='upbit'?'업비트':'빗썸'}</small></div><div id="paperList"></div></aside><section id="paperDetail" class="paper-detail"></section></section>`;
+    renderPaperList(list,selected);
+    renderPaperDetail(selected);
+  }
+
+  function renderPaperList(list,selected){
+    const box=root?.querySelector('#paperList');
+    if(!box)return;
+    const ex=ui().paperExchange;
+    box.innerHTML=list.length?list.slice(0,180).map(r=>{
+      const strategy=strategyLabel(paperStrategy(store.get(),ex,r));
+      return`<button data-paper-market="${esc(r.market)}" class="paper-row ${r.market===selected?'selected':''}"><span><b>${esc(r.symbol||r.market)}</b><small>${esc(strategy)} · ${esc(stateLabel(r))} · ${n(r.closed_trades)}회</small></span><strong class="${tone(r.return_pct)}">${pct(r.return_pct)}</strong></button>`;
+    }).join(''):empty('조건에 맞는 코인이 없습니다.');
+  }
+
+  async function renderPaperDetail(market){
+    const box=root?.querySelector('#paperDetail');
+    if(!box)return;
+    const ex=ui().paperExchange,row=findMarket(store.get(),ex,market);
+    if(!row){
+      seq++;
+      lastDetail=null;
+      lastDetailKey='';
+      box.innerHTML=empty('조건에 맞는 코인을 선택하세요.');
+      return;
+    }
+    const id=++seq,key=`${ex}|${market}`,strategy=strategyLabel(paperStrategy(store.get(),ex,row));
+    box.innerHTML=`<article class="paper-detail-hero"><div><span>${ex==='upbit'?'업비트':'빗썸'} · ${esc(strategy)} 실행 PAPER</span><h3>${esc(row.symbol||market)}</h3><p>${esc(stateLabel(row))}</p></div><div><span>전체 수익률</span><b class="${tone(row.return_pct)}">${pct(row.return_pct)}</b><small>평가액 ${money(row.equity_krw)}</small></div></article><div class="paper-detail-kpis"><span><small>실행 전략</small><b>${esc(strategy)}</b></span><span><small>남은 현금</small><b>${money(row.cash_krw)}</b></span><span><small>현재 보유금액</small><b>${money(row.position_value_krw)}</b></span><span><small>평균 매수가</small><b>${row.position_avg_price?price(row.position_avg_price):'-'}</b></span><span><small>미실현 손익</small><b class="${tone(row.unrealized_pnl_krw)}">${n(row.unrealized_pnl_krw)>=0?'+':''}${money(row.unrealized_pnl_krw)}</b></span><span><small>실현 손익</small><b class="${tone(row.realized_pnl_krw)}">${n(row.realized_pnl_krw)>=0?'+':''}${money(row.realized_pnl_krw)}</b></span><span><small>완료 거래 / 승률</small><b>${n(row.closed_trades)}회 · ${n(row.win_rate_pct).toFixed(1)}%</b></span></div><section id="paperDeep">${loading('매매 계획과 체결 이력을 불러오는 중입니다.')}</section>`;
+    try{
+      const detail=await getMarketDetail(ex,market);
+      if(id!==seq||ui().paperMarket!==market)return;
+      lastDetail=detail;
+      lastDetailKey=key;
+      renderPaperDeep(detail);
+    }catch(err){
+      if(id===seq){
+        lastDetail=null;
+        lastDetailKey='';
+        const d=root?.querySelector('#paperDeep');
+        if(d)d.innerHTML=empty('상세 PAPER 데이터를 불러오지 못했습니다.',err.message);
+      }
+    }
+  }
+
+  function renderPaperDeep(detail){
+    const box=root?.querySelector('#paperDeep');
+    if(!box)return;
+    if(!detail){
+      box.innerHTML=empty('상세 데이터가 아직 순회에 도착하지 않았습니다.');
+      return;
+    }
+    const data=detail.data||{},plan=data.trade_plan||{},fills=Array.isArray(data.fills)?data.fills:[],feedback=Array.isArray(data.feedback)?data.feedback:[],memory=Array.isArray(data.market_memory)?data.market_memory:[],eq=Array.isArray(data.equity_history)?data.equity_history:[],range=ui().paperRange||'24h',row=findMarket(store.get(),ui().paperExchange,ui().paperMarket),strategy=strategyLabel(paperStrategy(store.get(),ui().paperExchange,row,detail));
+    box.innerHTML=`<section class="trade-plan-panel"><header><h3>현재 매매 계획</h3><span>${esc(strategy)} · 조회 전용</span></header><div><span><small>다음 추가매수/진입</small><b>${price(n(plan.next_add_price)||n(plan.expected_entry_price))}</b></span><span><small>목표가</small><b>${price(plan.target_price)}</b></span><span><small>손절 기준</small><b>${price(plan.hard_stop_price)}</b></span><span><small>분할 진행</small><b>${n(plan.completed_entries)} / ${n(plan.expected_total_entries)}</b></span><span><small>남은 분할</small><b>${n(plan.remaining_entries)}회</b></span><span><small>제안 비중</small><b>${n(plan.suggested_weight_pct).toFixed(2)}%</b></span></div></section><section class="paper-history"><div class="history-toolbar"><div><h3>가격 · 체결 · 가상계좌</h3><p>${esc(strategy)} 실행 PAPER 가격 위에 가상 매수·매도 체결을 표시합니다.</p></div>${rangeControl('data-paper-range',range)}</div><div class="history-stack">${priceFillChart(memory,fills,{range,title:'가격 · PAPER 체결'})}${simpleLineChart('선택 코인 가상계좌 자산곡선',eq,'equity_krw',{range,className:'primary',suffix:'원'})}</div></section><div class="detail-columns"><section><header><h3>최근 체결</h3></header>${fills.slice(0,10).map(f=>`<div class="event-row"><b>${f.side==='buy'?'매수':'매도'}</b><span>${price(f.price)}<small>${esc(strategyLabel(f.strategy||strategy))}</small></span><strong class="${tone(f.realized_pnl)}">${f.side==='sell'?`${n(f.realized_pnl)>=0?'+':''}${money(f.realized_pnl)}`:money(f.krw)}</strong></div>`).join('')||'<p class="muted">체결 없음</p>'}</section><section><header><h3>최근 학습</h3></header>${feedback.slice(0,8).map(f=>`<div class="learning-item"><b class="${tone(f.outcome_return_pct)}">${pct(f.outcome_return_pct)}</b><span>${esc(f.note||'학습 기준 조정')}<small>${esc(strategyLabel(f.strategy||strategy))}</small></span></div>`).join('')||'<p class="muted">학습 기록 없음</p>'}</section></div>`;
+  }
+
+  function compareRows(){
+    const q=String(ui().paperCompareSearch||'').trim().toLowerCase(),sort=ui().paperCompareSort||'gap_desc';
+    let list=commonExchangeRows(store.get()).map(x=>({...x,gap:n(x.b.return_pct)-n(x.u.return_pct),oppGap:n(x.b.opportunity_score)-n(x.u.opportunity_score)}));
+    if(q)list=list.filter(x=>`${x.market} ${x.b.symbol||''} ${x.b.name||''} ${x.u.name||''}`.toLowerCase().includes(q));
+    const sorters={
+      gap_desc:(a,b)=>Math.abs(b.gap)-Math.abs(a.gap),
+      bithumb_desc:(a,b)=>n(b.b.return_pct)-n(a.b.return_pct),
+      upbit_desc:(a,b)=>n(b.u.return_pct)-n(a.u.return_pct),
+      opp_desc:(a,b)=>Math.abs(b.oppGap)-Math.abs(a.oppGap),
+      symbol:(a,b)=>String(a.b.symbol||a.market).localeCompare(String(b.b.symbol||b.market),'ko')
+    };
+    list.sort(sorters[sort]||sorters.gap_desc);
+    return list;
+  }
+
+  function renderCompare(){
+    const box=root?.querySelector('#paperBody');
+    if(!box)return;
+    const allCount=commonExchangeRows(store.get()).length,list=compareRows(),bStrategy=strategyLabel(paperStrategy(store.get(),'bithumb')),uStrategy=strategyLabel(paperStrategy(store.get(),'upbit'));
+    box.innerHTML=`<section class="compare-head"><div><h3>같은 코인, 거래소별 실행 PAPER 결과</h3><p>동일 KRW 종목의 독립 실행 PAPER 계좌입니다. 전략 연구의 Shadow 계좌와는 별도입니다.</p></div><span>빗썸 ${esc(bStrategy)} · 업비트 ${esc(uStrategy)} · 공통 ${allCount}종목</span></section><section class="compare-toolbar"><input data-compare-search type="search" value="${esc(ui().paperCompareSearch||'')}" placeholder="공통 코인 검색"><select data-compare-sort><option value="gap_desc" ${ui().paperCompareSort==='gap_desc'?'selected':''}>수익률 차이 큰 순</option><option value="opp_desc" ${ui().paperCompareSort==='opp_desc'?'selected':''}>기회점수 차이 큰 순</option><option value="bithumb_desc" ${ui().paperCompareSort==='bithumb_desc'?'selected':''}>빗썸 수익률 높은 순</option><option value="upbit_desc" ${ui().paperCompareSort==='upbit_desc'?'selected':''}>업비트 수익률 높은 순</option><option value="symbol" ${ui().paperCompareSort==='symbol'?'selected':''}>코인 이름순</option></select><button data-compare-reset>전체 보기</button></section><div class="compare-table"><div class="compare-row compare-columns"><span>코인</span><span>빗썸</span><span>업비트</span><span>차이</span></div>${list.length?list.slice(0,286).map(x=>`<div class="compare-row"><span><b>${esc(x.b.symbol||x.market.replace(/^KRW-/,''))}</b><small>${esc(x.b.name||x.u.name||'')}</small></span><span><b class="${tone(x.b.return_pct)}">${pct(x.b.return_pct)}</b><small>${esc(strategyLabel(paperStrategy(store.get(),'bithumb',x.b)))} · 기회 ${n(x.b.opportunity_score).toFixed(0)}</small></span><span><b class="${tone(x.u.return_pct)}">${pct(x.u.return_pct)}</b><small>${esc(strategyLabel(paperStrategy(store.get(),'upbit',x.u)))} · 기회 ${n(x.u.opportunity_score).toFixed(0)}</small></span><span><b class="${tone(x.gap)}">${pct(x.gap)}</b><small>빗썸-업비트</small></span></div>`).join(''):empty('조건에 맞는 공통 코인이 없습니다.')}</div>`;
+  }
+
+  const click=e=>{
+    const t=e.target.closest('[data-paper-tab]');
+    if(t){store.setUi({paperTab:t.dataset.paperTab},{scope:'paper'});render();return}
+    const ex=e.target.closest('[data-paper-exchange]');
+    if(ex){lastDetail=null;lastDetailKey='';store.setUi({paperExchange:ex.dataset.paperExchange,paperMarket:''},{scope:'paper'});render();return}
+    const f=e.target.closest('[data-paper-filter]');
+    if(f){store.setUi({paperFilter:f.dataset.paperFilter},{scope:'paper'});renderCoins();return}
+    const m=e.target.closest('[data-paper-market]');
+    if(m){store.setUi({paperMarket:m.dataset.paperMarket},{scope:'paper'});renderCoins();return}
+    const range=e.target.closest('[data-paper-range]');
+    if(range&&lastDetail&&lastDetailKey===`${ui().paperExchange}|${ui().paperMarket}`){store.setUi({paperRange:range.dataset.paperRange},{scope:'paper-range'});renderPaperDeep(lastDetail);return}
+    if(e.target.closest('[data-paper-reset]')){store.setUi({paperFilter:'all',paperSearch:'',paperSort:'return_desc'},{scope:'paper'});renderCoins();return}
+    if(e.target.closest('[data-compare-reset]')){store.setUi({paperCompareSearch:'',paperCompareSort:'gap_desc'},{scope:'paper'});renderCompare()}
+  };
+  const input=e=>{
+    if(e.target.matches('[data-paper-search]')){store.setUi({paperSearch:e.target.value},{scope:'paper-search'});const list=filteredRows(),selected=ensurePaperMarket();renderPaperList(list,selected);renderPaperDetail(selected);return}
+    if(e.target.matches('[data-compare-search]')){store.setUi({paperCompareSearch:e.target.value},{scope:'paper'});renderCompare()}
+  };
+  const change=e=>{
+    if(e.target.matches('[data-paper-sort]')){store.setUi({paperSort:e.target.value},{scope:'paper'});renderCoins();return}
+    if(e.target.matches('[data-compare-sort]')){store.setUi({paperCompareSort:e.target.value},{scope:'paper'});renderCompare()}
+  };
+
+  return{
+    mount(r){root=r;root.addEventListener('click',click);root.addEventListener('input',input);root.addEventListener('change',change);unsub=store.subscribe((_,m)=>{if(m.type==='snapshot')render()})},
+    render,
+    destroy(){seq++;lastDetail=null;lastDetailKey='';unsub?.();root?.removeEventListener('click',click);root?.removeEventListener('input',input);root?.removeEventListener('change',change);root=null}
+  };
 }
