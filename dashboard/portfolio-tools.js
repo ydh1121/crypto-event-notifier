@@ -31,14 +31,15 @@ function ensurePersonalTools(){
   workspace.insertAdjacentHTML('afterend',`
     <section id="personalTools" class="personal-tools">
       <article class="panel">
-        <div class="tool-head"><div><p class="panel-kicker">내 실제 보유분</p><h3>보유 수량과 평단</h3><p>거래소 계좌와 자동으로 연결하지 않습니다. 현재 가지고 있는 수량과 평균 매수가를 직접 적어두는 메모입니다.</p></div></div>
+        <div class="tool-head"><div><p class="panel-kicker">내 실제 보유분</p><h3>보유 거래소·수량·평단</h3><p>거래소 계좌와 자동으로 연결하지 않습니다. 실제 보유 거래소와 현재 가지고 있는 수량, 평균 매수가를 직접 저장합니다.</p></div></div>
         <form id="holdingForm" class="holding-form">
+          <label>보유 거래소<select id="holdingExchange"><option value="">선택 안 함</option><option value="bithumb">빗썸</option><option value="upbit">업비트</option></select></label>
           <label>보유 수량<input id="holdingVolume" type="number" min="0" step="any" inputmode="decimal" placeholder="예: 125000"></label>
           <label>평균 매수가<input id="holdingAvg" type="number" min="0" step="any" inputmode="decimal" placeholder="예: 0.777"></label>
         </form>
         <div id="holdingSummary" class="holding-summary"></div>
         <div class="tool-actions"><button id="saveHolding" class="button">보유 정보 저장</button><button id="clearHolding" class="button secondary">초기화</button></div>
-        <p class="form-note">이 정보는 로컬 SQLite에 저장되고 DB 백업에 포함됩니다. GitHub에는 올라가지 않습니다.</p>
+        <p class="form-note">거래소를 저장하면 Pages의 내 코인 참고 계획이 해당 거래소 PAPER 값을 먼저 사용합니다. 이 정보는 로컬 SQLite에 저장되고 DB 백업에 포함되며 GitHub에는 올라가지 않습니다.</p>
       </article>
       <article class="panel">
         <div class="tool-head"><div><p class="panel-kicker">평단 계산</p><h3>물타기 계산기</h3><p>추가 매수할 가격과 금액을 적으면 회차별 새 평단을 계산합니다. 코인마다 최대 20회까지 저장할 수 있습니다.</p></div></div>
@@ -52,7 +53,9 @@ function ensurePersonalTools(){
 }
 
 function holdingInputs(){
+  const exchange=String(document.getElementById('holdingExchange')?.value||'').trim().toLowerCase();
   return {
+    exchange:exchange==='bithumb'||exchange==='upbit'?exchange:'',
     volume:Math.max(0,Number(document.getElementById('holdingVolume')?.value||0)),
     avg:Math.max(0,Number(document.getElementById('holdingAvg')?.value||0)),
   };
@@ -135,6 +138,7 @@ async function loadPersonalTools(){
     const [holding,averaging]=await Promise.all([api(`/api/holdings/${encodeURIComponent(market)}`),api(`/api/averaging/${encodeURIComponent(market)}`)]);
     if(personalToolsState.market!==market)return;
     personalToolsState.holding=holding;
+    document.getElementById('holdingExchange').value=holding.exchange==='bithumb'||holding.exchange==='upbit'?holding.exchange:'';
     document.getElementById('holdingVolume').value=Number(holding.volume||0)||'';
     document.getElementById('holdingAvg').value=Number(holding.avg_price||0)||'';
     renderHoldingSummary();renderAveragingRows(averaging.plan?.rows||[]);renderEntryGuide();
@@ -145,11 +149,11 @@ function bindPersonalTools(){
   document.getElementById('holdingVolume')?.addEventListener('input',()=>{renderHoldingSummary();calculateAveragingLocal()});
   document.getElementById('holdingAvg')?.addEventListener('input',()=>{renderHoldingSummary();calculateAveragingLocal()});
   document.getElementById('saveHolding').onclick=async()=>{
-    const {volume,avg}=holdingInputs();
-    try{await api(`/api/holdings/${encodeURIComponent(ui.selectedMarket)}`,{method:'PUT',body:{volume,avg_price:avg}});await loadPersonalTools();alert('보유 수량과 평단을 저장했습니다.')}catch(err){alert(err.message)}
+    const {exchange,volume,avg}=holdingInputs();
+    try{await api(`/api/holdings/${encodeURIComponent(ui.selectedMarket)}`,{method:'PUT',body:{exchange,volume,avg_price:avg}});await loadPersonalTools();alert('보유 거래소·수량·평단을 저장했습니다.')}catch(err){alert(err.message)}
   };
   document.getElementById('clearHolding').onclick=async()=>{
-    if(!confirm('이 코인의 보유 수량과 평단 기록을 지울까요?'))return;
+    if(!confirm('이 코인의 보유 거래소·수량·평단 기록을 지울까요?'))return;
     try{await api(`/api/holdings/${encodeURIComponent(ui.selectedMarket)}`,{method:'DELETE'});await loadPersonalTools()}catch(err){alert(err.message)}
   };
   document.getElementById('addAveragingRow').onclick=()=>{

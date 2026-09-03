@@ -12,7 +12,7 @@ import{createHomePage}from'./pages/home.js?v=47';
 import{createDashboardPage}from'./pages/dashboard.js';
 import{createResearchPage}from'./pages/research.js?v=40';
 import{installDexLaunchResearchPanel}from'./pages/dex-launch-panel.js?v=44';
-import{createAssetsPage}from'./pages/assets.js?v=48';
+import{createAssetsPage}from'./pages/assets.js?v=49';
 import{createPaperPage}from'./pages/paper.js?v=46';
 import{createStrategyPage}from'./pages/strategy.js?v=46.2';
 import{createSectorsPage}from'./pages/sectors-v36.js?v=46';

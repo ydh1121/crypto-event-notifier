@@ -443,10 +443,26 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=422, detail="volume and avg_price must be numbers") from exc
         if volume < 0 or avg_price < 0:
             raise HTTPException(status_code=422, detail="volume and avg_price must be zero or greater")
-        user_tools.set_holding(normalized, volume=volume, avg_price=avg_price)
+        holding_kwargs: dict[str, Any] = {}
+        if "exchange" in payload:
+            holding_kwargs["exchange"] = payload.get("exchange")
+        try:
+            saved = user_tools.set_holding(
+                normalized,
+                volume=volume,
+                avg_price=avg_price,
+                **holding_kwargs,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         journal.record_event(
             "manual_holding_updated",
-            {"market": normalized, "volume": volume, "avg_price": avg_price},
+            {
+                "market": normalized,
+                "volume": volume,
+                "avg_price": avg_price,
+                "exchange": saved.get("exchange"),
+            },
         )
         return holding_with_market_value(normalized)
 

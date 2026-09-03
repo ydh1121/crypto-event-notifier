@@ -9,6 +9,20 @@ from typing import Any
 
 
 MAX_AVERAGING_ROWS = 20
+VALID_HOLDING_EXCHANGES = {"bithumb", "upbit"}
+_EXCHANGE_UNSET = object()
+
+
+def _normalize_holding_exchange(value: Any) -> str | None:
+    if value is None:
+        return None
+    exchange = str(value).strip().lower()
+    if not exchange:
+        return None
+    if exchange not in VALID_HOLDING_EXCHANGES:
+        allowed = ", ".join(sorted(VALID_HOLDING_EXCHANGES))
+        raise ValueError(f"exchange must be one of: {allowed}")
+    return exchange
 
 
 def calculate_averaging(
@@ -76,6 +90,7 @@ class UserToolsStore:
                     market TEXT PRIMARY KEY,
                     volume REAL NOT NULL,
                     avg_price REAL NOT NULL,
+                    exchange TEXT,
                     updated_ts REAL NOT NULL
                 );
 
@@ -86,33 +101,56 @@ class UserToolsStore:
                 );
                 """
             )
+            columns = {
+                str(row["name"])
+                for row in self._conn.execute("PRAGMA table_info(manual_holdings)").fetchall()
+            }
+            if "exchange" not in columns:
+                self._conn.execute("ALTER TABLE manual_holdings ADD COLUMN exchange TEXT")
 
     def get_holding(self, market: str) -> dict[str, Any]:
         with self._lock:
             row = self._conn.execute(
-                "SELECT market, volume, avg_price, updated_ts FROM manual_holdings WHERE market = ?",
+                "SELECT market, volume, avg_price, exchange, updated_ts FROM manual_holdings WHERE market = ?",
                 (market,),
             ).fetchone()
         if row is None:
-            return {"market": market, "volume": 0.0, "avg_price": 0.0, "updated_ts": None}
+            return {
+                "market": market,
+                "volume": 0.0,
+                "avg_price": 0.0,
+                "exchange": None,
+                "updated_ts": None,
+            }
         return dict(row)
 
     def list_holdings(self) -> list[dict[str, Any]]:
         with self._lock:
             rows = self._conn.execute(
-                "SELECT market, volume, avg_price, updated_ts FROM manual_holdings ORDER BY market"
+                "SELECT market, volume, avg_price, exchange, updated_ts FROM manual_holdings ORDER BY market"
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def set_holding(self, market: str, *, volume: float, avg_price: float) -> dict[str, Any]:
+    def set_holding(
+        self,
+        market: str,
+        *,
+        volume: float,
+        avg_price: float,
+        exchange: Any = _EXCHANGE_UNSET,
+    ) -> dict[str, Any]:
         volume = max(0.0, float(volume))
         avg_price = max(0.0, float(avg_price))
+        if exchange is _EXCHANGE_UNSET:
+            normalized_exchange = self.get_holding(market).get("exchange")
+        else:
+            normalized_exchange = _normalize_holding_exchange(exchange)
         now = time.time()
         with self._lock, self._conn:
             self._conn.execute(
-                "INSERT INTO manual_holdings(market, volume, avg_price, updated_ts) VALUES (?, ?, ?, ?) "
-                "ON CONFLICT(market) DO UPDATE SET volume=excluded.volume, avg_price=excluded.avg_price, updated_ts=excluded.updated_ts",
-                (market, volume, avg_price, now),
+                "INSERT INTO manual_holdings(market, volume, avg_price, exchange, updated_ts) VALUES (?, ?, ?, ?, ?) "
+                "ON CONFLICT(market) DO UPDATE SET volume=excluded.volume, avg_price=excluded.avg_price, exchange=excluded.exchange, updated_ts=excluded.updated_ts",
+                (market, volume, avg_price, normalized_exchange, now),
             )
         return self.get_holding(market)
 

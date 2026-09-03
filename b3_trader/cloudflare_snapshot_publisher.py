@@ -145,8 +145,13 @@ def _manual_holdings(journal_db: str, price_by_market: dict[str, float]) -> dict
                 "holdings": [], "invested_krw": 0.0, "value_krw": 0.0, "pnl_krw": 0.0,
                 "holding_count": 0, "priced_holding_count": 0, "valuation_complete": True,
             }
+        columns = {
+            str(row["name"])
+            for row in conn.execute("PRAGMA table_info(manual_holdings)").fetchall()
+        }
+        exchange_select = "exchange" if "exchange" in columns else "NULL AS exchange"
         rows = conn.execute(
-            "SELECT market,volume,avg_price,updated_ts FROM manual_holdings ORDER BY market"
+            f"SELECT market,volume,avg_price,{exchange_select},updated_ts FROM manual_holdings ORDER BY market"
         ).fetchall()
     finally:
         conn.close()
@@ -161,6 +166,9 @@ def _manual_holdings(journal_db: str, price_by_market: dict[str, float]) -> dict
         volume = max(0.0, _number(row.get("volume")))
         avg_price = max(0.0, _number(row.get("avg_price")))
         current_price = max(0.0, _number(price_by_market.get(str(row.get("market")))))
+        exchange = str(row.get("exchange") or "").strip().lower()
+        if exchange not in {"bithumb", "upbit"}:
+            exchange = ""
         invested = volume * avg_price
         value = volume * current_price if current_price > 0 else 0.0
         pnl = value - invested if current_price > 0 else 0.0
@@ -173,7 +181,8 @@ def _manual_holdings(journal_db: str, price_by_market: dict[str, float]) -> dict
         value_total += value
         items.append(
             {
-                "market": row.get("market"), "volume": volume, "avg_price": avg_price,
+                "market": row.get("market"), "exchange": exchange or None,
+                "volume": volume, "avg_price": avg_price,
                 "current_price": current_price, "invested_krw": round(invested, 2),
                 "value_krw": round(value, 2), "unrealized_pnl_krw": round(pnl, 2),
                 "unrealized_pnl_pct": round(pnl_pct, 4), "updated_ts": row.get("updated_ts"),

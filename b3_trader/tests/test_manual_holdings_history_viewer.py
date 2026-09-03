@@ -43,6 +43,7 @@ def test_manual_holdings_history_is_bounded_and_interval_limited(tmp_path: Path)
     assert summary["invested_krw"] == 10_000_000.0
     assert summary["value_krw"] == 11_000_000.0
     assert summary["pnl_krw"] == 1_000_000.0
+    assert summary["holdings"][0]["exchange"] is None
 
     assert _record_manual_holdings_snapshot(str(path), summary, now=10_000.0) is True
     assert _record_manual_holdings_snapshot(str(path), summary, now=10_299.0) is False
@@ -57,6 +58,33 @@ def test_manual_holdings_history_is_bounded_and_interval_limited(tmp_path: Path)
         [10_000.0, 10_000_000.0, 11_000_000.0, 1_000_000.0, 1],
         [10_301.0, 10_000_000.0, 12_000_000.0, 2_000_000.0, 1],
     ]
+
+
+def test_manual_holdings_snapshot_includes_saved_exchange(tmp_path: Path) -> None:
+    path = tmp_path / "journal.sqlite3"
+    conn = sqlite3.connect(path)
+    try:
+        with conn:
+            conn.execute(
+                """
+                CREATE TABLE manual_holdings (
+                    market TEXT PRIMARY KEY,
+                    volume REAL NOT NULL,
+                    avg_price REAL NOT NULL,
+                    exchange TEXT,
+                    updated_ts REAL NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                "INSERT INTO manual_holdings(market,volume,avg_price,exchange,updated_ts) VALUES (?,?,?,?,?)",
+                ("KRW-ETH", 2.0, 5_000_000.0, "UPBIT", 2_000.0),
+            )
+    finally:
+        conn.close()
+
+    summary = _manual_holdings(str(path), {"KRW-ETH": 5_500_000.0})
+    assert summary["holdings"][0]["exchange"] == "upbit"
 
 
 def test_incomplete_manual_holdings_valuation_is_not_recorded(tmp_path: Path) -> None:
