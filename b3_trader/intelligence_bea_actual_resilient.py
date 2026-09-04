@@ -32,6 +32,7 @@ BEA_NEWS_URL_TEMPLATE = (
 )
 BEA_NEWS_USER_AGENT = "crypto-event-notifier-phase5/1.0"
 MAX_HTML_BYTES = 2_000_000
+_PERCENT_NUMBER = r"([0-9]+(?:\.[0-9]+)?)"
 
 
 class _VisibleTextParser(HTMLParser):
@@ -75,6 +76,51 @@ def _signed_percent(direction: str, value: str) -> float:
     raise ValueError(f"unsupported BEA change direction: {direction!r}")
 
 
+def _release_section(text: str, start_phrase: str, end_phrase: str | None = None) -> str:
+    start = re.search(re.escape(start_phrase), text, flags=re.IGNORECASE)
+    if start is None:
+        return ""
+    start_index = start.start()
+    if end_phrase:
+        end = re.search(re.escape(end_phrase), text[start.end():], flags=re.IGNORECASE)
+        if end is not None:
+            return text[start_index:start.end() + end.start()]
+    return text[start_index:]
+
+
+def _parse_section_pair(
+    section: str,
+    *,
+    month_name: str,
+    allow_core_also: bool,
+) -> tuple[float, float] | None:
+    if not section:
+        return None
+
+    month_pattern = re.escape(month_name)
+    headline = re.search(
+        rf"the PCE price index for {month_pattern}\s+"
+        rf"(increased|decreased)\s+{_PERCENT_NUMBER}\s+percent\b",
+        section,
+        flags=re.IGNORECASE,
+    )
+    core_also = r"(?:\s+also)?" if allow_core_also else r"(?:\s+also)?"
+    core = re.search(
+        r"Excluding food and energy,\s+the PCE price index"
+        + core_also
+        + rf"\s+(increased|decreased)\s+{_PERCENT_NUMBER}\s+percent\b",
+        section,
+        flags=re.IGNORECASE,
+    )
+    if headline is None or core is None:
+        return None
+
+    return (
+        _signed_percent(headline.group(1), headline.group(2)),
+        _signed_percent(core.group(1), core.group(2)),
+    )
+
+
 def parse_bea_pce_news_release(
     html: str,
     *,
@@ -97,30 +143,30 @@ def parse_bea_pce_news_release(
     if expected_title.casefold() not in text.casefold():
         raise ValueError("BEA news release title/reference period mismatch")
 
-    month_pattern = re.escape(month_name)
-    mom_match = re.search(
-        rf"From the preceding month,\s+the PCE price index for {month_pattern}\s+"
-        r"(increased|decreased)\s+([0-9]+(?:\.[0-9]+)?)\s+percent\.\s+"
-        r"Excluding food and energy,\s+the PCE price index(?:\s+also)?\s+"
-        r"(increased|decreased)\s+([0-9]+(?:\.[0-9]+)?)\s+percent",
+    mom_section = _release_section(
         text,
-        flags=re.IGNORECASE,
+        "From the preceding month,",
+        "From the same month one year ago,",
     )
-    yoy_match = re.search(
-        rf"From the same month one year ago,\s+the PCE price index for {month_pattern}\s+"
-        r"(increased|decreased)\s+([0-9]+(?:\.[0-9]+)?)\s+percent\.\s+"
-        r"Excluding food and energy,\s+the PCE price index\s+"
-        r"(increased|decreased)\s+([0-9]+(?:\.[0-9]+)?)\s+percent\s+from one year ago",
+    yoy_section = _release_section(
         text,
-        flags=re.IGNORECASE,
+        "From the same month one year ago,",
     )
-    if mom_match is None or yoy_match is None:
+    mom_values = _parse_section_pair(
+        mom_section,
+        month_name=month_name,
+        allow_core_also=True,
+    )
+    yoy_values = _parse_section_pair(
+        yoy_section,
+        month_name=month_name,
+        allow_core_also=False,
+    )
+    if mom_values is None or yoy_values is None:
         raise ValueError("BEA PCE news release is missing complete headline/core MoM/YoY text")
 
-    headline_mom = _signed_percent(mom_match.group(1), mom_match.group(2))
-    core_mom = _signed_percent(mom_match.group(3), mom_match.group(4))
-    headline_yoy = _signed_percent(yoy_match.group(1), yoy_match.group(2))
-    core_yoy = _signed_percent(yoy_match.group(3), yoy_match.group(4))
+    headline_mom, core_mom = mom_values
+    headline_yoy, core_yoy = yoy_values
 
     common = {
         "event_id": event_id,
