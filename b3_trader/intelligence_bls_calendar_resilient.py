@@ -206,6 +206,7 @@ class ResilientBlsReleaseCalendarSource:
     ) -> list[IntelligenceEvent]:
         events: list[IntelligenceEvent] = []
         seen_ids: set[str] = set()
+        current_year = datetime.fromtimestamp(current, EASTERN_TIMEZONE).year
 
         for year in _window_years(min_scheduled_at, max_scheduled_at, current):
             for event_type, release_id, title in FRED_RELEASES:
@@ -234,6 +235,8 @@ class ResilientBlsReleaseCalendarSource:
                     received_at=current,
                 )
                 if not parsed:
+                    if year > current_year:
+                        continue
                     raise ValueError(f"FRED release calendar produced no {event_type} rows for {year}")
 
                 for event in parsed:
