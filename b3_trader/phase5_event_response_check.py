@@ -3,12 +3,47 @@ from __future__ import annotations
 import json
 import math
 import sqlite3
-import sys
 from pathlib import Path
 from typing import Any
 
 from .auto_demo_v2 import DB_PATH
 from .intelligence_event_response import HORIZONS, OBSERVATION_TOLERANCE_SECONDS, PROVIDER_ID
+
+STATUS_PATH = Path("b3_trader/data/research-platform/status.json")
+
+
+def _runtime_capture(path: Path = STATUS_PATH) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return {}
+    components = payload.get("components") if isinstance(payload, dict) else {}
+    phase5 = components.get("phase5-intelligence-ingest") if isinstance(components, dict) else {}
+    last_result = phase5.get("last_result") if isinstance(phase5, dict) else {}
+    capture = last_result.get("event_response_capture") if isinstance(last_result, dict) else {}
+    if not isinstance(capture, dict):
+        return {}
+    allowed = {
+        "ok",
+        "status",
+        "paper_only",
+        "shadow_only",
+        "can_place_orders",
+        "score_mutation",
+        "network_requests",
+        "provider_id",
+        "horizons",
+        "benchmarks",
+        "events_considered",
+        "events_excluded_imprecise",
+        "due_observations",
+        "future_observations",
+        "samples_inserted",
+        "already_captured",
+        "missing_baseline",
+        "missing_target",
+    }
+    return {key: capture[key] for key in allowed if key in capture}
 
 
 def run_check(*, path: Path | str = DB_PATH) -> tuple[dict[str, Any], int]:
@@ -27,6 +62,7 @@ def run_check(*, path: Path | str = DB_PATH) -> tuple[dict[str, Any], int]:
         "markets": [],
         "horizon_counts": {},
         "latest_event": {},
+        "runtime_capture": _runtime_capture(),
     }
     if not db_path.exists():
         result["status"] = "database_missing"
