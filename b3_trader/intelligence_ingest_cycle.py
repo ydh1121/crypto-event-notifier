@@ -8,6 +8,7 @@ from typing import Callable, Iterable
 
 from .auto_demo_v2 import DB_PATH
 from .intelligence_bea_schedule import BeaReleaseScheduleSource
+from .intelligence_bls_actual import BlsActualCaptureService
 from .intelligence_bls_calendar import BlsReleaseCalendarSource
 from .intelligence_event import IntelligenceEvent
 from .intelligence_event_store import IntelligenceEventStore
@@ -48,7 +49,9 @@ class IntelligenceIngestCycle:
     """Bounded Phase 5 macro/news ingest coordinator.
 
     Networking is opt-in per run. The cycle persists normalized evidence only and
-    has no score, PAPER, position-sizing or live-order authority.
+    has no score, PAPER, position-sizing or live-order authority. When the BLS
+    calendar is requested, the same cycle also attempts the bounded initial-actual
+    capture for due CPI/Employment events.
     """
 
     def __init__(
@@ -57,12 +60,14 @@ class IntelligenceIngestCycle:
         *,
         fetchers: dict[str, SourceFetcher] | None = None,
         conn: sqlite3.Connection | None = None,
+        bls_actual_capture: BlsActualCaptureService | None = None,
     ) -> None:
         self.path = Path(path)
         self.fetchers = dict(fetchers or default_intelligence_fetchers())
         self.conn = conn or sqlite3.connect(self.path, timeout=30)
         self.conn.row_factory = sqlite3.Row
         self.store = IntelligenceEventStore(self.conn)
+        self.bls_actual_capture = bls_actual_capture or BlsActualCaptureService(self.conn)
         self._owns_conn = conn is None
 
     def close(self) -> None:
@@ -95,6 +100,7 @@ class IntelligenceIngestCycle:
             "events_inserted": 0,
             "events_updated": 0,
             "source_failures": 0,
+            "macro_actual_capture": {"status": "not_requested"},
         }
         if not network_enabled:
             result["status"] = "network_disabled"
@@ -136,5 +142,22 @@ class IntelligenceIngestCycle:
             result["events_updated"] = int(result["events_updated"]) + int(ingest["updated"])
 
         result["source_results"] = source_results
+        if "us_bls_release_calendar" in requested:
+            try:
+                capture = self.bls_actual_capture.run_once(now=current, network_enabled=True)
+            except Exception as exc:
+                capture = {
+                    "status": "capture_error",
+                    "paper_only": True,
+                    "can_place_orders": False,
+                    "score_mutation": False,
+                    "error": f"{type(exc).__name__}: {exc}"[:300],
+                }
+                result["source_failures"] = int(result["source_failures"]) + 1
+            else:
+                if str(capture.get("status") or "") == "partial":
+                    result["source_failures"] = int(result["source_failures"]) + 1
+            result["macro_actual_capture"] = capture
+
         result["status"] = "ok" if int(result["source_failures"]) == 0 else "partial"
         return result
