@@ -61,7 +61,8 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` implemented/tested
 - [x] Massive 1-minute bar timestamp `t` is treated as bar-open time; the stored close observation clock is `t + 60s`. Empty provider intervals stay empty and are never synthetically filled.
 - [x] Massive Basic / Starter / Advanced plan metadata is preserved as end-of-day / 15-minute-delayed / realtime evidence instead of inferring entitlement from possession of an API key.
 - [x] `assess_us_market_reference_path()` provides a research-only reference-path quality gate with configurable endpoint skew, coverage ratio and maximum-gap thresholds plus latency/data-rights consistency checks. It does not create market scores or fill missing bars.
-- [ ] `IntelligenceUsMarketSensitivityStore.build_pairs()` does not yet enforce the new path-quality result for `massive_indices_1m`; quality-gated pair construction and rejected-path audit are the next backend step.
+- [x] `IntelligenceUsMarketSensitivityStore.build_pairs()` enforces that path-quality gate for `massive_indices_1m`; sparse paths do not become sensitivity samples, rejection reason counts are returned, and legacy/snapshot provider behavior remains backward-compatible.
+- [ ] Persistent rejected-path audit rows are not yet stored; current rejection evidence is returned as per-run reason counts and can be recomputed from retained reference observations.
 - [ ] Massive runtime cadence is intentionally not supervisor-wired until a real account/plan is configured and its permitted usage/latency class is observed. The adapters/collector are implemented/tested only.
 - [ ] Regular/pre-market/after-hours regime conditioning after sufficient source coverage.
 
@@ -98,7 +99,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` implemented/tested
 
 ## 7. Remaining promotion path
 
-1. Enforce the reference-path quality gate inside U.S. sensitivity pair construction for `massive_indices_1m`, retain rejected-path reason counts/evidence and keep legacy/snapshot providers explicitly distinguishable.
+1. Optionally persist rejected-path audit rows if per-run reason counts are not sufficient for long-horizon QA; this is evidence/audit work, not a scoring prerequisite while raw reference observations remain retained.
 2. Pull/restart the 24-hour PC on the current branch and run `python -m b3_trader.phase5_runtime_check` after the first Phase 5 cycle; retain the result as runtime evidence.
 3. Configure a valid BEA API UserID as a local environment secret (`BEA_API_KEY` or `BEA_USER_ID`; never commit the value) and observe one due PCE initial-actual capture.
 4. Configure a reviewed Trading Economics subscription key (`TRADING_ECONOMICS_API_KEY`) and observe one complete pre-release consensus snapshot for CPI, Employment or PCE.
@@ -144,3 +145,5 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` implemented/tested
 - `d9a8ffb` realistic aggregate OHLC fixture correction; Python/Viewer/dashboard checks green at validation point
 - `312b5b4` configurable U.S. reference-path quality assessor
 - `bc9c798` reference-path quality gate tests; Python regression green
+- `d682c2e` quality-gated `massive_indices_1m` sensitivity pair construction with rejection reason counts
+- `412cd68` quality-gated sensitivity integration tests; Python/Viewer/dashboard regression green at validation point
