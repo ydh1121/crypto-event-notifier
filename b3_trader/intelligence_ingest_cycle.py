@@ -10,7 +10,7 @@ from .auto_demo_v2 import DB_PATH
 from .intelligence_bea_actual import BeaActualCaptureService
 from .intelligence_bea_schedule import BeaReleaseScheduleSource
 from .intelligence_bls_actual import BlsActualCaptureService
-from .intelligence_bls_calendar import BlsReleaseCalendarSource
+from .intelligence_bls_calendar_resilient import ResilientBlsReleaseCalendarSource
 from .intelligence_event import IntelligenceEvent
 from .intelligence_event_store import IntelligenceEventStore
 from .intelligence_fomc_calendar import FomcMeetingCalendarSource
@@ -28,7 +28,7 @@ DEFAULT_SOURCE_ORDER = (
 
 
 def default_intelligence_fetchers() -> dict[str, SourceFetcher]:
-    bls = BlsReleaseCalendarSource()
+    bls = ResilientBlsReleaseCalendarSource()
     bea = BeaReleaseScheduleSource()
     fomc = FomcMeetingCalendarSource()
     sec = OfficialPressReleaseRssSource(SEC_FEED)
