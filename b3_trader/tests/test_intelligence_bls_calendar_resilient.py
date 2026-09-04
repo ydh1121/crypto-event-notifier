@@ -102,6 +102,47 @@ def test_resilient_source_uses_fred_after_terminal_bls_403(monkeypatch: pytest.M
     assert all("fred.stlouisfed.org/releases/calendar" in url for url in calls)
 
 
+def test_resilient_source_skips_unpublished_future_year(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Primary:
+        url = "https://www.bls.gov/schedule/news_release/bls.ics"
+
+        def fetch(self, **kwargs: object):
+            raise _http_error(403, self.url)
+
+    fixtures = {
+        50: _fred_fixture("Employment Situation", "Friday September 04, 2026"),
+        10: _fred_fixture("Consumer Price Index", "Friday September 11, 2026"),
+        46: _fred_fixture("Producer Price Index", "Thursday September 10, 2026"),
+        11: _fred_fixture("Employment Cost Index", "Friday October 30, 2026"),
+    }
+
+    class Response:
+        def __init__(self, text: str) -> None:
+            self.text = text
+
+    def fake_get(url: str, **kwargs: object):
+        if "y=2027" in url:
+            return Response("<html><body><table></table></body></html>"), 0
+        match = next(
+            (release_id for _, release_id, _ in resilient.FRED_RELEASES if f"rid={release_id}" in url),
+            None,
+        )
+        assert match is not None
+        return Response(fixtures[match]), 0
+
+    monkeypatch.setattr(resilient, "get_with_retry", fake_get)
+    source = ResilientBlsReleaseCalendarSource(primary=Primary())
+    now = datetime(2026, 9, 4, 9, 0, tzinfo=ET).timestamp()
+    events = source.fetch(now=now, horizon_seconds=400 * 86400, max_events=20)
+
+    assert {event.event_type for event in events} == {
+        "US_EMPLOYMENT",
+        "US_CPI",
+        "US_PPI",
+        "US_ECI",
+    }
+
+
 def test_resilient_source_does_not_mask_non_terminal_primary_failure() -> None:
     class Primary:
         url = "https://www.bls.gov/schedule/news_release/bls.ics"
