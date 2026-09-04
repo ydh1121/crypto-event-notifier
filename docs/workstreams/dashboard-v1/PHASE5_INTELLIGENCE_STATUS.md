@@ -53,7 +53,11 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` implemented/tested
 - [x] Empirical sample count, covariance, beta, correlation and same-direction rate are computed per event type / coin / horizon / coin provider / exchange / reference provider.
 - [x] VIX is stored with its raw sign; the research layer does not silently invert it into a risk-on score.
 - [x] U.S. sensitivity confidence remains `None / not_promoted`.
-- [ ] Reviewed live/intraday Nasdaq/S&P 500/VIX data-provider adapter with explicit permitted usage and timestamp semantics.
+- [x] Reviewed Massive Indices Snapshot adapter for Nasdaq Composite (`I:COMP`), S&P 500 (`I:SPX`) and VIX (`I:VIX`) with explicit provider timestamp, session state, latency class and data-rights metadata.
+- [x] Massive `last_updated` nanoseconds map to `observed_at`; `REAL-TIME` and `DELAYED` map explicitly to realtime / 15-minute-delayed evidence, and unsupported timeframe/session values fail closed.
+- [x] The required COMP/SPX/VIX set is atomic: missing entitlement, malformed data or one failed ticker causes zero reference rows to be persisted for that capture attempt.
+- [x] Massive credentials are accepted only from `MASSIVE_API_KEY`, are sent via Authorization header, and are never persisted in evidence or result payloads.
+- [ ] Massive runtime cadence is intentionally not supervisor-wired until a real account/plan is configured and its permitted usage/latency class is observed. The adapter itself is implemented/tested only.
 - [ ] Regular/pre-market/after-hours regime conditioning after sufficient source coverage.
 
 ## 5. Macro values and surprise
@@ -70,7 +74,9 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` implemented/tested
 - [x] BEA official PCE actual-value adapter uses the registered BEA Data API only (`NIPA`, `T20804`, `T20807`); there is no HTML-scraping fallback for actual values.
 - [x] BEA PCE actual capture produces headline/core MoM and YoY evidence, requires all four metrics atomically, preserves the first complete API observation as revision 0 and refuses late historical backfill outside the bounded post-release window.
 - [x] BEA API credentials are accepted only from `BEA_API_KEY` / `BEA_USER_ID`; missing or malformed credentials cause a no-network fail-closed result and credential values are never written to result payloads or evidence rows.
-- [ ] Reviewed external consensus provider. Official schedule sources are not treated as consensus providers.
+- [x] Reviewed Trading Economics economic-calendar consensus adapter for CPI, Employment and PCE. Official BLS/BEA schedules remain release clocks and are not treated as consensus providers.
+- [x] Trading Economics capture is limited to a complete snapshot inside the final 45 minutes before the official scheduled release; `known_at` must be strictly pre-release, event time/reference period must match, and incomplete/conflicting sets persist zero rows.
+- [x] Trading Economics credentials are accepted only from `TRADING_ECONOMICS_API_KEY`; missing credentials cause zero network requests and do not poison official-source ingest health.
 - [ ] Historical surprise distribution and z-score; do not calculate until enough clean comparable samples exist.
 - [ ] Macro sensitivity confidence/promotion gate.
 
@@ -82,14 +88,16 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` implemented/tested
 - [x] Malformed/missing runtime fields fail closed instead of being silently coerced into a pass.
 - [ ] Real 24-hour PC runtime smoke has not yet been observed after pulling this HEAD. Do not mark runtime green until the local command returns `"ok": true` after the supervisor has completed at least one cycle.
 - [ ] A valid BEA registered API UserID has not yet been configured and observed on the real 24-hour PC. BEA actual API capture is implemented/tested but not runtime-proven until a due PCE release is captured there.
+- [ ] A valid Trading Economics subscription key has not yet been configured and observed on the real 24-hour PC. Consensus capture is implemented/tested but not runtime-proven until one supported release receives a complete pre-release snapshot.
+- [ ] A Massive Indices plan/key has not yet been configured and observed on the real 24-hour PC. The actual entitlement and returned `REAL-TIME` / `DELAYED` class must be recorded before enabling a recurring reference-data worker.
 
 ## 7. Remaining promotion path
 
 1. Pull/restart the 24-hour PC on the current branch and run `python -m b3_trader.phase5_runtime_check` after the first Phase 5 cycle; retain the result as runtime evidence.
 2. Configure a valid BEA API UserID as a local environment secret (`BEA_API_KEY` or `BEA_USER_ID`; never commit the value) and observe one due PCE initial-actual capture.
-3. Connect a reviewed external consensus source.
-4. Connect a reviewed U.S. intraday reference provider.
-5. Accumulate forward-only samples across events, coins and regimes.
+3. Configure a reviewed Trading Economics subscription key (`TRADING_ECONOMICS_API_KEY`) and observe one complete pre-release consensus snapshot for CPI, Employment or PCE.
+4. Configure a Massive Indices key (`MASSIVE_API_KEY`), verify COMP/SPX/VIX entitlement and observed latency class, then choose a bounded recurring collection method/cadence before supervisor wiring.
+5. Accumulate forward-only macro surprise, coin reaction and U.S. reference samples across events, coins and regimes.
 6. Define minimum sample, dispersion, recency, provider-quality and regime-stability gates.
 7. Produce shadow EventScore / RegimeScore / RelativeStrengthScore contributions only for groups that pass those gates.
 8. Run baseline vs intelligence-v2 PAPER A/B without altering the current baseline strategy.
@@ -120,4 +128,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` implemented/tested
 - `8e00fed` bounded official BEA NIPA PCE actual adapter
 - `3f4deb0` BEA actual adapter tests
 - `3aa5541` BEA actual capture ingest-cycle wiring
-- `e0b31b7` BEA ingest wiring tests; Python/dashboard/typecheck checks green, Viewer check still pending at the last recorded validation point
+- `e0b31b7` BEA ingest wiring tests
+- `801e2bf` BEA status documentation; 23/23 workflows green at that checkpoint
+- `d7be160` Trading Economics pre-release consensus adapter + ingest wiring + tests; Python regression green
+- `739d8ce` Massive COMP/SPX/VIX reference adapter + atomic entitlement/timestamp/latency tests; Python regression green
