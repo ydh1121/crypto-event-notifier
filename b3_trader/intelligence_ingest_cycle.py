@@ -15,6 +15,7 @@ from .intelligence_event import IntelligenceEvent
 from .intelligence_event_store import IntelligenceEventStore
 from .intelligence_fomc_calendar import FomcMeetingCalendarSource
 from .intelligence_official_news import CFTC_FEED, SEC_FEED, OfficialPressReleaseRssSource
+from .intelligence_trading_economics_consensus import TradingEconomicsConsensusCaptureService
 
 SourceFetcher = Callable[[float], list[IntelligenceEvent]]
 DEFAULT_SOURCE_ORDER = (
@@ -50,11 +51,11 @@ class IntelligenceIngestCycle:
     """Bounded Phase 5 macro/news ingest coordinator.
 
     Networking is opt-in per run. The cycle persists normalized evidence only and
-    has no score, PAPER, position-sizing or live-order authority. When the BLS
-    calendar is requested, the same cycle attempts the bounded initial-actual
-    capture for due CPI/Employment events. When the BEA schedule is requested,
-    it also attempts bounded PCE actual capture if a registered BEA API UserID is
-    configured; missing credentials fail closed without breaking schedule ingest.
+    has no score, PAPER, position-sizing or live-order authority. BLS and BEA
+    official calendars feed bounded initial-actual capture, while the reviewed
+    Trading Economics adapter may capture one complete pre-release consensus
+    snapshot when its subscription API key is configured. Missing credentials
+    fail closed without breaking official-source ingest.
     """
 
     def __init__(
@@ -65,6 +66,7 @@ class IntelligenceIngestCycle:
         conn: sqlite3.Connection | None = None,
         bls_actual_capture: BlsActualCaptureService | None = None,
         bea_actual_capture: BeaActualCaptureService | None = None,
+        consensus_capture: TradingEconomicsConsensusCaptureService | None = None,
     ) -> None:
         self.path = Path(path)
         self.fetchers = dict(fetchers or default_intelligence_fetchers())
@@ -73,6 +75,7 @@ class IntelligenceIngestCycle:
         self.store = IntelligenceEventStore(self.conn)
         self.bls_actual_capture = bls_actual_capture or BlsActualCaptureService(self.conn)
         self.bea_actual_capture = bea_actual_capture or BeaActualCaptureService(self.conn)
+        self.consensus_capture = consensus_capture or TradingEconomicsConsensusCaptureService(self.conn)
         self._owns_conn = conn is None
 
     def close(self) -> None:
@@ -107,6 +110,7 @@ class IntelligenceIngestCycle:
             "source_failures": 0,
             "macro_actual_capture": {"status": "not_requested"},
             "bea_actual_capture": {"status": "not_requested"},
+            "consensus_capture": {"status": "not_requested"},
         }
         if not network_enabled:
             result["status"] = "network_disabled"
@@ -182,6 +186,24 @@ class IntelligenceIngestCycle:
                 if str(bea_capture.get("status") or "") == "partial":
                     result["source_failures"] = int(result["source_failures"]) + 1
             result["bea_actual_capture"] = bea_capture
+
+        if {"us_bls_release_calendar", "us_bea_release_schedule"}.intersection(requested):
+            try:
+                consensus = self.consensus_capture.run_once(now=current, network_enabled=True)
+            except Exception as exc:
+                consensus = {
+                    "status": "capture_error",
+                    "paper_only": True,
+                    "can_place_orders": False,
+                    "score_mutation": False,
+                    "credential_exposed": False,
+                    "error": f"{type(exc).__name__}: {exc}"[:300],
+                }
+                result["source_failures"] = int(result["source_failures"]) + 1
+            else:
+                if str(consensus.get("status") or "") == "partial":
+                    result["source_failures"] = int(result["source_failures"]) + 1
+            result["consensus_capture"] = consensus
 
         result["status"] = "ok" if int(result["source_failures"]) == 0 else "partial"
         return result
