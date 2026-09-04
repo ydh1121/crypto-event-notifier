@@ -10,6 +10,9 @@ def test_component_control_is_persistent_and_bounded(tmp_path):
     control_path = tmp_path / "components.json"
     control = load_control(control_path)
     assert control["components"]["warehouse-export"]["enabled"] is True
+    phase5 = control["components"]["phase5-intelligence-ingest"]
+    assert phase5["enabled"] is True
+    assert phase5["interval_seconds"] == 900.0
 
     updated = patch_component(
         "warehouse-export",
@@ -24,8 +27,16 @@ def test_component_control_is_persistent_and_bounded(tmp_path):
     assert row["run_nonce"] == 1
     assert updated["revision"] > control["revision"]
 
+    phase5_updated = patch_component(
+        "phase5-intelligence-ingest",
+        interval_seconds=1,
+        path=control_path,
+    )
+    assert phase5_updated["components"]["phase5-intelligence-ingest"]["interval_seconds"] == 300.0
+
     reloaded = load_control(control_path)
     assert reloaded["components"]["warehouse-export"] == row
+    assert reloaded["components"]["phase5-intelligence-ingest"]["interval_seconds"] == 300.0
 
 
 def test_platform_snapshot_summarizes_runtime_and_reference_updates(tmp_path):
@@ -53,6 +64,17 @@ def test_platform_snapshot_summarizes_runtime_and_reference_updates(tmp_path):
                         "last_success_at": now - 3,
                         "runs": 2,
                         "last_result": {},
+                    },
+                    "phase5-intelligence-ingest": {
+                        "status": "healthy",
+                        "last_success_at": now - 4,
+                        "runs": 1,
+                        "last_result": {
+                            "status": "ok",
+                            "paper_only": True,
+                            "can_place_orders": False,
+                            "score_mutation": False,
+                        },
                     },
                 },
             }
@@ -84,4 +106,7 @@ def test_platform_snapshot_summarizes_runtime_and_reference_updates(tmp_path):
     assert snapshot["references"]["failed"] == 1
     warehouse = next(row for row in snapshot["components"] if row["name"] == "warehouse-export")
     assert warehouse["last_result"]["exported_rows"] == 42
+    phase5 = next(row for row in snapshot["components"] if row["name"] == "phase5-intelligence-ingest")
+    assert phase5["status"] == "healthy"
+    assert phase5["last_result"]["can_place_orders"] is False
     assert snapshot["safety"]["can_place_orders"] is False
