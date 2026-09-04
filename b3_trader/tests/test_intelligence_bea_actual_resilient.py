@@ -80,6 +80,43 @@ def test_news_release_parser_extracts_four_initial_pce_actuals() -> None:
     assert all(value.attributes["score_authority"] is False for value in values)
 
 
+def test_news_release_parser_tolerates_live_inline_markup_and_footnote_text() -> None:
+    reference = resilient.parse_bea_reference_period("Personal Income and Outlays, July 2026")
+    assert reference is not None
+    html = """
+    <html><body>
+      <h1>Personal Income and Outlays, July 2026</h1>
+      <p>
+        From the preceding month, the PCE price index for July
+        <strong>increased 0.2 percent</strong><sup>1</sup>.
+        Excluding food and energy, the PCE price index <em>also</em>
+        increased <span>0.2 percent</span>.
+      </p>
+      <div class="release-note">Chart and table content may appear here.</div>
+      <p>
+        From the same month one year ago, the PCE price index for July
+        increased <strong>3.7 percent</strong><sup>2</sup>.
+        Excluding food and energy, the PCE price index
+        increased <span>3.3 percent</span> from one year ago.
+      </p>
+    </body></html>
+    """
+    values = parse_bea_pce_news_release(
+        html,
+        event_id="evt-live-markup",
+        reference=reference,
+        known_at=1000,
+        source_url="https://www.bea.gov/news/2026/personal-income-and-outlays-july-2026",
+    )
+    by_metric = {value.metric_id: value.numeric_value for value in values}
+    assert by_metric == {
+        "US_PCE_PRICE_MOM_PCT": 0.2,
+        "US_CORE_PCE_PRICE_MOM_PCT": 0.2,
+        "US_PCE_PRICE_YOY_PCT": 3.7,
+        "US_CORE_PCE_PRICE_YOY_PCT": 3.3,
+    }
+
+
 def test_news_release_parser_preserves_negative_direction() -> None:
     reference = resilient.parse_bea_reference_period("Personal Income and Outlays, July 2026")
     assert reference is not None
