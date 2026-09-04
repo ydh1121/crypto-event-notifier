@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Callable, Iterable
 
 from .auto_demo_v2 import DB_PATH
+from .intelligence_bea_actual import BeaActualCaptureService
 from .intelligence_bea_schedule import BeaReleaseScheduleSource
 from .intelligence_bls_actual import BlsActualCaptureService
 from .intelligence_bls_calendar import BlsReleaseCalendarSource
@@ -50,8 +51,10 @@ class IntelligenceIngestCycle:
 
     Networking is opt-in per run. The cycle persists normalized evidence only and
     has no score, PAPER, position-sizing or live-order authority. When the BLS
-    calendar is requested, the same cycle also attempts the bounded initial-actual
-    capture for due CPI/Employment events.
+    calendar is requested, the same cycle attempts the bounded initial-actual
+    capture for due CPI/Employment events. When the BEA schedule is requested,
+    it also attempts bounded PCE actual capture if a registered BEA API UserID is
+    configured; missing credentials fail closed without breaking schedule ingest.
     """
 
     def __init__(
@@ -61,6 +64,7 @@ class IntelligenceIngestCycle:
         fetchers: dict[str, SourceFetcher] | None = None,
         conn: sqlite3.Connection | None = None,
         bls_actual_capture: BlsActualCaptureService | None = None,
+        bea_actual_capture: BeaActualCaptureService | None = None,
     ) -> None:
         self.path = Path(path)
         self.fetchers = dict(fetchers or default_intelligence_fetchers())
@@ -68,6 +72,7 @@ class IntelligenceIngestCycle:
         self.conn.row_factory = sqlite3.Row
         self.store = IntelligenceEventStore(self.conn)
         self.bls_actual_capture = bls_actual_capture or BlsActualCaptureService(self.conn)
+        self.bea_actual_capture = bea_actual_capture or BeaActualCaptureService(self.conn)
         self._owns_conn = conn is None
 
     def close(self) -> None:
@@ -101,6 +106,7 @@ class IntelligenceIngestCycle:
             "events_updated": 0,
             "source_failures": 0,
             "macro_actual_capture": {"status": "not_requested"},
+            "bea_actual_capture": {"status": "not_requested"},
         }
         if not network_enabled:
             result["status"] = "network_disabled"
@@ -158,6 +164,24 @@ class IntelligenceIngestCycle:
                 if str(capture.get("status") or "") == "partial":
                     result["source_failures"] = int(result["source_failures"]) + 1
             result["macro_actual_capture"] = capture
+
+        if "us_bea_release_schedule" in requested:
+            try:
+                bea_capture = self.bea_actual_capture.run_once(now=current, network_enabled=True)
+            except Exception as exc:
+                bea_capture = {
+                    "status": "capture_error",
+                    "paper_only": True,
+                    "can_place_orders": False,
+                    "score_mutation": False,
+                    "credential_exposed": False,
+                    "error": f"{type(exc).__name__}: {exc}"[:300],
+                }
+                result["source_failures"] = int(result["source_failures"]) + 1
+            else:
+                if str(bea_capture.get("status") or "") == "partial":
+                    result["source_failures"] = int(result["source_failures"]) + 1
+            result["bea_actual_capture"] = bea_capture
 
         result["status"] = "ok" if int(result["source_failures"]) == 0 else "partial"
         return result
