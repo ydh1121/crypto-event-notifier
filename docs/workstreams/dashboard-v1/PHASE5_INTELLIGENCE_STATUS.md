@@ -57,7 +57,12 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` implemented/tested
 - [x] Massive `last_updated` nanoseconds map to `observed_at`; `REAL-TIME` and `DELAYED` map explicitly to realtime / 15-minute-delayed evidence, and unsupported timeframe/session values fail closed.
 - [x] The required COMP/SPX/VIX set is atomic: missing entitlement, malformed data or one failed ticker causes zero reference rows to be persisted for that capture attempt.
 - [x] Massive credentials are accepted only from `MASSIVE_API_KEY`, are sent via Authorization header, and are never persisted in evidence or result payloads.
-- [ ] Massive runtime cadence is intentionally not supervisor-wired until a real account/plan is configured and its permitted usage/latency class is observed. The adapter itself is implemented/tested only.
+- [x] Bounded Massive 1-minute custom-bars collector supports only `I:COMP`, `I:SPX` and `I:VIX`, uses an explicit `MASSIVE_INDICES_PLAN`, limits one request window to 48 hours and keeps the three-index capture atomic on request/parse failure.
+- [x] Massive 1-minute bar timestamp `t` is treated as bar-open time; the stored close observation clock is `t + 60s`. Empty provider intervals stay empty and are never synthetically filled.
+- [x] Massive Basic / Starter / Advanced plan metadata is preserved as end-of-day / 15-minute-delayed / realtime evidence instead of inferring entitlement from possession of an API key.
+- [x] `assess_us_market_reference_path()` provides a research-only reference-path quality gate with configurable endpoint skew, coverage ratio and maximum-gap thresholds plus latency/data-rights consistency checks. It does not create market scores or fill missing bars.
+- [ ] `IntelligenceUsMarketSensitivityStore.build_pairs()` does not yet enforce the new path-quality result for `massive_indices_1m`; quality-gated pair construction and rejected-path audit are the next backend step.
+- [ ] Massive runtime cadence is intentionally not supervisor-wired until a real account/plan is configured and its permitted usage/latency class is observed. The adapters/collector are implemented/tested only.
 - [ ] Regular/pre-market/after-hours regime conditioning after sufficient source coverage.
 
 ## 5. Macro values and surprise
@@ -93,16 +98,18 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` implemented/tested
 
 ## 7. Remaining promotion path
 
-1. Pull/restart the 24-hour PC on the current branch and run `python -m b3_trader.phase5_runtime_check` after the first Phase 5 cycle; retain the result as runtime evidence.
-2. Configure a valid BEA API UserID as a local environment secret (`BEA_API_KEY` or `BEA_USER_ID`; never commit the value) and observe one due PCE initial-actual capture.
-3. Configure a reviewed Trading Economics subscription key (`TRADING_ECONOMICS_API_KEY`) and observe one complete pre-release consensus snapshot for CPI, Employment or PCE.
-4. Configure a Massive Indices key (`MASSIVE_API_KEY`), verify COMP/SPX/VIX entitlement and observed latency class, then choose a bounded recurring collection method/cadence before supervisor wiring.
-5. Accumulate forward-only macro surprise, coin reaction and U.S. reference samples across events, coins and regimes.
-6. Define minimum sample, dispersion, recency, provider-quality and regime-stability gates.
-7. Produce shadow EventScore / RegimeScore / RelativeStrengthScore contributions only for groups that pass those gates.
-8. Run baseline vs intelligence-v2 PAPER A/B without altering the current baseline strategy.
-9. Validate walk-forward/out-of-sample behavior before any candidate promotion.
-10. Project evidence and explanations into the Viewer only after the backend contracts are stable.
+1. Enforce the reference-path quality gate inside U.S. sensitivity pair construction for `massive_indices_1m`, retain rejected-path reason counts/evidence and keep legacy/snapshot providers explicitly distinguishable.
+2. Pull/restart the 24-hour PC on the current branch and run `python -m b3_trader.phase5_runtime_check` after the first Phase 5 cycle; retain the result as runtime evidence.
+3. Configure a valid BEA API UserID as a local environment secret (`BEA_API_KEY` or `BEA_USER_ID`; never commit the value) and observe one due PCE initial-actual capture.
+4. Configure a reviewed Trading Economics subscription key (`TRADING_ECONOMICS_API_KEY`) and observe one complete pre-release consensus snapshot for CPI, Employment or PCE.
+5. Configure a Massive Indices key (`MASSIVE_API_KEY`) plus explicit `MASSIVE_INDICES_PLAN`, verify COMP/SPX/VIX entitlement and actual latency semantics, then choose a bounded recurring collection cadence before supervisor wiring.
+6. Accumulate forward-only macro surprise, coin reaction and quality-approved U.S. reference samples across events, coins and regimes.
+7. Add true lag-shifted and regime-conditioned reaction/sensitivity statistics.
+8. Define minimum sample, dispersion, recency, provider-quality and regime-stability gates.
+9. Produce shadow EventScore / RegimeScore / RelativeStrengthScore contributions only for groups that pass those gates.
+10. Run baseline vs intelligence-v2 PAPER A/B without altering the current baseline strategy.
+11. Validate walk-forward/out-of-sample behavior before any candidate promotion.
+12. Project evidence and explanations into the Viewer only after the backend contracts are stable.
 
 ## 8. Current implementation commits
 
@@ -132,3 +139,8 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` implemented/tested
 - `801e2bf` BEA status documentation; 23/23 workflows green at that checkpoint
 - `d7be160` Trading Economics pre-release consensus adapter + ingest wiring + tests; Python regression green
 - `739d8ce` Massive COMP/SPX/VIX reference adapter + atomic entitlement/timestamp/latency tests; Python regression green
+- `7e6b4a1` bounded Massive COMP/SPX/VIX 1-minute aggregate collector
+- `78feb12` Massive 1-minute aggregate collector tests
+- `d9a8ffb` realistic aggregate OHLC fixture correction; Python/Viewer/dashboard checks green at validation point
+- `312b5b4` configurable U.S. reference-path quality assessor
+- `bc9c798` reference-path quality gate tests; Python regression green
