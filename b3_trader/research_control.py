@@ -32,6 +32,7 @@ COMPONENT_DEFINITIONS: dict[str, dict[str, Any]] = {
     "market-ohlcv-history": {"label":"다중 기간 OHLCV 수집","description":"빗썸·업비트 KRW 시장의 1m/5m/15m/1h/4h/1d 공개 캔들을 회당 제한된 종목만 순환 수집하고 시장·타임프레임별 최신 400봉만 로컬 SQLite에 보존합니다. PAPER 주문에는 연결하지 않습니다.","default_enabled":True,"default_interval_seconds":300,"min_interval_seconds":300},
     "listing-history-research": {"label":"국내 상장 전 해외 가격 연구","description":"공식 KRW 상장 공지를 기준으로 검증된 코인 identity와 해외 CEX pair를 교차확인해 T-7d~T-1h 및 상장 후 7일 반응을 로컬 DB에 누적합니다. PAPER 점수에는 아직 반영하지 않습니다.","default_enabled":True,"default_interval_seconds":900,"min_interval_seconds":300},
     "dex-launch-research": {"label":"DEX 상장 전후 연구","description":"검증된 chain+contract identity로 DEX pool과 상장 전후 반응을 로컬 DB에 누적합니다. 1회 1 case만 처리하며 PAPER 점수와 주문에는 연결하지 않습니다.","default_enabled":True,"default_interval_seconds":3600,"min_interval_seconds":1800},
+    "phase5-intelligence-ingest": {"label":"미국 거시·공식 뉴스 수집","description":"BLS·BEA·FOMC·SEC·CFTC 공식 소스를 15분 주기로 연구 DB에 누적하고 발표 직후 BLS CPI·고용 최초 actual을 제한된 시간창에서 캡처합니다. PAPER 점수와 주문에는 연결하지 않습니다.","default_enabled":True,"default_interval_seconds":900,"min_interval_seconds":300},
     "upbit-paper-research": {"label":"업비트 전체 PAPER 연구","description":"업비트 KRW 전체 종목을 독립 1,000만원 PAPER 계좌로 연구합니다. 공개 시세 API만 사용합니다.","default_enabled":False,"default_interval_seconds":60,"min_interval_seconds":30},
     "strategy-lab-shadow": {"label":"전략 연구실","description":"동일한 시장 기억 데이터를 보수적·균형·공격적·분할매수·역추세·스윙 전략이 독립 PAPER 계좌로 비교합니다.","default_enabled":True,"default_interval_seconds":60,"min_interval_seconds":30},
     "cloudflare-pages-deploy": {"label":"웹 화면 자동 배포","description":"GitHub에서 새 웹 화면을 받은 뒤 Pages 코드가 바뀐 경우에만 pages.dev로 자동 배포합니다.","default_enabled":False,"default_interval_seconds":30,"min_interval_seconds":15},
@@ -212,7 +213,7 @@ def _telegram_summary(settings: Settings) -> dict[str, Any]:
     local = _local_api_json(settings, "/api/telegram/status")
     enabled = bool(local.get("enabled", settings.telegram_enabled))
     token_configured = bool(local.get("token_configured", bool(settings.telegram_token.strip())))
-    chat_configured = bool(local.get("chat_configured", bool(local.get("chat_id") or settings.telegram_chat_id.strip())))
+    chat_configured = bool(local.get("chat_config_id") or local.get("chat_id") or settings.telegram_chat_id.strip())
     automatic_alerts = str(local.get("automatic_alerts") or "buy_candidate_only")
     return {
         "enabled": enabled,
