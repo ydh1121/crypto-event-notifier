@@ -35,6 +35,7 @@ def _event(
     scheduled_at: float,
     external_id: str,
 ) -> str:
+    received_at = max(1.0, scheduled_at - 3600)
     event = normalize_intelligence_event(
         source_id="us_bls_release_calendar",
         source_family=MACRO_CALENDAR,
@@ -43,9 +44,9 @@ def _event(
         source_url="https://www.bls.gov/schedule/",
         external_id=external_id,
         scheduled_at=scheduled_at,
-        received_at=scheduled_at - 3600,
+        received_at=received_at,
     )
-    IntelligenceEventStore(conn).ingest([event], seen_at=scheduled_at - 3600)
+    IntelligenceEventStore(conn).ingest([event], seen_at=received_at)
     return event.event_id
 
 
