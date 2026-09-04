@@ -18,6 +18,13 @@ EXPECTED_SOURCE_IDS = {
 }
 
 
+def _safe_int(value: object, *, default: int = 0) -> tuple[int, bool]:
+    try:
+        return int(value), True
+    except (TypeError, ValueError):
+        return int(default), False
+
+
 def evaluate_phase5_runtime(snapshot: dict[str, Any]) -> dict[str, Any]:
     """Evaluate the read-only Phase 5 supervisor snapshot fail-closed.
 
@@ -63,10 +70,9 @@ def evaluate_phase5_runtime(snapshot: dict[str, Any]) -> dict[str, Any]:
     if status != "healthy":
         reasons.append("component_not_healthy")
 
-    try:
-        runs = int(component.get("runs") or 0)
-    except (TypeError, ValueError):
-        runs = 0
+    runs, runs_valid = _safe_int(component.get("runs"), default=0)
+    if not runs_valid:
+        reasons.append("runs_invalid")
     if runs < 1:
         reasons.append("no_completed_cycle")
 
@@ -74,6 +80,7 @@ def evaluate_phase5_runtime(snapshot: dict[str, Any]) -> dict[str, Any]:
         last_success_at = float(component.get("last_success_at") or 0.0)
     except (TypeError, ValueError):
         last_success_at = 0.0
+        reasons.append("success_timestamp_invalid")
     if last_success_at <= 0:
         reasons.append("no_success_timestamp")
 
@@ -91,10 +98,9 @@ def evaluate_phase5_runtime(snapshot: dict[str, Any]) -> dict[str, Any]:
     if last_result_status != "ok":
         reasons.append("last_cycle_not_ok")
 
-    try:
-        source_failures = int(last_result.get("source_failures"))
-    except (TypeError, ValueError):
-        source_failures = -1
+    source_failures, source_failures_valid = _safe_int(last_result.get("source_failures"), default=-1)
+    if not source_failures_valid:
+        reasons.append("source_failures_invalid")
     if source_failures != 0:
         reasons.append("source_failures_present")
 
@@ -107,6 +113,15 @@ def evaluate_phase5_runtime(snapshot: dict[str, Any]) -> dict[str, Any]:
     if missing_sources:
         reasons.append("official_sources_incomplete")
 
+    event_counts: dict[str, int] = {}
+    event_counts_valid = True
+    for key in ("events_received", "events_inserted", "events_updated"):
+        value, valid = _safe_int(last_result.get(key), default=0)
+        event_counts[key] = value
+        event_counts_valid = event_counts_valid and valid
+    if not event_counts_valid:
+        reasons.append("event_counters_invalid")
+
     return {
         "ok": not reasons,
         "component": COMPONENT_NAME,
@@ -117,9 +132,7 @@ def evaluate_phase5_runtime(snapshot: dict[str, Any]) -> dict[str, Any]:
         "last_result_status": last_result_status,
         "source_failures": source_failures,
         "missing_sources": missing_sources,
-        "events_received": int(last_result.get("events_received") or 0),
-        "events_inserted": int(last_result.get("events_inserted") or 0),
-        "events_updated": int(last_result.get("events_updated") or 0),
+        **event_counts,
     }
 
 
