@@ -9,7 +9,7 @@ from typing import Callable, Iterable
 from .auto_demo_v2 import DB_PATH
 from .intelligence_bea_actual import BeaActualCaptureService
 from .intelligence_bea_schedule import BeaReleaseScheduleSource
-from .intelligence_bls_actual import BlsActualCaptureService
+from .intelligence_bls_actual_resilient import BlsActualCaptureService
 from .intelligence_bls_calendar_resilient import ResilientBlsReleaseCalendarSource
 from .intelligence_event import IntelligenceEvent
 from .intelligence_event_store import IntelligenceEventStore
