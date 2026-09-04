@@ -213,7 +213,7 @@ def _telegram_summary(settings: Settings) -> dict[str, Any]:
     local = _local_api_json(settings, "/api/telegram/status")
     enabled = bool(local.get("enabled", settings.telegram_enabled))
     token_configured = bool(local.get("token_configured", bool(settings.telegram_token.strip())))
-    chat_configured = bool(local.get("chat_config_id") or local.get("chat_id") or settings.telegram_chat_id.strip())
+    chat_configured = bool(local.get("chat_configured", bool(local.get("chat_id") or settings.telegram_chat_id.strip())))
     automatic_alerts = str(local.get("automatic_alerts") or "buy_candidate_only")
     return {
         "enabled": enabled,
