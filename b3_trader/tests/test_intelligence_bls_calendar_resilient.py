@@ -25,6 +25,20 @@ def _fred_fixture(title: str, date_text: str, time_text: str = "7:30 am") -> str
     """
 
 
+def _fred_live_layout_fixture(title: str, date_text: str, time_text: str = "7:30 am") -> str:
+    return f"""
+    <html><body>
+      <main>
+        <div class="release-row">
+          <div class="release-date">{date_text} Updated</div>
+          <div class="release-time">{time_text}</div>
+          <div class="release-name"><a href="/release?rid=50">{title}</a></div>
+        </div>
+      </main>
+    </body></html>
+    """
+
+
 def _http_error(status: int, url: str) -> requests.HTTPError:
     response = requests.Response()
     response.status_code = status
@@ -52,6 +66,24 @@ def test_parse_fred_secondary_calendar_uses_central_time_and_preserves_provenanc
     assert event.attributes["calendar_source_format"] == "official_fred_secondary_calendar_fallback"
     assert event.attributes["calendar_source_authority"] == "Federal Reserve Bank of St. Louis (FRED)"
     assert event.attributes["upstream_release_agency"] == "U.S. Bureau of Labor Statistics"
+
+
+def test_parse_fred_secondary_calendar_handles_live_div_layout() -> None:
+    url = resilient.FRED_RELEASE_CALENDAR_URL.format(release_id=50, year=2026)
+    received = datetime(2026, 9, 4, 9, 0, tzinfo=ET).timestamp()
+    events = parse_fred_bls_release_calendar_html(
+        _fred_live_layout_fixture("Employment Situation", "Friday September 04, 2026"),
+        source_url=url,
+        expected_event_type="US_EMPLOYMENT",
+        expected_title="Employment Situation",
+        received_at=received,
+    )
+
+    assert len(events) == 1
+    event = events[0]
+    assert datetime.fromtimestamp(event.scheduled_at, CT).hour == 7
+    assert datetime.fromtimestamp(event.scheduled_at, ET).hour == 8
+    assert event.attributes["calendar_source_format"] == "official_fred_secondary_calendar_fallback"
 
 
 def test_resilient_source_uses_fred_after_terminal_bls_403(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -122,7 +154,7 @@ def test_resilient_source_skips_unpublished_future_year(monkeypatch: pytest.Monk
 
     def fake_get(url: str, **kwargs: object):
         if "y=2027" in url:
-            return Response("<html><body><table></table></body></html>"), 0
+            return Response("<html><body><div></div></body></html>"), 0
         match = next(
             (release_id for _, release_id, _ in resilient.FRED_RELEASES if f"rid={release_id}" in url),
             None,
