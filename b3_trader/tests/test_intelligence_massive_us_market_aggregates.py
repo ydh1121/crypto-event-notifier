@@ -48,7 +48,14 @@ def _conn() -> sqlite3.Connection:
 
 
 def _bar(ts_ms: int, close: float = 100.5) -> dict:
-    return {"t": ts_ms, "o": 100.0, "h": 101.0, "l": 99.5, "c": close}
+    open_value = max(0.001, close - 0.5)
+    return {
+        "t": ts_ms,
+        "o": open_value,
+        "h": max(open_value, close) + 1.0,
+        "l": max(0.0001, min(open_value, close) - 1.0),
+        "c": close,
+    }
 
 
 def test_client_requires_key_and_explicit_plan_without_network_guess() -> None:
