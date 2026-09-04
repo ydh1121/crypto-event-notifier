@@ -67,7 +67,9 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` implemented/tested
 - [x] Absolute and relative surprise are evidence only; z-score, confidence and score contribution remain unset.
 - [x] BLS official initial-actual adapter for CPI all-items MoM/YoY, nonfarm payroll change and unemployment rate.
 - [x] BLS actual capture is bounded to a post-release window, does not call before scheduled release, refuses late historical backfill, requires a complete metric set and never overwrites a captured initial actual.
-- [ ] BEA official actual-value adapter. BEA API credentials/data-access handling must be reviewed before implementation; HTML scraping is not an accepted substitute.
+- [x] BEA official PCE actual-value adapter uses the registered BEA Data API only (`NIPA`, `T20804`, `T20807`); there is no HTML-scraping fallback for actual values.
+- [x] BEA PCE actual capture produces headline/core MoM and YoY evidence, requires all four metrics atomically, preserves the first complete API observation as revision 0 and refuses late historical backfill outside the bounded post-release window.
+- [x] BEA API credentials are accepted only from `BEA_API_KEY` / `BEA_USER_ID`; missing or malformed credentials cause a no-network fail-closed result and credential values are never written to result payloads or evidence rows.
 - [ ] Reviewed external consensus provider. Official schedule sources are not treated as consensus providers.
 - [ ] Historical surprise distribution and z-score; do not calculate until enough clean comparable samples exist.
 - [ ] Macro sensitivity confidence/promotion gate.
@@ -79,11 +81,12 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` implemented/tested
 - [x] A healthy zero-new-event cycle is accepted; event count is not used as a fake health signal.
 - [x] Malformed/missing runtime fields fail closed instead of being silently coerced into a pass.
 - [ ] Real 24-hour PC runtime smoke has not yet been observed after pulling this HEAD. Do not mark runtime green until the local command returns `"ok": true` after the supervisor has completed at least one cycle.
+- [ ] A valid BEA registered API UserID has not yet been configured and observed on the real 24-hour PC. BEA actual API capture is implemented/tested but not runtime-proven until a due PCE release is captured there.
 
 ## 7. Remaining promotion path
 
 1. Pull/restart the 24-hour PC on the current branch and run `python -m b3_trader.phase5_runtime_check` after the first Phase 5 cycle; retain the result as runtime evidence.
-2. Connect the BEA official actual-value adapter after credential/data-access review.
+2. Configure a valid BEA API UserID as a local environment secret (`BEA_API_KEY` or `BEA_USER_ID`; never commit the value) and observe one due PCE initial-actual capture.
 3. Connect a reviewed external consensus source.
 4. Connect a reviewed U.S. intraday reference provider.
 5. Accumulate forward-only samples across events, coins and regimes.
@@ -114,3 +117,7 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` implemented/tested
 - `6262455` read-only Phase 5 runtime smoke checker
 - `5538b4d` runtime checker unit tests
 - `e08fe4d` fail-closed runtime field parsing hardening
+- `8e00fed` bounded official BEA NIPA PCE actual adapter
+- `3f4deb0` BEA actual adapter tests
+- `3aa5541` BEA actual capture ingest-cycle wiring
+- `e0b31b7` BEA ingest wiring tests; Python/dashboard/typecheck checks green, Viewer check still pending at the last recorded validation point
