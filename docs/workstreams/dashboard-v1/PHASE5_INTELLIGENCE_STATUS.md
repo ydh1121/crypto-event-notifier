@@ -97,4 +97,4 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` implemented/tested
 - `879a98f` reaction-builder float assertion correction; full B3 CI green
 - `5769097` event-conditioned U.S. market sensitivity evidence; full B3 CI green
 - `6eb14f9` look-ahead-safe macro previous/consensus/actual contract; full B3 CI green
-- `d56650e` bounded BLS CPI/Employment initial-actual capture + ingest-cycle integration
+- `4cc23b6` bounded BLS CPI/Employment initial-actual capture + ingest-cycle integration
