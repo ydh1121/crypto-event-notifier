@@ -34,12 +34,21 @@ _MONTH_RE = (
     r"(January|February|March|April|May|June|July|August|"
     r"September|October|November|December)"
 )
+_DATE_RE = re.compile(rf"{_MONTH_RE}\s+\d{{1,2}},\s+\d{{4}}", flags=re.IGNORECASE)
 
 
 class _FredCalendarHtmlParser(HTMLParser):
+    """Collect visible FRED release-calendar text in document order.
+
+    The live FRED calendar is not guaranteed to use a semantic HTML table. Keep
+    table rows for compatibility with older/test markup, but also retain bounded
+    visible text tokens so div/list based layouts parse deterministically.
+    """
+
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.rows: list[list[str]] = []
+        self.tokens: list[str] = []
         self._row: list[str] | None = None
         self._cell: list[str] | None = None
         self._skip_depth = 0
@@ -58,9 +67,13 @@ class _FredCalendarHtmlParser(HTMLParser):
             self._cell = []
 
     def handle_data(self, data: str) -> None:
-        if self._skip_depth or self._cell is None:
+        if self._skip_depth:
             return
-        self._cell.append(data)
+        normalized = re.sub(r"\s+", " ", str(data or "")).strip()
+        if normalized:
+            self.tokens.append(normalized)
+        if self._cell is not None:
+            self._cell.append(data)
 
     def handle_endtag(self, tag: str) -> None:
         lower = tag.lower()
@@ -125,46 +138,56 @@ def parse_fred_bls_release_calendar_html(
     received = float(received_at if received_at is not None else time.time())
     expected_name = re.sub(r"\s+", " ", expected_title).strip().casefold()
     output: list[IntelligenceEvent] = []
+    seen_event_ids: set[str] = set()
 
-    for cells in parser.rows:
-        title_index = -1
-        title = ""
-        for index, cell in enumerate(cells):
-            normalized = re.sub(r"\s+", " ", str(cell or "")).strip()
-            if normalized.casefold() == expected_name:
-                title_index = index
-                title = normalized
-                break
-        if title_index < 0:
+    # The live FRED page renders each release as visible date/time/title text but
+    # does not consistently expose those fields as <tr>/<td> cells. Match each
+    # exact release title to its nearest preceding date token, then parse only
+    # that local slice. This avoids borrowing a prior release's clock if markup
+    # is incomplete.
+    for title_index, token in enumerate(parser.tokens):
+        title = re.sub(r"\s+", " ", str(token or "")).strip()
+        if title.casefold() != expected_name:
             continue
 
-        scheduled_at = _parse_fred_release_clock(" ".join(cells[:title_index]))
+        date_index = -1
+        lower_bound = max(0, title_index - 12)
+        for index in range(title_index - 1, lower_bound - 1, -1):
+            if _DATE_RE.search(parser.tokens[index]):
+                date_index = index
+                break
+        if date_index < 0:
+            continue
+
+        scheduled_at = _parse_fred_release_clock(" ".join(parser.tokens[date_index:title_index]))
         if scheduled_at <= 0:
             continue
 
         eastern = datetime.fromtimestamp(scheduled_at, EASTERN_TIMEZONE)
         external_id = f"{expected_event_type.lower()}-{eastern.strftime('%Y%m%dT%H%M')}"
-        output.append(
-            normalize_intelligence_event(
-                source_id=SOURCE_ID,
-                source_family=MACRO_CALENDAR,
-                event_type=expected_event_type,
-                title=title,
-                source_url=source_url,
-                external_id=external_id,
-                scheduled_at=scheduled_at,
-                received_at=received,
-                entities=("US",),
-                market_scope=("GLOBAL", "CRYPTO"),
-                attributes={
-                    "calendar_timezone": "America/Chicago",
-                    "time_semantics": "fred_release_calendar_all_times_central",
-                    "calendar_source_format": "official_fred_secondary_calendar_fallback",
-                    "calendar_source_authority": "Federal Reserve Bank of St. Louis (FRED)",
-                    "upstream_release_agency": "U.S. Bureau of Labor Statistics",
-                },
-            )
+        event = normalize_intelligence_event(
+            source_id=SOURCE_ID,
+            source_family=MACRO_CALENDAR,
+            event_type=expected_event_type,
+            title=title,
+            source_url=source_url,
+            external_id=external_id,
+            scheduled_at=scheduled_at,
+            received_at=received,
+            entities=("US",),
+            market_scope=("GLOBAL", "CRYPTO"),
+            attributes={
+                "calendar_timezone": "America/Chicago",
+                "time_semantics": "fred_release_calendar_all_times_central",
+                "calendar_source_format": "official_fred_secondary_calendar_fallback",
+                "calendar_source_authority": "Federal Reserve Bank of St. Louis (FRED)",
+                "upstream_release_agency": "U.S. Bureau of Labor Statistics",
+            },
         )
+        if event.event_id in seen_event_ids:
+            continue
+        seen_event_ids.add(event.event_id)
+        output.append(event)
 
     output.sort(key=lambda event: (event.scheduled_at, event.event_type, event.title))
     return output
