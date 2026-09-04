@@ -15,6 +15,7 @@ from .cloudflare_pages_deployer import CloudflarePagesDeployer
 from .cloudflare_snapshot_lifecycle import CloudflareSnapshotPublisher
 from .coin_profile_research_cycle_v36 import CoinProfileResearchCycleV36
 from .dex_launch_research_cycle import DexLaunchResearchCycle
+from .intelligence_ingest_cycle import IntelligenceIngestCycle
 from .listing_history_research_cycle import ListingHistoryResearchCycle
 from .market_notice_collector import MarketNoticeCollector
 from .market_ohlcv_research_cycle import MarketOhlcvResearchCycle
@@ -98,6 +99,7 @@ class ResearchSupervisor:
         self.market_ohlcv_research: MarketOhlcvResearchCycle | None = None
         self.listing_history_research: ListingHistoryResearchCycle | None = None
         self.dex_launch_research: DexLaunchResearchCycle | None = None
+        self.intelligence_ingest: IntelligenceIngestCycle | None = None
         self.cloudflare_deployer = CloudflarePagesDeployer()
         self.upbit_paper_runner = UpbitPaperResearchRunner()
         self.strategy_lab_runner = ConfiguredStrategyLabRunner()
@@ -112,6 +114,7 @@ class ResearchSupervisor:
             "market-ohlcv-history": self._run_market_ohlcv_once,
             "listing-history-research": self._run_listing_history_once,
             "dex-launch-research": self._run_dex_launch_once,
+            "phase5-intelligence-ingest": self._run_intelligence_ingest_once,
             "upbit-paper-research": self.upbit_paper_runner.run_once,
             "strategy-lab-shadow": self.strategy_lab_runner.run_once,
             "cloudflare-pages-deploy": self.cloudflare_deployer.deploy_once,
@@ -149,6 +152,12 @@ class ResearchSupervisor:
             if self.dex_launch_research is None:
                 self.dex_launch_research = DexLaunchResearchCycle()
             return self.dex_launch_research.run_once()
+
+    def _run_intelligence_ingest_once(self) -> dict[str, Any]:
+        """Run the bounded Phase 5 official-source ingest outside the DEX forward lock."""
+        if self.intelligence_ingest is None:
+            self.intelligence_ingest = IntelligenceIngestCycle()
+        return self.intelligence_ingest.run_once(network_enabled=True)
 
     @staticmethod
     def _research_work_lock_busy(name: str) -> dict[str, Any]:
@@ -202,6 +211,12 @@ class ResearchSupervisor:
             self.dex_launch_research = None
             if cycle is not None:
                 cycle.close()
+            return
+        if name == "phase5-intelligence-ingest":
+            cycle = self.intelligence_ingest
+            self.intelligence_ingest = None
+            if cycle is not None:
+                cycle.close()
 
     def _install_components(self) -> None:
         components = self.control.get("components") or {}
@@ -253,6 +268,9 @@ class ResearchSupervisor:
                     "listing_history_shadow_only": True,
                     "dex_launch_public_sources_only": True,
                     "dex_launch_shadow_only": True,
+                    "phase5_intelligence_official_sources_only": True,
+                    "phase5_intelligence_shadow_only": True,
+                    "phase5_intelligence_paper_unwired": True,
                     "forward_pipeline_dedicated_mode": self.forward_pipeline_dedicated_mode,
                     "generic_listing_history_supervisor_enabled": bool(
                         self.states.get("listing-history-research")
