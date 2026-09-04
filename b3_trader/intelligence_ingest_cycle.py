@@ -12,6 +12,7 @@ from .intelligence_bea_schedule import BeaReleaseScheduleSource
 from .intelligence_bls_actual_resilient import BlsActualCaptureService
 from .intelligence_bls_calendar_resilient import ResilientBlsReleaseCalendarSource
 from .intelligence_event import IntelligenceEvent
+from .intelligence_event_response import IntelligenceEventResponseCollector
 from .intelligence_event_store import IntelligenceEventStore
 from .intelligence_fomc_calendar import FomcMeetingCalendarSource
 from .intelligence_official_news import CFTC_FEED, SEC_FEED, OfficialPressReleaseRssSource
@@ -55,7 +56,10 @@ class IntelligenceIngestCycle:
     official calendars feed bounded initial-actual capture, while the reviewed
     Trading Economics adapter may capture one complete pre-release consensus
     snapshot when its subscription API key is configured. Missing credentials
-    fail closed without breaking official-source ingest.
+    fail closed without breaking official-source ingest. Stored official events
+    are also paired with local public BTC/ETH trade flow at exact 15m/1h/4h/1d
+    horizons; missing market observations remain missing rather than becoming
+    synthetic zero returns.
     """
 
     def __init__(
@@ -67,6 +71,7 @@ class IntelligenceIngestCycle:
         bls_actual_capture: BlsActualCaptureService | None = None,
         bea_actual_capture: BeaActualCaptureService | None = None,
         consensus_capture: TradingEconomicsConsensusCaptureService | None = None,
+        event_response_capture: IntelligenceEventResponseCollector | None = None,
     ) -> None:
         self.path = Path(path)
         self.fetchers = dict(fetchers or default_intelligence_fetchers())
@@ -76,6 +81,7 @@ class IntelligenceIngestCycle:
         self.bls_actual_capture = bls_actual_capture or BlsActualCaptureService(self.conn)
         self.bea_actual_capture = bea_actual_capture or BeaActualCaptureService(self.conn)
         self.consensus_capture = consensus_capture or TradingEconomicsConsensusCaptureService(self.conn)
+        self.event_response_capture = event_response_capture or IntelligenceEventResponseCollector(self.conn)
         self._owns_conn = conn is None
 
     def close(self) -> None:
@@ -108,9 +114,11 @@ class IntelligenceIngestCycle:
             "events_inserted": 0,
             "events_updated": 0,
             "source_failures": 0,
+            "event_response_failures": 0,
             "macro_actual_capture": {"status": "not_requested"},
             "bea_actual_capture": {"status": "not_requested"},
             "consensus_capture": {"status": "not_requested"},
+            "event_response_capture": {"status": "not_requested"},
         }
         if not network_enabled:
             result["status"] = "network_disabled"
@@ -205,5 +213,25 @@ class IntelligenceIngestCycle:
                     result["source_failures"] = int(result["source_failures"]) + 1
             result["consensus_capture"] = consensus
 
-        result["status"] = "ok" if int(result["source_failures"]) == 0 else "partial"
+        try:
+            response_capture = self.event_response_capture.run_once(now=current)
+        except Exception as exc:
+            response_capture = {
+                "ok": False,
+                "status": "capture_error",
+                "paper_only": True,
+                "shadow_only": True,
+                "can_place_orders": False,
+                "score_mutation": False,
+                "network_requests": 0,
+                "error": f"{type(exc).__name__}: {exc}"[:300],
+            }
+            result["event_response_failures"] = int(result["event_response_failures"]) + 1
+        result["event_response_capture"] = response_capture
+
+        result["status"] = (
+            "ok"
+            if int(result["source_failures"]) == 0 and int(result["event_response_failures"]) == 0
+            else "partial"
+        )
         return result
