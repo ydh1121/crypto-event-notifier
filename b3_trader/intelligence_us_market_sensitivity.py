@@ -9,11 +9,13 @@ import time
 from collections import defaultdict
 from typing import Any, Iterable
 
+from .intelligence_us_market_path_quality import assess_us_market_reference_path
 from .intelligence_us_market_reference import SERIES_BY_SOURCE
 
 DEFAULT_REFERENCE_SOURCES = tuple(SERIES_BY_SOURCE)
 DEFAULT_MAX_REFERENCE_SKEW_SECONDS = 120.0
 DEFAULT_MAX_REACTIONS = 1000
+QUALITY_GATED_REFERENCE_PROVIDERS = {"massive_indices_1m"}
 PAIR_VERSION = 1
 SENSITIVITY_VERSION = 1
 _EPSILON = 1e-12
@@ -172,7 +174,7 @@ class IntelligenceUsMarketSensitivityStore:
         max_reference_skew_seconds: float = DEFAULT_MAX_REFERENCE_SKEW_SECONDS,
         max_reactions: int = DEFAULT_MAX_REACTIONS,
         seen_at: float | None = None,
-    ) -> dict[str, int]:
+    ) -> dict[str, Any]:
         now = float(seen_at if seen_at is not None else time.time())
         skew = float(max_reference_skew_seconds)
         if now <= 0:
@@ -199,6 +201,8 @@ class IntelligenceUsMarketSensitivityStore:
             (max(1, min(10000, int(max_reactions))),),
         ).fetchall()
         providers_considered = 0
+        quality_rejected = 0
+        quality_rejection_reasons: dict[str, int] = defaultdict(int)
         ready: list[tuple[Any, ...]] = []
 
         for reaction in reactions:
@@ -226,6 +230,25 @@ class IntelligenceUsMarketSensitivityStore:
                     )
                     if start is None or end is None:
                         continue
+                    if reference_provider in QUALITY_GATED_REFERENCE_PROVIDERS:
+                        quality = assess_us_market_reference_path(
+                            self.conn,
+                            source_id=source_id,
+                            provider_id=reference_provider,
+                            start_at=anchor,
+                            end_at=target_end,
+                            max_endpoint_skew_seconds=skew,
+                        )
+                        if not bool(quality.get("eligible_for_pairing")):
+                            quality_rejected += 1
+                            reasons = quality.get("reasons")
+                            if isinstance(reasons, list) and reasons:
+                                for reason in reasons:
+                                    clean_reason = _clean(reason).lower() or "unknown"
+                                    quality_rejection_reasons[clean_reason] += 1
+                            else:
+                                quality_rejection_reasons["unknown"] += 1
+                            continue
                     start_value = float(start["value"])
                     end_value = float(end["value"])
                     if start_value <= 0 or end_value <= 0:
@@ -319,13 +342,17 @@ class IntelligenceUsMarketSensitivityStore:
             else:
                 inserted += 1
         self.conn.commit()
-        return {
+        result: dict[str, Any] = {
             "reactions_considered": len(reactions),
             "providers_considered": providers_considered,
             "pairs_ready": len(ready),
             "inserted": inserted,
             "updated": updated,
         }
+        if quality_rejected:
+            result["quality_rejected"] = quality_rejected
+            result["quality_rejection_reasons"] = dict(sorted(quality_rejection_reasons.items()))
+        return result
 
     def refresh_sensitivity(self, *, now: float | None = None) -> dict[str, int]:
         current = float(now if now is not None else time.time())
