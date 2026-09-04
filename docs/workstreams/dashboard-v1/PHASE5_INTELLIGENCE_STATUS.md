@@ -63,14 +63,16 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` implemented/tested
 - [x] Initial actual must be known at/after the release boundary.
 - [x] Unit/reference-period mismatches fail closed.
 - [x] Absolute and relative surprise are evidence only; z-score, confidence and score contribution remain unset.
-- [ ] BLS/BEA official actual-value adapters.
+- [x] BLS official initial-actual adapter for CPI all-items MoM/YoY, nonfarm payroll change and unemployment rate.
+- [x] BLS actual capture is bounded to a post-release window, does not call before scheduled release, refuses late historical backfill, requires a complete metric set and never overwrites a captured initial actual.
+- [ ] BEA official actual-value adapter. BEA API credentials/data-access handling must be reviewed before implementation; HTML scraping is not an accepted substitute.
 - [ ] Reviewed external consensus provider. Official schedule sources are not treated as consensus providers.
 - [ ] Historical surprise distribution and z-score; do not calculate until enough clean comparable samples exist.
 - [ ] Macro sensitivity confidence/promotion gate.
 
 ## 6. Remaining promotion path
 
-1. Connect BLS/BEA official actual-value adapters.
+1. Connect the BEA official actual-value adapter after credential/data-access review.
 2. Connect a reviewed external consensus source.
 3. Connect a reviewed U.S. intraday reference provider.
 4. Accumulate forward-only samples across events, coins and regimes.
@@ -94,3 +96,5 @@ Status legend: `[ ]` pending · `[-]` active · `[x]` implemented/tested
 - `8071acc` closed-OHLCV reaction builder
 - `879a98f` reaction-builder float assertion correction; full B3 CI green
 - `5769097` event-conditioned U.S. market sensitivity evidence; full B3 CI green
+- `6eb14f9` look-ahead-safe macro previous/consensus/actual contract; full B3 CI green
+- `d56650e` bounded BLS CPI/Employment initial-actual capture + ingest-cycle integration
