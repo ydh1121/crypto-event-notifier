@@ -5,6 +5,7 @@ from typing import Any, Callable
 
 from fastapi import Body, Depends, FastAPI, HTTPException, Request
 
+from .phase5_gate_dashboard import build_phase5_gate_dashboard_snapshot
 from .research_control import COMPONENT_DEFINITIONS, patch_component, platform_snapshot
 from .strategy_lab import STYLE_SPECS
 from .strategy_lab_candidates import read_strategy_lab_candidates
@@ -33,6 +34,10 @@ def install_research_routes(
         payload["can_control"] = client_host in LOOPBACK_HOSTS
         payload["control_scope"] = "local_pc_only"
         return payload
+
+    @app.get("/api/research/phase5-gates", dependencies=[Depends(auth)])
+    def phase5_gates() -> dict[str, Any]:
+        return build_phase5_gate_dashboard_snapshot()
 
     @app.patch("/api/research/components/{name}", dependencies=[Depends(auth)])
     def patch_research_component(
