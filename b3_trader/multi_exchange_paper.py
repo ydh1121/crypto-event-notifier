@@ -29,7 +29,6 @@ from .research_retention import (
     HOT_MEMORY_DAYS,
     RETENTION_MAINTENANCE_SECONDS,
     ResearchRetentionManager,
-    compact_runtime_history,
 )
 from .scoped_paper_store import ScopedPaperStore
 
@@ -174,10 +173,12 @@ class MultiExchangePaperDemo(AutoPaperDemo):
                 strategy=self.strategy_name,
             )
             now = time.time()
-            memory = detail.get("market_memory") if isinstance(detail.get("market_memory"), list) else []
-            equity = detail.get("equity_history") if isinstance(detail.get("equity_history"), list) else []
-            detail["market_memory"] = compact_runtime_history(memory, now=now)
-            detail["equity_history"] = compact_runtime_history(equity, now=now)
+            runtime_history = self.store.runtime_history(
+                market,
+                now=now,
+            )
+            detail["market_memory"] = runtime_history["market_memory"]
+            detail["equity_history"] = runtime_history["equity_history"]
             detail["runtime_history_policy"] = {
                 "recent_full_resolution_hours": 24,
                 "older_bucket_minutes": 60,

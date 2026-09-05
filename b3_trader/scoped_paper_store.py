@@ -7,6 +7,7 @@ from typing import Any
 
 from .auto_demo_v2 import DB_PATH, START_KRW, _json_load, _num
 from .multi_exchange_store import MultiExchangeStore, paper_key
+from .research_retention import RUNTIME_HORIZON_SECONDS, compact_runtime_history
 
 
 class ScopedPaperStore(MultiExchangeStore):
@@ -294,6 +295,49 @@ class ScopedPaperStore(MultiExchangeStore):
             )
         result.sort(key=lambda item: (item["return_pct"], item["closed_trades"], item["opportunity_score"]), reverse=True)
         return result[: max(1, int(limit))]
+
+    def runtime_history(
+        self,
+        market: str,
+        *,
+        now: float | None = None,
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Return scalar-only runtime chart history with a true seven-day horizon."""
+        current = float(now or time.time())
+        horizon_cutoff = current - RUNTIME_HORIZON_SECONDS
+        scope = (self.exchange, market, self.strategy)
+
+        equity = self.conn.execute(
+            """SELECT ts,equity_krw,return_pct,cash_krw,position_value_krw
+               FROM research_equity_mx
+               WHERE exchange=? AND market=? AND strategy=? AND ts>=?
+               ORDER BY id ASC""",
+            (*scope, horizon_cutoff),
+        ).fetchall()
+
+        memory = self.conn.execute(
+            """SELECT ts,signal_ts,price,change_24h_pct,turnover_24h,liquidity_score,
+                      regime_score,entry_score,opportunity_score,suggested_weight_pct,
+                      trade_intent,asset_return_pct,pullback_pct,volatility_pct,
+                      orderbook_imbalance,fib_retrace,btc_return_pct,eth_return_pct,
+                      asset_vs_majors_pct,price_delta_pct,opportunity_delta,
+                      regime_delta,entry_delta
+               FROM research_market_memory_mx
+               WHERE exchange=? AND market=? AND strategy=? AND ts>=?
+               ORDER BY id ASC""",
+            (*scope, horizon_cutoff),
+        ).fetchall()
+
+        return {
+            "equity_history": compact_runtime_history(
+                [dict(row) for row in equity],
+                now=current,
+            ),
+            "market_memory": compact_runtime_history(
+                [dict(row) for row in memory],
+                now=current,
+            ),
+        }
 
     def market_detail(self, market: str) -> dict[str, Any]:
         summary = next((row for row in self.leaderboard(5000) if row["market"] == market), None)
