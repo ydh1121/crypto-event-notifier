@@ -13,6 +13,7 @@ from .intelligence_bls_actual_resilient import BlsActualCaptureService
 from .intelligence_bls_calendar_resilient import ResilientBlsReleaseCalendarSource
 from .intelligence_event import IntelligenceEvent
 from .intelligence_event_response import IntelligenceEventResponseCollector
+from .intelligence_event_response_us_sensitivity import IntelligenceEventResponseUsSensitivityStore
 from .intelligence_event_store import IntelligenceEventStore
 from .intelligence_fomc_calendar import FomcMeetingCalendarSource
 from .intelligence_official_news import CFTC_FEED, SEC_FEED, OfficialPressReleaseRssSource
@@ -59,7 +60,9 @@ class IntelligenceIngestCycle:
     fail closed without breaking official-source ingest. Stored official events
     are also paired with local public BTC/ETH trade flow at exact 15m/1h/4h/1d
     horizons; missing market observations remain missing rather than becoming
-    synthetic zero returns.
+    synthetic zero returns. Strict event responses are then correlated with
+    locally persisted S&P 500, Nasdaq and VIX reference observations for shadow
+    research only; that descriptive layer has no score, sizing or order authority.
     """
 
     def __init__(
@@ -72,6 +75,7 @@ class IntelligenceIngestCycle:
         bea_actual_capture: BeaActualCaptureService | None = None,
         consensus_capture: TradingEconomicsConsensusCaptureService | None = None,
         event_response_capture: IntelligenceEventResponseCollector | None = None,
+        event_response_us_sensitivity: IntelligenceEventResponseUsSensitivityStore | None = None,
     ) -> None:
         self.path = Path(path)
         self.fetchers = dict(fetchers or default_intelligence_fetchers())
@@ -82,6 +86,9 @@ class IntelligenceIngestCycle:
         self.bea_actual_capture = bea_actual_capture or BeaActualCaptureService(self.conn)
         self.consensus_capture = consensus_capture or TradingEconomicsConsensusCaptureService(self.conn)
         self.event_response_capture = event_response_capture or IntelligenceEventResponseCollector(self.conn)
+        self.event_response_us_sensitivity = (
+            event_response_us_sensitivity or IntelligenceEventResponseUsSensitivityStore(self.conn)
+        )
         self._owns_conn = conn is None
 
     def close(self) -> None:
@@ -115,10 +122,12 @@ class IntelligenceIngestCycle:
             "events_updated": 0,
             "source_failures": 0,
             "event_response_failures": 0,
+            "us_market_sensitivity_failures": 0,
             "macro_actual_capture": {"status": "not_requested"},
             "bea_actual_capture": {"status": "not_requested"},
             "consensus_capture": {"status": "not_requested"},
             "event_response_capture": {"status": "not_requested"},
+            "event_response_us_sensitivity": {"status": "not_requested"},
         }
         if not network_enabled:
             result["status"] = "network_disabled"
@@ -229,9 +238,32 @@ class IntelligenceIngestCycle:
             result["event_response_failures"] = int(result["event_response_failures"]) + 1
         result["event_response_capture"] = response_capture
 
+        try:
+            sensitivity = self.event_response_us_sensitivity.run(now=current)
+        except Exception as exc:
+            sensitivity = {
+                "ok": False,
+                "status": "capture_error",
+                "paper_only": True,
+                "shadow_only": True,
+                "can_place_orders": False,
+                "score_mutation": False,
+                "score_authority": False,
+                "promotion_eligible": False,
+                "network_requests": 0,
+                "missing_values_coerced_to_zero": False,
+                "error": f"{type(exc).__name__}: {exc}"[:300],
+            }
+            result["us_market_sensitivity_failures"] = int(
+                result["us_market_sensitivity_failures"]
+            ) + 1
+        result["event_response_us_sensitivity"] = sensitivity
+
         result["status"] = (
             "ok"
-            if int(result["source_failures"]) == 0 and int(result["event_response_failures"]) == 0
+            if int(result["source_failures"]) == 0
+            and int(result["event_response_failures"]) == 0
+            and int(result["us_market_sensitivity_failures"]) == 0
             else "partial"
         )
         return result
