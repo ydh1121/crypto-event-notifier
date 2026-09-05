@@ -1,0 +1,26 @@
+.reader-mode-control{display:inline-flex;align-items:center;gap:2px;padding:3px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.72);box-shadow:0 1px 1px rgba(0,0,0,.018)}.reader-mode-control button{min-height:36px;border:0;border-radius:7px;background:transparent;color:var(--muted);padding:7px 10px;font-size:13px;font-weight:700;white-space:nowrap}.reader-mode-control button.active{background:var(--accent2);color:var(--accent);box-shadow:inset 0 0 0 1px rgba(0,102,204,.12)}.reader-mode-note{font-size:13px;color:var(--muted)}
+
+/* Simple mode keeps the decision/result layer visible and collapses specialist evidence.
+   Detail mode changes no data or calculations; it only restores the existing UI layers. */
+html[data-reader-mode="simple"] #pageRoot[data-page-route="research"] .listing-history-panel,
+html[data-reader-mode="simple"] #pageRoot[data-page-route="research"] .research-score-grid,
+html[data-reader-mode="simple"] #pageRoot[data-page-route="research"] .research-deep{display:none!important}
+
+html[data-reader-mode="simple"] #pageRoot[data-page-route="assets"] .asset-research-sides,
+html[data-reader-mode="simple"] #pageRoot[data-page-route="assets"] .direct-average-panel,
+html[data-reader-mode="simple"] #pageRoot[data-page-route="assets"] .averaging-calculator,
+html[data-reader-mode="simple"] #pageRoot[data-page-route="assets"] .local-management-note{display:none!important}
+
+html[data-reader-mode="simple"] #pageRoot[data-page-route="paper"] .paper-history,
+html[data-reader-mode="simple"] #pageRoot[data-page-route="paper"] .detail-columns{display:none!important}
+
+html[data-reader-mode="simple"] #pageRoot[data-page-route="strategy"] .strategy-breakdown,
+html[data-reader-mode="simple"] #pageRoot[data-page-route="strategy"] .strategy-evidence{display:none!important}
+
+html[data-reader-mode="simple"] #pageRoot[data-page-route="sectors"] .sector-detail-kpis,
+html[data-reader-mode="simple"] #pageRoot[data-page-route="sectors"] .sector-history-head,
+html[data-reader-mode="simple"] #pageRoot[data-page-route="sectors"] .sector-charts,
+html[data-reader-mode="simple"] #pageRoot[data-page-route="sectors"] .sector-method{display:none!important}
+
+@media(max-width:980px){.reader-mode-control button{min-height:40px;padding:8px 10px}}
+@media(max-width:620px){.app-header-inner{grid-template-columns:1fr;grid-template-areas:'brand' 'tools' 'nav';gap:7px}.header-tools{grid-area:tools;width:100%;justify-content:space-between}.reader-mode-control{order:0}.reader-mode-control button{min-height:44px;padding:8px 9px;font-size:13px}.utility-status{display:inline-flex;align-items:center;justify-content:center;min-height:44px}}

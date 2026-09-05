@@ -1,0 +1,427 @@
+from __future__ import annotations
+
+import os
+import signal
+import threading
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Callable
+
+from dotenv import load_dotenv
+
+from .cloudflare_market_detail_strategy_lab import CloudflareMarketDetailPublisher
+from .cloudflare_pages_deployer import CloudflarePagesDeployer
+from .cloudflare_snapshot_lifecycle import CloudflareSnapshotPublisher
+from .coin_profile_research_cycle_v36 import CoinProfileResearchCycleV36
+from .dex_launch_research_cycle import DexLaunchResearchCycle
+from .intelligence_ingest_cycle import IntelligenceIngestCycle
+from .listing_history_research_cycle import ListingHistoryResearchCycle
+from .market_notice_collector import MarketNoticeCollector
+from .market_ohlcv_research_cycle import MarketOhlcvResearchCycle
+from .reference_components import ReferenceComponentWatcher
+from .research_control import COMPONENT_DEFINITIONS, STATUS_PATH, atomic_json, load_control
+from .research_work_lock import ResearchWorkLock
+from .research_warehouse import ResearchWarehouse
+from .strategy_lab_custom import ConfiguredStrategyLabRunner
+from .upbit_paper_runner import UpbitPaperResearchRunner
+
+LOG_PATH = Path("b3_trader/data/research-platform/supervisor.log")
+FORWARD_PIPELINE_DEDICATED_MODE_ENV = "DEX_FORWARD_PIPELINE_DEDICATED_MODE"
+FORWARD_PIPELINE_BLOCKED_COMPONENTS = {
+    "listing-history-research",
+    "dex-launch-research",
+}
+
+
+def _log(message: str) -> None:
+    try:
+        LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        line = f"{time.strftime('%Y-%m-%d %H:%M:%S')} {message}\n"
+        with LOG_PATH.open("a", encoding="utf-8") as handle:
+            handle.write(line)
+        if LOG_PATH.stat().st_size > 2_000_000:
+            text = LOG_PATH.read_text(encoding="utf-8", errors="replace")
+            LOG_PATH.write_text(text[-1_000_000:], encoding="utf-8")
+    except OSError:
+        pass
+
+
+@dataclass
+class ComponentState:
+    name: str
+    enabled: bool
+    interval_seconds: float
+    status: str = "starting"
+    last_started_at: float = 0.0
+    last_finished_at: float = 0.0
+    last_success_at: float = 0.0
+    last_error_at: float = 0.0
+    last_error: str = ""
+    runs: int = 0
+    last_result: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "enabled": self.enabled,
+            "interval_seconds": self.interval_seconds,
+            "status": self.status,
+            "last_started_at": self.last_started_at,
+            "last_finished_at": self.last_finished_at,
+            "last_success_at": self.last_success_at,
+            "last_error_at": self.last_error_at,
+            "last_error": self.last_error,
+            "runs": self.runs,
+            "last_result": self.last_result,
+        }
+
+
+class ResearchSupervisor:
+    """Non-trading sidecar for storage, research enrichment, web snapshots and Pages deployment."""
+
+    def __init__(self) -> None:
+        load_dotenv()
+        self.stop_event = threading.Event()
+        self.started_at = time.time()
+        self.forward_pipeline_dedicated_mode = str(
+            os.getenv(FORWARD_PIPELINE_DEDICATED_MODE_ENV, "false")
+        ).strip().lower() in {"1", "true", "yes", "on"}
+        self.control = load_control()
+        self.warehouse = ResearchWarehouse()
+        self.reference_watcher = ReferenceComponentWatcher()
+        self.cloudflare_publisher = CloudflareSnapshotPublisher()
+        self.cloudflare_market_detail_publisher = CloudflareMarketDetailPublisher()
+        self.coin_profile_research = CoinProfileResearchCycleV36()
+        self.market_notice_collector = MarketNoticeCollector()
+        # SQLite-owning research cycles must be created, used and closed on
+        # their own component worker threads; never construct them on main.
+        self.market_ohlcv_research: MarketOhlcvResearchCycle | None = None
+        self.listing_history_research: ListingHistoryResearchCycle | None = None
+        self.dex_launch_research: DexLaunchResearchCycle | None = None
+        self.intelligence_ingest: IntelligenceIngestCycle | None = None
+        self.cloudflare_deployer = CloudflarePagesDeployer()
+        self.upbit_paper_runner = UpbitPaperResearchRunner()
+        self.strategy_lab_runner = ConfiguredStrategyLabRunner()
+        self.states: dict[str, ComponentState] = {}
+        self.runners: dict[str, Callable[[], dict[str, Any]]] = {
+            "warehouse-export": self.warehouse.export_once,
+            "reference-version-watch": self.reference_watcher.check_once,
+            "cloudflare-snapshot-publish": self.cloudflare_publisher.publish_once,
+            "cloudflare-market-detail-publish": self.cloudflare_market_detail_publisher.publish_once,
+            "coin-profile-enrichment": self.coin_profile_research.run_once,
+            "market-notice-watch": self.market_notice_collector.run_once,
+            "market-ohlcv-history": self._run_market_ohlcv_once,
+            "listing-history-research": self._run_listing_history_once,
+            "dex-launch-research": self._run_dex_launch_once,
+            "phase5-intelligence-ingest": self._run_intelligence_ingest_once,
+            "upbit-paper-research": self.upbit_paper_runner.run_once,
+            "strategy-lab-shadow": self.strategy_lab_runner.run_once,
+            "cloudflare-pages-deploy": self.cloudflare_deployer.deploy_once,
+        }
+        self.threads: dict[str, threading.Thread] = {}
+        self.wake_events: dict[str, threading.Event] = {}
+        self.force_run: dict[str, bool] = {}
+        self.last_run_nonce: dict[str, int] = {}
+        self._lock = threading.RLock()
+        self._install_components()
+
+    def _run_market_ohlcv_once(self) -> dict[str, Any]:
+        """Run bounded public OHLCV collection under the shared research lock."""
+        with ResearchWorkLock() as work_lock:
+            if not work_lock.acquired:
+                return self._research_work_lock_busy("market-ohlcv-history")
+            if self.market_ohlcv_research is None:
+                self.market_ohlcv_research = MarketOhlcvResearchCycle()
+            return self.market_ohlcv_research.run_once()
+
+    def _run_listing_history_once(self) -> dict[str, Any]:
+        """Create and use listing-history SQLite owners on this component thread."""
+        with ResearchWorkLock() as work_lock:
+            if not work_lock.acquired:
+                return self._research_work_lock_busy("listing-history-research")
+            if self.listing_history_research is None:
+                self.listing_history_research = ListingHistoryResearchCycle()
+            return self.listing_history_research.run_once()
+
+    def _run_dex_launch_once(self) -> dict[str, Any]:
+        """Create and use DEX-research SQLite owners on this component thread."""
+        with ResearchWorkLock() as work_lock:
+            if not work_lock.acquired:
+                return self._research_work_lock_busy("dex-launch-research")
+            if self.dex_launch_research is None:
+                self.dex_launch_research = DexLaunchResearchCycle()
+            return self.dex_launch_research.run_once()
+
+    def _run_intelligence_ingest_once(self) -> dict[str, Any]:
+        """Run the bounded Phase 5 official-source ingest outside the DEX forward lock."""
+        if self.intelligence_ingest is None:
+            self.intelligence_ingest = IntelligenceIngestCycle()
+        return self.intelligence_ingest.run_once(network_enabled=True)
+
+    @staticmethod
+    def _research_work_lock_busy(name: str) -> dict[str, Any]:
+        return {
+            "ok": True,
+            "status": "deferred_forward_research_work_lock_busy",
+            "component": name,
+            "paper_only": True,
+            "shadow_only": True,
+            "can_place_orders": False,
+            "network_fetches": False,
+            "database_mutation": False,
+        }
+
+    def _component_blocked_by_forward_mode(self, name: str) -> bool:
+        return bool(
+            self.forward_pipeline_dedicated_mode
+            and name in FORWARD_PIPELINE_BLOCKED_COMPONENTS
+        )
+
+    @staticmethod
+    def _forward_mode_blocked_result(name: str) -> dict[str, Any]:
+        return {
+            "ok": True,
+            "status": "disabled_by_forward_pipeline_dedicated_mode",
+            "component": name,
+            "paper_only": True,
+            "shadow_only": True,
+            "can_place_orders": False,
+            "network_fetches": False,
+            "database_mutation": False,
+            "build47_historical_cursor_read": False,
+        }
+
+    def _close_component_resources(self, name: str) -> None:
+        """Close thread-affine resources before their component thread exits."""
+        if name == "market-ohlcv-history":
+            cycle = self.market_ohlcv_research
+            self.market_ohlcv_research = None
+            if cycle is not None:
+                cycle.close()
+            return
+        if name == "listing-history-research":
+            cycle = self.listing_history_research
+            self.listing_history_research = None
+            if cycle is not None:
+                cycle.close()
+            return
+        if name == "dex-launch-research":
+            cycle = self.dex_launch_research
+            self.dex_launch_research = None
+            if cycle is not None:
+                cycle.close()
+            return
+        if name == "phase5-intelligence-ingest":
+            cycle = self.intelligence_ingest
+            self.intelligence_ingest = None
+            if cycle is not None:
+                cycle.close()
+
+    def _install_components(self) -> None:
+        components = self.control.get("components") or {}
+        global_enabled = bool(self.control.get("enabled", True))
+        for name, definition in COMPONENT_DEFINITIONS.items():
+            cfg = components.get(name) or {}
+            default_enabled = bool(definition.get("default_enabled", True))
+            enabled = bool(cfg.get("enabled", default_enabled)) and global_enabled
+            blocked = self._component_blocked_by_forward_mode(name)
+            if blocked:
+                enabled = False
+            minimum = float(definition["min_interval_seconds"])
+            interval = max(minimum, float(cfg.get("interval_seconds") or definition["default_interval_seconds"]))
+            self.states[name] = ComponentState(
+                name=name,
+                enabled=enabled,
+                interval_seconds=interval,
+                status="starting" if enabled else "stopped",
+                last_result=(self._forward_mode_blocked_result(name) if blocked else {}),
+            )
+            self.wake_events[name] = threading.Event()
+            self.force_run[name] = False
+            self.last_run_nonce[name] = int(cfg.get("run_nonce") or 0)
+            self.threads[name] = threading.Thread(target=self._component_loop, args=(name, self.runners[name]), name=f"research-{name}", daemon=True)
+
+    def _write_status(self) -> None:
+        with self._lock:
+            payload = {
+                "version": 3,
+                "pid": os.getpid(),
+                "running": not self.stop_event.is_set(),
+                "paper_only": True,
+                "started_at": self.started_at,
+                "updated_at": time.time(),
+                "control_revision": int(self.control.get("revision") or 1),
+                "components": {name: state.to_dict() for name, state in self.states.items()},
+                "safety": {
+                    "can_place_orders": False,
+                    "can_modify_strategy_profiles": False,
+                    "auto_promote_external_code": False,
+                    "cloudflare_viewer_read_only": True,
+                    "coin_profile_enrichment_public_sources_only": True,
+                    "coin_profile_identity_guard": True,
+                    "market_notice_public_sources_only": True,
+                    "market_lifecycle_shadow_only": True,
+                    "market_ohlcv_public_sources_only": True,
+                    "market_ohlcv_paper_unwired": True,
+                    "listing_history_public_sources_only": True,
+                    "listing_history_shadow_only": True,
+                    "dex_launch_public_sources_only": True,
+                    "dex_launch_shadow_only": True,
+                    "phase5_intelligence_official_sources_only": True,
+                    "phase5_intelligence_shadow_only": True,
+                    "phase5_intelligence_paper_unwired": True,
+                    "forward_pipeline_dedicated_mode": self.forward_pipeline_dedicated_mode,
+                    "generic_listing_history_supervisor_enabled": bool(
+                        self.states.get("listing-history-research")
+                        and self.states["listing-history-research"].enabled
+                    ),
+                    "generic_dex_launch_supervisor_enabled": bool(
+                        self.states.get("dex-launch-research")
+                        and self.states["dex-launch-research"].enabled
+                    ),
+                },
+            }
+        atomic_json(STATUS_PATH, payload)
+
+    def _safe_write_status(self) -> None:
+        try:
+            self._write_status()
+        except Exception as exc:
+            _log(f"status write retryable error: {type(exc).__name__}: {exc}")
+
+    def _apply_control(self) -> None:
+        next_control = load_control()
+        current_revision = int(self.control.get("revision") or 0)
+        next_revision = int(next_control.get("revision") or 0)
+        if next_revision == current_revision:
+            return
+        global_enabled = bool(next_control.get("enabled", True))
+        components = next_control.get("components") or {}
+        with self._lock:
+            self.control = next_control
+            for name, state in self.states.items():
+                definition = COMPONENT_DEFINITIONS[name]
+                cfg = components.get(name) or {}
+                default_enabled = bool(definition.get("default_enabled", True))
+                minimum = float(definition["min_interval_seconds"])
+                state.enabled = bool(cfg.get("enabled", default_enabled)) and global_enabled
+                if self._component_blocked_by_forward_mode(name):
+                    state.enabled = False
+                    state.last_result = self._forward_mode_blocked_result(name)
+                state.interval_seconds = max(minimum, float(cfg.get("interval_seconds") or definition["default_interval_seconds"]))
+                nonce = int(cfg.get("run_nonce") or 0)
+                if nonce != self.last_run_nonce.get(name, 0):
+                    self.last_run_nonce[name] = nonce
+                    self.force_run[name] = True
+                if not state.enabled and state.status != "running":
+                    state.status = "stopped"
+                self.wake_events[name].set()
+        _log(f"control revision {next_revision} applied")
+
+    def _component_loop(self, name: str, runner: Callable[[], dict[str, Any]]) -> None:
+        state = self.states[name]
+        wake = self.wake_events[name]
+        next_due = 0.0
+        try:
+            while not self.stop_event.is_set():
+                if not state.enabled:
+                    if state.status != "running":
+                        state.status = "stopped"
+                    wake.wait(2.0)
+                    wake.clear()
+                    continue
+                now = time.time()
+                forced = bool(self.force_run.get(name))
+                if not forced and next_due > now:
+                    wake.wait(min(2.0, max(0.1, next_due - now)))
+                    wake.clear()
+                    continue
+                self.force_run[name] = False
+                state.status = "running"
+                state.last_started_at = time.time()
+                self._safe_write_status()
+                try:
+                    result = runner()
+                    state.last_result = result if isinstance(result, dict) else {"result": str(result)}
+                    state.last_success_at = time.time()
+                    state.last_error = ""
+                    state.status = "healthy"
+                    _log(f"{name}: healthy")
+                except Exception as exc:
+                    state.last_error_at = time.time()
+                    state.last_error = f"{type(exc).__name__}: {exc}"
+                    state.status = "degraded"
+                    _log(f"{name}: degraded: {state.last_error}")
+                finally:
+                    state.runs += 1
+                    state.last_finished_at = time.time()
+                    next_due = state.last_finished_at + state.interval_seconds
+                    if not state.enabled:
+                        state.status = "stopped"
+                    self._safe_write_status()
+        finally:
+            try:
+                self._close_component_resources(name)
+            except Exception as exc:
+                _log(f"{name}: component close error: {type(exc).__name__}: {exc}")
+
+    def run(self) -> None:
+        _log("research supervisor starting")
+        self._safe_write_status()
+        for thread in self.threads.values():
+            thread.start()
+        while not self.stop_event.wait(2.0):
+            try:
+                self._apply_control()
+            except Exception as exc:
+                _log(f"control loop retryable error: {type(exc).__name__}: {exc}")
+            self._safe_write_status()
+        for event in self.wake_events.values():
+            event.set()
+        for thread in self.threads.values():
+            thread.join(timeout=5.0)
+        self.market_notice_collector.close()
+        self._safe_write_status()
+        _log("research supervisor stopped")
+
+    def stop(self) -> None:
+        self.stop_event.set()
+        for event in self.wake_events.values():
+            event.set()
+
+
+def main() -> None:
+    stop_requested = threading.Event()
+    holder: dict[str, ResearchSupervisor | None] = {"supervisor": None}
+
+    def _signal_handler(_signum, _frame) -> None:
+        stop_requested.set()
+        supervisor = holder.get("supervisor")
+        if supervisor is not None:
+            supervisor.stop()
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            signal.signal(sig, _signal_handler)
+        except (ValueError, OSError):
+            pass
+    while not stop_requested.is_set():
+        supervisor: ResearchSupervisor | None = None
+        try:
+            supervisor = ResearchSupervisor()
+            holder["supervisor"] = supervisor
+            supervisor.run()
+            if stop_requested.is_set():
+                break
+            _log("research supervisor exited unexpectedly; restarting in 3 seconds")
+        except Exception as exc:
+            _log(f"research supervisor crashed: {type(exc).__name__}: {exc}; restarting in 3 seconds")
+        finally:
+            holder["supervisor"] = None
+        if stop_requested.wait(3.0):
+            break
+
+
+if __name__ == "__main__":
+    main()

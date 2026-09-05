@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#f5f5f7" />
+  <meta name="crypto-dashboard-build" content="2026.09.06-12" />
+  <title>Crypto Auto Trader</title>
+  <link rel="stylesheet" href="./styles.css?v=2" />
+  <link rel="stylesheet" href="./plain-language.css?v=1" />
+  <link rel="stylesheet" href="./portfolio-tools.css?v=3" />
+  <link rel="stylesheet" href="./ux-polish.css?v=1" />
+  <link rel="stylesheet" href="./navigation-v3.css?v=11" />
+  <link rel="stylesheet" href="./demo-research.css?v=8" />
+  <link rel="stylesheet" href="./research-capital.css?v=8" />
+  <link rel="stylesheet" href="./research-components.css?v=2" />
+  <link rel="stylesheet" href="./phase5-gates.css?v=1" />
+  <link rel="stylesheet" href="./strategy-lab-local.css?v=1" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand-block">
+        <div class="eyebrow">PAPER CONTROL</div>
+        <div class="brand-row">
+          <h1>Crypto Auto Trader</h1>
+          <span id="enginePill" class="status-pill neutral">상태 확인 중</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <span id="connectionPill" class="status-pill neutral">연결 확인 중</span>
+        <button id="settingsBtn" class="button secondary compact">연결 설정</button>
+      </div>
+    </div>
+    <nav class="view-rail" aria-label="대시보드 화면">
+      <div class="view-rail-inner">
+        <button class="view-tab is-active" data-view="overview">개요</button>
+        <button class="view-tab" data-view="assets">자산</button>
+        <button class="view-tab" data-view="performance">성과</button>
+        <button class="view-tab" data-view="activity">활동</button>
+        <button class="view-tab" data-view="settings">설정</button>
+      </div>
+    </nav>
+  </header>
+
+  <main class="app-main">
+    <section class="view is-active" data-view-panel="overview">
+      <div class="section-intro">
+        <div>
+          <p class="section-kicker">현재 상태</p>
+          <h2>시장을 보고, 진입은 따로 판단합니다.</h2>
+          <p class="section-copy">Regime은 시장 환경, Entry는 지금 가격의 진입 품질입니다. 둘 중 하나만 높으면 매수하지 않습니다.</p>
+        </div>
+        <div class="engine-controls" aria-label="엔진 제어">
+          <button id="pauseBtn" class="button secondary">신규 진입 일시정지</button>
+          <button id="resumeBtn" class="button secondary">재개</button>
+          <button id="killBtn" class="button danger">Kill switch</button>
+          <button id="resetKillBtn" class="button secondary">Kill 해제</button>
+        </div>
+      </div>
+
+      <section class="kpi-grid" aria-label="PAPER 계좌 요약">
+        <article class="metric-card"><span>평가금액</span><strong id="equityValue">-</strong><small id="returnValue">수익률 -</small></article>
+        <article class="metric-card"><span>현금</span><strong id="cashValue">-</strong><small id="exposureValue">노출 -</small></article>
+        <article class="metric-card"><span>일중 DD</span><strong id="ddValue">-</strong><small id="maxDdValue">최대 DD -</small></article>
+        <article class="metric-card"><span>실현손익</span><strong id="realizedValue">-</strong><small id="winRateValue">완료 거래 -</small></article>
+      </section>
+
+      <section class="overview-grid">
+        <article class="panel market-panel">
+          <div class="panel-head">
+            <div><p class="panel-kicker">Market pulse</p><h3>시장 국면</h3></div>
+            <span id="marketUpdated" class="muted">-</span>
+          </div>
+          <div id="marketPulse" class="market-pulse empty-state">시장 데이터를 불러오는 중입니다.</div>
+        </article>
+        <article class="panel system-panel">
+          <div class="panel-head"><div><p class="panel-kicker">System</p><h3>운영 상태</h3></div></div>
+          <div id="systemSummary" class="system-summary"></div>
+        </article>
+      </section>
+
+      <div class="section-head">
+        <div><p class="section-kicker">Watchlist</p><h2>감시 자산</h2><p>카드를 선택하면 자산 화면에서 판단 근거와 차트를 자세히 볼 수 있습니다.</p></div>
+        <form id="addAssetForm" class="inline-add"><input id="tickerInput" placeholder="XRP, SEI, KRW-SOL" autocomplete="off" /><button type="submit" class="button">추가</button></form>
+      </div>
+      <section id="assetGrid" class="asset-grid"></section>
+    </section>
+
+    <section class="view" data-view-panel="assets">
+      <div class="section-head asset-head">
+        <div><p class="section-kicker">Asset workspace</p><h2>자산 분석</h2><p>현재 점수, 진입 위치, 상대강도와 컨텍스트를 한 화면에서 확인합니다.</p></div>
+        <label class="asset-select-label">자산<select id="assetSelect"></select></label>
+      </div>
+
+      <section class="asset-workspace">
+        <article class="panel asset-detail-panel">
+          <div id="assetDetailHeader" class="asset-detail-header"></div>
+          <div id="assetDecision" class="decision-block"></div>
+          <div id="assetScoreGrid" class="score-detail-grid"></div>
+          <div id="assetDiagnostics" class="diagnostic-grid"></div>
+        </article>
+        <article class="panel context-panel">
+          <div class="panel-head"><div><p class="panel-kicker">Context</p><h3>관련 시장</h3></div></div>
+          <div id="assetContext" class="context-body empty-state">자산을 선택하세요.</div>
+        </article>
+      </section>
+
+      <section class="panel chart-panel">
+        <div class="chart-head">
+          <div><p class="panel-kicker">Price</p><h3 id="priceChartTitle">가격 흐름</h3></div>
+          <div class="range-control" data-range-group="asset">
+            <button data-range="1h">1H</button><button data-range="6h">6H</button><button class="is-active" data-range="24h">24H</button><button data-range="7d">7D</button>
+          </div>
+        </div>
+        <div id="priceChart" class="chart-box empty-state">데이터를 모으는 중입니다.</div>
+      </section>
+
+      <section class="panel chart-panel">
+        <div class="chart-head"><div><p class="panel-kicker">Scores</p><h3>Regime / Entry</h3></div><div class="chart-legend"><span><i class="dot regime"></i>Regime</span><span><i class="dot entry"></i>Entry</span></div></div>
+        <div id="scoreChart" class="chart-box empty-state">데이터를 모으는 중입니다.</div>
+      </section>
+    </section>
+
+    <section class="view" data-view-panel="performance">
+      <div class="section-head">
+        <div><p class="section-kicker">Forward test</p><h2>PAPER 성과</h2><p>현재 전략의 판단 품질을 실제 누적 데이터로 검증합니다.</p></div>
+        <div class="range-control" data-range-group="portfolio"><button data-range="1h">1H</button><button data-range="6h">6H</button><button data-range="24h">24H</button><button class="is-active" data-range="7d">7D</button></div>
+      </div>
+
+      <section id="performanceGrid" class="kpi-grid performance-grid"></section>
+      <section class="panel chart-panel">
+        <div class="chart-head"><div><p class="panel-kicker">Equity</p><h3>PAPER 평가금액</h3></div><span id="equityChartMeta" class="muted"></span></div>
+        <div id="equityChart" class="chart-box large empty-state">데이터를 모으는 중입니다.</div>
+      </section>
+      <section class="performance-columns">
+        <article class="panel"><div class="panel-head"><div><p class="panel-kicker">By asset</p><h3>자산별 결과</h3></div></div><div id="marketPerformance" class="list"></div></article>
+        <article class="panel"><div class="panel-head"><div><p class="panel-kicker">Interpretation</p><h3>검증 메모</h3></div></div><div id="performanceNote" class="note-block"></div></article>
+      </section>
+    </section>
+
+    <section class="view" data-view-panel="activity">
+      <div class="section-head"><div><p class="section-kicker">Journal</p><h2>활동 기록</h2><p>체결, 차단, 설정 변경과 오류를 시간순으로 확인합니다.</p></div><button id="refreshActivity" class="button secondary compact">새로고침</button></div>
+      <section class="activity-grid">
+        <article class="panel"><div class="panel-head"><h3>최근 체결</h3></div><div id="fillsList" class="list"></div></article>
+        <article class="panel"><div class="panel-head"><h3>이벤트</h3></div><div id="eventsList" class="list"></div></article>
+      </section>
+    </section>
+
+    <section class="view" data-view-panel="settings">
+      <div class="section-head"><div><p class="section-kicker">Control</p><h2>설정</h2><p>전략 기준과 운영 연결을 관리합니다. 실거래 엔진은 이 작업 범위에 포함하지 않습니다.</p></div></div>
+
+      <section class="settings-grid">
+        <article class="panel settings-panel wide-settings">
+          <div class="panel-head"><div><p class="panel-kicker">Strategy</p><h3>전략·리스크</h3></div><span class="muted">저장 시 로컬 즉시 반영 + GitHub 동기화</span></div>
+          <form id="runtimeConfigForm" class="settings-form">
+            <fieldset><legend>주문·포지션</legend><div class="field-grid"><label>기본 주문금액<input type="number" data-config="default_order_krw" min="1000" step="1000"></label><label>자산별 최대금액<input type="number" data-config="default_max_position_krw" min="1000" step="1000"></label><label>총 최대노출<input type="number" data-config="max_total_exposure_krw" min="1000" step="1000"></label><label>매수 쿨다운(초)<input type="number" data-config="buy_cooldown_seconds" min="0" step="60"></label></div></fieldset>
+            <fieldset><legend>진입 기준</legend><div class="field-grid"><label>Regime 최소<input type="number" data-config="min_regime_score" min="0" max="100" step="1"></label><label>Entry 최소<input type="number" data-config="min_entry_score" min="0" max="100" step="1"></label></div></fieldset>
+            <fieldset><legend>시장 위험 차단</legend><div class="field-grid"><label>일 최대손실 %<input type="number" data-config="max_daily_loss_pct" min="0.1" max="50" step="0.1"></label><label>최대 스프레드 bps<input type="number" data-config="max_spread_bps" min="1" step="1"></label><label>최대 슬리피지 bps<input type="number" data-config="max_slippage_bps" min="1" step="1"></label><label>BTC 급락 차단 %<input type="number" data-config="btc_flash_crash_pct" max="0" step="0.1"></label></div></fieldset>
+            <div class="form-actions"><button type="submit" class="button">설정 저장</button></div>
+          </form>
+        </article>
+
+        <article class="panel"><div class="panel-head"><div><p class="panel-kicker">Telegram</p><h3>알림</h3></div><span id="telegramStatePill" class="status-pill neutral">확인 중</span></div><p class="panel-copy">매수하기 좋은 조건이 처음 충족될 때만 자동으로 알려드립니다.</p><div class="button-row"><button id="telegramSettings" class="button secondary">설정</button><button id="telegramTest" class="button secondary">테스트</button></div></article>
+
+        <article class="panel"><div class="panel-head"><div><p class="panel-kicker">Backup & sync</p><h3>데이터 보존</h3></div></div><div id="backupSyncStatus" class="list"></div><div class="button-row"><button id="backupNow" class="button secondary">백업 실행</button><button id="syncNow" class="button secondary">GitHub 동기화</button></div></article>
+
+        <article class="panel phone-panel"><div class="panel-head"><div><p class="panel-kicker">Phone access</p><h3>폰 외부 접속</h3></div><span id="tailscalePill" class="status-pill neutral">확인 중</span></div><div id="phoneAccessBody" class="phone-access-body empty-state">네트워크 상태를 확인하는 중입니다.</div><div class="phone-warning">포트 8765를 인터넷에 직접 개방하지 않습니다. 외부에서는 Cloudflare HTTPS 연결을 사용합니다.</div></article>
+
+        <article class="panel"><div class="panel-head"><div><p class="panel-kicker">System</p><h3>로컬 엔진</h3></div></div><div id="systemDetail" class="list"></div></article>
+
+        <article class="panel" id="staticUiBuild"><div class="panel-head"><div><p class="panel-kicker">UI BUILD</p><h3>화면 버전</h3></div><span class="status-pill good">UI 2026.09.06-12</span></div><p class="panel-copy">Photo-eBook 방식의 Liquid 내비게이션, 24시간 연구 구성요소, Phase 5 Gate Matrix, 로컬 전용 Strategy Lab 실험 설계가 적용된 버전입니다.</p></article>
+
+        <article class="panel deferred-panel"><div class="panel-head"><div><p class="panel-kicker">Deferred</p><h3>실거래 엔진</h3></div></div><p class="panel-copy">실제 주문, 잔고 정합성, 부분체결, 중복 주문 방지는 별도 Work에서 구축합니다. 현재 앱은 PAPER 전용입니다.</p><span class="status-pill warn">아직 구현하지 않음</span></article>
+      </section>
+    </section>
+  </main>
+
+  <dialog id="settingsDialog" class="settings-dialog">
+    <form method="dialog" class="dialog-card" id="connectionForm">
+      <div class="dialog-head"><div><p class="panel-kicker">Connection</p><h3>대시보드 연결</h3></div><button value="cancel" class="icon-button" aria-label="닫기">×</button></div>
+      <p id="connectionHint" class="dialog-copy">로컬에서는 토큰 없이 동작합니다. 원격 접속에서는 연결 코드를 입력하세요.</p>
+      <label>API 주소<input id="apiBaseInput" type="url" placeholder="http://100.x.x.x:8765" /></label>
+      <label>연결 코드<input id="tokenInput" type="password" autocomplete="off" placeholder="로컬 설정 화면에서 확인" /></label>
+      <div class="dialog-actions"><button value="cancel" class="button secondary">취소</button><button id="saveConnection" value="default" class="button">저장</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="telegramDialog" class="settings-dialog">
+    <form method="dialog" class="dialog-card" id="telegramForm">
+      <div class="dialog-head"><div><p class="panel-kicker">Telegram</p><h3>알림 설정</h3></div><button value="cancel" class="icon-button" aria-label="닫기">×</button></div>
+      <label class="toggle-label"><span>텔레그램 알림 사용</span><input id="telegramEnabledInput" type="checkbox"></label>
+      <label>Bot token<input id="telegramTokenInput" type="password" autocomplete="off" placeholder="기존 값 유지 시 비워두기"></label>
+      <label>Chat ID<input id="telegramChatInput" type="text" autocomplete="off"></label>
+      <div class="dialog-actions"><button value="cancel" class="button secondary">취소</button><button id="saveTelegram" value="default" class="button">저장</button></div>
+    </form>
+  </dialog>
+
+  <script src="./app.js?v=1"></script>
+  <script src="./plain-language.js?v=1"></script>
+  <script src="./portfolio-tools.js?v=3"></script>
+  <script src="./ux-stability.js?v=1"></script>
+  <script src="./navigation-v3.js?v=11"></script>
+  <script src="./demo-research.js?v=8"></script>
+  <script src="./research-capital.js?v=8"></script>
+  <script src="./research-components.js?v=2"></script>
+  <script src="./phase5-gates.js?v=1"></script>
+  <script src="./strategy-lab-local.js?v=1"></script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+name: B3 DEX Temporal Backfill Build 56
+
+on:
+  push:
+    branches:
+      - b3-auto-trader-phase1
+    paths:
+      - "b3_trader/dex_temporal_backfill.py"
+      - "b3_trader/tests/test_dex_temporal_backfill_build56.py"
+      - "scripts/check-dex-temporal-backfill-build56.py"
+      - "scripts/verify-dex-temporal-backfill-build56.py"
+      - ".github/workflows/b3-dex-temporal-backfill-build56.yml"
+  pull_request:
+    branches:
+      - master
+    paths:
+      - "b3_trader/dex_temporal_backfill.py"
+      - "b3_trader/tests/test_dex_temporal_backfill_build56.py"
+      - "scripts/check-dex-temporal-backfill-build56.py"
+      - "scripts/verify-dex-temporal-backfill-build56.py"
+      - ".github/workflows/b3-dex-temporal-backfill-build56.yml"
+
+jobs:
+  build56:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r b3_trader/requirements.txt pytest
+      - name: Compile temporal backfill
+        run: >-
+          python -m py_compile
+          b3_trader/dex_temporal_backfill.py
+          scripts/check-dex-temporal-backfill-build56.py
+          scripts/verify-dex-temporal-backfill-build56.py
+      - name: Direct Build 56 verifier import bootstrap
+        run: python scripts/verify-dex-temporal-backfill-build56.py --import-check
+      - name: Build 56 temporal backfill unit tests
+        run: python -m pytest -q b3_trader/tests/test_dex_temporal_backfill_build56.py
+      - name: Build 45 regression contract
+        run: python scripts/check-dex-quality-build45.py
+      - name: Build 46 regression contract
+        run: python scripts/check-dex-backfill-build46.py
+      - name: Build 47 regression contract
+        run: python scripts/check-historical-listing-build47.py
+      - name: Build 48 regression contract
+        run: python scripts/check-listing-accelerator-build48.py
+      - name: Build 49 regression contract
+        run: python scripts/check-research-pipeline-build49.py
+      - name: Build 50 regression contract
+        run: python scripts/check-dex-sample-audit-build50.py
+      - name: Build 51 regression contract
+        run: python scripts/check-dex-diversity-build51.py
+      - name: Build 52 regression contract
+        run: python scripts/check-dex-network-pagination-build52.py
+      - name: Build 53 regression contract
+        run: python scripts/check-dex-shadow-readiness-build53.py
+      - name: Build 54 regression contract
+        run: python scripts/check-dex-shadow-remediation-build54.py
+      - name: Build 55 regression contract
+        run: python scripts/check-dex-shadow-remediation-runner-build55.py
+      - name: Build 56 temporal backfill contract
+        run: python scripts/check-dex-temporal-backfill-build56.py

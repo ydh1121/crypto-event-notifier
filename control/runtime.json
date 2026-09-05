@@ -1,0 +1,30 @@
+{
+  "schema_version": 2,
+  "mode": "paper",
+  "trading": {
+    "poll_seconds": 5.0,
+    "candle_refresh_seconds": 60.0,
+    "external_refresh_seconds": 60.0,
+    "default_order_krw": 50000.0,
+    "default_max_position_krw": 300000.0,
+    "max_total_exposure_krw": 600000.0,
+    "buy_cooldown_seconds": 1800.0,
+    "adaptive_size_min_multiplier": 0.6,
+    "adaptive_size_max_multiplier": 1.25,
+    "min_regime_score": 65.0,
+    "min_entry_score": 68.0,
+    "max_daily_loss_pct": 3.0,
+    "max_slippage_bps": 35.0,
+    "max_spread_bps": 45.0,
+    "max_orders_per_minute": 2,
+    "max_orders_per_hour": 8,
+    "btc_flash_crash_pct": -3.0,
+    "btc_flash_window_candles": 3
+  },
+  "storage_policy": {
+    "local_sqlite": "authoritative runtime database",
+    "google_drive": "backup/mirror via rclone",
+    "github_private": "code and non-secret desired state",
+    "cloudflare_pages": "optional static dashboard mirror"
+  }
+}
