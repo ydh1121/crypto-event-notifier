@@ -5,192 +5,204 @@ from pathlib import Path
 
 import pytest
 
-from b3_trader.intelligence_event import normalize_intelligence_event
-from b3_trader.intelligence_reaction import compute_event_reaction, normalize_reaction_price_observation
-from b3_trader.intelligence_reaction_store import IntelligenceReactionStore
-from b3_trader.intelligence_us_market_reference import (
-    UsMarketReferenceStore,
-    normalize_us_market_reference_observation,
+from b3_trader.intelligence_event_response import PROVIDER_ID
+from b3_trader.intelligence_us_market_sensitivity import (
+    MIN_DESCRIPTIVE_SAMPLES,
+    MIN_EXPLORATORY_SAMPLES,
+    UsMarketSensitivityAccumulator,
 )
-from b3_trader.intelligence_us_market_sensitivity import IntelligenceUsMarketSensitivityStore
 
 
 def _conn() -> sqlite3.Connection:
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
+    conn.execute(
+        """CREATE TABLE research_intelligence_event_responses(
+               event_id TEXT NOT NULL,
+               event_type TEXT NOT NULL,
+               source_id TEXT NOT NULL,
+               exchange TEXT NOT NULL,
+               market TEXT NOT NULL,
+               horizon_label TEXT NOT NULL,
+               horizon_seconds REAL NOT NULL,
+               event_ts REAL NOT NULL,
+               return_pct REAL NOT NULL,
+               provider_id TEXT NOT NULL
+           )"""
+    )
     return conn
 
 
-def _reaction(external_id: str, anchor: float, coin_return_pct: float):
-    event = normalize_intelligence_event(
-        source_id="us_sec_press_releases",
-        source_family="official_news",
-        event_type="US_SEC_POLICY",
-        title=f"fixture {external_id}",
-        source_url=f"https://www.sec.gov/newsroom/press-releases/{external_id}",
-        external_id=external_id,
-        published_at=anchor,
-        received_at=anchor + 1,
-    )
-    start = normalize_reaction_price_observation(
-        market="KRW-BTC",
-        observed_at=anchor,
-        price=100.0,
-        provider_id="upbit:public_rest:1m",
-        exchange="upbit",
-        source="public_rest",
-        received_at=anchor + 1,
-    )
-    end = normalize_reaction_price_observation(
-        market="KRW-BTC",
-        observed_at=anchor + 900,
-        price=100.0 * (1.0 + coin_return_pct / 100.0),
-        provider_id="upbit:public_rest:1m",
-        exchange="upbit",
-        source="public_rest",
-        received_at=anchor + 901,
-    )
-    reaction = compute_event_reaction(event, market="KRW-BTC", window="15m", start=start, end=end)
-    assert reaction is not None
-    return reaction
-
-
-def _reference(
+def _response(
+    conn: sqlite3.Connection,
     *,
-    source_id: str,
-    ts: float,
-    value: float,
-    provider: str = "licensed_a",
-    session: str = "regular",
-):
-    return normalize_us_market_reference_observation(
-        source_id=source_id,
-        observed_at=ts,
-        received_at=ts + 2,
-        value=value,
-        provider_id=provider,
-        provider_url="https://data.example.com/reference",
-        data_rights="research-use fixture",
-        session_state=session,
-        latency_class="delayed",
-        delayed_seconds=15,
+    event_id: str,
+    return_pct: float,
+    event_ts: float,
+    event_type: str = "US_CPI",
+    exchange: str = "bithumb",
+    market: str = "KRW-BTC",
+    horizon_label: str = "15m",
+    horizon_seconds: float = 900.0,
+) -> None:
+    conn.execute(
+        """INSERT INTO research_intelligence_event_responses(
+               event_id,event_type,source_id,exchange,market,horizon_label,
+               horizon_seconds,event_ts,return_pct,provider_id
+           ) VALUES(?,?,?,?,?,?,?,?,?,?)""",
+        (
+            event_id,
+            event_type,
+            "us_bls_release_calendar",
+            exchange,
+            market,
+            horizon_label,
+            horizon_seconds,
+            event_ts,
+            return_pct,
+            PROVIDER_ID,
+        ),
     )
+    conn.commit()
 
 
-def test_event_conditioned_sp500_pairs_produce_empirical_beta_and_correlation() -> None:
+def test_waiting_state_preserves_missing_semantics() -> None:
     conn = _conn()
-    reactions = [
-        _reaction("event-a", 1000, 2.0),
-        _reaction("event-b", 3000, 4.0),
-        _reaction("event-c", 5000, 6.0),
-    ]
-    IntelligenceReactionStore(conn).ingest(reactions, seen_at=7000)
-    reference_store = UsMarketReferenceStore(conn)
-    observations = []
-    for anchor, ref_return in ((1000, 1.0), (3000, 2.0), (5000, 3.0)):
-        observations.extend(
-            [
-                _reference(source_id="us_sp500", ts=anchor, value=100.0),
-                _reference(source_id="us_sp500", ts=anchor + 900, value=100.0 * (1.0 + ref_return / 100.0)),
-            ]
-        )
-    reference_store.ingest(observations, seen_at=7000)
+    accumulator = UsMarketSensitivityAccumulator(conn)
+    result = accumulator.run_once(now=1000)
+    assert result["ok"] is True
+    assert result["status"] == "waiting_for_event_response_samples"
+    assert result["samples_considered"] == 0
+    assert accumulator.recent() == []
 
-    store = IntelligenceUsMarketSensitivityStore(conn)
-    result = store.run(source_ids=["us_sp500"], max_reference_skew_seconds=0, now=7000)
-    assert result["pairs"] == {
-        "reactions_considered": 3,
-        "providers_considered": 3,
-        "pairs_ready": 3,
-        "inserted": 3,
-        "updated": 0,
-    }
-    assert result["sensitivity"] == {"source_pairs": 3, "groups": 1}
 
-    rows = store.sensitivity(
-        market="KRW-BTC",
-        event_type="US_SEC_POLICY",
-        window="15m",
-        reference_source_id="us_sp500",
-        now=7000,
-    )
-    assert len(rows) == 1
-    row = rows[0]
+def test_aggregates_descriptive_statistics_without_score_authority() -> None:
+    conn = _conn()
+    _response(conn, event_id="e1", return_pct=1.0, event_ts=1000)
+    _response(conn, event_id="e2", return_pct=-2.0, event_ts=2000)
+    _response(conn, event_id="e3", return_pct=3.0, event_ts=3000)
+    accumulator = UsMarketSensitivityAccumulator(conn)
+
+    result = accumulator.run_once(now=4000)
+    assert result["status"] == "ok"
+    assert result["samples_considered"] == 3
+    assert result["groups_written"] == 1
+    assert result["readiness_counts"]["insufficient_sample"] == 1
+
+    row = accumulator.recent(limit=1)[0]
     assert row["sample_count"] == 3
-    assert row["beta"] == pytest.approx(2.0)
-    assert row["correlation"] == pytest.approx(1.0)
-    assert row["same_direction_count"] == 3
-    assert row["same_direction_rate_pct"] == pytest.approx(100.0)
-    assert row["reference_positive_count"] == 3
-    assert row["reference_negative_count"] == 0
-    assert row["mean_coin_when_reference_positive"] == pytest.approx(4.0)
-    assert row["confidence"] is None
-    assert row["confidence_status"] == "not_promoted"
-    assert row["reference_direction_semantics"] == "raw_not_inverted"
+    assert row["distinct_event_count"] == 3
+    assert row["positive_count"] == 2
+    assert row["negative_count"] == 1
+    assert row["flat_count"] == 0
+    assert row["positive_rate_pct"] == pytest.approx(200.0 / 3.0)
+    assert row["mean_return_pct"] == pytest.approx(2.0 / 3.0)
+    assert row["median_return_pct"] == pytest.approx(1.0)
+    assert row["mean_abs_return_pct"] == pytest.approx(2.0)
+    assert row["stddev_return_pct"] == pytest.approx(2.516611478423583)
+    assert row["min_return_pct"] == pytest.approx(-2.0)
+    assert row["max_return_pct"] == pytest.approx(3.0)
+    assert row["readiness"] == "insufficient_sample"
+    assert row["attributes"]["descriptive_only"] is True
+    assert row["attributes"]["score_authority"] is False
+    assert row["attributes"]["promotion_eligible"] is False
+    assert row["attributes"]["missing_values_coerced_to_zero"] is False
 
 
-def test_pairing_is_forward_only_and_does_not_use_pre_event_reference() -> None:
+def test_groups_are_separated_by_market_horizon_and_event_type() -> None:
     conn = _conn()
-    IntelligenceReactionStore(conn).ingest([_reaction("event-a", 1000, 2.0)], seen_at=2000)
-    UsMarketReferenceStore(conn).ingest(
-        [
-            _reference(source_id="us_sp500", ts=999, value=100),
-            _reference(source_id="us_sp500", ts=1900, value=101),
-        ],
-        seen_at=2000,
+    _response(conn, event_id="cpi-btc", return_pct=1.0, event_ts=1000)
+    _response(
+        conn,
+        event_id="cpi-eth",
+        return_pct=2.0,
+        event_ts=1000,
+        market="KRW-ETH",
     )
-    store = IntelligenceUsMarketSensitivityStore(conn)
-    result = store.run(source_ids=["us_sp500"], max_reference_skew_seconds=0, now=2000)
-    assert result["pairs"]["pairs_ready"] == 0
-    assert conn.execute("SELECT COUNT(*) FROM research_intelligence_us_reference_pairs").fetchone()[0] == 0
-
-
-def test_reference_provider_identity_is_never_collapsed() -> None:
-    conn = _conn()
-    reactions = [_reaction("event-a", 1000, 1.0), _reaction("event-b", 3000, 2.0)]
-    IntelligenceReactionStore(conn).ingest(reactions, seen_at=5000)
-    observations = []
-    for provider in ("licensed_a", "licensed_b"):
-        for anchor in (1000, 3000):
-            observations.extend(
-                [
-                    _reference(source_id="us_sp500", ts=anchor, value=100.0, provider=provider),
-                    _reference(source_id="us_sp500", ts=anchor + 900, value=101.0, provider=provider),
-                ]
-            )
-    UsMarketReferenceStore(conn).ingest(observations, seen_at=5000)
-    store = IntelligenceUsMarketSensitivityStore(conn)
-    result = store.run(source_ids=["us_sp500"], max_reference_skew_seconds=0, now=5000)
-    assert result["pairs"]["pairs_ready"] == 4
-    assert result["sensitivity"]["groups"] == 2
-    rows = store.sensitivity(market="KRW-BTC", reference_source_id="us_sp500", now=5000)
-    assert {row["reference_provider_id"] for row in rows} == {"licensed_a", "licensed_b"}
-    assert all(row["sample_count"] == 2 for row in rows)
-
-
-def test_vix_reference_return_is_stored_raw_without_risk_direction_inversion() -> None:
-    conn = _conn()
-    IntelligenceReactionStore(conn).ingest([_reaction("event-a", 1000, 5.0)], seen_at=2000)
-    UsMarketReferenceStore(conn).ingest(
-        [
-            _reference(source_id="us_cboe_vix", ts=1000, value=20.0),
-            _reference(source_id="us_cboe_vix", ts=1900, value=22.0),
-        ],
-        seen_at=2000,
+    _response(
+        conn,
+        event_id="cpi-btc-1h",
+        return_pct=3.0,
+        event_ts=1000,
+        horizon_label="1h",
+        horizon_seconds=3600,
     )
-    store = IntelligenceUsMarketSensitivityStore(conn)
-    store.run(source_ids=["us_cboe_vix"], max_reference_skew_seconds=0, now=2000)
-    pair = conn.execute("SELECT * FROM research_intelligence_us_reference_pairs").fetchone()
-    assert pair is not None
-    assert pair["reference_series"] == "VIX"
-    assert pair["reference_return_pct"] == pytest.approx(10.0)
-    row = store.sensitivity(market="KRW-BTC", reference_source_id="us_cboe_vix", now=2000)[0]
-    assert row["reference_direction_semantics"] == "raw_not_inverted"
-    assert row["beta"] is None
-    assert row["correlation"] is None
+    _response(
+        conn,
+        event_id="employment-btc",
+        return_pct=-1.0,
+        event_ts=2000,
+        event_type="US_EMPLOYMENT",
+    )
+    accumulator = UsMarketSensitivityAccumulator(conn)
+    result = accumulator.run_once(now=3000)
+    assert result["groups_written"] == 4
+    rows = accumulator.recent(limit=10)
+    keys = {
+        (row["event_type"], row["market"], row["horizon_label"])
+        for row in rows
+    }
+    assert keys == {
+        ("US_CPI", "KRW-BTC", "15m"),
+        ("US_CPI", "KRW-ETH", "15m"),
+        ("US_CPI", "KRW-BTC", "1h"),
+        ("US_EMPLOYMENT", "KRW-BTC", "15m"),
+    }
 
 
-def test_sensitivity_layer_has_no_score_paper_decision_or_order_dependency() -> None:
+def test_readiness_thresholds_are_explicit_and_descriptive_only() -> None:
+    assert MIN_EXPLORATORY_SAMPLES == 5
+    assert MIN_DESCRIPTIVE_SAMPLES == 20
+    assert UsMarketSensitivityAccumulator.readiness_for(4) == "insufficient_sample"
+    assert UsMarketSensitivityAccumulator.readiness_for(5) == "exploratory"
+    assert UsMarketSensitivityAccumulator.readiness_for(19) == "exploratory"
+    assert UsMarketSensitivityAccumulator.readiness_for(20) == "descriptive_ready"
+
+
+def test_recompute_is_idempotent_and_replaces_derived_snapshot() -> None:
+    conn = _conn()
+    _response(conn, event_id="e1", return_pct=1.0, event_ts=1000)
+    accumulator = UsMarketSensitivityAccumulator(conn)
+    first = accumulator.run_once(now=2000)
+    second = accumulator.run_once(now=2100)
+    assert first["groups_written"] == 1
+    assert second["groups_written"] == 1
+    assert len(accumulator.recent()) == 1
+    assert accumulator.recent()[0]["calculated_at"] == pytest.approx(2100)
+
+
+def test_invalid_response_row_fails_closed_without_zero_coercion() -> None:
+    conn = _conn()
+    _response(conn, event_id="valid", return_pct=1.0, event_ts=1000)
+    accumulator = UsMarketSensitivityAccumulator(conn)
+    assert accumulator.run_once(now=2000)["status"] == "ok"
+    conn.execute(
+        """INSERT INTO research_intelligence_event_responses(
+               event_id,event_type,source_id,exchange,market,horizon_label,
+               horizon_seconds,event_ts,return_pct,provider_id
+           ) VALUES(?,?,?,?,?,?,?,?,?,?)""",
+        (
+            "invalid",
+            "US_CPI",
+            "us_bls_release_calendar",
+            "bithumb",
+            "KRW-BTC",
+            "15m",
+            900.0,
+            2000.0,
+            float("inf"),
+            PROVIDER_ID,
+        ),
+    )
+    conn.commit()
+    result = accumulator.run_once(now=3000)
+    assert result["ok"] is False
+    assert result["status"] == "invalid_event_response_rows"
+    assert result["invalid_rows"] == 1
+    assert accumulator.recent()[0]["sample_count"] == 1
+
+
+def test_sensitivity_module_has_no_trading_authority_dependency() -> None:
     path = Path(__file__).resolve().parents[1] / "intelligence_us_market_sensitivity.py"
     text = path.read_text(encoding="utf-8").casefold()
     assert "score_engine" not in text
