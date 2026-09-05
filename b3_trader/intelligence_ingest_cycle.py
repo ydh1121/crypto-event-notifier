@@ -17,6 +17,7 @@ from .intelligence_event_response_us_sensitivity import IntelligenceEventRespons
 from .intelligence_event_store import IntelligenceEventStore
 from .intelligence_fomc_calendar import FomcMeetingCalendarSource
 from .intelligence_official_news import CFTC_FEED, SEC_FEED, OfficialPressReleaseRssSource
+from .intelligence_shadow_promotion_readiness import ShadowPromotionReadinessEvaluator
 from .intelligence_trading_economics_consensus import TradingEconomicsConsensusCaptureService
 from .intelligence_us_market_reference_capture import UsMarketReferenceCaptureService
 
@@ -65,6 +66,8 @@ class IntelligenceIngestCycle:
     configured; missing credentials initialize storage without network access and
     are not a Phase 5 source failure. Strict event responses are then correlated
     with those locally persisted U.S. market references for shadow research only.
+    A final read-only readiness gate may mark complete evidence for manual review,
+    but it never grants promotion, score, sizing or order authority.
     """
 
     def __init__(
@@ -79,6 +82,7 @@ class IntelligenceIngestCycle:
         event_response_capture: IntelligenceEventResponseCollector | None = None,
         us_market_reference_capture: UsMarketReferenceCaptureService | None = None,
         event_response_us_sensitivity: IntelligenceEventResponseUsSensitivityStore | None = None,
+        shadow_promotion_readiness: ShadowPromotionReadinessEvaluator | None = None,
     ) -> None:
         self.path = Path(path)
         self.fetchers = dict(fetchers or default_intelligence_fetchers())
@@ -94,6 +98,9 @@ class IntelligenceIngestCycle:
         )
         self.event_response_us_sensitivity = (
             event_response_us_sensitivity or IntelligenceEventResponseUsSensitivityStore(self.conn)
+        )
+        self.shadow_promotion_readiness = (
+            shadow_promotion_readiness or ShadowPromotionReadinessEvaluator(self.conn)
         )
         self._owns_conn = conn is None
 
@@ -130,12 +137,14 @@ class IntelligenceIngestCycle:
             "event_response_failures": 0,
             "us_market_reference_failures": 0,
             "us_market_sensitivity_failures": 0,
+            "shadow_promotion_readiness_failures": 0,
             "macro_actual_capture": {"status": "not_requested"},
             "bea_actual_capture": {"status": "not_requested"},
             "consensus_capture": {"status": "not_requested"},
             "event_response_capture": {"status": "not_requested"},
             "us_market_reference_capture": {"status": "not_requested"},
             "event_response_us_sensitivity": {"status": "not_requested"},
+            "shadow_promotion_readiness": {"status": "not_requested"},
         }
         if not network_enabled:
             result["status"] = "network_disabled"
@@ -266,14 +275,10 @@ class IntelligenceIngestCycle:
                 "missing_values_coerced_to_zero": False,
                 "error": f"{type(exc).__name__}: {exc}"[:300],
             }
-            result["us_market_reference_failures"] = int(
-                result["us_market_reference_failures"]
-            ) + 1
+            result["us_market_reference_failures"] = int(result["us_market_reference_failures"]) + 1
         else:
             if str(reference_capture.get("status") or "") == "partial":
-                result["us_market_reference_failures"] = int(
-                    result["us_market_reference_failures"]
-                ) + 1
+                result["us_market_reference_failures"] = int(result["us_market_reference_failures"]) + 1
         result["us_market_reference_capture"] = reference_capture
 
         try:
@@ -292,10 +297,31 @@ class IntelligenceIngestCycle:
                 "missing_values_coerced_to_zero": False,
                 "error": f"{type(exc).__name__}: {exc}"[:300],
             }
-            result["us_market_sensitivity_failures"] = int(
-                result["us_market_sensitivity_failures"]
-            ) + 1
+            result["us_market_sensitivity_failures"] = int(result["us_market_sensitivity_failures"]) + 1
         result["event_response_us_sensitivity"] = sensitivity
+
+        try:
+            readiness = self.shadow_promotion_readiness.run()
+        except Exception as exc:
+            readiness = {
+                "ok": False,
+                "status": "readiness_error",
+                "paper_only": True,
+                "shadow_only": True,
+                "can_place_orders": False,
+                "score_mutation": False,
+                "score_authority": False,
+                "promotion_eligible": False,
+                "automatic_promotion": False,
+                "manual_review_ready": False,
+                "network_requests": 0,
+                "missing_values_coerced_to_zero": False,
+                "error": f"{type(exc).__name__}: {exc}"[:300],
+            }
+            result["shadow_promotion_readiness_failures"] = int(
+                result["shadow_promotion_readiness_failures"]
+            ) + 1
+        result["shadow_promotion_readiness"] = readiness
 
         result["status"] = (
             "ok"
@@ -303,6 +329,7 @@ class IntelligenceIngestCycle:
             and int(result["event_response_failures"]) == 0
             and int(result["us_market_reference_failures"]) == 0
             and int(result["us_market_sensitivity_failures"]) == 0
+            and int(result["shadow_promotion_readiness_failures"]) == 0
             else "partial"
         )
         return result
