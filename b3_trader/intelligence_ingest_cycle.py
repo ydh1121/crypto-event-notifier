@@ -18,6 +18,7 @@ from .intelligence_event_store import IntelligenceEventStore
 from .intelligence_fomc_calendar import FomcMeetingCalendarSource
 from .intelligence_official_news import CFTC_FEED, SEC_FEED, OfficialPressReleaseRssSource
 from .intelligence_trading_economics_consensus import TradingEconomicsConsensusCaptureService
+from .intelligence_us_market_reference_capture import UsMarketReferenceCaptureService
 
 SourceFetcher = Callable[[float], list[IntelligenceEvent]]
 DEFAULT_SOURCE_ORDER = (
@@ -56,13 +57,14 @@ class IntelligenceIngestCycle:
     has no score, PAPER, position-sizing or live-order authority. BLS and BEA
     official calendars feed bounded initial-actual capture, while the reviewed
     Trading Economics adapter may capture one complete pre-release consensus
-    snapshot when its subscription API key is configured. Missing credentials
-    fail closed without breaking official-source ingest. Stored official events
+    snapshot when its subscription API key is configured. Stored official events
     are also paired with local public BTC/ETH trade flow at exact 15m/1h/4h/1d
     horizons; missing market observations remain missing rather than becoming
-    synthetic zero returns. Strict event responses are then correlated with
-    locally persisted S&P 500, Nasdaq and VIX reference observations for shadow
-    research only; that descriptive layer has no score, sizing or order authority.
+    synthetic zero returns. A bounded Twelve Data adapter may persist real one-
+    minute S&P 500, Nasdaq Composite and VIX observations when its credential is
+    configured; missing credentials initialize storage without network access and
+    are not a Phase 5 source failure. Strict event responses are then correlated
+    with those locally persisted U.S. market references for shadow research only.
     """
 
     def __init__(
@@ -75,6 +77,7 @@ class IntelligenceIngestCycle:
         bea_actual_capture: BeaActualCaptureService | None = None,
         consensus_capture: TradingEconomicsConsensusCaptureService | None = None,
         event_response_capture: IntelligenceEventResponseCollector | None = None,
+        us_market_reference_capture: UsMarketReferenceCaptureService | None = None,
         event_response_us_sensitivity: IntelligenceEventResponseUsSensitivityStore | None = None,
     ) -> None:
         self.path = Path(path)
@@ -86,6 +89,9 @@ class IntelligenceIngestCycle:
         self.bea_actual_capture = bea_actual_capture or BeaActualCaptureService(self.conn)
         self.consensus_capture = consensus_capture or TradingEconomicsConsensusCaptureService(self.conn)
         self.event_response_capture = event_response_capture or IntelligenceEventResponseCollector(self.conn)
+        self.us_market_reference_capture = (
+            us_market_reference_capture or UsMarketReferenceCaptureService(self.conn)
+        )
         self.event_response_us_sensitivity = (
             event_response_us_sensitivity or IntelligenceEventResponseUsSensitivityStore(self.conn)
         )
@@ -122,11 +128,13 @@ class IntelligenceIngestCycle:
             "events_updated": 0,
             "source_failures": 0,
             "event_response_failures": 0,
+            "us_market_reference_failures": 0,
             "us_market_sensitivity_failures": 0,
             "macro_actual_capture": {"status": "not_requested"},
             "bea_actual_capture": {"status": "not_requested"},
             "consensus_capture": {"status": "not_requested"},
             "event_response_capture": {"status": "not_requested"},
+            "us_market_reference_capture": {"status": "not_requested"},
             "event_response_us_sensitivity": {"status": "not_requested"},
         }
         if not network_enabled:
@@ -239,6 +247,36 @@ class IntelligenceIngestCycle:
         result["event_response_capture"] = response_capture
 
         try:
+            reference_capture = self.us_market_reference_capture.run_once(
+                now=current,
+                network_enabled=True,
+            )
+        except Exception as exc:
+            reference_capture = {
+                "ok": False,
+                "status": "capture_error",
+                "paper_only": True,
+                "shadow_only": True,
+                "can_place_orders": False,
+                "score_mutation": False,
+                "score_authority": False,
+                "promotion_eligible": False,
+                "credential_exposed": False,
+                "network_requests": 0,
+                "missing_values_coerced_to_zero": False,
+                "error": f"{type(exc).__name__}: {exc}"[:300],
+            }
+            result["us_market_reference_failures"] = int(
+                result["us_market_reference_failures"]
+            ) + 1
+        else:
+            if str(reference_capture.get("status") or "") == "partial":
+                result["us_market_reference_failures"] = int(
+                    result["us_market_reference_failures"]
+                ) + 1
+        result["us_market_reference_capture"] = reference_capture
+
+        try:
             sensitivity = self.event_response_us_sensitivity.run(now=current)
         except Exception as exc:
             sensitivity = {
@@ -263,6 +301,7 @@ class IntelligenceIngestCycle:
             "ok"
             if int(result["source_failures"]) == 0
             and int(result["event_response_failures"]) == 0
+            and int(result["us_market_reference_failures"]) == 0
             and int(result["us_market_sensitivity_failures"]) == 0
             else "partial"
         )
