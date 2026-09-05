@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
+from .backup_retention import prune_local_backups
 from .runtime_state import RuntimeState
 from .telegram_notify import TelegramNotifier
 
@@ -355,9 +356,7 @@ class BackupManager:
         finally:
             target.close()
             source.close()
-        backups = sorted(self.local_dir.glob("crypto-trader-*.sqlite3"), reverse=True)
-        for old in backups[48:]:
-            old.unlink(missing_ok=True)
+        retention = prune_local_backups(self.local_dir)
         drive_status = "disabled"
         if self.rclone_remote:
             if shutil.which("rclone") is None:
@@ -372,7 +371,13 @@ class BackupManager:
                 if dashboard_dir.exists():
                     self._rclone("sync", str(dashboard_dir), f"{base}/dashboard")
                 drive_status = "uploaded_and_mirrored"
-        payload = {"status": "ok", "ts": time.time(), "local": str(destination), "drive": drive_status}
+        payload = {
+            "status": "ok",
+            "ts": time.time(),
+            "local": str(destination),
+            "drive": drive_status,
+            "local_retention": retention,
+        }
         self.state.set_backup(payload)
         return payload
 
