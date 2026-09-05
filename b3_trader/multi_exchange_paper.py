@@ -24,9 +24,16 @@ from .exchange_public import PublicExchangeAdapter, PublicMarket, public_exchang
 from .market_feature_store import MarketFeatureStore
 from .market_lifecycle import NORMAL, lifecycle_entry_policy
 from .market_lifecycle_service import MarketLifecycleService
+from .research_retention import (
+    HOT_EQUITY_DAYS,
+    HOT_MEMORY_DAYS,
+    RETENTION_MAINTENANCE_SECONDS,
+    ResearchRetentionManager,
+    compact_runtime_history,
+)
 from .scoped_paper_store import ScopedPaperStore
 
-MARKET_MEMORY_RETENTION_DAYS = 45
+MARKET_MEMORY_RETENTION_DAYS = HOT_MEMORY_DAYS
 ENTRY_INTENTS = {"buy", "explore", "idle_explore"}
 
 
@@ -53,6 +60,9 @@ class MultiExchangePaperDemo(AutoPaperDemo):
         self.lifecycle = MarketLifecycleService(self.store.conn)
         self.lifecycle_snapshot = self.lifecycle.snapshot(self.exchange)
         self.market_features = MarketFeatureStore(self.store.conn)
+        self.retention = ResearchRetentionManager(self.store.conn)
+        self.last_retention_result: dict[str, Any] = {}
+        self._last_retention_maintenance = 0.0
         self.prices: dict[str, float] = {}
         self.names: dict[str, str] = {}
         self.market_meta: dict[str, PublicMarket] = {}
@@ -163,6 +173,18 @@ class MultiExchangePaperDemo(AutoPaperDemo):
                 market=market,
                 strategy=self.strategy_name,
             )
+            now = time.time()
+            memory = detail.get("market_memory") if isinstance(detail.get("market_memory"), list) else []
+            equity = detail.get("equity_history") if isinstance(detail.get("equity_history"), list) else []
+            detail["market_memory"] = compact_runtime_history(memory, now=now)
+            detail["equity_history"] = compact_runtime_history(equity, now=now)
+            detail["runtime_history_policy"] = {
+                "recent_full_resolution_hours": 24,
+                "older_bucket_minutes": 60,
+                "horizon_days": 7,
+                "feature_json_embedded": False,
+                "database_history_unchanged": True,
+            }
             _atomic_json(self.detail_dir / f"{market.replace('/', '_')}.json", detail)
 
     def _write_status(self, *, scanned: int, total: int, error: str = "") -> None:
@@ -214,6 +236,7 @@ class MultiExchangePaperDemo(AutoPaperDemo):
             "last_scan_completed": self.last_scan_completed,
             "scan_number": self.scan_number,
             "error": error,
+            "storage_retention": self.last_retention_result,
             "rules": {
                 "each_scope_start_krw": START_KRW,
                 "scan_interval_seconds": SCAN_INTERVAL_SECONDS,
@@ -228,6 +251,9 @@ class MultiExchangePaperDemo(AutoPaperDemo):
                 "max_slippage_bps": MAX_SLIPPAGE_BPS,
                 "public_market_data_only": True,
                 "market_memory_retention_days": MARKET_MEMORY_RETENTION_DAYS,
+                "equity_hot_retention_days": HOT_EQUITY_DAYS,
+                "archive_required_before_prune": True,
+                "retention_maintenance_seconds": RETENTION_MAINTENANCE_SECONDS,
                 "market_lifecycle_mode": "termination_gate_only",
                 "market_lifecycle_notice_overlay": True,
                 "termination_blocks_new_paper_entries": True,
@@ -240,12 +266,17 @@ class MultiExchangePaperDemo(AutoPaperDemo):
 
     def scan_once(self) -> None:
         super().scan_once()
-        cutoff = time.time() - MARKET_MEMORY_RETENTION_DAYS * 86400.0
-        self.store.conn.execute(
-            "DELETE FROM research_market_memory_mx WHERE exchange=? AND strategy=? AND ts < ?",
-            (self.exchange, self.strategy_name, cutoff),
+        now = time.time()
+        if now - self._last_retention_maintenance < RETENTION_MAINTENANCE_SECONDS:
+            return
+        self.last_retention_result = self.retention.prune_scope(
+            exchange=self.exchange,
+            strategy=self.strategy_name,
+            now=now,
+            memory_days=HOT_MEMORY_DAYS,
+            equity_days=HOT_EQUITY_DAYS,
         )
-        self.store.conn.commit()
+        self._last_retention_maintenance = now
 
     def run_once(self) -> None:
         try:
