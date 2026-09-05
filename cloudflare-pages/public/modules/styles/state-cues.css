@@ -1,0 +1,12 @@
+/* Build 48 non-color cues: direction must remain readable without red/green perception. */
+html[data-reader-baseline="senior"] #pageRoot b.positive::before,
+html[data-reader-baseline="senior"] #pageRoot strong.positive::before,
+html[data-reader-baseline="senior"] #pageRoot span.positive::before,
+html[data-reader-baseline="senior"] #pageRoot small.positive::before{content:'▲ ';font-weight:900}
+html[data-reader-baseline="senior"] #pageRoot b.negative::before,
+html[data-reader-baseline="senior"] #pageRoot strong.negative::before,
+html[data-reader-baseline="senior"] #pageRoot span.negative::before,
+html[data-reader-baseline="senior"] #pageRoot small.negative::before{content:'▼ ';font-weight:900}
+html[data-reader-baseline="senior"] .holding-plan-status.positive>strong::before{content:'▲ ';font-weight:900}
+html[data-reader-baseline="senior"] .holding-plan-status.negative>strong::before{content:'▼ ';font-weight:900}
+html[data-reader-baseline="senior"] .profit-stage.reached>span::before{content:'✓ ';font-weight:900}

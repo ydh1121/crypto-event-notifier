@@ -1,0 +1,66 @@
+name: B3 DEX Supervisor Build 43
+
+on:
+  push:
+    branches:
+      - "b3-auto-trader-phase1"
+    paths:
+      - "b3_trader/research_control.py"
+      - "b3_trader/research_supervisor.py"
+      - "b3_trader/dex_launch_research_cycle.py"
+      - "b3_trader/dex_launch_store.py"
+      - "b3_trader/tests/test_dex_launch_supervisor_thread.py"
+      - "b3_trader/tests/test_listing_history_supervisor_thread.py"
+      - "b3_trader/tests/test_research_control.py"
+      - "scripts/check-dex-supervisor-build43.py"
+      - "scripts/verify-dex-supervisor-build43.py"
+      - "scripts/cleanup-stale-runtime-supervisors.ps1"
+      - "scripts/run-local.ps1"
+      - "start-trader-secure.bat"
+      - ".github/workflows/b3-dex-supervisor-build43.yml"
+  workflow_dispatch:
+
+jobs:
+  build43:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r b3_trader/requirements.txt pytest
+      - name: Compile supervisor integration
+        run: >-
+          python -m py_compile
+          b3_trader/research_control.py
+          b3_trader/research_supervisor.py
+          b3_trader/dex_launch_research_cycle.py
+          b3_trader/dex_launch_store.py
+          scripts/check-dex-supervisor-build43.py
+          scripts/verify-dex-supervisor-build43.py
+      - name: Parse PowerShell runtime scripts
+        shell: pwsh
+        run: |
+          $failed = $false
+          foreach ($path in @("scripts/cleanup-stale-runtime-supervisors.ps1", "scripts/run-local.ps1")) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $failed = $true
+              Write-Host "PowerShell parse errors in $path"
+              $errors | ForEach-Object { Write-Host $_.Message }
+            }
+          }
+          if ($failed) { exit 1 }
+      - name: Supervisor thread and control tests
+        run: >-
+          python -m pytest -q
+          b3_trader/tests/test_dex_launch_supervisor_thread.py
+          b3_trader/tests/test_listing_history_supervisor_thread.py
+          b3_trader/tests/test_research_control.py
+          b3_trader/tests/test_dex_launch_build42.py
+      - name: Build 42 regression contract
+        run: python scripts/check-dex-build42.py
+      - name: Build 43 supervisor contract
+        run: python scripts/check-dex-supervisor-build43.py

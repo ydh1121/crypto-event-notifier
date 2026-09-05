@@ -1,0 +1,44 @@
+name: B3 DEX Shadow Score V2 Forward Build66
+
+on:
+  push:
+    branches: [b3-auto-trader-phase1]
+    paths:
+      - "b3_trader/dex_shadow_score_v2_forward.py"
+      - "b3_trader/tests/test_dex_shadow_score_v2_forward_build66.py"
+      - "scripts/check-dex-shadow-score-v2-forward-build66.py"
+      - "scripts/verify-dex-shadow-score-v2-forward-build66.py"
+      - ".github/workflows/b3-dex-shadow-score-v2-forward-build66.yml"
+  pull_request:
+    paths:
+      - "b3_trader/dex_shadow_score_v2_forward.py"
+      - "b3_trader/tests/test_dex_shadow_score_v2_forward_build66.py"
+      - "scripts/check-dex-shadow-score-v2-forward-build66.py"
+      - "scripts/verify-dex-shadow-score-v2-forward-build66.py"
+      - ".github/workflows/b3-dex-shadow-score-v2-forward-build66.yml"
+
+jobs:
+  build66:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r b3_trader/requirements.txt pytest
+      - name: Compile Build 66
+        run: python -m py_compile b3_trader/dex_shadow_score_v2_forward.py scripts/check-dex-shadow-score-v2-forward-build66.py scripts/verify-dex-shadow-score-v2-forward-build66.py
+      - name: Direct Build 66 verifier import bootstrap
+        run: python scripts/verify-dex-shadow-score-v2-forward-build66.py --import-check
+      - name: Build 66 forward scorer unit tests
+        run: python -m pytest -q b3_trader/tests/test_dex_shadow_score_v2_forward_build66.py
+      - name: Build 62 regression contract
+        run: python scripts/check-dex-shadow-score-build62.py
+      - name: Build 63 regression contract
+        run: python scripts/check-dex-shadow-score-validation-build63.py
+      - name: Build 64 regression contract
+        run: python scripts/check-dex-shadow-score-failure-diagnostic-build64.py
+      - name: Build 65 regression contract
+        run: python scripts/check-dex-shadow-score-v2-preregistration-build65.py
+      - name: Build 66 forward scorer contract
+        run: python scripts/check-dex-shadow-score-v2-forward-build66.py

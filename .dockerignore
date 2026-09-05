@@ -1,0 +1,12 @@
+.git
+.github
+__pycache__
+*.pyc
+*.pyo
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+b3_trader/data
+cloudflare/node_modules
+cloudflare/.wrangler
+.env

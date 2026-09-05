@@ -1,0 +1,91 @@
+name: B3 DEX Forward Pipeline Scheduler Build69
+
+on:
+  push:
+    branches: [b3-auto-trader-phase1]
+    paths:
+      - "b3_trader/forward_pipeline_scheduler.py"
+      - "b3_trader/research_work_lock.py"
+      - "b3_trader/research_supervisor.py"
+      - "b3_trader/market_notice_collector.py"
+      - "b3_trader/tests/test_forward_pipeline_scheduler_build69.py"
+      - "b3_trader/tests/test_forward_pipeline_scheduler_supervisor_isolation_build69.py"
+      - "scripts/check-dex-forward-pipeline-scheduler-build69.py"
+      - "scripts/verify-dex-forward-pipeline-scheduler-build69.py"
+      - "scripts/run-local.ps1"
+      - "scripts/cleanup-stale-runtime-supervisors.ps1"
+      - ".github/workflows/b3-dex-forward-pipeline-scheduler-build69.yml"
+  pull_request:
+    paths:
+      - "b3_trader/forward_pipeline_scheduler.py"
+      - "b3_trader/research_work_lock.py"
+      - "b3_trader/research_supervisor.py"
+      - "b3_trader/market_notice_collector.py"
+      - "b3_trader/tests/test_forward_pipeline_scheduler_build69.py"
+      - "b3_trader/tests/test_forward_pipeline_scheduler_supervisor_isolation_build69.py"
+      - "scripts/check-dex-forward-pipeline-scheduler-build69.py"
+      - "scripts/verify-dex-forward-pipeline-scheduler-build69.py"
+      - "scripts/run-local.ps1"
+      - "scripts/cleanup-stale-runtime-supervisors.ps1"
+      - ".github/workflows/b3-dex-forward-pipeline-scheduler-build69.yml"
+
+jobs:
+  build69-scheduler:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r b3_trader/requirements.txt pytest
+      - name: Compile scheduled runner
+        run: >-
+          python -m py_compile
+          b3_trader/research_work_lock.py
+          b3_trader/forward_pipeline_scheduler.py
+          b3_trader/research_supervisor.py
+          b3_trader/market_notice_collector.py
+          scripts/check-dex-forward-pipeline-scheduler-build69.py
+          scripts/verify-dex-forward-pipeline-scheduler-build69.py
+      - name: Direct verifier import bootstrap
+        run: python scripts/verify-dex-forward-pipeline-scheduler-build69.py --import-check
+      - name: Server-off verifier boundary
+        run: python scripts/verify-dex-forward-pipeline-scheduler-build69.py
+      - name: Scheduled runner and isolation tests
+        run: >-
+          python -m pytest -q
+          b3_trader/tests/test_forward_pipeline_scheduler_build69.py
+          b3_trader/tests/test_forward_pipeline_scheduler_supervisor_isolation_build69.py
+          b3_trader/tests/test_market_notice_collector.py
+          b3_trader/tests/test_listing_history_supervisor_thread.py
+          b3_trader/tests/test_dex_launch_supervisor_thread.py
+      - name: Parse Windows launcher scripts
+        shell: pwsh
+        run: |
+          $failed = $false
+          foreach ($path in @("scripts/cleanup-stale-runtime-supervisors.ps1", "scripts/run-local.ps1")) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $failed = $true
+              $errors | ForEach-Object { Write-Host "$path : $($_.Message)" }
+            }
+          }
+          if ($failed) { exit 1 }
+      - name: Historical supervisor regression contracts
+        run: |
+          python scripts/check-sector-build38.py
+          python scripts/check-listing-build39.py
+          python scripts/check-dex-supervisor-build43.py
+      - name: Build 65 through 71 regression contracts
+        run: |
+          python scripts/check-dex-shadow-score-v2-preregistration-build65.py
+          python scripts/check-dex-shadow-score-v2-forward-build66.py
+          python scripts/check-dex-forward-sample-intake-build67.py
+          python scripts/check-dex-forward-sample-enrichment-build68.py
+          python scripts/check-dex-forward-pipeline-orchestrator-build69.py
+          python scripts/check-dex-forward-sample-ledger-build70.py
+          python scripts/check-dex-shadow-score-v2-forward-validation-build71.py
+      - name: Build 69 scheduled runner contract
+        run: python scripts/check-dex-forward-pipeline-scheduler-build69.py

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ko" data-reader-baseline="senior" data-reader-mode="simple">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f5f5f7">
+  <meta name="crypto-viewer-build" content="2026.09.03-48">
+  <meta name="crypto-sector-build" content="2026.09.03-45">
+  <!-- Historical Build38 floor contract: crypto-sector-build" content="2026.08.27-38 · /modules/main.js?v=15 -->
+  <meta name="crypto-viewer-mode" content="READ ONLY PAPER">
+  <title>Crypto Research</title>
+  <link rel="stylesheet" href="/modules/styles/tokens.css?v=3">
+  <link rel="stylesheet" href="/modules/styles/shell.css?v=4">
+  <link rel="stylesheet" href="/modules/styles/components.css?v=3">
+  <link rel="stylesheet" href="/modules/styles/charts.css?v=3">
+  <link rel="stylesheet" href="/modules/styles/dashboard.css?v=3">
+  <link rel="stylesheet" href="/modules/styles/research.css?v=4">
+  <link rel="stylesheet" href="/modules/styles/assets.css?v=5">
+  <link rel="stylesheet" href="/modules/styles/holding-plan.css?v=3">
+  <link rel="stylesheet" href="/modules/styles/amount-input-ux.css?v=1">
+  <link rel="stylesheet" href="/modules/styles/paper.css?v=6">
+  <link rel="stylesheet" href="/modules/styles/strategy.css?v=4">
+  <link rel="stylesheet" href="/modules/styles/strategy-journey.css?v=1">
+  <link rel="stylesheet" href="/modules/styles/sectors.css?v=2">
+  <link rel="stylesheet" href="/modules/styles/records-system.css?v=5">
+  <link rel="stylesheet" href="/modules/styles/records-audience.css?v=1">
+  <link rel="stylesheet" href="/modules/styles/build29.css?v=1">
+  <link rel="stylesheet" href="/modules/styles/exchange-ui.css?v=2">
+  <link rel="stylesheet" href="/modules/styles/build32.css?v=1">
+  <link rel="stylesheet" href="/modules/styles/build37.css?v=1">
+  <link rel="stylesheet" href="/modules/styles/viewer-context.css?v=45">
+  <link rel="stylesheet" href="/modules/styles/home-journey.css?v=46">
+  <link rel="stylesheet" href="/modules/styles/content-priority.css?v=1">
+  <link rel="stylesheet" href="/modules/styles/reader-mode.css?v=2">
+  <link rel="stylesheet" href="/modules/styles/state-cues.css?v=1">
+  <link rel="stylesheet" href="/modules/styles/senior-default.css?v=48">
+</head>
+<body>
+  <section id="authView" class="auth-wrap">
+    <article class="auth-card" id="loginCard"><span class="readonly-badge">READ ONLY PAPER</span><h2>Crypto Research</h2><p>조회 계정으로 로그인합니다.</p><form id="loginForm"><label>이메일<input id="loginEmail" type="email" autocomplete="username" required></label><label>비밀번호<input id="loginPassword" type="password" autocomplete="current-password" minlength="10" required></label><button class="primary" type="submit">로그인</button></form><button id="showBootstrapBtn" class="text-button" type="button">처음 관리자 계정 만들기</button></article>
+    <article class="auth-card hidden" id="bootstrapCard"><span class="readonly-badge">FIRST SETUP</span><h2>첫 관리자 만들기</h2><p>관리자 생성 키는 계정을 만든 뒤 평소 사용하지 않습니다.</p><form id="bootstrapForm"><label>표시 이름<input id="bootstrapName" autocomplete="name" value="Owner"></label><label>이메일<input id="bootstrapEmail" type="email" autocomplete="username" required></label><label>비밀번호<input id="bootstrapPassword" type="password" minlength="10" autocomplete="new-password" required></label><label>관리자 생성 키<input id="bootstrapToken" type="password" autocomplete="off" required></label><button class="primary" type="submit">관리자 계정 만들기</button></form><button id="showLoginBtn" class="text-button" type="button">로그인으로 돌아가기</button></article>
+    <article class="auth-card hidden" id="inviteCard"><span class="readonly-badge">INVITE</span><h2>초대받은 계정 만들기</h2><p>초대 링크를 확인했습니다.</p><form id="inviteForm"><label>표시 이름<input id="inviteName" autocomplete="name" required></label><label>비밀번호<input id="invitePassword" type="password" minlength="10" autocomplete="new-password" required></label><button class="primary" type="submit">계정 만들고 시작</button></form></article>
+  </section>
+  <section id="appShell" class="app-shell hidden">
+    <header class="app-header"><div class="app-header-inner">
+      <div class="brand"><strong>Crypto Research</strong><span>읽기 전용 · PAPER</span></div>
+      <nav id="mainNav" class="main-nav" aria-label="주요 화면"><button data-route="dashboard" class="active">홈</button><button data-route="research">코인 찾기</button><button data-route="sectors">섹터</button><button data-route="assets">내 코인</button><button data-route="paper">매매 성적</button><button data-route="records">기록</button></nav>
+      <div class="header-tools"><div id="readerModeControl" class="reader-mode-control" role="group" aria-label="화면 정보량"><button type="button" data-reader-mode="simple" class="active" aria-pressed="true">간편 보기</button><button type="button" data-reader-mode="detail" aria-pressed="false">상세 보기</button></div><button id="systemStatusBtn" data-route="system" class="utility-status neutral">● 연결 확인</button><button id="userMenuBtn" class="user-menu"><span>사용자</span><small>조회</small></button><button id="logoutBtn" class="logout">로그아웃</button></div>
+    </div><nav id="journeyNav" class="journey-nav hidden" aria-label="현재 작업의 상세 화면"></nav></header>
+    <main id="pageRoot" class="app-main"></main>
+  </section>
+  <script type="module" src="/modules/main.js?v=52"></script>
+</body>
+</html>

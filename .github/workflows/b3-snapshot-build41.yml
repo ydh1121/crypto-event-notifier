@@ -1,0 +1,52 @@
+name: B3 snapshot Build 41
+
+on:
+  push:
+    branches:
+      - "b3-auto-trader-phase1"
+    paths:
+      - "b3_trader/cloudflare_snapshot_budget.py"
+      - "b3_trader/cloudflare_snapshot_lifecycle.py"
+      - "b3_trader/cloudflare_snapshot_publisher.py"
+      - "b3_trader/listing_history_snapshot.py"
+      - "b3_trader/performance_analytics.py"
+      - "b3_trader/strategy_lab_snapshot.py"
+      - "b3_trader/tests/test_cloudflare_snapshot_budget.py"
+      - "cloudflare-pages/public/modules/shared/selectors.js"
+      - "scripts/check-snapshot-build41.py"
+      - "scripts/verify-snapshot-build41.py"
+      - ".github/workflows/b3-snapshot-build41.yml"
+  workflow_dispatch:
+
+jobs:
+  build41:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: pip install -r b3_trader/requirements.txt pytest
+      - name: Compile snapshot budget
+        run: >-
+          python -m py_compile
+          b3_trader/cloudflare_snapshot_budget.py
+          b3_trader/cloudflare_snapshot_lifecycle.py
+          scripts/check-snapshot-build41.py
+          scripts/verify-snapshot-build41.py
+      - name: Snapshot budget tests
+        run: python -m pytest -q b3_trader/tests/test_cloudflare_snapshot_budget.py b3_trader/tests/test_listing_history_snapshot.py
+      - name: Build 41 contract
+        run: python scripts/check-snapshot-build41.py
+      - name: Local snapshot budget verifier
+        run: python scripts/verify-snapshot-build41.py
+      - name: Viewer selector syntax
+        run: node --check cloudflare-pages/public/modules/shared/selectors.js
+      - name: Cloudflare Pages typecheck
+        working-directory: cloudflare-pages
+        run: |
+          npm install
+          npm run typecheck

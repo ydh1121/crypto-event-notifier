@@ -1,0 +1,42 @@
+name: B3 DEX Forward Sample Ledger Build70
+
+on:
+  push:
+    branches: [b3-auto-trader-phase1]
+    paths:
+      - "b3_trader/forward_sample_ledger.py"
+      - "b3_trader/tests/test_forward_sample_ledger_build70.py"
+      - "scripts/check-dex-forward-sample-ledger-build70.py"
+      - "scripts/verify-dex-forward-sample-ledger-build70.py"
+      - ".github/workflows/b3-dex-forward-sample-ledger-build70.yml"
+  pull_request:
+    paths:
+      - "b3_trader/forward_sample_ledger.py"
+      - "b3_trader/tests/test_forward_sample_ledger_build70.py"
+      - "scripts/check-dex-forward-sample-ledger-build70.py"
+      - "scripts/verify-dex-forward-sample-ledger-build70.py"
+      - ".github/workflows/b3-dex-forward-sample-ledger-build70.yml"
+
+jobs:
+  build70:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r b3_trader/requirements.txt pytest
+      - name: Compile Build 70
+        run: python -m py_compile b3_trader/forward_sample_ledger.py scripts/check-dex-forward-sample-ledger-build70.py scripts/verify-dex-forward-sample-ledger-build70.py
+      - name: Direct Build 70 verifier import bootstrap
+        run: python scripts/verify-dex-forward-sample-ledger-build70.py --import-check
+      - name: Build 70 ledger unit tests
+        run: python -m pytest -q b3_trader/tests/test_forward_sample_ledger_build70.py
+      - name: Build 65 regression contract
+        run: python scripts/check-dex-shadow-score-v2-preregistration-build65.py
+      - name: Build 66 regression contract
+        run: python scripts/check-dex-shadow-score-v2-forward-build66.py
+      - name: Build 69 regression contract
+        run: python scripts/check-dex-forward-pipeline-orchestrator-build69.py
+      - name: Build 70 ledger contract
+        run: python scripts/check-dex-forward-sample-ledger-build70.py

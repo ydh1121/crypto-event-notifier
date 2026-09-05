@@ -1,0 +1,220 @@
+name: B3 trader tests
+
+on:
+  push:
+    branches:
+      - "b3-auto-trader-phase1"
+  pull_request:
+    paths:
+      - "AGENTS.md"
+      - "DESIGN.md"
+      - "TASTES.md"
+      - "docs/**"
+      - "b3_trader/**"
+      - "control/**"
+      - "dashboard/**"
+      - "scripts/**"
+      - "cloudflare/**"
+      - "cloudflare-pages/**"
+      - "start-trader.bat"
+      - "start-trader-secure.bat"
+      - "LOCAL_MULTI_ASSET.md"
+      - "Dockerfile"
+      - ".dockerignore"
+      - ".github/workflows/b3-trader-tests.yml"
+      - ".github/workflows/deploy-b3-cloudflare.yml"
+      - ".github/workflows/deploy-pages-viewer.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: b3-trader-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r b3_trader/requirements.txt pytest
+      - run: python -m pytest -q b3_trader/tests
+      - run: python -m py_compile b3_trader/*.py scripts/check-viewer-modular.py
+      - name: Validate research performance and operations contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'class CoinProfileEnricher' b3_trader/coin_profile_enricher.py
+          grep -q 'BITHUMB_MANUAL_URL' b3_trader/coin_profile_enricher.py
+          grep -q 'class CoinProfileResearchCycle' b3_trader/coin_profile_research_cycle.py
+          grep -q 'PRECISION_PER_EXCHANGE = 3' b3_trader/coin_profile_research_cycle.py
+          grep -q 'CoinProfileResearchCycle' b3_trader/research_supervisor.py
+          grep -q 'strategy_lab_equity_history' b3_trader/performance_analytics.py
+          grep -q 'paper_portfolio_history' b3_trader/performance_analytics.py
+          grep -q 'coin_matrix' b3_trader/performance_analytics.py
+          grep -q 'read_performance_analytics' b3_trader/strategy_lab_snapshot.py
+          grep -q '"version": 3' b3_trader/strategy_lab_snapshot.py
+          grep -q '_git_summary' b3_trader/research_control.py
+          grep -q '_cloudflare_summary' b3_trader/research_control.py
+          grep -q '_warehouse_summary' b3_trader/research_control.py
+          grep -q '_backup_summary' b3_trader/research_control.py
+          grep -q '_telegram_summary' b3_trader/research_control.py
+          grep -q '_remote_access_summary' b3_trader/research_control.py
+          grep -q 'address_values_exposed' b3_trader/research_control.py
+          grep -q 'remote_path_exposed' b3_trader/research_control.py
+          grep -q 'buy_candidate_sent_count' b3_trader/telegram_notify.py
+          grep -q 'last_buy_candidate_sent_at' b3_trader/telegram_notify.py
+
+  dashboard-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate local dashboard assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in \
+            dashboard/index.html dashboard/app.js dashboard/plain-language.js dashboard/portfolio-tools.js \
+            dashboard/ux-stability.js dashboard/navigation-v3.js dashboard/demo-research.js \
+            dashboard/research-capital.js dashboard/research-components.js dashboard/strategy-lab-local.js \
+            dashboard/styles.css dashboard/plain-language.css dashboard/portfolio-tools.css dashboard/ux-polish.css \
+            dashboard/navigation-v3.css dashboard/demo-research.css dashboard/research-capital.css \
+            dashboard/research-components.css dashboard/strategy-lab-local.css; do
+            test -s "$file"
+          done
+          for file in dashboard/*.js; do node --check "$file"; done
+          grep -q 'data-view-panel="overview"' dashboard/index.html
+          grep -q 'data-view-panel="performance"' dashboard/index.html
+          grep -q 'portfolio-tools.js' dashboard/index.html
+          grep -q 'Phone access' dashboard/index.html
+
+  cloudflare-typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install
+      - run: npm run typecheck
+
+  cloudflare-pages-viewer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare-pages
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install
+      - run: npm run typecheck
+      - run: find public/modules -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Validate Viewer baseline source contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in \
+            public/index.html public/modules/main.js public/modules/core/router.js public/modules/core/store.js \
+            public/modules/shared/selectors.js public/modules/shared/charts.js public/modules/shared/viewer-context.js \
+            public/modules/pages/dashboard.js public/modules/pages/research.js public/modules/pages/assets.js \
+            public/modules/pages/paper.js public/modules/pages/strategy.js public/modules/pages/sectors-v36.js \
+            public/modules/pages/sector-coin-table.js public/modules/pages/records.js public/modules/pages/system.js \
+            public/modules/services/coin-profile.js public/modules/services/sectors.js \
+            public/modules/styles/strategy.css public/modules/styles/sectors.css public/modules/styles/records-system.css \
+            public/modules/styles/exchange-ui.css public/modules/styles/build32.css public/modules/styles/viewer-context.css \
+            scripts/check-ux-state-contract.mjs \
+            functions/api/sector-summary.ts functions/api/coin-profile.ts functions/api/ingest-coin-profiles.ts \
+            functions/api/coin-profile-backlog.ts functions/lib/coin-taxonomy.ts \
+            migrations/0004_coin_profile_cache.sql migrations/0005_coin_profile_evidence.sql; do
+            test -s "$file"
+          done
+          grep -Eq 'crypto-viewer-build" content="20[0-9]{2}\.[0-9]{2}\.[0-9]{2}-[1-9][0-9]*"' public/index.html
+          grep -Eq 'type="module" src="/modules/main\.js\?v=(1[2-9]|[2-9][0-9]+)"' public/index.html
+          grep -q '/modules/styles/records-system.css?v=5' public/index.html
+          grep -q '/modules/styles/viewer-context.css?v=45' public/index.html
+          grep -q 'data-route="system"' public/index.html
+          grep -q 'data-route="sectors"' public/index.html
+          grep -q 'system.js?v=35' public/modules/main.js
+          grep -q 'paper.js?v=46' public/modules/main.js
+          grep -q 'strategy.js?v=46' public/modules/main.js
+          grep -q 'sectors-v36.js?v=46' public/modules/main.js
+          grep -q '프로젝트별 설명 확인 중' public/modules/pages/sectors-v36.js
+          grep -q 'profile.business_summary_ko' public/modules/pages/sectors-v36.js
+          ! grep -q "chosen?.sector_business||''" public/modules/pages/sectors-v36.js
+          grep -q '근거 출처' public/modules/pages/sectors-v36.js
+          grep -q 'match_confidence' public/modules/pages/sectors-v36.js
+          grep -q '프로젝트 조사' public/modules/pages/sectors-v36.js
+          grep -q 'return24h' public/modules/pages/sector-coin-table.js
+          grep -q 'return7d' public/modules/pages/sector-coin-table.js
+          grep -q 'return30d' public/modules/pages/sector-coin-table.js
+          grep -q 'sector-coin-expanded' public/modules/pages/sector-coin-table.js
+          grep -q 'aria-pressed' public/modules/pages/sector-coin-table.js
+          grep -q 'business_summary_ko' functions/api/ingest-coin-profiles.ts
+          grep -q 'evidence_json' functions/api/ingest-coin-profiles.ts
+          grep -q 'env.DB.batch' functions/api/ingest-coin-profiles.ts
+          grep -q 'round-robin' functions/api/coin-profile-backlog.ts
+          grep -q 'eligible_by_exchange' functions/api/coin-profile-backlog.ts
+          grep -q 'quality_pending_by_exchange' functions/api/coin-profile-backlog.ts
+          grep -q 'canonical_sector' functions/api/sector-summary.ts
+          grep -q 'researched_count' functions/api/sector-summary.ts
+          grep -q 'evidenceText' functions/lib/coin-taxonomy.ts
+          grep -q 'last_verified_at' migrations/0005_coin_profile_evidence.sql
+          grep -q 'community_json' migrations/0005_coin_profile_evidence.sql
+          grep -q 'strategyEquityHistory' public/modules/shared/selectors.js
+          grep -q 'strategyCoinRows' public/modules/shared/selectors.js
+          grep -q 'paperPortfolioHistory' public/modules/shared/selectors.js
+          grep -q '현재 실행 가상매매' public/modules/shared/viewer-context.js
+          grep -q '전략 비교용 가상계좌' public/modules/shared/viewer-context.js
+          grep -q '실행 전략' public/modules/pages/paper.js
+          grep -q 'data-paper-strategy' public/modules/pages/paper.js
+          grep -q '전략 자산곡선' public/modules/pages/strategy.js
+          grep -q 'experiment_id' public/modules/pages/strategy.js
+          grep -q '코인별 성과' public/modules/pages/strategy.js
+          grep -q '코인 × 전략' public/modules/pages/strategy.js
+          grep -q 'data-strategy-coin-experiment' public/modules/pages/strategy.js
+          grep -q '현재 실행 방식의 성적' public/modules/pages/strategy.js
+          grep -q 'SQLite · Drive 백업' public/modules/pages/system.js
+          grep -q 'BUY_CANDIDATE 알림' public/modules/pages/system.js
+          grep -q '휴대폰 · 원격 접속' public/modules/pages/system.js
+          grep -q 'componentDiagnostics' public/modules/pages/system.js
+          grep -q 'operations-grid' public/modules/styles/records-system.css
+          grep -q 'component-diagnostic' public/modules/styles/records-system.css
+          grep -q '내 금액으로 분할 계획 계산' public/modules/pages/assets.js
+          grep -q 'DB 원본을 수정하지 않습니다' public/modules/pages/assets.js
+          test -s ../docs/VIEWER_BUILD32_PLAN.md
+          test -s ../docs/VIEWER_BUILD33_PLAN.md
+          test -s ../docs/VIEWER_BUILD34_PLAN.md
+          test -s ../docs/VIEWER_BUILD35_PLAN.md
+          test -s ../docs/VIEWER_REBUILD_CHECKLIST.md
+          test -s ../docs/VIEWER_UX_STATE_AUDIT_2026-09-03.md
+          grep -q '전체 코인 사업·섹터 전수조사' ../docs/VIEWER_BUILD32_PLAN.md
+          grep -q 'Strategy / PAPER Performance Analytics' ../docs/VIEWER_BUILD33_PLAN.md
+          grep -q 'Operations Visibility' ../docs/VIEWER_BUILD34_PLAN.md
+          grep -q 'Operations Completion' ../docs/VIEWER_BUILD35_PLAN.md
+          grep -q '\[x\] SQLite/Drive backup 상세' ../docs/VIEWER_REBUILD_CHECKLIST.md
+          grep -q '\[ \] GitHub Actions CI 상태를 Viewer에서 직접 표시' ../docs/VIEWER_REBUILD_CHECKLIST.md
+      - name: Ensure retired Pages UI assets are physically absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pattern in \
+            'app.js' 'asset-local-port.*' 'asset-parity-shell.*' 'exchange-phase3.*' 'local-parity.*' \
+            'market-detail.*' 'records-port.*' 'strategy-lab-v1.*' 'strategy-lab-v2.js' 'viewer-best-port.*' \
+            'viewer-canonical-v1.*' 'viewer-canonical-v2.*' 'viewer-canonical-v3.*' 'viewer-canonical-v4.*' \
+            'viewer-ia-v5.*' 'viewer-performance-v1.*' 'viewer-performance-v2.*' 'viewer-shell-v2.*' \
+            'viewer-shell-v3.*' 'viewer-ux-v4.*' 'styles.css' 'workspaces.css'; do
+            if compgen -G "public/$pattern" >/dev/null; then
+              echo "retired asset still exists: $pattern" >&2
+              exit 1
+            fi
+          done
+      - run: grep -q 'setup-cloudflare-pages-viewer.ps1' README.md

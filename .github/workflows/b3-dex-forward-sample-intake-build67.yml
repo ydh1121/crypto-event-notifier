@@ -1,0 +1,40 @@
+name: B3 DEX Forward Sample Intake Build67
+
+on:
+  push:
+    branches: [b3-auto-trader-phase1]
+    paths:
+      - "b3_trader/forward_sample_intake.py"
+      - "b3_trader/tests/test_forward_sample_intake_build67.py"
+      - "scripts/check-dex-forward-sample-intake-build67.py"
+      - "scripts/verify-dex-forward-sample-intake-build67.py"
+      - ".github/workflows/b3-dex-forward-sample-intake-build67.yml"
+  pull_request:
+    paths:
+      - "b3_trader/forward_sample_intake.py"
+      - "b3_trader/tests/test_forward_sample_intake_build67.py"
+      - "scripts/check-dex-forward-sample-intake-build67.py"
+      - "scripts/verify-dex-forward-sample-intake-build67.py"
+      - ".github/workflows/b3-dex-forward-sample-intake-build67.yml"
+
+jobs:
+  build67:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r b3_trader/requirements.txt pytest
+      - name: Compile Build 67
+        run: python -m py_compile b3_trader/forward_sample_intake.py scripts/check-dex-forward-sample-intake-build67.py scripts/verify-dex-forward-sample-intake-build67.py
+      - name: Direct Build 67 verifier import bootstrap
+        run: python scripts/verify-dex-forward-sample-intake-build67.py --import-check
+      - name: Build 67 intake unit tests
+        run: python -m pytest -q b3_trader/tests/test_forward_sample_intake_build67.py
+      - name: Build 65 regression contract
+        run: python scripts/check-dex-shadow-score-v2-preregistration-build65.py
+      - name: Build 66 regression contract
+        run: python scripts/check-dex-shadow-score-v2-forward-build66.py
+      - name: Build 67 intake contract
+        run: python scripts/check-dex-forward-sample-intake-build67.py

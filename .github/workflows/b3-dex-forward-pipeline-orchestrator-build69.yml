@@ -1,0 +1,42 @@
+name: B3 DEX Forward Pipeline Orchestrator Build69
+
+on:
+  push:
+    branches: [b3-auto-trader-phase1]
+    paths:
+      - "b3_trader/forward_pipeline_orchestrator.py"
+      - "b3_trader/tests/test_forward_pipeline_orchestrator_build69.py"
+      - "scripts/check-dex-forward-pipeline-orchestrator-build69.py"
+      - "scripts/verify-dex-forward-pipeline-orchestrator-build69.py"
+      - ".github/workflows/b3-dex-forward-pipeline-orchestrator-build69.yml"
+  pull_request:
+    paths:
+      - "b3_trader/forward_pipeline_orchestrator.py"
+      - "b3_trader/tests/test_forward_pipeline_orchestrator_build69.py"
+      - "scripts/check-dex-forward-pipeline-orchestrator-build69.py"
+      - "scripts/verify-dex-forward-pipeline-orchestrator-build69.py"
+      - ".github/workflows/b3-dex-forward-pipeline-orchestrator-build69.yml"
+
+jobs:
+  build69:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r b3_trader/requirements.txt pytest
+      - name: Compile Build 69
+        run: python -m py_compile b3_trader/forward_pipeline_orchestrator.py scripts/check-dex-forward-pipeline-orchestrator-build69.py scripts/verify-dex-forward-pipeline-orchestrator-build69.py
+      - name: Direct Build 69 verifier import bootstrap
+        run: python scripts/verify-dex-forward-pipeline-orchestrator-build69.py --import-check
+      - name: Build 69 orchestrator unit tests
+        run: python -m pytest -q b3_trader/tests/test_forward_pipeline_orchestrator_build69.py
+      - name: Build 66 regression contract
+        run: python scripts/check-dex-shadow-score-v2-forward-build66.py
+      - name: Build 67 regression contract
+        run: python scripts/check-dex-forward-sample-intake-build67.py
+      - name: Build 68 regression contract
+        run: python scripts/check-dex-forward-sample-enrichment-build68.py
+      - name: Build 69 orchestrator contract
+        run: python scripts/check-dex-forward-pipeline-orchestrator-build69.py
