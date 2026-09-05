@@ -24,7 +24,7 @@ def test_replay_uses_shared_capital_and_executes_prefunded_ladder() -> None:
         _row(600.0, "KRW-AAA", 97.0, opportunity=52.0),
         _row(900.0, "KRW-AAA", 94.5, opportunity=48.0),
         _row(1200.0, "KRW-AAA", 92.5, opportunity=45.0),
-        _row(1500.0, "KRW-AAA", 110.0, opportunity=70.0),
+        _row(1500.0, "KRW-AAA", 110.0, entry=40.0, opportunity=45.0),
     ]
     result = replay_shared_portfolio(rows, max_positions=1, bucket_seconds=300)
 
