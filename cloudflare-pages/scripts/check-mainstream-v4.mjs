@@ -9,6 +9,7 @@ const theme=read('public/modules/shared/theme.js');
 const css=read('public/modules/styles/mainstream-v4.css');
 const layout=read('public/modules/styles/layout-fixes-v4.css');
 const dark=read('public/modules/styles/theme-dark-v4.css');
+const darkAudit=read('public/modules/styles/theme-dark-audit-v4.css');
 const amount=read('public/modules/shared/amount-input-ux.js');
 const fail=[];
 const check=(name,value)=>{if(!value)fail.push(name)};
@@ -37,11 +38,19 @@ check('legacy workspaces collapse before narrow overlap',layout.includes('@media
 check('mobile detail nav avoids horizontal hidden discovery',layout.includes('grid-template-columns:repeat(auto-fit,minmax(88px,1fr))!important'));
 check('table cells can shrink without text collision',layout.includes('.mainstream-table-head>span,.mainstream-table-row>span,.market-summary-row>span,.trade-row>span,.trade-row>time{min-width:0!important}'));
 check('dark mode stylesheet loads last',index.includes('/modules/styles/theme-dark-v4.css?v=1')&&index.indexOf('layout-fixes-v4.css')<index.indexOf('theme-dark-v4.css'));
+check('dark audit stylesheet loads after base dark mode',index.includes('/modules/styles/theme-dark-audit-v4.css?v=1')&&index.indexOf('theme-dark-v4.css')<index.indexOf('theme-dark-audit-v4.css'));
 check('dark mode controls exist before and after login',index.includes('class="auth-theme-toggle" data-theme-toggle')&&index.includes('class="theme-toggle" data-theme-toggle'));
 check('dark mode is installed from main entry',main.includes("installThemeToggle")&&main.includes("./shared/theme.js?v=1"));
 check('dark mode persists user choice',theme.includes("localStorage.setItem(STORAGE_KEY,next)")&&theme.includes("localStorage.getItem(STORAGE_KEY)"));
 check('dark mode follows system until user chooses',theme.includes("prefers-color-scheme: dark")&&theme.includes("if(savedTheme())return"));
 check('dark mode updates browser chrome',theme.includes("meta[name=\"theme-color\"]")&&theme.includes("#111214"));
 check('dark mode covers shell and legacy surfaces',dark.includes('html[data-theme="dark"] .app-header')&&dark.includes('html[data-theme="dark"] .research-master')&&dark.includes('html[data-theme="dark"] .paper-master')&&dark.includes('html[data-theme="dark"] .records-feed'));
+check('dark audit covers dashboard light surfaces',darkAudit.includes('.priority-item')&&darkAudit.includes('.summary-tile')&&darkAudit.includes('.allocation-donut::after'));
+check('dark audit covers chart light surfaces',darkAudit.includes('.mini-chart')&&darkAudit.includes('.major-context>div')&&darkAudit.includes('.history-range button.active')&&darkAudit.includes('.fill-marker'));
+check('dark audit covers holding and averaging light surfaces',darkAudit.includes('.holding-plan-grid>span')&&darkAudit.includes('.holding-budget-summary>span')&&darkAudit.includes('.profit-stage')&&darkAudit.includes('.amount-quick-buttons button'));
+check('dark audit covers sector and coin profile light surfaces',darkAudit.includes('.sector-coin-table')&&darkAudit.includes('.sector-coin-profile')&&darkAudit.includes('.sector-coin-select')&&darkAudit.includes('.sector-method'));
+check('dark audit covers records and system light surfaces',darkAudit.includes('.records-scope-switch button')&&darkAudit.includes('.component-diagnostic')&&darkAudit.includes('.component-error'));
+check('dark audit covers strategy white rows',darkAudit.includes('.strategy-row:not(.columns)'));
+check('dark audit covers legacy viewer scope',darkAudit.includes('.viewer-scope'));
 if(fail.length){console.error('MAINSTREAM_V4_CONTRACT=FAIL');for(const item of fail)console.error(`- ${item}`);process.exit(1)}
 console.log('MAINSTREAM_V4_CONTRACT=PASS');
