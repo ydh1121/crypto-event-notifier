@@ -48,24 +48,24 @@ function replaceText(value){
   return out;
 }
 
-function skipElement(element){
-  return !element||['SCRIPT','STYLE','CODE','PRE','TEXTAREA','INPUT','SELECT'].includes(element.tagName)||element.closest?.('[data-raw-text]');
-}
+function rawElement(element){return !element||element.closest?.('[data-raw-text]')}
+function skipTextElement(element){return rawElement(element)||['SCRIPT','STYLE','CODE','PRE','TEXTAREA','INPUT','SELECT'].includes(element.tagName)}
+function skipAttributes(element){return rawElement(element)||['SCRIPT','STYLE','CODE','PRE'].includes(element.tagName)}
 
 function translateTextNode(node){
-  if(node.nodeType!==Node.TEXT_NODE||skipElement(node.parentElement))return;
+  if(node.nodeType!==Node.TEXT_NODE||skipTextElement(node.parentElement))return;
   const next=replaceText(node.nodeValue);
   if(next!==node.nodeValue)node.nodeValue=next;
 }
 
 function translateElement(element){
-  if(!(element instanceof Element)||skipElement(element))return;
+  if(!(element instanceof Element)||skipAttributes(element))return;
   for(const attr of['placeholder','aria-label','title']){
     if(!element.hasAttribute(attr))continue;
     const value=element.getAttribute(attr),next=replaceText(value);
     if(next!==value)element.setAttribute(attr,next);
   }
-  for(const node of element.childNodes)if(node.nodeType===Node.TEXT_NODE)translateTextNode(node);
+  if(!skipTextElement(element))for(const node of element.childNodes)if(node.nodeType===Node.TEXT_NODE)translateTextNode(node);
 }
 
 function walk(root){
