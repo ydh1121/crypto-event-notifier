@@ -5,8 +5,10 @@ const main=read('public/modules/main.js');
 const router=read('public/modules/core/router.js');
 const home=read('public/modules/pages/v4/home.js');
 const words=read('public/modules/shared/mainstream-ui.js');
+const theme=read('public/modules/shared/theme.js');
 const css=read('public/modules/styles/mainstream-v4.css');
 const layout=read('public/modules/styles/layout-fixes-v4.css');
+const dark=read('public/modules/styles/theme-dark-v4.css');
 const amount=read('public/modules/shared/amount-input-ux.js');
 const fail=[];
 const check=(name,value)=>{if(!value)fail.push(name)};
@@ -34,5 +36,12 @@ check('sticky side panes cannot hide below variable header',layout.includes('.re
 check('legacy workspaces collapse before narrow overlap',layout.includes('@media(max-width:900px)')&&layout.includes('.research-workspace,.asset-workspace,.paper-workspace,.strategy-workspace,.sector-layout,.records-content-grid{grid-template-columns:1fr!important}'));
 check('mobile detail nav avoids horizontal hidden discovery',layout.includes('grid-template-columns:repeat(auto-fit,minmax(88px,1fr))!important'));
 check('table cells can shrink without text collision',layout.includes('.mainstream-table-head>span,.mainstream-table-row>span,.market-summary-row>span,.trade-row>span,.trade-row>time{min-width:0!important}'));
+check('dark mode stylesheet loads last',index.includes('/modules/styles/theme-dark-v4.css?v=1')&&index.indexOf('layout-fixes-v4.css')<index.indexOf('theme-dark-v4.css'));
+check('dark mode controls exist before and after login',index.includes('class="auth-theme-toggle" data-theme-toggle')&&index.includes('class="theme-toggle" data-theme-toggle'));
+check('dark mode is installed from main entry',main.includes("installThemeToggle")&&main.includes("./shared/theme.js?v=1"));
+check('dark mode persists user choice',theme.includes("localStorage.setItem(STORAGE_KEY,next)")&&theme.includes("localStorage.getItem(STORAGE_KEY)"));
+check('dark mode follows system until user chooses',theme.includes("prefers-color-scheme: dark")&&theme.includes("if(savedTheme())return"));
+check('dark mode updates browser chrome',theme.includes("meta[name=\"theme-color\"]")&&theme.includes("#111214"));
+check('dark mode covers shell and legacy surfaces',dark.includes('html[data-theme="dark"] .app-header')&&dark.includes('html[data-theme="dark"] .research-master')&&dark.includes('html[data-theme="dark"] .paper-master')&&dark.includes('html[data-theme="dark"] .records-feed'));
 if(fail.length){console.error('MAINSTREAM_V4_CONTRACT=FAIL');for(const item of fail)console.error(`- ${item}`);process.exit(1)}
 console.log('MAINSTREAM_V4_CONTRACT=PASS');
