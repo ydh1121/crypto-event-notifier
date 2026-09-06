@@ -1,7 +1,8 @@
 import{patchPreservingUi}from'../shared/ui-continuity.js';
 const ROUTES=new Set(['dashboard','dashboard-detail','research','assets','paper','strategy','sectors','records','system']);
 const NAV_PARENT={
-  'dashboard-detail':'dashboard',
+  'dashboard-detail':'research',
+  sectors:'research',
   strategy:'paper',
 };
 export function navRouteFor(name){return NAV_PARENT[name]||name}
