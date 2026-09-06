@@ -1,0 +1,38 @@
+.technical-detail-row{display:none!important}
+
+[data-page-route="system"] .operation-primary b,
+[data-page-route="system"] .operation-primary small{
+  overflow-wrap:anywhere;
+}
+
+[data-page-route="system"] .operation-card,
+[data-page-route="system"] .section-panel{
+  box-shadow:none!important;
+  border-radius:8px!important;
+}
+
+[data-page-route="system"] .component-diagnostic{
+  border-radius:0!important;
+  border-left:0!important;
+  border-right:0!important;
+  box-shadow:none!important;
+}
+
+[data-page-route="system"] .component-detail-grid{
+  gap:10px!important;
+}
+
+[data-page-route="system"] code,
+[data-page-route="system"] pre,
+[data-page-route="system"] .raw-technical-value{
+  display:none!important;
+}
+
+[data-reader-mode="simple"] [data-page-route="system"] .component-diagnostics,
+[data-reader-mode="simple"] [data-page-route="system"] [data-ci-panel]{
+  display:none!important;
+}
+
+[data-reader-mode="simple"] [data-page-route="system"] .system-grid{
+  grid-template-columns:1fr!important;
+}
