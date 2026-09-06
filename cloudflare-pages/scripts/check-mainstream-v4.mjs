@@ -6,10 +6,12 @@ const router=read('public/modules/core/router.js');
 const home=read('public/modules/pages/v4/home.js');
 const words=read('public/modules/shared/mainstream-ui.js');
 const theme=read('public/modules/shared/theme.js');
+const drilldown=read('public/modules/shared/strategy-drilldown-v4.js');
 const css=read('public/modules/styles/mainstream-v4.css');
 const layout=read('public/modules/styles/layout-fixes-v4.css');
 const dark=read('public/modules/styles/theme-dark-v4.css');
 const darkAudit=read('public/modules/styles/theme-dark-audit-v4.css');
+const decision=read('public/modules/styles/decision-workspace-v4.css');
 const amount=read('public/modules/shared/amount-input-ux.js');
 const fail=[];
 const check=(name,value)=>{if(!value)fail.push(name)};
@@ -37,7 +39,7 @@ check('sticky side panes cannot hide below variable header',layout.includes('.re
 check('legacy workspaces collapse before narrow overlap',layout.includes('@media(max-width:900px)')&&layout.includes('.research-workspace,.asset-workspace,.paper-workspace,.strategy-workspace,.sector-layout,.records-content-grid{grid-template-columns:1fr!important}'));
 check('mobile detail nav avoids horizontal hidden discovery',layout.includes('grid-template-columns:repeat(auto-fit,minmax(88px,1fr))!important'));
 check('table cells can shrink without text collision',layout.includes('.mainstream-table-head>span,.mainstream-table-row>span,.market-summary-row>span,.trade-row>span,.trade-row>time{min-width:0!important}'));
-check('dark mode stylesheet loads last',index.includes('/modules/styles/theme-dark-v4.css?v=1')&&index.indexOf('layout-fixes-v4.css')<index.indexOf('theme-dark-v4.css'));
+check('dark mode stylesheet loads after layout',index.includes('/modules/styles/theme-dark-v4.css?v=1')&&index.indexOf('layout-fixes-v4.css')<index.indexOf('theme-dark-v4.css'));
 check('dark audit stylesheet loads after base dark mode',index.includes('/modules/styles/theme-dark-audit-v4.css?v=1')&&index.indexOf('theme-dark-v4.css')<index.indexOf('theme-dark-audit-v4.css'));
 check('dark mode controls exist before and after login',index.includes('class="auth-theme-toggle" data-theme-toggle')&&index.includes('class="theme-toggle" data-theme-toggle'));
 check('dark mode is installed from main entry',main.includes("installThemeToggle")&&main.includes("./shared/theme.js?v=1"));
@@ -52,5 +54,11 @@ check('dark audit covers sector and coin profile light surfaces',darkAudit.inclu
 check('dark audit covers records and system light surfaces',darkAudit.includes('.records-scope-switch button')&&darkAudit.includes('.component-diagnostic')&&darkAudit.includes('.component-error'));
 check('dark audit covers strategy white rows',darkAudit.includes('.strategy-row:not(.columns)'));
 check('dark audit covers legacy viewer scope',darkAudit.includes('.viewer-scope'));
+check('decision workspace stylesheet loads after dark audit',index.includes('/modules/styles/decision-workspace-v4.css?v=1')&&index.indexOf('theme-dark-audit-v4.css')<index.indexOf('decision-workspace-v4.css'));
+check('coin secondary navigation is visually prominent',decision.includes('.journey-nav{min-height:56px')&&decision.includes('font-size:15px!important')&&decision.includes('border-bottom:3px solid transparent!important'));
+check('strategy overview avoids horizontal default scroll',decision.includes('#pageRoot[data-page-route="strategy"] .strategy-workspace{grid-template-columns:1fr!important')&&decision.includes('#pageRoot[data-page-route="strategy"] .strategy-table{max-height:none!important;max-width:100%!important;overflow:visible!important}'));
+check('strategy coin breakdown avoids horizontal default scroll',decision.includes('.strategy-breakdown-table{max-width:100%!important;overflow:visible!important}'));
+check('strategy coin drilldown preserves selected market',drilldown.includes('researchMarket:market')&&drilldown.includes("navigate('research')")&&drilldown.includes('strategy-coin-drilldown'));
+check('strategy drilldown is installed from main entry',main.includes('installStrategyDrilldown')&&main.includes('./shared/strategy-drilldown-v4.js?v=1'));
 if(fail.length){console.error('MAINSTREAM_V4_CONTRACT=FAIL');for(const item of fail)console.error(`- ${item}`);process.exit(1)}
 console.log('MAINSTREAM_V4_CONTRACT=PASS');
