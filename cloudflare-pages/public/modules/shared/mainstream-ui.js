@@ -49,7 +49,7 @@ function replaceText(value){
 }
 
 function skipElement(element){
-  return !element||['SCRIPT','STYLE','CODE','PRE','TEXTAREA','INPUT','SELECT','OPTION'].includes(element.tagName)||element.closest?.('[data-raw-text]');
+  return !element||['SCRIPT','STYLE','CODE','PRE','TEXTAREA','INPUT','SELECT'].includes(element.tagName)||element.closest?.('[data-raw-text]');
 }
 
 function translateTextNode(node){
