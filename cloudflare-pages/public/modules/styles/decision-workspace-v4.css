@@ -1,0 +1,45 @@
+/* V4.4: make secondary navigation discoverable and strategy tables readable without horizontal scroll. */
+.journey-nav{min-height:56px!important;gap:30px!important;padding-top:0!important;padding-bottom:0!important;border-top:1px solid var(--line)!important;border-bottom:1px solid var(--line)!important;align-items:stretch!important}
+.journey-nav button{min-height:56px!important;padding:0 2px!important;font-size:15px!important;font-weight:700!important;color:var(--muted)!important;text-decoration:none!important;border-bottom:3px solid transparent!important}
+.journey-nav button:hover{color:var(--ink)!important}
+.journey-nav button.active{color:var(--ink)!important;border-bottom-color:var(--ink)!important}
+
+#pageRoot[data-page-route="strategy"] .strategy-workspace{grid-template-columns:1fr!important;gap:12px!important}
+#pageRoot[data-page-route="strategy"] .strategy-detail{position:static!important;max-height:none!important;overflow:visible!important;margin:0!important}
+#pageRoot[data-page-route="strategy"] .strategy-table{max-height:none!important;max-width:100%!important;overflow:visible!important}
+#pageRoot[data-page-route="strategy"] .strategy-row{min-width:0!important;width:100%!important;grid-template-columns:minmax(220px,1.8fr) minmax(90px,.65fr) minmax(100px,.7fr) minmax(150px,.9fr)!important}
+#pageRoot[data-page-route="strategy"] .strategy-row>span:nth-child(4),
+#pageRoot[data-page-route="strategy"] .strategy-row>span:nth-child(5),
+#pageRoot[data-page-route="strategy"] .strategy-row>span:nth-child(6){display:none!important}
+
+#pageRoot[data-page-route="strategy"] .strategy-breakdown-table{max-width:100%!important;overflow:visible!important}
+#pageRoot[data-page-route="strategy"] .strategy-breakdown-table .strategy-coin-row{min-width:0!important;width:100%!important;grid-template-columns:minmax(150px,1.35fr) minmax(86px,.65fr) minmax(120px,.85fr) minmax(86px,.65fr) minmax(100px,.7fr)!important}
+#pageRoot[data-page-route="strategy"] .strategy-breakdown-table .strategy-coin-row>span:nth-child(4),
+#pageRoot[data-page-route="strategy"] .strategy-breakdown-table .strategy-coin-row>span:nth-child(6),
+#pageRoot[data-page-route="strategy"] .strategy-breakdown-table .strategy-coin-row>span:nth-child(7){display:none!important}
+#pageRoot[data-page-route="strategy"] .strategy-coin-drilldown{cursor:pointer;transition:background-color 120ms ease-out,box-shadow 120ms ease-out}
+#pageRoot[data-page-route="strategy"] .strategy-coin-drilldown:hover{background:var(--surface2)!important;box-shadow:inset 3px 0 0 var(--accent)!important}
+#pageRoot[data-page-route="strategy"] .strategy-coin-drilldown:focus-visible{outline:2px solid color-mix(in srgb,var(--accent) 50%,transparent);outline-offset:-2px}
+#pageRoot[data-page-route="strategy"] .strategy-coin-drilldown>span:first-child b::after{content:'  상세 보기';font-size:10px;font-weight:600;color:var(--accent);white-space:nowrap}
+
+html[data-theme="dark"] .journey-nav button{color:#aeb4bc!important}
+html[data-theme="dark"] .journey-nav button:hover,html[data-theme="dark"] .journey-nav button.active{color:#fff!important}
+html[data-theme="dark"] .journey-nav button.active{border-bottom-color:#fff!important}
+html[data-theme="dark"] #pageRoot[data-page-route="strategy"] .strategy-coin-drilldown:hover{background:#1c1f23!important}
+
+@media(max-width:900px){
+  .journey-nav{min-height:52px!important;gap:18px!important;display:flex!important;flex-wrap:wrap!important;justify-content:flex-start!important}
+  .journey-nav button{min-height:52px!important;font-size:15px!important;flex:0 0 auto!important}
+  #pageRoot[data-page-route="strategy"] .strategy-row{grid-template-columns:minmax(170px,1.45fr) minmax(80px,.65fr) minmax(90px,.7fr) minmax(120px,.8fr)!important}
+  #pageRoot[data-page-route="strategy"] .strategy-breakdown-table .strategy-coin-row{grid-template-columns:minmax(130px,1.2fr) minmax(78px,.65fr) minmax(108px,.85fr) minmax(80px,.65fr) minmax(90px,.7fr)!important}
+}
+@media(max-width:620px){
+  .journey-nav{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:0 12px!important;min-height:50px!important}
+  .journey-nav button{min-width:0!important;width:100%!important;min-height:50px!important;text-align:center!important;font-size:14px!important}
+  #pageRoot[data-page-route="strategy"] .strategy-row{grid-template-columns:minmax(120px,1.35fr) minmax(70px,.65fr) minmax(88px,.75fr)!important;padding:10px 8px!important;gap:8px!important}
+  #pageRoot[data-page-route="strategy"] .strategy-row>span:nth-child(3){display:none!important}
+  #pageRoot[data-page-route="strategy"] .strategy-breakdown-table .strategy-coin-row{grid-template-columns:minmax(105px,1.2fr) minmax(70px,.65fr) minmax(86px,.75fr)!important;padding:10px 8px!important;gap:8px!important}
+  #pageRoot[data-page-route="strategy"] .strategy-breakdown-table .strategy-coin-row>span:nth-child(3),
+  #pageRoot[data-page-route="strategy"] .strategy-breakdown-table .strategy-coin-row>span:nth-child(5){display:none!important}
+  #pageRoot[data-page-route="strategy"] .strategy-coin-drilldown>span:first-child b::after{display:block;margin-top:2px}
+}
