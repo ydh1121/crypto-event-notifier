@@ -1,54 +1,55 @@
-import fs from 'node:fs';
-import path from 'node:path';
-
+import fs from'node:fs';
+import path from'node:path';
 const root=process.cwd();
-const read=file=>fs.readFileSync(path.join(root,file),'utf8');
-const fail=[];
-function check(name,ok){if(!ok)fail.push(name)}
-
+const read=f=>fs.readFileSync(path.join(root,f),'utf8');
+const fail=[];const check=(name,ok)=>{if(!ok)fail.push(name)};
+const index=read('public/index.html');
+const main=read('public/modules/main.js');
 const router=read('public/modules/core/router.js');
 const store=read('public/modules/core/store.js');
-const main=read('public/modules/main.js');
-const index=read('public/index.html');
-const home=read('public/modules/pages/home.js');
-const paper=read('public/modules/pages/paper.js');
-const strategy=read('public/modules/pages/strategy.js');
-const sectorTable=read('public/modules/pages/sector-coin-table.js');
-const shell=read('public/modules/styles/shell.css');
-const amountUx=read('public/modules/shared/amount-input-ux.js');
-const rebuild=read('public/modules/styles/rebuild-v2.css');
-
-check('sector owns its main-nav active state',index.includes('data-route="sectors"')&&!router.includes("sectors:'research'")&&!router.includes("sectors: 'research'"));
-check('strategy route remains under performance workspace',router.includes("strategy:'paper'")||router.includes("strategy: 'paper'"));
-check('strategy overview state is explicit',store.includes('strategyOverviewExperiment'));
-check('strategy selection drives inline coin breakdown',strategy.includes('id="strategyBreakdown"')&&strategy.includes('renderBreakdown(chosen)')&&strategy.includes('data-strategy-coin-experiment="${esc(key(chosen))}"'));
-check('separate strategy coin tab is retired',!strategy.includes('data-strategy-tab="coins"'));
-check('strategy row selection rerenders full selected journey',/const row=e\.target\.closest\('\[data-strategy-key\]'\);[\s\S]{0,500}renderOverview\(/.test(strategy));
-check('strategy overview status counts use displayed rows',strategy.includes('const states=rows.map(row=>candidateLabel(row,criteria)[1])'));
-check('strategy breakdown sort and search are visible',strategy.includes('data-strategy-coin-sort')&&strategy.includes('data-strategy-breakdown-search'));
-check('strategy matrix search is isolated from breakdown search',strategy.includes("matrixSearch=''")&&strategy.includes('data-strategy-matrix-search'));
-check('paper has execution-strategy filter state',store.includes('paperStrategyFilter'));
-check('paper has visible execution-strategy filter',paper.includes('data-paper-strategy'));
-check('paper strategy filter uses execution row strategy',paper.includes('paperStrategy(store.get(),ex,r)'));
-check('home detail link carries visible holding',home.includes('data-home-asset="${esc(row.market)}"'));
-check('strategy hidden market handoff is scoped to matrix',router.includes("ui.strategyTab==='matrix'"));
-check('assets route does not leak stale research exchange',router.includes("if(name==='assets')return{exchange:'',market:ui.assetMarket}"));
-check('sector sort exposes pressed state',sectorTable.includes('aria-pressed='));
-check('mobile primary nav exposes all items without hidden horizontal discovery',shell.includes('grid-template-columns:repeat(3,1fr)'));
-check('performance journey labels are user-facing',main.includes("['paper','가상매매']")&&main.includes("['strategy','방법 비교']"));
-check('averaging amount presets exceed one million',amountUx.includes("[100_000_000,'1억원']")&&amountUx.includes("[10_000_000,'1,000만원']"));
-check('averaging amount input has no one-million cap',amountUx.includes("input.removeAttribute('max')")&&amountUx.includes("input.setAttribute('placeholder','예: 10000000')"));
-check('amount presets trigger existing calculator input flow',amountUx.includes("dispatchEvent(new Event('input',{bubbles:true}))")&&main.includes('installAmountInputUx(root)'));
-
-check('v2 shell stylesheet loaded',index.includes('/modules/styles/rebuild-v2.css?v=1'));
-check('v2 home has no hero layout',home.includes('v2-status-strip')&&home.includes('v2-table')&&!home.includes('home-answer'));
-check('v2 visible shell is Korean',index.includes('가상자산 상태판')&&index.includes('종류별 보기')&&index.includes('가상매매'));
-check('v2 shell avoids gradient decoration',!rebuild.includes('linear-gradient')&&!rebuild.includes('radial-gradient'));
-check('v2 shell avoids shadow decoration',rebuild.includes('box-shadow:none'));
-
-if(fail.length){
-  console.error('VIEWER_UX_STATE_CONTRACT=FAIL');
-  for(const item of fail)console.error(`- ${item}`);
-  process.exit(1);
-}
-console.log('VIEWER_UX_STATE_CONTRACT=PASS');
+const home=read('public/modules/pages/v2/home.js');
+const dashboard=read('public/modules/pages/v2/dashboard.js');
+const research=read('public/modules/pages/v2/research.js');
+const assets=read('public/modules/pages/v2/assets.js');
+const paper=read('public/modules/pages/v2/paper.js');
+const strategy=read('public/modules/pages/v2/strategy.js');
+const sectors=read('public/modules/pages/v2/sectors.js');
+const records=read('public/modules/pages/v2/records.js');
+const system=read('public/modules/pages/v2/system.js');
+const css=read('public/modules/styles/rebuild-v3.css');
+const visible=[index,home,dashboard,research,assets,paper,strategy,sectors,records,system].join('\n');
+for(const route of['dashboard','dashboard-detail','research','assets','paper','strategy','sectors','records','system'])check(`route ${route}`,main.includes(`${route}:`)||main.includes(`'${route}':`));
+check('router route set preserved',router.includes("'dashboard-detail'")&&router.includes("'strategy'")&&router.includes("'system'"));
+check('auth forms preserved',['loginForm','bootstrapForm','inviteForm','logoutBtn'].every(id=>index.includes(`id="${id}"`)));
+check('six primary nav items preserved',['홈','코인 찾기','종류별 보기','내 코인','가상매매','기록'].every(x=>index.includes(x)));
+check('reader mode preserved',store.includes('readerMode')&&main.includes('data-reader-mode')&&css.includes('data-reader-mode="simple"'));
+check('mobile nav exposes all items',css.includes('grid-template-columns:repeat(3,1fr)'));
+check('new shell uses one stylesheet',index.includes('rebuild-v3.css')&&!index.includes('senior-default.css')&&!index.includes('home-journey.css'));
+check('no gradient decoration',!css.includes('linear-gradient')&&!css.includes('radial-gradient')&&!css.includes('conic-gradient'));
+check('home is row/table based',home.includes('v3-table')&&home.includes('v3-simple-list')&&!home.includes('hero'));
+check('dashboard detail retained',dashboard.includes('getSectorSummary')&&dashboard.includes('paperStats')&&dashboard.includes('holdingsSummary'));
+check('research search/filter/detail retained',research.includes('data-v2-research-search')&&research.includes('data-v2-research-filter')&&research.includes('getMarketDetail'));
+check('research listing history retained',research.includes('listing_history'));
+check('assets holding detail retained',assets.includes('holdingsSummary')&&assets.includes('data-v2-asset-market'));
+check('assets direct average retained',assets.includes('calculateDirectAverage')&&assets.includes('data-v2-direct-amount'));
+check('assets staged averaging retained',assets.includes('calculateAveraging')&&assets.includes('data-v2-add-avg')&&assets.includes('rows.length<20'));
+check('assets budget schedule retained',assets.includes('buildHoldingBudgetSchedule')&&assets.includes('data-v2-asset-budget'));
+check('assets profit protection retained',assets.includes('buildProfitProtectionGuidance'));
+check('large amount presets retained',assets.includes('100000000')&&assets.includes('50000000')&&assets.includes('10000000'));
+check('paper tabs retained',['summary','coins','compare'].every(x=>paper.includes(`data-v2-paper-tab=\\"${x}`)||paper.includes(`data-v2-paper-tab="${x}`)));
+check('paper execution method filter retained',paper.includes('paperStrategyFilter')&&paper.includes('data-v2-paper-method'));
+check('paper detail retained',paper.includes('getMarketDetail')&&paper.includes('data-v2-paper-market'));
+check('strategy three views retained',['overview','matrix','paper'].every(x=>strategy.includes(`data-v2-strategy-tab=\\"${x}`)||strategy.includes(`data-v2-strategy-tab="${x}`)));
+check('strategy coin matrix retained',strategy.includes('strategyCoinMatrix')&&strategy.includes('data-v2-matrix-search'));
+check('sector search/filter retained',sectors.includes('data-v2-sector-search')&&sectors.includes('data-v2-sector-filter'));
+check('sector profile retained',sectors.includes('getCoinProfile')&&sectors.includes('data-v2-sector-market'));
+check('market lifecycle retained',sectors.includes('marketLifecycle'));
+check('records user/system split retained',records.includes('recordsScope')&&records.includes('data-v2-records-scope'));
+check('records filters and period retained',records.includes('data-v2-records-filter')&&records.includes('data-v2-records-period'));
+check('system invite retained',system.includes('/api/invites/create')&&system.includes('v2InviteForm'));
+check('system backup and remote status retained',system.includes('operations')&&system.includes('backup')&&system.includes('remote_access'));
+for(const term of['PAPER','READ ONLY','Profit Factor','CEX','DEX','LIVE','SQLite','Warehouse','Supervisor','PID'])check(`visible banned term ${term}`,!visible.includes(term));
+check('no legacy research panel installer',!main.includes('installDexLaunchResearchPanel'));
+check('new page modules only',main.includes("./pages/v2/home.js")&&main.includes("./pages/v2/system.js"));
+if(fail.length){console.error('VIEWER_V3_CONTRACT=FAIL');for(const item of fail)console.error(`- ${item}`);process.exit(1)}
+console.log('VIEWER_V3_CONTRACT=PASS');

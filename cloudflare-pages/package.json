@@ -1,11 +1,11 @@
 {
   "name": "crypto-auto-trader-viewer",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "build": "npm run typecheck",
-    "typecheck": "tsc --noEmit && node --check public/modules/core/http.js && node --check public/modules/core/store.js && node --check public/modules/core/router.js && node --check public/modules/core/auth.js && node --check public/modules/core/snapshot.js && node --check public/modules/shared/format.js && node --check public/modules/shared/selectors.js && node --check public/modules/shared/components.js && node --check public/modules/shared/viewer-context.js && node --check public/modules/shared/amount-input-ux.js && node --check public/modules/services/market-detail.js && node --check public/modules/pages/home.js && node --check public/modules/pages/dashboard.js && node --check public/modules/pages/research.js && node --check public/modules/pages/assets.js && node --check public/modules/pages/paper.js && node --check public/modules/pages/strategy.js && node --check public/modules/pages/sectors-v36.js && node --check public/modules/pages/sector-coin-table.js && node --check public/modules/pages/records.js && node --check public/modules/pages/system.js && node --check public/modules/main.js && node scripts/check-ux-state-contract.mjs"
+    "typecheck": "tsc --noEmit && node --check public/modules/core/http.js && node --check public/modules/core/store.js && node --check public/modules/core/router.js && node --check public/modules/core/auth.js && node --check public/modules/core/snapshot.js && node --check public/modules/shared/format.js && node --check public/modules/shared/selectors.js && node --check public/modules/shared/decision.js && node --check public/modules/shared/averaging.js && node --check public/modules/shared/holding-plan.js && node --check public/modules/services/market-detail.js && node --check public/modules/services/sectors.js && node --check public/modules/services/coin-profile.js && node --check public/modules/pages/v2/common.js && node --check public/modules/pages/v2/home.js && node --check public/modules/pages/v2/dashboard.js && node --check public/modules/pages/v2/research.js && node --check public/modules/pages/v2/assets.js && node --check public/modules/pages/v2/paper.js && node --check public/modules/pages/v2/strategy.js && node --check public/modules/pages/v2/sectors.js && node --check public/modules/pages/v2/records.js && node --check public/modules/pages/v2/system.js && node --check public/modules/main.js && node scripts/check-ux-state-contract.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260825.1",

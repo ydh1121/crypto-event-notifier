@@ -1,46 +1,18 @@
 <!doctype html>
-<html lang="ko" data-reader-baseline="senior" data-reader-mode="simple">
+<html lang="ko" data-reader-mode="simple">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <meta name="crypto-viewer-build" content="2026.09.06-v2">
-  <meta name="crypto-sector-build" content="2026.09.03-45">
-  <!-- Historical Build38 floor contract: crypto-sector-build" content="2026.08.27-38 · /modules/main.js?v=15 -->
-  <meta name="crypto-viewer-mode" content="READ ONLY PAPER">
+  <meta name="crypto-viewer-build" content="2026.09.06-v3">
   <title>가상자산 상태판</title>
-  <link rel="stylesheet" href="/modules/styles/tokens.css?v=3">
-  <link rel="stylesheet" href="/modules/styles/shell.css?v=4">
-  <link rel="stylesheet" href="/modules/styles/components.css?v=3">
-  <link rel="stylesheet" href="/modules/styles/charts.css?v=3">
-  <link rel="stylesheet" href="/modules/styles/dashboard.css?v=3">
-  <link rel="stylesheet" href="/modules/styles/research.css?v=4">
-  <link rel="stylesheet" href="/modules/styles/assets.css?v=5">
-  <link rel="stylesheet" href="/modules/styles/holding-plan.css?v=3">
-  <link rel="stylesheet" href="/modules/styles/amount-input-ux.css?v=1">
-  <link rel="stylesheet" href="/modules/styles/paper.css?v=6">
-  <link rel="stylesheet" href="/modules/styles/strategy.css?v=4">
-  <link rel="stylesheet" href="/modules/styles/strategy-journey.css?v=1">
-  <link rel="stylesheet" href="/modules/styles/sectors.css?v=2">
-  <link rel="stylesheet" href="/modules/styles/records-system.css?v=5">
-  <link rel="stylesheet" href="/modules/styles/records-audience.css?v=1">
-  <link rel="stylesheet" href="/modules/styles/build29.css?v=1">
-  <link rel="stylesheet" href="/modules/styles/exchange-ui.css?v=2">
-  <link rel="stylesheet" href="/modules/styles/build32.css?v=1">
-  <link rel="stylesheet" href="/modules/styles/build37.css?v=1">
-  <link rel="stylesheet" href="/modules/styles/viewer-context.css?v=45">
-  <link rel="stylesheet" href="/modules/styles/home-journey.css?v=46">
-  <link rel="stylesheet" href="/modules/styles/content-priority.css?v=1">
-  <link rel="stylesheet" href="/modules/styles/reader-mode.css?v=2">
-  <link rel="stylesheet" href="/modules/styles/state-cues.css?v=1">
-  <link rel="stylesheet" href="/modules/styles/senior-default.css?v=48">
-  <link rel="stylesheet" href="/modules/styles/rebuild-v2.css?v=1">
+  <link rel="stylesheet" href="/modules/styles/rebuild-v3.css?v=1">
 </head>
 <body>
   <section id="authView" class="auth-wrap">
     <article class="auth-card" id="loginCard">
       <span class="readonly-badge">조회 전용</span>
-      <h2>가상자산 상태판</h2>
+      <h1>가상자산 상태판</h1>
       <p>등록된 계정으로 로그인하세요.</p>
       <form id="loginForm">
         <label>이메일<input id="loginEmail" type="email" autocomplete="username" required></label>
@@ -51,7 +23,7 @@
     </article>
     <article class="auth-card hidden" id="bootstrapCard">
       <span class="readonly-badge">처음 설정</span>
-      <h2>관리자 계정 만들기</h2>
+      <h1>관리자 계정 만들기</h1>
       <p>처음 한 번만 관리자 계정을 만듭니다.</p>
       <form id="bootstrapForm">
         <label>이름<input id="bootstrapName" autocomplete="name" value="관리자"></label>
@@ -64,7 +36,7 @@
     </article>
     <article class="auth-card hidden" id="inviteCard">
       <span class="readonly-badge">초대 계정</span>
-      <h2>초대받은 계정 만들기</h2>
+      <h1>초대받은 계정 만들기</h1>
       <p>이름과 비밀번호를 정하면 바로 시작할 수 있습니다.</p>
       <form id="inviteForm">
         <label>이름<input id="inviteName" autocomplete="name" required></label>
@@ -77,7 +49,7 @@
   <section id="appShell" class="app-shell hidden">
     <header class="app-header">
       <div class="app-header-inner">
-        <div class="brand"><strong>가상자산 상태판</strong><span>조회 전용</span></div>
+        <a class="brand" href="#" onclick="return false"><strong>가상자산 상태판</strong><span>조회 전용</span></a>
         <nav id="mainNav" class="main-nav" aria-label="주요 화면">
           <button data-route="dashboard" class="active">홈</button>
           <button data-route="research">코인 찾기</button>
@@ -91,7 +63,7 @@
             <button type="button" data-reader-mode="simple" class="active" aria-pressed="true">간단히</button>
             <button type="button" data-reader-mode="detail" aria-pressed="false">자세히</button>
           </div>
-          <button id="systemStatusBtn" data-route="system" class="utility-status neutral">연결 상태</button>
+          <button id="systemStatusBtn" class="utility-status neutral">연결 상태</button>
           <button id="userMenuBtn" class="user-menu"><span>사용자</span><small>조회</small></button>
           <button id="logoutBtn" class="logout">로그아웃</button>
         </div>
@@ -101,6 +73,6 @@
     <main id="pageRoot" class="app-main"></main>
   </section>
 
-  <script type="module" src="/modules/main.js?v=60"></script>
+  <script type="module" src="/modules/main.js?v=70"></script>
 </body>
 </html>
