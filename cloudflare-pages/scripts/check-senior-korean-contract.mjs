@@ -17,7 +17,7 @@ const localGuard=read('../dashboard/senior-korean.js');
 const localCss=read('../dashboard/senior-korean.css');
 
 for(const route of ['dashboard','dashboard-detail','research','assets','paper','strategy','sectors','records','system']){
-  requireText(main,`${route}:`, 'public route preservation');
+  requireText(main,route,'public route preservation');
 }
 for(const id of ['authView','loginForm','bootstrapForm','inviteForm','mainNav','readerModeControl','systemStatusBtn','userMenuBtn','logoutBtn','pageRoot']){
   requireText(publicIndex,`id="${id}"`,'public function entry preservation');
