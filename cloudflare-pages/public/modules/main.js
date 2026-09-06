@@ -9,6 +9,7 @@ import{installSamePageInteractionContinuity}from'./shared/ui-continuity.js?v=38'
 import{installAmountInputUx}from'./shared/amount-input-ux.js?v=1';
 import{installMainstreamUi}from'./shared/mainstream-ui.js?v=1';
 import{installThemeToggle}from'./shared/theme.js?v=1';
+import{installStrategyDrilldown}from'./shared/strategy-drilldown-v4.js?v=1';
 import{createHomePage}from'./pages/v4/home.js?v=1';
 import{createDashboardPage}from'./pages/dashboard.js';
 import{createResearchPage}from'./pages/research.js?v=40';
@@ -88,6 +89,7 @@ journey?.addEventListener('click',event=>{
 });
 
 router=createRouter({store,root,nav,pages,onChange:renderJourney});
+installStrategyDrilldown({store,root,navigate:name=>router.go(name)});
 const poller=createSnapshotPoller({store,onUnauthorized:()=>auth.showAuth()});
 const auth=createAuth({
   store,
