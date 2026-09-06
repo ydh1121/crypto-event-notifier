@@ -6,6 +6,7 @@ const router=read('public/modules/core/router.js');
 const home=read('public/modules/pages/v4/home.js');
 const words=read('public/modules/shared/mainstream-ui.js');
 const css=read('public/modules/styles/mainstream-v4.css');
+const layout=read('public/modules/styles/layout-fixes-v4.css');
 const amount=read('public/modules/shared/amount-input-ux.js');
 const fail=[];
 const check=(name,value)=>{if(!value)fail.push(name)};
@@ -25,5 +26,13 @@ check('new visual layer explicitly removes shadows',css.includes('box-shadow:non
 check('mobile navigation exposes all six items',css.includes('grid-template-columns:repeat(3,1fr)!important'));
 check('simple mode keeps advanced internal sections hidden',css.includes('html[data-reader-mode="simple"] [data-dex-launch-panel]')&&css.includes('.component-panel'));
 check('amount presets remain available',amount.includes("[100_000_000,'1억원']")&&amount.includes("dispatchEvent(new Event('input',{bubbles:true}))"));
+check('layout repair stylesheet is loaded after visual layer',index.includes('/modules/styles/mainstream-v4.css?v=1')&&index.includes('/modules/styles/layout-fixes-v4.css?v=1')&&index.indexOf('mainstream-v4.css')<index.indexOf('layout-fixes-v4.css'));
+check('sticky header height is allowed to grow',layout.includes('.app-header{height:auto!important;min-height:68px!important}'));
+check('header center column can shrink without covering tools',layout.includes('grid-template-columns:auto minmax(0,1fr) auto!important'));
+check('medium header becomes two rows before collision',layout.includes('@media(max-width:1180px)')&&layout.includes('grid-template-areas:"brand tools" "nav nav"!important'));
+check('sticky side panes cannot hide below variable header',layout.includes('.research-master,.asset-master,.paper-master,.strategy-detail{position:static!important'));
+check('legacy workspaces collapse before narrow overlap',layout.includes('@media(max-width:900px)')&&layout.includes('.research-workspace,.asset-workspace,.paper-workspace,.strategy-workspace,.sector-layout,.records-content-grid{grid-template-columns:1fr!important}'));
+check('mobile detail nav avoids horizontal hidden discovery',layout.includes('grid-template-columns:repeat(auto-fit,minmax(88px,1fr))!important'));
+check('table cells can shrink without text collision',layout.includes('.mainstream-table-head>span,.mainstream-table-row>span,.market-summary-row>span,.trade-row>span,.trade-row>time{min-width:0!important}'));
 if(fail.length){console.error('MAINSTREAM_V4_CONTRACT=FAIL');for(const item of fail)console.error(`- ${item}`);process.exit(1)}
 console.log('MAINSTREAM_V4_CONTRACT=PASS');
