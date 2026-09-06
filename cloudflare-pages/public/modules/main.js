@@ -48,8 +48,8 @@ const pages={
 const GROUPS={
   dashboard:[['dashboard','홈'],['dashboard-detail','시장 자세히']],
   'dashboard-detail':[['dashboard','홈'],['dashboard-detail','시장 자세히']],
-  paper:[['paper','가상매매'],['strategy','전략 비교']],
-  strategy:[['paper','가상매매'],['strategy','전략 비교']],
+  paper:[['paper','가상매매'],['strategy','방법 비교']],
+  strategy:[['paper','가상매매'],['strategy','방법 비교']],
 };
 
 function renderJourneyNav(name){
