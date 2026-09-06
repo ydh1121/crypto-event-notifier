@@ -8,6 +8,7 @@ import{installTableSortEnhancer}from'./shared/table-sort-enhancer.js?v=37';
 import{installSamePageInteractionContinuity}from'./shared/ui-continuity.js?v=38';
 import{installAmountInputUx}from'./shared/amount-input-ux.js?v=1';
 import{installMainstreamUi}from'./shared/mainstream-ui.js?v=1';
+import{installThemeToggle}from'./shared/theme.js?v=1';
 import{createHomePage}from'./pages/v4/home.js?v=1';
 import{createDashboardPage}from'./pages/dashboard.js';
 import{createResearchPage}from'./pages/research.js?v=40';
@@ -21,6 +22,7 @@ import{createSystemPage}from'./pages/system.js?v=35';
 
 installSectorImeGuard();
 installTableSortEnhancer();
+installThemeToggle();
 
 const root=document.getElementById('pageRoot');
 const nav=document.getElementById('mainNav');
