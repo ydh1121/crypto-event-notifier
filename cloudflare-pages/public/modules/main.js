@@ -10,9 +10,9 @@ import{installAmountInputUx}from'./shared/amount-input-ux.js?v=1';
 import{installMainstreamUi}from'./shared/mainstream-ui.js?v=1';
 import{installThemeToggle}from'./shared/theme.js?v=1';
 import{installStrategyDrilldown}from'./shared/strategy-drilldown-v4.js?v=1';
-import{installInformationArchitectureV5}from'./shared/information-architecture-v5.js?v=1';
+import{installInformationArchitectureV5}from'./shared/information-architecture-v5.js?v=2';
 import{createHomePage}from'./pages/v4/home.js?v=1';
-import{createDashboardPage}from'./pages/dashboard.js';
+import{createMarketPage}from'./pages/v5/market.js?v=1';
 import{createResearchPage}from'./pages/research.js?v=40';
 import{installDexLaunchResearchPanel}from'./pages/dex-launch-panel.js?v=44';
 import{createAssetsPage}from'./pages/assets.js?v=49';
@@ -40,7 +40,7 @@ installInformationArchitectureV5(root);
 let router=null;
 const pages={
   dashboard:()=>createHomePage({store,navigate:name=>router.go(name)}),
-  'dashboard-detail':()=>createDashboardPage({store,navigate:name=>router.go(name)}),
+  'dashboard-detail':()=>createMarketPage({store,navigate:name=>router.go(name)}),
   research:()=>createResearchPage({store}),
   assets:()=>createAssetsPage({store}),
   paper:()=>createPaperPage({store}),
