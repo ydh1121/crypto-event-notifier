@@ -5,7 +5,7 @@ import{decisionKind}from'../../shared/decision.js';
 function exchangeLabel(value){return String(value||'').toLowerCase()==='upbit'?'업비트':'빗썸'}
 function symbol(row){return String(row?.symbol||row?.market||'').replace(/^KRW-/,'')||'-'}
 function stateLabel(row){const kind=decisionKind(row);if(kind==='buy')return'매수 관심';if(kind==='wait')return'가격 대기';if(kind==='risk')return'주의';if(kind==='holding')return'보유 중';return'관심'}
-function recentTrades(state){const rows=[];for(const exchange of['bithumb','upbit']){const data=recordsData(state,exchange);for(const row of Array.isArray(data.fills)?data.fills:[])rows.push({...row,exchange,kind:row.side==='sell'?'매도':'매수'})}return rows.sort((a,b)=>n(b.ts)-n(a.ts)).slice(0,8)}
+function recentTrades(state){const rows=[];for(const exchange of['bithumb','upbit']){const data=recordsData(state,exchange);for(const row of Array.isArray(data.fills)?data.fills:[])rows.push({...row,exchange,kind:row.side==='sell'?'매도':'매수'})}return rows.sort((a,b)=>n(b.ts)-n(a.ts)).slice(0,6)}
 function sectionHead(title,route,label){return`<header class="mainstream-section-head"><h2>${esc(title)}</h2>${route?`<button type="button" data-home-route="${route}">${esc(label||'전체보기')}</button>`:''}</header>`}
 
 export function createHomePage({store,navigate}){
@@ -15,22 +15,31 @@ export function createHomePage({store,navigate}){
     const state=store.get();
     if(!state.snapshot){root.innerHTML='<div class="mainstream-loading">최신 정보를 불러오는 중입니다.</div>';return}
     const assets=holdings(state),assetSummary=holdingsSummary(state),paper=combinedPaper(state),candidates=allCandidateRows(state).filter(row=>row?.market).sort((a,b)=>n(b.opportunity_score)-n(a.opportunity_score)),b=marketSummary(state,'bithumb'),u=marketSummary(state,'upbit'),trades=recentTrades(state);
-    const assetPnl=n(assetSummary?.pnl_krw);
-    root.innerHTML=`<div class="mainstream-page home-v4">
-      <header class="mainstream-page-head"><h1>홈</h1></header>
+    const assetPnl=n(assetSummary?.pnl_krw),focusCoin=candidates[0]||null,focusAsset=[...assets].sort((a,b)=>Math.abs(n(b.unrealized_pnl_pct))-Math.abs(n(a.unrealized_pnl_pct)))[0]||null;
+    root.innerHTML=`<div class="mainstream-page home-v4 home-v5">
+      <header class="mainstream-page-head"><div><h1>홈</h1><p>오늘 볼 코인, 내 자산, 모의투자 결과를 먼저 확인합니다.</p></div></header>
+
+      <section class="v5-home-focus" aria-label="오늘 볼 순서">
+        <header><h2>오늘 볼 순서</h2><p>전체 정보를 펼쳐놓지 않고 지금 판단에 필요한 세 가지부터 봅니다.</p></header>
+        <div>
+          <button type="button" ${focusCoin?`data-home-market="${esc(focusCoin.market)}" data-home-exchange="${esc(focusCoin.__exchange||'bithumb')}"`:'data-home-route="research"'}><small>1 · 먼저 볼 코인</small><b>${focusCoin?esc(symbol(focusCoin)):'코인 확인'}</b><span>${focusCoin?`${exchangeLabel(focusCoin.__exchange)} · ${esc(stateLabel(focusCoin))}`:'현재 후보 목록 보기'}</span></button>
+          <button type="button" ${focusAsset?`data-home-asset="${esc(focusAsset.market)}"`:'data-home-route="assets"'}><small>2 · 내 자산 확인</small><b>${focusAsset?esc(symbol(focusAsset)):'자산 확인'}</b><span>${focusAsset?`현재 손익 ${pct(focusAsset.unrealized_pnl_pct)}`:'등록된 자산 보기'}</span></button>
+          <button type="button" data-home-route="paper"><small>3 · 모의투자 검증</small><b class="${tone(paper.pnl)}">${n(paper.pnl)>=0?'+':''}${money(paper.pnl)}</b><span>실제 사용 전 결과 확인</span></button>
+        </div>
+      </section>
 
       <section class="mainstream-summary" aria-label="내 현황">
         <div><span>내 자산</span><b>${assetSummary?money(assetSummary.value_krw):'등록 없음'}</b></div>
-        <div><span>평가손익</span><b class="${tone(assetPnl)}">${assetSummary?`${assetPnl>=0?'+':''}${money(assetPnl)}`:'-'}</b></div>
+        <div><span>현재 손익</span><b class="${tone(assetPnl)}">${assetSummary?`${assetPnl>=0?'+':''}${money(assetPnl)}`:'-'}</b></div>
         <div><span>모의투자 손익</span><b class="${tone(paper.pnl)}">${n(paper.pnl)>=0?'+':''}${money(paper.pnl)}</b></div>
       </section>
 
       <section class="mainstream-section">
-        ${sectionHead('시장현황','dashboard-detail','자세히')}
+        ${sectionHead('시장현황','dashboard-detail','시장 전체 보기')}
         <div class="market-summary-table">
           <div class="market-summary-row head"><span>거래소</span><span>상승</span><span>매수 관심</span><span>상태</span></div>
-          <button class="market-summary-row" data-home-route="research"><span>빗썸</span><span>${n(b.up)}개</span><span>${n(b.buyCandidates)}개</span><span>${n(b.avgRegime)>=50?'보통 이상':'약한 편'}</span></button>
-          <button class="market-summary-row" data-home-route="research"><span>업비트</span><span>${n(u.up)}개</span><span>${n(u.buyCandidates)}개</span><span>${n(u.avgRegime)>=50?'보통 이상':'약한 편'}</span></button>
+          <button class="market-summary-row" data-home-route="dashboard-detail"><span>빗썸</span><span>${n(b.up)}개</span><span>${n(b.buyCandidates)}개</span><span>${n(b.avgRegime)>=50?'보통 이상':'약한 편'}</span></button>
+          <button class="market-summary-row" data-home-route="dashboard-detail"><span>업비트</span><span>${n(u.up)}개</span><span>${n(u.buyCandidates)}개</span><span>${n(u.avgRegime)>=50?'보통 이상':'약한 편'}</span></button>
         </div>
       </section>
 
@@ -38,7 +47,7 @@ export function createHomePage({store,navigate}){
         ${sectionHead('코인','research','전체보기')}
         <div class="mainstream-table">
           <div class="mainstream-table-head"><span>코인</span><span>거래소</span><span>상태</span></div>
-          ${candidates.length?candidates.slice(0,8).map(row=>`<button class="mainstream-table-row" data-home-market="${esc(row.market)}" data-home-exchange="${esc(row.__exchange||'bithumb')}"><span><b>${esc(symbol(row))}</b><small>${esc(row.name||'')}</small></span><span>${exchangeLabel(row.__exchange)}</span><span>${esc(stateLabel(row))}</span></button>`).join(''):'<div class="mainstream-empty">표시할 코인이 없습니다.</div>'}
+          ${candidates.length?candidates.slice(0,6).map(row=>`<button class="mainstream-table-row" data-home-market="${esc(row.market)}" data-home-exchange="${esc(row.__exchange||'bithumb')}"><span><b>${esc(symbol(row))}</b><small>${esc(row.name||'')}</small></span><span>${exchangeLabel(row.__exchange)}</span><span>${esc(stateLabel(row))}</span></button>`).join(''):'<div class="mainstream-empty">표시할 코인이 없습니다.</div>'}
         </div>
       </section>
 
@@ -46,7 +55,7 @@ export function createHomePage({store,navigate}){
         ${sectionHead('내 자산','assets','전체보기')}
         <div class="mainstream-table asset-table">
           <div class="mainstream-table-head"><span>코인</span><span>평균 매수가</span><span>현재가</span><span>손익</span></div>
-          ${assets.length?[...assets].sort((a,b)=>n(b.value_krw)-n(a.value_krw)).slice(0,8).map(row=>`<button class="mainstream-table-row" data-home-asset="${esc(row.market)}"><span><b>${esc(symbol(row))}</b><small>${money(row.value_krw)}</small></span><span>${price(row.avg_price)}</span><span>${price(row.current_price)}</span><span class="${tone(row.unrealized_pnl_pct)}">${pct(row.unrealized_pnl_pct)}</span></button>`).join(''):'<div class="mainstream-empty">등록된 자산이 없습니다.</div>'}
+          ${assets.length?[...assets].sort((a,b)=>n(b.value_krw)-n(a.value_krw)).slice(0,6).map(row=>`<button class="mainstream-table-row" data-home-asset="${esc(row.market)}"><span><b>${esc(symbol(row))}</b><small>${money(row.value_krw)}</small></span><span>${price(row.avg_price)}</span><span>${price(row.current_price)}</span><span class="${tone(row.unrealized_pnl_pct)}">${pct(row.unrealized_pnl_pct)}</span></button>`).join(''):'<div class="mainstream-empty">등록된 자산이 없습니다.</div>'}
         </div>
       </section>
 
@@ -66,7 +75,7 @@ export function createHomePage({store,navigate}){
     const patch={};
     if(route==='research'){if(exchange)patch.researchExchange=exchange;if(market)patch.researchMarket=market;patch.researchSearch='';patch.researchFilter='all'}
     if(route==='assets'&&market)patch.assetMarket=market;
-    if(Object.keys(patch).length)store.setUi(patch,{scope:'home-v4'});
+    if(Object.keys(patch).length)store.setUi(patch,{scope:'home-v5'});
     navigate?.(route);
   }
   const click=event=>{
