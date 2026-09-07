@@ -5,6 +5,14 @@ function marketFromRow(row){
   return symbol?`KRW-${symbol}`:'';
 }
 
+function strategyContext(row){
+  const section=row?.closest?.('.strategy-breakdown');
+  return{
+    experiment:String(section?.dataset?.strategyCoinExperiment||''),
+    label:String(section?.querySelector?.('.strategy-breakdown-head h3')?.textContent||'').trim(),
+  };
+}
+
 export function installStrategyDrilldown({store,root,navigate}){
   if(!root||typeof navigate!=='function')return()=>{};
   const selector='.strategy-breakdown-table .strategy-coin-row:not(.columns)';
@@ -23,7 +31,15 @@ export function installStrategyDrilldown({store,root,navigate}){
     const market=marketFromRow(row);
     if(!market)return;
     const exchange=String(store.get().ui.strategyExchange||'bithumb').toLowerCase()==='upbit'?'upbit':'bithumb';
-    store.setUi({researchExchange:exchange,researchMarket:market,researchFilter:'all',researchSearch:''},{scope:'strategy-coin-drilldown'});
+    const context=strategyContext(row);
+    store.setUi({
+      researchExchange:exchange,
+      researchMarket:market,
+      researchFilter:'all',
+      researchSearch:'',
+      researchSourceStrategyExperiment:context.experiment,
+      researchSourceStrategyLabel:context.label,
+    },{scope:'strategy-coin-drilldown'});
     navigate('research');
   };
   const click=event=>{
