@@ -55,21 +55,26 @@ function ensureDecisionLens(root){
   if(!detail||!hero||qs(detail,'.v5-decision-lens'))return;
   const section=document.createElement('section');
   section.className='v5-decision-lens';
-  section.innerHTML=`<header><div><span>매매 기준 선택</span><h3>어떤 방식과 시간으로 볼까요?</h3></div><strong>의사결정 행렬 준비 중</strong></header>
-    <div class="v5-lens-row"><b>매매 방식</b><div role="group" aria-label="매매 방식"><button type="button" data-v5-mode="short" class="active">단타</button><button type="button" data-v5-mode="swing">스윙</button><button type="button" data-v5-mode="dca">적립식</button></div></div>
-    <div class="v5-lens-row"><b>시간 기준</b><div role="group" aria-label="시간 기준"><button type="button" data-v5-timeframe="15m" class="active">15분</button><button type="button" data-v5-timeframe="30m">30분</button><button type="button" data-v5-timeframe="1h">1시간</button><button type="button" data-v5-timeframe="4h">4시간</button><button type="button" data-v5-timeframe="1d">일봉</button><button type="button" data-v5-timeframe="1w">주봉</button></div></div>
-    <div class="v5-lens-status"><span><b data-v5-lens-title>단타 · 15분</b><small>추천 진입·추가매수·불타기·손절·분할익절·완전익절</small></span><strong>아직 계산하지 않음</strong><p>현재 백엔드에는 이 조합별 의사결정 행렬이 없습니다. 실제 계산기가 준비되기 전에는 타점을 만들어 표시하지 않습니다. 아래 ‘현재 계산’에는 지금 엔진이 실제로 산출한 값만 표시합니다.</p></div>`;
+  section.innerHTML=`<header><div><span>매매 기준 선택</span><h3>어떤 방식과 시간으로 볼까요?</h3><small data-v5-lens-source></small></div><strong>세부 계산 준비 중</strong></header>
+    <div class="v5-lens-row"><b>매매 방식</b><div role="group" aria-label="매매 방식"><button type="button" data-v5-mode="short">단타</button><button type="button" data-v5-mode="swing">스윙</button><button type="button" data-v5-mode="dca">적립식</button></div></div>
+    <div class="v5-lens-row"><b>시간 기준</b><div role="group" aria-label="시간 기준"><button type="button" data-v5-timeframe="15m">15분</button><button type="button" data-v5-timeframe="30m">30분</button><button type="button" data-v5-timeframe="1h">1시간</button><button type="button" data-v5-timeframe="4h">4시간</button><button type="button" data-v5-timeframe="1d">일봉</button><button type="button" data-v5-timeframe="1w">주봉</button></div></div>
+    <div class="v5-lens-status"><span><b data-v5-lens-title>단타 · 15분</b><small>추천 진입 · 추가매수 · 상승추격 · 손실 제한 · 나눠 팔기 · 완전히 팔기 · 강한 상승장 타점</small></span><strong>아직 계산하지 않음</strong><p>현재 저장된 데이터에는 이 조합별 세부 계산값이 없습니다. 계산기가 준비되기 전에는 가격을 임의로 만들어 표시하지 않습니다. 아래 ‘현재 계산’에는 지금 실제로 산출되는 값만 표시합니다.</p></div>
+    <div class="v5-dca-criteria hidden" data-v5-dca-criteria><header><b>적립식 추천 대상 판단</b><span>평가 데이터 연결 전</span></header><div><span>프로젝트 존속 가능성</span><span>실제 사업·이용 실적</span><span>주요 투자사·재무 지원</span><span>사업성</span><span>개발·운영 지속성</span><span>공급 구조와 장기 부담</span></div><p>가격이 싸다는 이유만으로 적립식 대상으로 추천하지 않습니다. 위 항목을 수치화한 뒤 추천·관찰·제외로 구분합니다.</p></div>`;
   hero.after(section);
 }
 
-function updateDecisionLens(root){
+function updateDecisionLens(root,store){
   const lens=qs(root,'.v5-decision-lens');
   if(!lens)return;
+  const ui=store?.get?.()?.ui||{};
   const modes={short:'단타',swing:'스윙',dca:'적립식'},frames={'15m':'15분','30m':'30분','1h':'1시간','4h':'4시간','1d':'일봉','1w':'주봉'};
-  const mode=root.dataset.v5Mode||'short',frame=root.dataset.v5Timeframe||'15m';
+  const mode=ui.researchDecisionMode||root.dataset.v5Mode||'short',frame=ui.researchTimeframe||root.dataset.v5Timeframe||'15m';
   qsa(lens,'[data-v5-mode]').forEach(button=>button.classList.toggle('active',button.dataset.v5Mode===mode));
   qsa(lens,'[data-v5-timeframe]').forEach(button=>button.classList.toggle('active',button.dataset.v5Timeframe===frame));
   const title=qs(lens,'[data-v5-lens-title]');if(title)title.textContent=`${modes[mode]||'단타'} · ${frames[frame]||'15분'}`;
+  const source=qs(lens,'[data-v5-lens-source]');
+  if(source)source.textContent=ui.researchSourceStrategyLabel?`매매방법 비교에서 선택: ${ui.researchSourceStrategyLabel}`:'';
+  qs(lens,'[data-v5-dca-criteria]')?.classList.toggle('hidden',mode!=='dca');
 }
 
 function organizeResearchDeep(root){
@@ -87,7 +92,7 @@ function organizeResearchDeep(root){
   ]});
 }
 
-function organizeResearch(root){
+function organizeResearch(root,store){
   const workspace=qs(root,'.research-workspace');
   const listing=qs(root,'.listing-history-panel');
   if(workspace&&listing&&!listing.closest('[data-v5-collapsible]')){
@@ -95,7 +100,7 @@ function organizeResearch(root){
     wrapAdvancedSection(listing,{title:'상장 전후 반응',summary:'선택 코인 판단과 분리해 필요할 때만 확인합니다.'});
   }
   ensureDecisionLens(root);
-  updateDecisionLens(root);
+  updateDecisionLens(root,store);
   organizeResearchDeep(root);
 }
 
@@ -196,9 +201,9 @@ function organizeRecords(root){
   if(head)root.classList.add('v5-records-page');
 }
 
-function organize(root){
+function organize(root,store){
   const route=root?.dataset?.pageRoute||'';
-  if(route==='research')organizeResearch(root);
+  if(route==='research')organizeResearch(root,store);
   else if(route==='assets')organizeAssets(root);
   else if(route==='strategy')organizeStrategy(root);
   else if(route==='paper')organizePaper(root);
@@ -207,13 +212,15 @@ function organize(root){
   else if(route==='system')organizeSystem(root);
 }
 
-export function installInformationArchitectureV5(root){
+export function installInformationArchitectureV5(target){
+  const root=target?.root||target;
+  const store=target?.store||null;
   if(!root)return()=>{};
   let queued=false;
   const queue=()=>{
     if(queued)return;
     queued=true;
-    requestAnimationFrame(()=>{queued=false;organize(root)});
+    requestAnimationFrame(()=>{queued=false;organize(root,store)});
   };
   const observer=new MutationObserver(queue);
   observer.observe(root,{childList:true,subtree:true});
@@ -221,9 +228,15 @@ export function installInformationArchitectureV5(root){
     const tab=event.target.closest('[data-v5-tab][data-v5-tab-group]');
     if(tab){selectPanel(root,tab.dataset.v5TabGroup,tab.dataset.v5Tab);return}
     const mode=event.target.closest('[data-v5-mode]');
-    if(mode){root.dataset.v5Mode=mode.dataset.v5Mode;updateDecisionLens(root);return}
+    if(mode){
+      if(store?.setUi)store.setUi({researchDecisionMode:mode.dataset.v5Mode},{scope:'v5-decision-mode'});else root.dataset.v5Mode=mode.dataset.v5Mode;
+      updateDecisionLens(root,store);return;
+    }
     const frame=event.target.closest('[data-v5-timeframe]');
-    if(frame){root.dataset.v5Timeframe=frame.dataset.v5Timeframe;updateDecisionLens(root);return}
+    if(frame){
+      if(store?.setUi)store.setUi({researchTimeframe:frame.dataset.v5Timeframe},{scope:'v5-decision-timeframe'});else root.dataset.v5Timeframe=frame.dataset.v5Timeframe;
+      updateDecisionLens(root,store);return;
+    }
   });
   queue();
   return()=>observer.disconnect();
