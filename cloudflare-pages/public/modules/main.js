@@ -9,8 +9,8 @@ import{installSamePageInteractionContinuity}from'./shared/ui-continuity.js?v=38'
 import{installAmountInputUx}from'./shared/amount-input-ux.js?v=1';
 import{installMainstreamUi}from'./shared/mainstream-ui.js?v=1';
 import{installThemeToggle}from'./shared/theme.js?v=1';
-import{installStrategyDrilldown}from'./shared/strategy-drilldown-v4.js?v=1';
-import{installInformationArchitectureV5}from'./shared/information-architecture-v5.js?v=2';
+import{installStrategyDrilldown}from'./shared/strategy-drilldown-v4.js?v=2';
+import{installInformationArchitectureV5}from'./shared/information-architecture-v5.js?v=3';
 import{createHomePage}from'./pages/v4/home.js?v=1';
 import{createMarketPage}from'./pages/v5/market.js?v=1';
 import{createResearchPage}from'./pages/research.js?v=40';
@@ -35,7 +35,7 @@ installSamePageInteractionContinuity(root);
 installAmountInputUx(root);
 installDexLaunchResearchPanel({store,root});
 installMainstreamUi(document.body);
-installInformationArchitectureV5(root);
+installInformationArchitectureV5({root,store});
 
 let router=null;
 const pages={
