@@ -59,6 +59,6 @@ check('coin secondary navigation is visually prominent',decision.includes('.jour
 check('strategy overview avoids horizontal default scroll',decision.includes('#pageRoot[data-page-route="strategy"] .strategy-workspace{grid-template-columns:1fr!important')&&decision.includes('#pageRoot[data-page-route="strategy"] .strategy-table{max-height:none!important;max-width:100%!important;overflow:visible!important}'));
 check('strategy coin breakdown avoids horizontal default scroll',decision.includes('.strategy-breakdown-table{max-width:100%!important;overflow:visible!important}'));
 check('strategy coin drilldown preserves selected market',drilldown.includes('researchMarket:market')&&drilldown.includes("navigate('research')")&&drilldown.includes('strategy-coin-drilldown'));
-check('strategy drilldown is installed from main entry',main.includes('installStrategyDrilldown')&&main.includes('./shared/strategy-drilldown-v4.js?v=1'));
+check('strategy drilldown is installed from main entry',main.includes('installStrategyDrilldown')&&main.includes('./shared/strategy-drilldown-v4.js?v=2'));
 if(fail.length){console.error('MAINSTREAM_V4_CONTRACT=FAIL');for(const item of fail)console.error(`- ${item}`);process.exit(1)}
 console.log('MAINSTREAM_V4_CONTRACT=PASS');
