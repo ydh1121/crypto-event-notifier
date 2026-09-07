@@ -1,0 +1,74 @@
+/* V5 information architecture reset.
+   Goal: one purpose per page, compact decision workspaces, no endless vertical stacking.
+   This branch is not deployed until all routed pages are reorganized and regression checked. */
+
+:root{
+  --v5-content:1180px;
+  --v5-rail:260px;
+  --v5-gap:18px;
+}
+
+.app-main{max-width:var(--v5-content)!important;margin:0 auto!important;padding-bottom:48px!important}
+
+/* Every page gets a clear local hierarchy instead of a stack of unrelated panels. */
+.page-head{margin-bottom:18px!important}
+.subnav{display:flex!important;flex-wrap:wrap!important;gap:8px!important;margin:0 0 18px!important}
+.subnav button{min-height:38px!important}
+
+/* Strategy comparison: compact selector + selected strategy summary in the first viewport. */
+#pageRoot[data-page-route="strategy"] .strategy-overview-summary{display:grid!important;grid-template-columns:minmax(220px,1fr) repeat(3,minmax(110px,.45fr))!important;gap:1px!important;margin:0 0 12px!important}
+#pageRoot[data-page-route="strategy"] .strategy-sort-note{margin:0 0 12px!important}
+#pageRoot[data-page-route="strategy"] .strategy-workspace{display:grid!important;grid-template-columns:minmax(0,1.45fr) minmax(300px,.8fr)!important;gap:14px!important;align-items:start!important}
+#pageRoot[data-page-route="strategy"] .strategy-table{max-height:430px!important;overflow:auto!important;border:1px solid var(--line)!important}
+#pageRoot[data-page-route="strategy"] .strategy-row{grid-template-columns:minmax(180px,1.45fr) 82px 92px minmax(110px,.8fr)!important;min-height:58px!important;padding:9px 12px!important}
+#pageRoot[data-page-route="strategy"] .strategy-detail{position:sticky!important;top:152px!important;max-height:430px!important;overflow:auto!important;border:1px solid var(--line)!important}
+#pageRoot[data-page-route="strategy"] .strategy-detail-kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+
+/* Secondary strategy content becomes a tabbed workspace. JS toggles these sections. */
+#pageRoot[data-page-route="strategy"] .v5-strategy-sections{margin-top:16px!important}
+#pageRoot[data-page-route="strategy"] .v5-section-tabs{display:flex!important;flex-wrap:wrap!important;gap:8px!important;margin-bottom:12px!important;border-bottom:1px solid var(--line)!important}
+#pageRoot[data-page-route="strategy"] .v5-section-tabs button{appearance:none;border:0;background:transparent;color:var(--muted);font:inherit;font-weight:700;padding:10px 4px;border-bottom:3px solid transparent;cursor:pointer}
+#pageRoot[data-page-route="strategy"] .v5-section-tabs button.active{color:var(--ink);border-bottom-color:var(--ink)}
+#pageRoot[data-page-route="strategy"] [data-v5-strategy-panel].hidden{display:none!important}
+#pageRoot[data-page-route="strategy"] .strategy-breakdown{margin:0!important}
+#pageRoot[data-page-route="strategy"] .strategy-breakdown-table{max-height:620px!important;overflow:auto!important;border:1px solid var(--line)!important}
+
+/* Coin, holdings and paper pages use a master-detail workspace, not a full-width sequence of panels. */
+#pageRoot[data-page-route="research"] .research-workspace,
+#pageRoot[data-page-route="assets"] .asset-workspace,
+#pageRoot[data-page-route="paper"] .paper-workspace{display:grid!important;grid-template-columns:var(--v5-rail) minmax(0,1fr)!important;gap:var(--v5-gap)!important;align-items:start!important}
+#pageRoot[data-page-route="research"] .research-master,
+#pageRoot[data-page-route="assets"] .asset-master,
+#pageRoot[data-page-route="paper"] .paper-master{position:sticky!important;top:152px!important;max-height:calc(100vh - 176px)!important;overflow:auto!important}
+#pageRoot[data-page-route="research"] .research-detail,
+#pageRoot[data-page-route="assets"] .asset-detail,
+#pageRoot[data-page-route="paper"] .paper-detail{min-width:0!important}
+
+/* Long evidence/history areas should not visually compete with the decision area. */
+#pageRoot[data-page-route="research"] .listing-history-panel,
+#pageRoot[data-page-route="assets"] .asset-history-panel,
+#pageRoot[data-page-route="paper"] .paper-combined,
+#pageRoot[data-page-route="paper"] .exchange-paper-grid{margin-bottom:18px!important}
+
+html[data-theme="dark"] #pageRoot[data-page-route="strategy"] .strategy-table,
+html[data-theme="dark"] #pageRoot[data-page-route="strategy"] .strategy-detail,
+html[data-theme="dark"] #pageRoot[data-page-route="strategy"] .strategy-breakdown-table{border-color:#30343a!important}
+
+@media(max-width:980px){
+  #pageRoot[data-page-route="strategy"] .strategy-workspace,
+  #pageRoot[data-page-route="research"] .research-workspace,
+  #pageRoot[data-page-route="assets"] .asset-workspace,
+  #pageRoot[data-page-route="paper"] .paper-workspace{grid-template-columns:1fr!important}
+  #pageRoot[data-page-route="strategy"] .strategy-detail,
+  #pageRoot[data-page-route="research"] .research-master,
+  #pageRoot[data-page-route="assets"] .asset-master,
+  #pageRoot[data-page-route="paper"] .paper-master{position:static!important;max-height:none!important;overflow:visible!important}
+  #pageRoot[data-page-route="strategy"] .strategy-table{max-height:none!important}
+}
+
+@media(max-width:620px){
+  #pageRoot[data-page-route="strategy"] .strategy-overview-summary{grid-template-columns:1fr 1fr!important}
+  #pageRoot[data-page-route="strategy"] .strategy-row{grid-template-columns:minmax(120px,1.4fr) 72px minmax(88px,.8fr)!important}
+  #pageRoot[data-page-route="strategy"] .strategy-row>span:nth-child(3){display:none!important}
+  #pageRoot[data-page-route="strategy"] .strategy-detail-kpis{grid-template-columns:1fr 1fr!important}
+}
