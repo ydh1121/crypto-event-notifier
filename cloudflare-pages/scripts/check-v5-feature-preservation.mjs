@@ -32,7 +32,7 @@ check('paper keeps exchange summary',paper.includes('exchange-paper-grid')&&pape
 
 check('strategy keeps strategy selector',strategy.includes('strategy-workspace')&&strategy.includes('strategy-table')&&strategy.includes('strategy-detail'));
 check('strategy keeps coin breakdown',strategy.includes('strategyBreakdown')&&strategy.includes('strategy-coin-table'));
-check('strategy keeps coin matrix',strategy.includes('strategyCoinMatrix')&&strategy.includes("strategyTab==='matrix'"));
+check('strategy keeps coin matrix',strategy.includes('strategyCoinMatrix')&&strategy.includes("if(tab==='matrix')"));
 check('strategy keeps evidence charts',strategy.includes('strategyEvidence')&&strategy.includes('strategyEquityHistory'));
 check('strategy keeps current paper benchmark',strategy.includes('paperPortfolioHistory')&&strategy.includes('combinedPaper'));
 
