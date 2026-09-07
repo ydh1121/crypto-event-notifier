@@ -5,6 +5,18 @@ function marketFromRow(row){
   return symbol?`KRW-${symbol}`:'';
 }
 
+function strategyContext(root){
+  const section=root?.querySelector('.strategy-breakdown[data-strategy-coin-experiment]');
+  const experiment=String(section?.dataset?.strategyCoinExperiment||'');
+  const label=String(section?.querySelector('.strategy-breakdown-head h3')?.textContent||'').trim();
+  const normalized=label.toLowerCase();
+  let mode='';
+  if(/적립|dca|accum/.test(normalized))mode='dca';
+  else if(/스윙|swing/.test(normalized))mode='swing';
+  else if(/단타|scalp|short|intraday/.test(normalized))mode='short';
+  return{experiment,label,mode};
+}
+
 export function installStrategyDrilldown({store,root,navigate}){
   if(!root||typeof navigate!=='function')return()=>{};
   const selector='.strategy-breakdown-table .strategy-coin-row:not(.columns)';
@@ -23,7 +35,17 @@ export function installStrategyDrilldown({store,root,navigate}){
     const market=marketFromRow(row);
     if(!market)return;
     const exchange=String(store.get().ui.strategyExchange||'bithumb').toLowerCase()==='upbit'?'upbit':'bithumb';
-    store.setUi({researchExchange:exchange,researchMarket:market,researchFilter:'all',researchSearch:''},{scope:'strategy-coin-drilldown'});
+    const context=strategyContext(root);
+    const patch={
+      researchExchange:exchange,
+      researchMarket:market,
+      researchFilter:'all',
+      researchSearch:'',
+      researchSourceStrategyExperiment:context.experiment,
+      researchSourceStrategyLabel:context.label,
+    };
+    if(context.mode)patch.researchDecisionMode=context.mode;
+    store.setUi(patch,{scope:'strategy-coin-drilldown'});
     navigate('research');
   };
   const click=event=>{
