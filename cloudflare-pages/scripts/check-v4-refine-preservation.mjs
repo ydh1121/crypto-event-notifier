@@ -47,6 +47,8 @@ check('decision lens is additive',main.includes('installCoinDecisionLens')&&lens
 check('decision modes exist',['short','swing','dca'].every(value=>lens.includes(`['${value}'`)));
 check('six timeframes exist',['15m','30m','1h','4h','1d','1w'].every(value=>lens.includes(`['${value}'`)));
 check('missing timeframe values are not fabricated',lens.includes('시간 기준별 별도 계산값은 계산기가 연결되기 전에는 만들지 않습니다'));
+check('decision lens observer cannot self-loop on unchanged selected label',lens.includes('selected.textContent!==selectedLabel')&&lens.includes('if(selected&&selected.textContent!==selectedLabel)selected.textContent=selectedLabel'));
+check('decision lens cache version is refreshed',main.includes("coin-decision-lens-v4-refine.js?v=2")&&index.includes('/modules/main.js?v=86'));
 check('strategy context is carried to coin detail',drilldown.includes('researchSourceStrategyExperiment')&&drilldown.includes('researchSourceStrategyLabel'));
 check('secondary nav is centered and more visible',css.includes('.journey-nav{justify-content:center!important')&&css.includes('min-width:132px!important'));
 check('all strategy metrics are explicitly restored',css.includes('.strategy-row>span')&&css.includes('display:block!important')&&css.includes("content:'손익비'")&&css.includes("content:'승률'")&&css.includes("content:'검증'"));
