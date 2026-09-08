@@ -14,7 +14,8 @@ export function installCoinDecisionLens({store,root}){
     const modeLabel=MODES.find(([key])=>key===mode)?.[1]||'단타';
     const frameLabel=FRAMES.find(([key])=>key===frame)?.[1]||'15분';
     const selected=panel.querySelector('[data-decision-selected]');
-    if(selected)selected.textContent=`${modeLabel} · ${frameLabel}`;
+    const selectedLabel=`${modeLabel} · ${frameLabel}`;
+    if(selected&&selected.textContent!==selectedLabel)selected.textContent=selectedLabel;
     const dca=panel.querySelector('[data-dca-note]');
     if(dca)dca.hidden=mode!=='dca';
   }
