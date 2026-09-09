@@ -5,7 +5,7 @@ import{createSnapshotPoller}from'./core/snapshot.js';
 import{esc}from'./shared/format.js';
 import{installSectorImeGuard}from'./shared/sector-ime-guard.js?v=37';
 import{installTableSortEnhancer}from'./shared/table-sort-enhancer.js?v=37';
-import{installSamePageInteractionContinuity}from'./shared/ui-continuity.js?v=38';
+import{installSamePageInteractionContinuity,patchPreservingUi}from'./shared/ui-continuity.js?v=38';
 import{installAmountInputUx}from'./shared/amount-input-ux.js?v=1';
 import{installMainstreamUi}from'./shared/mainstream-ui.js?v=1';
 import{installThemeToggle}from'./shared/theme.js?v=1';
@@ -85,7 +85,9 @@ reader?.addEventListener('click',event=>{
   if(mode===readerMode())return;
   store.setUi({readerMode:mode},{scope:'reader-mode'});
   renderReader();
-  router?.render();
+  patchPreservingUi(root,()=>router?.render(),{
+    scrollSelectors:['[data-preserve-scroll]','.master-list','.asset-holdings-list','#paperList','.strategy-table'],
+  });
 });
 journey?.addEventListener('click',event=>{
   const button=event.target.closest('[data-journey-route]');
