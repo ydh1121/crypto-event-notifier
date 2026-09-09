@@ -20,11 +20,11 @@ function headerOffset(){
   return Math.max(12,Math.ceil(height)+12);
 }
 
-function scrollTargetIntoView(target){
+function scrollTargetIntoView(target,{settle=false}={}){
   const rect=target.getBoundingClientRect();
   const top=Math.max(0,window.scrollY+rect.top-headerOffset());
   if(Math.abs(window.scrollY-top)<8)return;
-  window.scrollTo({top,left:0,behavior:prefersReducedMotion()?'auto':'smooth'});
+  window.scrollTo({top,left:0,behavior:settle||prefersReducedMotion()?'auto':'smooth'});
 }
 
 function reveal(root,selector,{force=false,retries=6}={}){
@@ -35,6 +35,10 @@ function reveal(root,selector,{force=false,retries=6}={}){
     const target=root.querySelector(selector);
     if(target){
       scrollTargetIntoView(target);
+      requestAnimationFrame(()=>{
+        const settled=root.querySelector(selector);
+        if(settled)scrollTargetIntoView(settled,{settle:true});
+      });
       return;
     }
     remaining-=1;
