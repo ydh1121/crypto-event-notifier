@@ -1,32 +1,118 @@
-/* V4 interaction layout: judge each action by what the user sees after the click. */
+/* V4 interaction layout: judge every click by the result visible on the user's real display. */
 
-/* The coin page opens on selection + current judgment. Historical research stays intact below it. */
+/* Coin: selection + current judgment first. Historical research remains intact below. */
 #pageRoot[data-page-route="research"]{display:flex;flex-direction:column}
 #pageRoot[data-page-route="research"]>.page-head{order:0}
-#pageRoot[data-page-route="research"]>.research-workspace{order:1;margin-top:0!important}
-#pageRoot[data-page-route="research"]>.listing-history-panel:not([data-dex-launch-panel]){order:2;margin-top:28px}
-#pageRoot[data-page-route="research"]>[data-dex-launch-panel]{order:3;margin-top:18px}
+#pageRoot[data-page-route="research"]>.research-workspace{order:1;margin-top:0!important;min-height:0!important}
+#pageRoot[data-page-route="research"]>.listing-history-panel:not([data-dex-launch-panel]){order:2;margin-top:28px;margin-bottom:0!important}
+#pageRoot[data-page-route="research"]>[data-dex-launch-panel]{order:3;margin-top:18px;margin-bottom:0!important}
+
+/* Assets: summary -> selectable holdings + selected result -> long history. */
+#pageRoot[data-page-route="assets"]{display:flex;flex-direction:column}
+#pageRoot[data-page-route="assets"]>.page-head{order:0}
+#pageRoot[data-page-route="assets"]>.asset-kpis{order:1}
+#pageRoot[data-page-route="assets"]>.asset-workspace{order:2;margin-top:0!important}
+#pageRoot[data-page-route="assets"]>.asset-history-panel{order:3;margin-top:28px!important}
 
 /* Click targets must land below the real sticky header, not underneath it. */
-#researchDetail,#assetDetail,#paperDetail,#strategyDetail{scroll-margin-top:180px}
+#researchDetail,#assetDetail,#paperDetail,#strategyDetail,#paperBody,#strategyBody{scroll-margin-top:180px}
 
-/* On desktop, choosing a strategy must show the chosen strategy summary in the same viewport. */
+/* Desktop interaction model: the thing clicked and its result share the viewport. */
 @media(min-width:901px){
-  #pageRoot[data-page-route="strategy"] .strategy-workspace{
-    grid-template-columns:minmax(0,1.35fr) minmax(320px,.65fr)!important;
+  #pageRoot[data-page-route="research"] .research-workspace{
+    grid-template-columns:minmax(280px,330px) minmax(0,1fr)!important;
     gap:18px!important;
     align-items:start!important;
   }
-  #pageRoot[data-page-route="strategy"] .strategy-table,
-  #pageRoot[data-page-route="strategy"] .strategy-detail{min-width:0!important}
-  #pageRoot[data-page-route="strategy"] .strategy-detail{align-self:start!important}
+  #pageRoot[data-page-route="research"] .research-master .master-list{max-height:calc(100dvh - 390px)!important}
+
+  #pageRoot[data-page-route="assets"] .asset-workspace{
+    grid-template-columns:minmax(280px,340px) minmax(0,1fr)!important;
+    gap:18px!important;
+    align-items:start!important;
+  }
+  #pageRoot[data-page-route="assets"] .allocation-list{max-height:150px!important}
+  #pageRoot[data-page-route="assets"] .asset-holdings-list{max-height:calc(100dvh - 405px)!important}
+
+  #pageRoot[data-page-route="paper"] .paper-strategy-filter{
+    padding:9px 12px!important;
+    margin-bottom:8px!important;
+  }
+  #pageRoot[data-page-route="paper"] .paper-toolbar{
+    grid-template-columns:auto minmax(150px,1fr) minmax(160px,190px) auto!important;
+    gap:8px!important;
+    margin-bottom:8px!important;
+  }
+  #pageRoot[data-page-route="paper"] .paper-toolbar>div{grid-column:auto!important}
+  #pageRoot[data-page-route="paper"] .paper-filter{margin-bottom:8px!important}
+  #pageRoot[data-page-route="paper"] .paper-workspace{
+    grid-template-columns:minmax(280px,340px) minmax(0,1fr)!important;
+    gap:18px!important;
+    min-height:0!important;
+    align-items:start!important;
+  }
+  #pageRoot[data-page-route="paper"] .paper-master #paperList{max-height:calc(100dvh - 420px)!important}
+
+  #pageRoot[data-page-route="strategy"] .strategy-workspace{
+    grid-template-columns:minmax(430px,1.3fr) minmax(320px,.7fr)!important;
+    gap:18px!important;
+    align-items:start!important;
+  }
+  #pageRoot[data-page-route="strategy"] .strategy-table{
+    min-width:0!important;
+    min-height:360px!important;
+    max-height:calc(100dvh - 270px)!important;
+    overflow:auto!important;
+    overscroll-behavior:contain;
+  }
+  #pageRoot[data-page-route="strategy"] .strategy-detail{
+    position:sticky!important;
+    top:156px!important;
+    align-self:start!important;
+    min-width:0!important;
+    max-height:calc(100dvh - 176px)!important;
+    overflow:auto!important;
+  }
 }
 
-/* On stacked displays, leave a clear visual boundary when the viewport hands off to detail. */
+/* 1024-class displays need the same interaction model without cramped text. */
+@media(min-width:901px) and (max-width:1080px){
+  #pageRoot[data-page-route="research"] .research-workspace{grid-template-columns:minmax(250px,29%) minmax(0,1fr)!important}
+  #pageRoot[data-page-route="assets"] .asset-workspace{grid-template-columns:minmax(250px,30%) minmax(0,1fr)!important}
+  #pageRoot[data-page-route="paper"] .paper-workspace{grid-template-columns:minmax(250px,30%) minmax(0,1fr)!important}
+  #pageRoot[data-page-route="strategy"] .strategy-workspace{grid-template-columns:minmax(410px,1.25fr) minmax(300px,.75fr)!important}
+  #pageRoot[data-page-route="strategy"] .strategy-detail-kpis{grid-template-columns:1fr 1fr!important}
+}
+
+/* Stacked displays: selection stays compact, then the viewport hands off to the result. */
 @media(max-width:900px){
   #pageRoot[data-page-route="research"] .research-workspace,
   #pageRoot[data-page-route="assets"] .asset-workspace,
   #pageRoot[data-page-route="paper"] .paper-workspace,
-  #pageRoot[data-page-route="strategy"] .strategy-workspace{gap:22px!important}
+  #pageRoot[data-page-route="strategy"] .strategy-workspace{gap:18px!important}
+
+  #pageRoot[data-page-route="research"] .research-master .master-list,
+  #pageRoot[data-page-route="assets"] .asset-holdings-list,
+  #pageRoot[data-page-route="paper"] .paper-master #paperList{max-height:44dvh!important}
+
+  #pageRoot[data-page-route="strategy"] .strategy-table{
+    min-height:0!important;
+    max-height:none!important;
+    overflow:visible!important;
+  }
+  #pageRoot[data-page-route="strategy"] .strategy-detail{
+    position:static!important;
+    max-height:none!important;
+    overflow:visible!important;
+  }
+
   #researchDetail,#assetDetail,#paperDetail,#strategyDetail{padding-top:4px}
+}
+
+/* Mobile result areas should begin with the answer, not with excess whitespace. */
+@media(max-width:520px){
+  #pageRoot[data-page-route="research"] .decision-hero,
+  #pageRoot[data-page-route="assets"] .asset-detail-hero,
+  #pageRoot[data-page-route="paper"] .paper-detail-hero,
+  #pageRoot[data-page-route="strategy"] .strategy-detail{padding:14px!important}
 }
