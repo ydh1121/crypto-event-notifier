@@ -41,6 +41,7 @@ export function installStrategyDrilldown({store,root,navigate}){
       researchSourceStrategyLabel:context.label,
     },{scope:'strategy-coin-drilldown'});
     navigate('research');
+    root.dispatchEvent(new CustomEvent('viewport:handoff',{detail:{selector:'#researchDetail',force:true}}));
   };
   const click=event=>{
     const row=event.target.closest(selector);
