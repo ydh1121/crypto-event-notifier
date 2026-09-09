@@ -11,7 +11,7 @@ import{installMainstreamUi}from'./shared/mainstream-ui.js?v=1';
 import{installThemeToggle}from'./shared/theme.js?v=1';
 import{installStrategyDrilldown}from'./shared/strategy-drilldown-v4.js?v=3';
 import{installCoinDecisionLens}from'./shared/coin-decision-lens-v4-refine.js?v=2';
-import{installViewportHandoff}from'./shared/viewport-handoff-v4.js?v=1';
+import{installViewportHandoff}from'./shared/viewport-handoff-v4.js?v=2';
 import{createHomePage}from'./pages/v4/home.js?v=1';
 import{createDashboardPage}from'./pages/dashboard.js';
 import{createResearchPage}from'./pages/research.js?v=40';
