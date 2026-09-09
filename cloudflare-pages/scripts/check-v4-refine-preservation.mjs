@@ -26,7 +26,7 @@ check('coin market theme group remains',main.includes("['research','코인']")&&
 check('paper strategy group remains',main.includes("['paper','모의투자']")&&main.includes("['strategy','매매방법 비교']"));
 check('v4 style stack remains',['mainstream-v4.css','layout-fixes-v4.css','theme-dark-v4.css','theme-dark-audit-v4.css','decision-workspace-v4.css'].every(value=>index.includes(value)));
 check('refine layer loads after v4',index.includes('v4-refine-v1.css')&&index.indexOf('decision-workspace-v4.css')<index.indexOf('v4-refine-v1.css'));
-check('interaction layout loads after refine',index.includes('interaction-layout-v4.css?v=1')&&index.indexOf('v4-refine-v1.css')<index.indexOf('interaction-layout-v4.css'));
+check('interaction layout loads after refine',index.includes('interaction-layout-v4.css?v=2')&&index.indexOf('v4-refine-v1.css')<index.indexOf('interaction-layout-v4.css'));
 
 check('research workspace remains',research.includes('research-workspace')&&research.includes('research-detail'));
 check('research listing study remains',research.includes('listing-history-panel'));
@@ -54,14 +54,24 @@ check('decision lens observer cannot self-loop on unchanged selected label',lens
 check('decision lens cache version is refreshed',main.includes("coin-decision-lens-v4-refine.js?v=2"));
 check('strategy context is carried to coin detail',drilldown.includes('researchSourceStrategyExperiment')&&drilldown.includes('researchSourceStrategyLabel'));
 check('strategy coin click lands on requested decision result',drilldown.includes("viewport:handoff")&&drilldown.includes("selector:'#researchDetail'")&&drilldown.includes('force:true'));
-check('viewport handoff is installed from main entry',main.includes('installViewportHandoff')&&main.includes("./shared/viewport-handoff-v4.js?v=1"));
+check('viewport handoff is installed from main entry',main.includes('installViewportHandoff')&&main.includes("./shared/viewport-handoff-v4.js?v=2"));
 check('compact list selections reveal their detail result',['[data-research-market]','#researchDetail','[data-asset-market]','#assetDetail','[data-paper-market]','#paperDetail','[data-strategy-key]','#strategyDetail'].every(value=>viewport.includes(value)));
+check('paper summary action reveals the newly selected tab result',viewport.includes(".paper-next [data-paper-tab]")&&viewport.includes("reveal(root,'#paperBody',{force:true})"));
+check('viewport handoff retries after synchronous rerenders',viewport.includes('retries=6')&&viewport.includes('remaining-=1')&&viewport.includes('if(remaining>0)attempt()'));
 check('viewport handoff respects compact displays and reduced motion',viewport.includes("(max-width: 900px)")&&viewport.includes('prefers-reduced-motion: reduce'));
 check('viewport handoff is event driven without mutation observer',!viewport.includes('MutationObserver')&&viewport.includes("root.addEventListener('click',click)"));
-check('interaction cache version is refreshed',index.includes('/modules/main.js?v=87'));
+check('interaction cache version is refreshed',index.includes('/modules/main.js?v=88'));
+
 check('coin page prioritizes workspace before historical panels',interaction.includes('>.research-workspace{order:1')&&interaction.includes('>.listing-history-panel:not([data-dex-launch-panel]){order:2'));
-check('desktop strategy selection and result share one viewport',interaction.includes('@media(min-width:901px)')&&interaction.includes('grid-template-columns:minmax(0,1.35fr) minmax(320px,.65fr)!important'));
-check('detail destinations account for sticky header',interaction.includes('#researchDetail,#assetDetail,#paperDetail,#strategyDetail{scroll-margin-top:180px}'));
+check('asset page prioritizes selection and detail before long history',interaction.includes('>.asset-workspace{order:2')&&interaction.includes('>.asset-history-panel{order:3'));
+check('desktop research selection and result share one viewport',interaction.includes('grid-template-columns:minmax(280px,330px) minmax(0,1fr)!important'));
+check('desktop asset selection and result share one viewport',interaction.includes('grid-template-columns:minmax(280px,340px) minmax(0,1fr)!important'));
+check('desktop paper controls remain compact before master detail',interaction.includes('.paper-toolbar')&&interaction.includes('grid-template-columns:auto minmax(150px,1fr) minmax(160px,190px) auto!important'));
+check('desktop strategy click keeps list and selected result together',interaction.includes('grid-template-columns:minmax(430px,1.3fr) minmax(320px,.7fr)!important')&&interaction.includes('max-height:calc(100dvh - 270px)!important')&&interaction.includes('position:sticky!important'));
+check('1024 class display has explicit split layout',interaction.includes('@media(min-width:901px) and (max-width:1080px)'));
+check('stacked displays bound selection lists before handoff',interaction.includes('max-height:44dvh!important'));
+check('detail destinations account for sticky header',interaction.includes('#researchDetail,#assetDetail,#paperDetail,#strategyDetail,#paperBody,#strategyBody{scroll-margin-top:180px}'));
+
 check('secondary nav is centered and more visible',css.includes('.journey-nav{justify-content:center!important')&&css.includes('min-width:132px!important'));
 check('all strategy metrics are explicitly restored',css.includes('.strategy-row>span')&&css.includes('display:block!important')&&css.includes("content:'손익비'")&&css.includes("content:'승률'")&&css.includes("content:'검증'"));
 check('all coin breakdown metrics are explicitly restored',['실현손익','미실현','하락폭','완료 거래','승률','상태'].every(value=>css.includes(`content:'${value}'`)));
