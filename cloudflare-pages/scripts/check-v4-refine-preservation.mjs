@@ -14,6 +14,7 @@ const lens=read('public/modules/shared/coin-decision-lens-v4-refine.js');
 const drilldown=read('public/modules/shared/strategy-drilldown-v4.js');
 const viewport=read('public/modules/shared/viewport-handoff-v4.js');
 const css=read('public/modules/styles/v4-refine-v1.css');
+const interaction=read('public/modules/styles/interaction-layout-v4.css');
 const fail=[];
 const check=(name,value)=>{if(!value)fail.push(name)};
 
@@ -25,6 +26,7 @@ check('coin market theme group remains',main.includes("['research','코인']")&&
 check('paper strategy group remains',main.includes("['paper','모의투자']")&&main.includes("['strategy','매매방법 비교']"));
 check('v4 style stack remains',['mainstream-v4.css','layout-fixes-v4.css','theme-dark-v4.css','theme-dark-audit-v4.css','decision-workspace-v4.css'].every(value=>index.includes(value)));
 check('refine layer loads after v4',index.includes('v4-refine-v1.css')&&index.indexOf('decision-workspace-v4.css')<index.indexOf('v4-refine-v1.css'));
+check('interaction layout loads after refine',index.includes('interaction-layout-v4.css?v=1')&&index.indexOf('v4-refine-v1.css')<index.indexOf('interaction-layout-v4.css'));
 
 check('research workspace remains',research.includes('research-workspace')&&research.includes('research-detail'));
 check('research listing study remains',research.includes('listing-history-panel'));
@@ -57,6 +59,9 @@ check('compact list selections reveal their detail result',['[data-research-mark
 check('viewport handoff respects compact displays and reduced motion',viewport.includes("(max-width: 900px)")&&viewport.includes('prefers-reduced-motion: reduce'));
 check('viewport handoff is event driven without mutation observer',!viewport.includes('MutationObserver')&&viewport.includes("root.addEventListener('click',click)"));
 check('interaction cache version is refreshed',index.includes('/modules/main.js?v=87'));
+check('coin page prioritizes workspace before historical panels',interaction.includes('>.research-workspace{order:1')&&interaction.includes('>.listing-history-panel:not([data-dex-launch-panel]){order:2'));
+check('desktop strategy selection and result share one viewport',interaction.includes('@media(min-width:901px)')&&interaction.includes('grid-template-columns:minmax(0,1.35fr) minmax(320px,.65fr)!important'));
+check('detail destinations account for sticky header',interaction.includes('#researchDetail,#assetDetail,#paperDetail,#strategyDetail{scroll-margin-top:180px}'));
 check('secondary nav is centered and more visible',css.includes('.journey-nav{justify-content:center!important')&&css.includes('min-width:132px!important'));
 check('all strategy metrics are explicitly restored',css.includes('.strategy-row>span')&&css.includes('display:block!important')&&css.includes("content:'손익비'")&&css.includes("content:'승률'")&&css.includes("content:'검증'"));
 check('all coin breakdown metrics are explicitly restored',['실현손익','미실현','하락폭','완료 거래','승률','상태'].every(value=>css.includes(`content:'${value}'`)));
