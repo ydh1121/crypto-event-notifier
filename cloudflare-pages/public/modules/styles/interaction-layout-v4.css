@@ -1,0 +1,32 @@
+/* V4 interaction layout: judge each action by what the user sees after the click. */
+
+/* The coin page opens on selection + current judgment. Historical research stays intact below it. */
+#pageRoot[data-page-route="research"]{display:flex;flex-direction:column}
+#pageRoot[data-page-route="research"]>.page-head{order:0}
+#pageRoot[data-page-route="research"]>.research-workspace{order:1;margin-top:0!important}
+#pageRoot[data-page-route="research"]>.listing-history-panel:not([data-dex-launch-panel]){order:2;margin-top:28px}
+#pageRoot[data-page-route="research"]>[data-dex-launch-panel]{order:3;margin-top:18px}
+
+/* Click targets must land below the real sticky header, not underneath it. */
+#researchDetail,#assetDetail,#paperDetail,#strategyDetail{scroll-margin-top:180px}
+
+/* On desktop, choosing a strategy must show the chosen strategy summary in the same viewport. */
+@media(min-width:901px){
+  #pageRoot[data-page-route="strategy"] .strategy-workspace{
+    grid-template-columns:minmax(0,1.35fr) minmax(320px,.65fr)!important;
+    gap:18px!important;
+    align-items:start!important;
+  }
+  #pageRoot[data-page-route="strategy"] .strategy-table,
+  #pageRoot[data-page-route="strategy"] .strategy-detail{min-width:0!important}
+  #pageRoot[data-page-route="strategy"] .strategy-detail{align-self:start!important}
+}
+
+/* On stacked displays, leave a clear visual boundary when the viewport hands off to detail. */
+@media(max-width:900px){
+  #pageRoot[data-page-route="research"] .research-workspace,
+  #pageRoot[data-page-route="assets"] .asset-workspace,
+  #pageRoot[data-page-route="paper"] .paper-workspace,
+  #pageRoot[data-page-route="strategy"] .strategy-workspace{gap:22px!important}
+  #researchDetail,#assetDetail,#paperDetail,#strategyDetail{padding-top:4px}
+}
