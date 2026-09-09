@@ -58,8 +58,10 @@ check('viewport handoff is installed from main entry',main.includes('installView
 check('compact list selections reveal their detail result',['[data-research-market]','#researchDetail','[data-asset-market]','#assetDetail','[data-paper-market]','#paperDetail','[data-strategy-key]','#strategyDetail'].every(value=>viewport.includes(value)));
 check('paper summary action reveals the newly selected tab result',viewport.includes(".paper-next [data-paper-tab]")&&viewport.includes("reveal(root,'#paperBody',{force:true})"));
 check('viewport handoff retries after synchronous rerenders',viewport.includes('retries=6')&&viewport.includes('remaining-=1')&&viewport.includes('if(remaining>0)attempt()'));
+check('viewport handoff settles after continuity restoration',viewport.includes('requestAnimationFrame(()=>{')&&viewport.includes('settled=root.querySelector(selector)')&&viewport.includes('settle:true'));
 check('viewport handoff respects compact displays and reduced motion',viewport.includes("(max-width: 900px)")&&viewport.includes('prefers-reduced-motion: reduce'));
 check('viewport handoff is event driven without mutation observer',!viewport.includes('MutationObserver')&&viewport.includes("root.addEventListener('click',click)"));
+check('reader mode rerender preserves current viewport',main.includes('patchPreservingUi')&&main.includes("'.strategy-table'"));
 check('interaction cache version is refreshed',index.includes('/modules/main.js?v=88'));
 
 check('coin page prioritizes workspace before historical panels',interaction.includes('>.research-workspace{order:1')&&interaction.includes('>.listing-history-panel:not([data-dex-launch-panel]){order:2'));
@@ -70,6 +72,7 @@ check('desktop paper controls remain compact before master detail',interaction.i
 check('desktop strategy click keeps list and selected result together',interaction.includes('grid-template-columns:minmax(430px,1.3fr) minmax(320px,.7fr)!important')&&interaction.includes('max-height:calc(100dvh - 270px)!important')&&interaction.includes('position:sticky!important'));
 check('1024 class display has explicit split layout',interaction.includes('@media(min-width:901px) and (max-width:1080px)'));
 check('stacked displays bound selection lists before handoff',interaction.includes('max-height:44dvh!important'));
+check('mobile keeps basic detail control reachable',interaction.includes('.reader-mode-control{display:inline-flex!important}'));
 check('detail destinations account for sticky header',interaction.includes('#researchDetail,#assetDetail,#paperDetail,#strategyDetail,#paperBody,#strategyBody{scroll-margin-top:180px}'));
 
 check('secondary nav is centered and more visible',css.includes('.journey-nav{justify-content:center!important')&&css.includes('min-width:132px!important'));
