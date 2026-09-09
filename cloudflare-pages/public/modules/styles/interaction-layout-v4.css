@@ -86,6 +86,8 @@
 
 /* Stacked displays: selection stays compact, then the viewport hands off to the result. */
 @media(max-width:900px){
+  .reader-mode-control{display:inline-flex!important}
+
   #pageRoot[data-page-route="research"] .research-workspace,
   #pageRoot[data-page-route="assets"] .asset-workspace,
   #pageRoot[data-page-route="paper"] .paper-workspace,
@@ -109,8 +111,13 @@
   #researchDetail,#assetDetail,#paperDetail,#strategyDetail{padding-top:4px}
 }
 
-/* Mobile result areas should begin with the answer, not with excess whitespace. */
-@media(max-width:520px){
+/* Mobile keeps the Basic/Detail control reachable because Basic hides secondary V4 evidence. */
+@media(max-width:620px){
+  .header-tools{gap:6px!important;justify-content:flex-end!important;flex-wrap:wrap!important}
+  .reader-mode-control{padding:2px!important}
+  .reader-mode-control button{min-height:36px!important;padding:6px 8px!important;font-size:12px!important}
+  .theme-toggle,.logout{min-height:36px!important}
+
   #pageRoot[data-page-route="research"] .decision-hero,
   #pageRoot[data-page-route="assets"] .asset-detail-hero,
   #pageRoot[data-page-route="paper"] .paper-detail-hero,
