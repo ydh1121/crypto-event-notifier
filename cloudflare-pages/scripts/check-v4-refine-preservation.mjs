@@ -62,7 +62,7 @@ check('viewport handoff settles after continuity restoration',viewport.includes(
 check('viewport handoff respects compact displays and reduced motion',viewport.includes("(max-width: 900px)")&&viewport.includes('prefers-reduced-motion: reduce'));
 check('viewport handoff is event driven without mutation observer',!viewport.includes('MutationObserver')&&viewport.includes("root.addEventListener('click',click)"));
 check('reader mode rerender preserves current viewport',main.includes('patchPreservingUi')&&main.includes("'.strategy-table'"));
-check('interaction cache version is refreshed',index.includes('/modules/main.js?v=88'));
+check('interaction cache version is refreshed',index.includes('/modules/main.js?v=89'));
 
 check('coin page prioritizes workspace before historical panels',interaction.includes('>.research-workspace{order:1')&&interaction.includes('>.listing-history-panel:not([data-dex-launch-panel]){order:2'));
 check('asset page prioritizes selection and detail before long history',interaction.includes('>.asset-workspace{order:2')&&interaction.includes('>.asset-history-panel{order:3'));
