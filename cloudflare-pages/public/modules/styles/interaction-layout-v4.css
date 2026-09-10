@@ -53,6 +53,20 @@
   }
   #pageRoot[data-page-route="paper"] .paper-master #paperList{max-height:calc(100dvh - 420px)!important}
 
+  /* Research, assets and paper now behave like one desktop workbench instead of a long stacked document. */
+  #pageRoot[data-page-route="research"] .research-detail,
+  #pageRoot[data-page-route="assets"] .asset-detail,
+  #pageRoot[data-page-route="paper"] .paper-detail{
+    position:sticky!important;
+    top:156px!important;
+    align-self:start!important;
+    min-width:0!important;
+    max-height:calc(100dvh - 176px)!important;
+    overflow:auto!important;
+    overscroll-behavior:contain;
+    scrollbar-gutter:stable;
+  }
+
   #pageRoot[data-page-route="strategy"] .strategy-workspace{
     grid-template-columns:minmax(430px,1.3fr) minmax(320px,.7fr)!important;
     gap:18px!important;
@@ -97,13 +111,18 @@
   #pageRoot[data-page-route="assets"] .asset-holdings-list,
   #pageRoot[data-page-route="paper"] .paper-master #paperList{max-height:44dvh!important}
 
-  #pageRoot[data-page-route="strategy"] .strategy-table{
-    min-height:0!important;
+  #pageRoot[data-page-route="research"] .research-detail,
+  #pageRoot[data-page-route="assets"] .asset-detail,
+  #pageRoot[data-page-route="paper"] .paper-detail,
+  #pageRoot[data-page-route="strategy"] .strategy-detail{
+    position:static!important;
+    top:auto!important;
     max-height:none!important;
     overflow:visible!important;
   }
-  #pageRoot[data-page-route="strategy"] .strategy-detail{
-    position:static!important;
+
+  #pageRoot[data-page-route="strategy"] .strategy-table{
+    min-height:0!important;
     max-height:none!important;
     overflow:visible!important;
   }

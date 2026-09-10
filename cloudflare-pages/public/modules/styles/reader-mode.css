@@ -6,6 +6,7 @@ html[data-reader-mode="simple"] #pageRoot[data-page-route="research"] .listing-h
 html[data-reader-mode="simple"] #pageRoot[data-page-route="research"] .research-score-grid,
 html[data-reader-mode="simple"] #pageRoot[data-page-route="research"] .research-deep{display:none!important}
 
+html[data-reader-mode="simple"] #pageRoot[data-page-route="assets"] .asset-history-panel,
 html[data-reader-mode="simple"] #pageRoot[data-page-route="assets"] .asset-research-sides,
 html[data-reader-mode="simple"] #pageRoot[data-page-route="assets"] .direct-average-panel,
 html[data-reader-mode="simple"] #pageRoot[data-page-route="assets"] .averaging-calculator,
