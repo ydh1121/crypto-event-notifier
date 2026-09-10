@@ -13,7 +13,7 @@ check('temporary strategy DOM patch is not loaded',!index.includes('strategy-wor
 check('main cache version is refreshed',index.includes('/modules/main.js?v=89'));
 check('strategy module cache version is refreshed',main.includes("./pages/strategy.js?v=47"));
 check('overview renders native master detail workspace',strategy.includes('data-strategy-workspace-v5="ready"')&&strategy.includes('strategy-v5-detail-shell'));
-check('three local strategy detail tabs exist',['summary','coins','evidence'].every(value=>strategy.includes(`data-strategy-v5-tab=\"${value}\"`)));
+check('three local strategy detail tabs exist',['summary','coins','evidence'].every(value=>strategy.includes(`item('${value}'`)));
 check('strategy rail is rendered as navigation items',strategy.includes('strategy-v5-strategy-item')&&strategy.includes('aria-current'));
 check('strategy selection updates detail without rerendering whole overview',strategy.includes('setSelectedRailItem(key(chosen))')&&strategy.includes('renderOverviewDetails(chosen,criteria)'));
 check('strategy rail scroll is preserved',strategy.includes('overviewRailScroll')&&strategy.includes('list.scrollTop=overviewRailScroll'));
