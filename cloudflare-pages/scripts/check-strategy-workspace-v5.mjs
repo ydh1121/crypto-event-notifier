@@ -8,9 +8,9 @@ const fail=[];
 const check=(name,value)=>{if(!value)fail.push(name)};
 
 check('native strategy stylesheet is loaded',index.includes('/modules/styles/strategy-native-v5.css?v=1'));
-check('native strategy stylesheet loads last',index.indexOf('interaction-layout-v4.css')<index.indexOf('strategy-native-v5.css'));
+check('native strategy stylesheet loads after interaction layout',index.indexOf('interaction-layout-v4.css')<index.indexOf('strategy-native-v5.css'));
 check('temporary strategy DOM patch is not loaded',!index.includes('strategy-workspace-v5.js'));
-check('main cache version is refreshed',index.includes('/modules/main.js?v=89'));
+check('main cache version is refreshed',index.includes('/modules/main.js?v=90'));
 check('strategy module cache version is refreshed',main.includes("./pages/strategy.js?v=47"));
 check('overview renders native master detail workspace',strategy.includes('data-strategy-workspace-v5="ready"')&&strategy.includes('strategy-v5-detail-shell'));
 check('three local strategy detail tabs exist',['summary','coins','evidence'].every(value=>strategy.includes(`item('${value}'`)));
