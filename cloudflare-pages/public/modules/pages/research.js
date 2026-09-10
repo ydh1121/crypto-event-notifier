@@ -51,7 +51,7 @@ export function createResearchPage({store}){
     });
   }
 
-  function renderSecondaryResearch(){const box=root?.querySelector('#researchSecondary');if(box)box.innerHTML=renderListingHistory(fullPublic(store.get()).listing_history)}
+  function renderSecondaryResearch(){const box=root?.querySelector('#researchSecondary');if(box&&root?.querySelector('.decision-first-extra-research')?.open)box.innerHTML=renderListingHistory(fullPublic(store.get()).listing_history)}
 
   function renderList(list=filteredRows()){
     const box=root?.querySelector('#researchList');if(!box)return;const selected=ui().researchMarket;
@@ -64,8 +64,8 @@ export function createResearchPage({store}){
   function tabButton(key,label){return`<button type="button" data-research-detail-tab="${key}" class="${detailTab===key?'active':''}" aria-pressed="${detailTab===key?'true':'false'}">${label}</button>`}
 
   function summaryHtml(row,holding){
-    const holdingHtml=holding?`<section class="decision-first-summary-row"><div><span>내 실제 보유</span><small>실제 자산 기준</small></div><div><b>${money(holding.value_krw)}</b><small class="${tone(holding.unrealized_pnl_krw)}">${holding.unrealized_pnl_krw>=0?'+':''}${money(holding.unrealized_pnl_krw)} · ${pct(holding.unrealized_pnl_pct)}</small></div><div><small>평단</small><b>${price(holding.avg_price)}</b></div></section>`:'';
-    return`<div class="decision-first-summary-stack">${holdingHtml}<section class="decision-first-summary-row"><div><span>PAPER 참고</span><small>실제 주문이 아닌 독립 가상계좌</small></div><div><b class="${tone(row.return_pct)}">${pct(row.return_pct)}</b><small>수익률</small></div><div><small>완료 거래</small><b>${n(row.closed_trades)}회 · ${n(row.win_rate_pct).toFixed(1)}%</b></div></section></div>`;
+    const holdingHtml=holding?`<section class="decision-first-summary-row" data-research-holding-row><div><span>내 실제 보유</span><small>실제 자산 기준</small></div><div><b data-research-live="holding-value">${money(holding.value_krw)}</b><small data-research-live="holding-pnl" class="${tone(holding.unrealized_pnl_krw)}">${holding.unrealized_pnl_krw>=0?'+':''}${money(holding.unrealized_pnl_krw)} · ${pct(holding.unrealized_pnl_pct)}</small></div><div><small>평균 매수가</small><b data-research-live="holding-avg">${price(holding.avg_price)}</b></div></section>`:'';
+    return`<div class="decision-first-summary-stack">${holdingHtml}<section class="decision-first-summary-row"><div><span>PAPER 참고</span><small>실제 주문이 아닌 독립 가상계좌</small></div><div><b data-research-live="paper-return" class="${tone(row.return_pct)}">${pct(row.return_pct)}</b><small>수익률</small></div><div><small>완료 거래</small><b data-research-live="paper-trades">${n(row.closed_trades)}회 · ${n(row.win_rate_pct).toFixed(1)}%</b></div></section></div>`;
   }
 
   function valPct(v){return v===undefined||v===null?'-':pct(v)}
@@ -89,12 +89,37 @@ export function createResearchPage({store}){
     body.innerHTML=summaryHtml(row,holding);
   }
 
+  function patchText(selector,text,className){const node=root?.querySelector(selector);if(!node)return;if(node.textContent!==text)node.textContent=text;if(className!==undefined)node.className=className}
+  function patchDetailLive(){
+    const box=root?.querySelector('#researchDetail'),row=currentRow();if(!box||!row)return false;
+    const holding=findHolding(store.get(),row.market),holdingFlag=holding?'1':'0';
+    if(box.dataset.market!==row.market||box.dataset.exchange!==ui().researchExchange||box.dataset.holding!==holdingFlag)return false;
+    patchText('[data-research-live="decision"]',decisionLabel(row));
+    patchText('[data-research-live="state"]',row.state_label||'현재 시장과 진입 조건을 함께 반영한 판단입니다.');
+    patchText('[data-research-live="entry"]',n(row.entry_score).toFixed(0));
+    patchText('[data-research-live="opportunity"]',n(row.opportunity_score).toFixed(0));
+    patchText('[data-research-live="regime"]',n(row.regime_score).toFixed(0));
+    patchText('[data-research-live="price"]',price(row.price));
+    patchText('[data-research-live="return"]',pct(row.return_pct),tone(row.return_pct));
+    if(detailTab==='summary'){
+      patchText('[data-research-live="paper-return"]',pct(row.return_pct),tone(row.return_pct));
+      patchText('[data-research-live="paper-trades"]',`${n(row.closed_trades)}회 · ${n(row.win_rate_pct).toFixed(1)}%`);
+      if(holding){
+        patchText('[data-research-live="holding-value"]',money(holding.value_krw));
+        patchText('[data-research-live="holding-pnl"]',`${holding.unrealized_pnl_krw>=0?'+':''}${money(holding.unrealized_pnl_krw)} · ${pct(holding.unrealized_pnl_pct)}`,tone(holding.unrealized_pnl_krw));
+        patchText('[data-research-live="holding-avg"]',price(holding.avg_price));
+      }
+    }
+    return true;
+  }
+
   async function renderDetail({refreshDetail=true}={}){
     const box=root?.querySelector('#researchDetail');if(!box)return;
     const ex=ui().researchExchange,market=ui().researchMarket,row=findMarket(store.get(),ex,market);
-    if(!row){seq++;lastDetail=null;lastDetailKey='';box.innerHTML=empty('현재 조건에서 선택할 코인이 없습니다.','왼쪽 검색 또는 판단 필터를 변경하세요.');return}
+    if(!row){seq++;lastDetail=null;lastDetailKey='';box.innerHTML=empty('현재 조건에서 선택할 코인이 없습니다.','왼쪽 검색 또는 판단 필터를 변경하세요.');box.dataset.market='';box.dataset.exchange=ex;box.dataset.holding='0';return}
     const holding=findHolding(store.get(),market),key=`${ex}|${market}`,cached=lastDetailKey===key?lastDetail:null;
-    box.innerHTML=`<article class="decision-first-hero"><div class="decision-first-conclusion"><span>먼저 볼 것</span><h3>${esc(decisionLabel(row))}</h3><p>${esc(row.state_label||'현재 시장과 진입 조건을 함께 반영한 판단입니다.')}</p></div><div class="decision-first-vitals"><span><small>진입 타이밍</small><b>${n(row.entry_score).toFixed(0)}</b></span><span><small>기회점수</small><b>${n(row.opportunity_score).toFixed(0)}</b></span><span><small>시장 분위기</small><b>${n(row.regime_score).toFixed(0)}</b></span></div><div class="price-stack"><span>${esc(row.symbol||market)} · ${ex==='upbit'?'업비트':'빗썸'}</span><b>${price(row.price)}</b><strong class="${tone(row.return_pct)}">${pct(row.return_pct)}</strong></div></article><nav class="decision-first-tabs" aria-label="코인 상세 보기">${tabButton('summary','요약')}${tabButton('plan','매매 계획')}${tabButton('history','이력')}</nav><section id="researchDetailBody" class="decision-first-body"></section>`;
+    box.dataset.market=market;box.dataset.exchange=ex;box.dataset.holding=holding?'1':'0';
+    box.innerHTML=`<article class="decision-first-hero"><div class="decision-first-conclusion"><span>먼저 볼 것</span><h3 data-research-live="decision">${esc(decisionLabel(row))}</h3><p data-research-live="state">${esc(row.state_label||'현재 시장과 진입 조건을 함께 반영한 판단입니다.')}</p></div><div class="decision-first-vitals"><span><small>진입 타이밍</small><b data-research-live="entry">${n(row.entry_score).toFixed(0)}</b></span><span><small>기회점수</small><b data-research-live="opportunity">${n(row.opportunity_score).toFixed(0)}</b></span><span><small>시장 분위기</small><b data-research-live="regime">${n(row.regime_score).toFixed(0)}</b></span></div><div class="price-stack"><span>${esc(row.symbol||market)} · ${ex==='upbit'?'업비트':'빗썸'}</span><b data-research-live="price">${price(row.price)}</b><strong data-research-live="return" class="${tone(row.return_pct)}">${pct(row.return_pct)}</strong></div></article><nav class="decision-first-tabs" aria-label="코인 상세 보기">${tabButton('summary','요약')}${tabButton('plan','매매 계획')}${tabButton('history','이력')}</nav><section id="researchDetailBody" class="decision-first-body"></section>`;
     renderDetailBody(row,holding,cached);
     if(cached&&!refreshDetail)return;
     const requestId=++seq;
@@ -111,25 +136,30 @@ export function createResearchPage({store}){
 
   function refreshSnapshot(){
     if(!root?.querySelector('.decision-first-workspace')){render();return}
+    const previousMarket=ui().researchMarket;
     renderMasterSummary();updateFilterState();
-    const list=filteredRows();ensureSelected(list);renderList(list);renderSecondaryResearch();renderDetail({refreshDetail:false});
+    const list=filteredRows();ensureSelected(list);renderList(list);
+    if(root?.querySelector('.decision-first-extra-research')?.open)renderSecondaryResearch();
+    if(previousMarket!==ui().researchMarket||!patchDetailLive())renderDetail({refreshDetail:previousMarket!==ui().researchMarket});
   }
 
   const click=e=>{
     const ex=e.target.closest('[data-research-exchange]');
     if(ex){lastDetail=null;lastDetailKey='';store.setUi({researchExchange:ex.dataset.researchExchange,researchMarket:''},{scope:'research'});render();return}
     const f=e.target.closest('[data-research-filter]');
-    if(f){const previous=ui().researchMarket;store.setUi({researchFilter:f.dataset.researchFilter},{scope:'research'});updateFilterState();const list=filteredRows();ensureSelected(list);renderList(list);renderDetail({refreshDetail:previous!==ui().researchMarket});return}
+    if(f){const previous=ui().researchMarket;store.setUi({researchFilter:f.dataset.researchFilter},{scope:'research'});updateFilterState();const list=filteredRows();ensureSelected(list);renderList(list);if(previous!==ui().researchMarket)renderDetail({refreshDetail:true});else patchDetailLive();return}
     const row=e.target.closest('[data-research-market]');
     if(row){const market=row.dataset.researchMarket;if(market===ui().researchMarket)return;store.setUi({researchMarket:market},{scope:'research'});selectListRow(market);renderDetail({refreshDetail:true});return}
     const tab=e.target.closest('[data-research-detail-tab]');
     if(tab){detailTab=tab.dataset.researchDetailTab||'summary';renderDetailBody();return}
     const range=e.target.closest('[data-research-range]');
     if(range&&cachedDetail()){store.setUi({researchRange:range.dataset.researchRange},{scope:'research-range'});renderDetailBody();return}
+    const extra=e.target.closest('.decision-first-extra-research>summary');
+    if(extra)requestAnimationFrame(()=>{if(root?.querySelector('.decision-first-extra-research')?.open)renderSecondaryResearch()});
   };
 
   const input=e=>{
-    if(e.target.matches('[data-research-search]')){const previous=ui().researchMarket;store.setUi({researchSearch:e.target.value},{scope:'research-search'});const list=filteredRows();ensureSelected(list);renderList(list);renderDetail({refreshDetail:previous!==ui().researchMarket})}
+    if(e.target.matches('[data-research-search]')){const previous=ui().researchMarket;store.setUi({researchSearch:e.target.value},{scope:'research-search'});const list=filteredRows();ensureSelected(list);renderList(list);if(previous!==ui().researchMarket)renderDetail({refreshDetail:true})}
   };
 
   return{

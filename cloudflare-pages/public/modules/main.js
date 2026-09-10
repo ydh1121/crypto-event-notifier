@@ -13,7 +13,7 @@ import{installStrategyDrilldown}from'./shared/strategy-drilldown-v4.js?v=3';
 import{installViewportHandoff}from'./shared/viewport-handoff-v4.js?v=2';
 import{createHomePage}from'./pages/v4/home.js?v=2';
 import{createDashboardPage}from'./pages/dashboard.js';
-import{createResearchPage}from'./pages/research.js?v=41';
+import{createResearchPage}from'./pages/research.js?v=42';
 import{installDexLaunchResearchPanel}from'./pages/dex-launch-panel.js?v=44';
 import{createAssetsPage}from'./pages/assets.js?v=49';
 import{createPaperPage}from'./pages/paper.js?v=46';
