@@ -1,5 +1,5 @@
 import{rowsFor,findHolding,findMarket,marketSummary,fullPublic}from'../shared/selectors.js';
-import{pageHead,loading,empty,exchangeToggle,score}from'../shared/components.js';
+import{pageHead,loading,empty,exchangeToggle}from'../shared/components.js';
 import{n,money,pct,price,tone,esc,decisionLabel,stateLabel,dt}from'../shared/format.js';
 import{DECISION_FILTERS,decisionCounts,decisionMatches,decisionEmptyMessage}from'../shared/decision.js';
 import{rangeControl,priceFillChart,scoreHistoryChart,simpleLineChart}from'../shared/charts.js';
@@ -12,28 +12,129 @@ function renderListingSource(source){const pre=source.prelisting_returns||{},pos
 function renderListingHistory(history){const data=history&&typeof history==='object'?history:{},cases=Array.isArray(data.cases)?data.cases:[],counts=data.status_counts&&typeof data.status_counts==='object'?data.status_counts:{};if(!cases.length)return`<section class="listing-history-panel"><div class="listing-history-head"><div><h3>상장 이력 연구</h3><p>국내 상장 전후의 검증된 해외 CEX 반응을 compact feature로 비교합니다.</p></div><span>원본 캔들 로컬 보관</span></div>${empty('상장 이력 feature가 아직 없습니다.','리서치 수집기가 사례를 검증하면 이 영역에 요약값만 표시됩니다.')}</section>`;return`<section class="listing-history-panel"><div class="listing-history-head"><div><h3>상장 이력 연구</h3><p>국내 상장 전후의 검증된 해외 CEX 반응입니다. 원본 OHLCV는 Viewer로 전송하지 않습니다.</p></div><span>${data.raw_candles_included===false?'COMPACT · NO RAW CANDLES':'COMPACT'}</span></div><div class="listing-history-summary"><span><small>사례</small><b>${n(data.case_count)}</b></span><span><small>완료</small><b>${n(counts.complete)}</b></span><span><small>검증 source</small><b>${n(data.source_count)}</b></span><span><small>feature</small><b>${n(data.feature_count)}</b></span></div><div class="listing-case-grid">${cases.slice(0,12).map(row=>{const sources=Array.isArray(row.sources)?row.sources:[];return`<article class="listing-case-card"><header><div><span>${esc(String(row.exchange||'').toUpperCase())}</span><h4>${esc(row.market||row.symbol||'-')}</h4><small>${row.domestic_open_at?dt(row.domestic_open_at):'개시 시각 미확인'} · ${row.domestic_open_price?price(row.domestic_open_price):'상장가 미확인'}</small></div><strong>${esc(LISTING_STATUS[row.status]||row.status||'대기')}</strong></header>${sources.length?sources.map(renderListingSource).join(''):'<p class="listing-no-source">검증된 해외 선행 CEX source가 없습니다.</p>'}</article>`}).join('')}</div></section>`}
 
 export function createResearchPage({store}){
-  let root=null,unsub=null,seq=0,lastDetail=null,lastDetailKey='';
+  let root=null,unsub=null,seq=0,lastDetail=null,lastDetailKey='',detailTab='summary';
   const ui=()=>store.get().ui;
   const rows=()=>rowsFor(store.get(),ui().researchExchange);
   function matches(row){const q=String(ui().researchSearch||'').trim().toLowerCase();if(q&&!`${row.symbol||''} ${row.name||''} ${row.market||''}`.toLowerCase().includes(q))return false;return decisionMatches(row,ui().researchFilter)}
   function filteredRows(){return rows().filter(matches).sort((a,b)=>n(b.opportunity_score)-n(a.opportunity_score))}
   function ensureSelected(list=filteredRows()){let market=ui().researchMarket;if(!list.some(r=>r.market===market))market=list[0]?.market||'';if(market!==ui().researchMarket)store.setUi({researchMarket:market},{scope:'research-select'});return market}
   function filterButton(key,counts){const info=DECISION_FILTERS[key];return`<button data-research-filter="${key}" title="${esc(info.hint)}" class="${ui().researchFilter===key?'active':''}">${esc(info.label)} <span>${counts[key]||0}</span></button>`}
+  function currentKey(){return`${ui().researchExchange}|${ui().researchMarket}`}
+  function cachedDetail(){return lastDetailKey===currentKey()?lastDetail:null}
+  function currentRow(){return findMarket(store.get(),ui().researchExchange,ui().researchMarket)}
+
   function render(){
-    if(!root)return;const state=store.get();if(!state.snapshot){root.innerHTML=pageHead('리서치','시장 후보를 찾고 선택 코인의 판단 근거를 같은 화면에서 봅니다.')+loading('리서치 데이터를 불러오는 중입니다.');return}
-    const ex=ui().researchExchange,summary=marketSummary(state,ex),list=filteredRows(),counts=summary.decisionCounts||decisionCounts(rows()),listing=fullPublic(state).listing_history;ensureSelected(list);
-    root.innerHTML=`${pageHead('리서치','시장 후보를 찾고 선택 코인의 판단 근거를 같은 화면에서 봅니다.',exchangeToggle(ex,'data-research-exchange'))}${renderListingHistory(listing)}<section class="research-workspace"><aside class="research-master"><div class="market-pulse"><div><span>시장</span><b>${summary.avgRegime.toFixed(0)}</b></div><div><span>진입</span><b>${summary.avgEntry.toFixed(0)}</b></div><div><span>매수 후보</span><b>${summary.buyCandidates}</b></div><div><span>기회 65+</span><b>${summary.opportunityCandidates}</b></div></div><input class="search" data-research-search type="search" value="${esc(ui().researchSearch)}" placeholder="티커·코인명 검색"><div class="chip-row research-filter">${['all','buy','wait','watch','risk','holding'].map(k=>filterButton(k,counts)).join('')}</div><div class="filter-basis">판단 필터는 PAPER 실행 여부가 아니라 현재 전략 판단 기준으로 분류합니다.</div><div id="researchList" class="master-list"></div></aside><section id="researchDetail" class="research-detail"></section></section>`;
-    renderList(list);renderDetail();
+    if(!root)return;
+    const state=store.get();
+    if(!state.snapshot){root.innerHTML=pageHead('코인','코인을 고르면 먼저 현재 판단을 보여주고, 필요한 근거만 단계별로 엽니다.')+loading('리서치 데이터를 불러오는 중입니다.');return}
+    const ex=ui().researchExchange,summary=marketSummary(state,ex),list=filteredRows(),counts=summary.decisionCounts||decisionCounts(rows());
+    ensureSelected(list);
+    root.innerHTML=`${pageHead('코인','한 번에 하나의 결론과 근거에 집중합니다.',exchangeToggle(ex,'data-research-exchange'))}<section class="research-workspace decision-first-workspace"><aside class="research-master decision-first-master"><div id="researchPulse" class="decision-first-market-pulse"></div><input class="search" data-research-search type="search" value="${esc(ui().researchSearch)}" placeholder="티커·코인명 검색"><div id="researchFilters" class="chip-row research-filter">${['all','buy','wait','watch','risk','holding'].map(k=>filterButton(k,counts)).join('')}</div><div id="researchList" class="master-list"></div></aside><section id="researchDetail" class="research-detail decision-first-detail"></section></section><details class="decision-first-extra-research"><summary>추가 연구 · 상장 이력</summary><div id="researchSecondary"></div></details>`;
+    renderMasterSummary();
+    renderList(list);
+    renderSecondaryResearch();
+    renderDetail({refreshDetail:true});
   }
-  function renderList(list=filteredRows()){const box=root?.querySelector('#researchList');if(!box)return;const selected=ui().researchMarket;if(list.length){box.innerHTML=list.slice(0,160).map(r=>`<button data-research-market="${esc(r.market)}" class="master-row ${r.market===selected?'selected':''}"><span><b>${esc(r.symbol||r.market)}</b><small>${esc(r.name||stateLabel(r))}</small></span><span><strong>${n(r.opportunity_score).toFixed(0)}</strong><small>${esc(decisionLabel(r))}</small></span></button>`).join('');return}if(String(ui().researchSearch||'').trim()){box.innerHTML=empty('검색 결과가 없습니다.','검색어를 지우거나 다른 코인을 입력하세요.');return}const[title,desc]=decisionEmptyMessage(ui().researchFilter,ui().researchExchange==='upbit'?'업비트':'빗썸');box.innerHTML=empty(title,desc)}
-  async function renderDetail(){
-    const box=root?.querySelector('#researchDetail');if(!box)return;const ex=ui().researchExchange,market=ui().researchMarket,row=findMarket(store.get(),ex,market);if(!row){seq++;lastDetail=null;lastDetailKey='';box.innerHTML=empty('현재 조건에서 선택할 코인이 없습니다.','왼쪽 검색 또는 판단 필터를 변경하세요.');return}const holding=findHolding(store.get(),market),requestId=++seq,key=`${ex}|${market}`;
-    box.innerHTML=`<article class="decision-hero"><div><span>현재 판단</span><h3>${esc(decisionLabel(row))}</h3><p>${esc(row.state_label||'현재 시장과 진입 조건을 함께 반영한 판단입니다.')}</p></div><div class="price-stack"><span>${esc(row.symbol||market)} · ${ex==='upbit'?'업비트':'빗썸'}</span><b>${price(row.price)}</b><strong class="${tone(row.return_pct)}">${pct(row.return_pct)}</strong></div></article><div class="research-score-grid">${score('전체 시장 분위기',row.regime_score)}${score('지금 매수 타이밍',row.entry_score)}${score('현재 기회점수',row.opportunity_score)}</div>${holding?`<section class="inline-holding"><header><h3>내 실제 보유</h3><span>자산 데이터</span></header><div><span><small>평단</small><b>${price(holding.avg_price)}</b></span><span><small>현재 평가액</small><b>${money(holding.value_krw)}</b></span><span><small>평가손익</small><b class="${tone(holding.unrealized_pnl_krw)}">${holding.unrealized_pnl_krw>=0?'+':''}${money(holding.unrealized_pnl_krw)} · ${pct(holding.unrealized_pnl_pct)}</b></span></div></section>`:''}<section class="paper-inline"><header><h3>이 코인의 PAPER 참고</h3><span>독립 1,000만원 계좌</span></header><div><span><small>평가액</small><b>${money(row.equity_krw)}</b></span><span><small>현재 보유</small><b>${money(row.position_value_krw)}</b></span><span><small>수익률</small><b class="${tone(row.return_pct)}">${pct(row.return_pct)}</b></span><span><small>완료 거래</small><b>${n(row.closed_trades)}회 · 승률 ${n(row.win_rate_pct).toFixed(1)}%</b></span></div></section><section id="researchDeep" class="research-deep">${loading('판단 근거와 체결 이력을 불러오는 중입니다.')}</section>`;
-    try{const detail=await getMarketDetail(ex,market);if(requestId!==seq||ui().researchMarket!==market)return;lastDetail=detail;lastDetailKey=key;renderDeep(detail)}catch(err){if(requestId===seq){lastDetail=null;lastDetailKey='';const d=root?.querySelector('#researchDeep');if(d)d.innerHTML=empty('상세 연구 데이터를 불러오지 못했습니다.',err.message)}}
+
+  function renderMasterSummary(){
+    const box=root?.querySelector('#researchPulse');if(!box)return;
+    const summary=marketSummary(store.get(),ui().researchExchange);
+    box.innerHTML=`<span><small>매수 후보</small><b>${summary.buyCandidates}</b></span><span><small>기회 65+</small><b>${summary.opportunityCandidates}</b></span><span><small>시장</small><b>${summary.avgRegime.toFixed(0)}</b></span>`;
   }
+
+  function updateFilterState(){
+    const summary=marketSummary(store.get(),ui().researchExchange),counts=summary.decisionCounts||decisionCounts(rows());
+    root?.querySelectorAll('[data-research-filter]').forEach(button=>{
+      const key=button.dataset.researchFilter,info=DECISION_FILTERS[key];
+      button.classList.toggle('active',ui().researchFilter===key);
+      button.innerHTML=`${esc(info.label)} <span>${counts[key]||0}</span>`;
+    });
+  }
+
+  function renderSecondaryResearch(){const box=root?.querySelector('#researchSecondary');if(box)box.innerHTML=renderListingHistory(fullPublic(store.get()).listing_history)}
+
+  function renderList(list=filteredRows()){
+    const box=root?.querySelector('#researchList');if(!box)return;const selected=ui().researchMarket;
+    if(list.length){box.innerHTML=list.slice(0,160).map(r=>`<button data-research-market="${esc(r.market)}" class="master-row ${r.market===selected?'selected':''}"><span><b>${esc(r.symbol||r.market)}</b><small>${esc(r.name||stateLabel(r))}</small></span><span><strong>${n(r.opportunity_score).toFixed(0)}</strong><small>${esc(decisionLabel(r))}</small></span></button>`).join('');return}
+    if(String(ui().researchSearch||'').trim()){box.innerHTML=empty('검색 결과가 없습니다.','검색어를 지우거나 다른 코인을 입력하세요.');return}
+    const[title,desc]=decisionEmptyMessage(ui().researchFilter,ui().researchExchange==='upbit'?'업비트':'빗썸');box.innerHTML=empty(title,desc)
+  }
+
+  function selectListRow(market){root?.querySelectorAll('[data-research-market]').forEach(button=>button.classList.toggle('selected',button.dataset.researchMarket===market))}
+  function tabButton(key,label){return`<button type="button" data-research-detail-tab="${key}" class="${detailTab===key?'active':''}" aria-pressed="${detailTab===key?'true':'false'}">${label}</button>`}
+
+  function summaryHtml(row,holding){
+    const holdingHtml=holding?`<section class="decision-first-summary-row"><div><span>내 실제 보유</span><small>실제 자산 기준</small></div><div><b>${money(holding.value_krw)}</b><small class="${tone(holding.unrealized_pnl_krw)}">${holding.unrealized_pnl_krw>=0?'+':''}${money(holding.unrealized_pnl_krw)} · ${pct(holding.unrealized_pnl_pct)}</small></div><div><small>평단</small><b>${price(holding.avg_price)}</b></div></section>`:'';
+    return`<div class="decision-first-summary-stack">${holdingHtml}<section class="decision-first-summary-row"><div><span>PAPER 참고</span><small>실제 주문이 아닌 독립 가상계좌</small></div><div><b class="${tone(row.return_pct)}">${pct(row.return_pct)}</b><small>수익률</small></div><div><small>완료 거래</small><b>${n(row.closed_trades)}회 · ${n(row.win_rate_pct).toFixed(1)}%</b></div></section></div>`;
+  }
+
   function valPct(v){return v===undefined||v===null?'-':pct(v)}
-  function renderDeep(detail){const box=root?.querySelector('#researchDeep');if(!box)return;if(!detail){box.innerHTML=empty('상세 연구 데이터가 아직 순회에 도착하지 않았습니다.');return}const data=detail.data||{},plan=data.trade_plan||{},signal=data.signal||{},diag=signal.diagnostics||{},fills=Array.isArray(data.fills)?data.fills:[],feedback=Array.isArray(data.feedback)?data.feedback:[],eq=Array.isArray(data.equity_history)?data.equity_history:[],memory=Array.isArray(data.market_memory)?data.market_memory:[],latest=memory[memory.length-1]||{},range=ui().researchRange||'24h';box.innerHTML=`<details open class="deep-section"><summary>판단 근거 · 다음 매매 계획</summary><div class="plan-grid"><span><small>다음 추가매수/진입</small><b>${price(n(plan.next_add_price)||n(plan.expected_entry_price))}</b></span><span><small>목표가</small><b>${price(plan.target_price)}</b></span><span><small>손절 기준</small><b>${price(plan.hard_stop_price)}</b></span><span><small>분할 진행</small><b>${n(plan.completed_entries)} / ${n(plan.expected_total_entries)}</b></span><span><small>현재 되돌림</small><b>${pct(diag.pullback_pct)}</b></span><span><small>최근 변동성</small><b>${n(diag.volatility_pct).toFixed(2)}%</b></span><span><small>호가 균형</small><b>${n(diag.orderbook_imbalance).toFixed(3)}</b></span><span><small>BTC 흐름</small><b class="${tone(diag.btc_return_pct)}">${pct(diag.btc_return_pct)}</b></span></div></details><section class="major-context"><div><span>BTC 시장참고</span><b class="${tone(latest.btc_return_pct??diag.btc_return_pct)}">${valPct(latest.btc_return_pct??diag.btc_return_pct)}</b></div><div><span>ETH 시장참고</span><b class="${tone(latest.eth_return_pct)}">${valPct(latest.eth_return_pct)}</b></div><div><span>선택 코인 vs BTC·ETH</span><b class="${tone(latest.asset_vs_majors_pct)}">${valPct(latest.asset_vs_majors_pct)}</b></div></section><section><div class="history-toolbar"><div><h3>가격 · 판단 이력</h3><p>같은 기간 기준으로 가격, PAPER 체결, 판단 점수를 비교합니다.</p></div>${rangeControl('data-research-range',range)}</div><div class="history-stack">${priceFillChart(memory,fills,{range})}${scoreHistoryChart(memory,{range})}${simpleLineChart('가상계좌 자산곡선',eq,'equity_krw',{range,className:'primary',suffix:'원'})}</div></section><div class="detail-columns"><section><header><h3>최근 가상체결</h3></header>${fills.length?fills.slice(0,8).map(f=>`<div class="event-row"><b>${f.side==='buy'?'매수':'매도'}</b><span>${price(f.price)}</span><strong class="${tone(f.realized_pnl)}">${f.side==='sell'?`${n(f.realized_pnl)>=0?'+':''}${money(f.realized_pnl)}`:money(f.krw)}</strong><small>${dt(f.ts)}</small></div>`).join(''):'<p class="muted">체결 없음</p>'}</section><section><header><h3>최근 학습 변화</h3></header>${feedback.length?feedback.slice(0,6).map(f=>`<div class="learning-item"><b class="${tone(f.outcome_return_pct)}">${pct(f.outcome_return_pct)}</b><span>${esc(f.note||'학습 기준 조정')}</span><small>${dt(f.ts)}</small></div>`).join(''):'<p class="muted">학습 기록 없음</p>'}</section></div>`}
-  const click=e=>{const ex=e.target.closest('[data-research-exchange]');if(ex){lastDetail=null;lastDetailKey='';store.setUi({researchExchange:ex.dataset.researchExchange,researchMarket:''},{scope:'research'});render();return}const f=e.target.closest('[data-research-filter]');if(f){store.setUi({researchFilter:f.dataset.researchFilter},{scope:'research'});render();return}const row=e.target.closest('[data-research-market]');if(row){store.setUi({researchMarket:row.dataset.researchMarket},{scope:'research'});renderList();renderDetail();return}const range=e.target.closest('[data-research-range]');if(range&&lastDetail&&lastDetailKey===`${ui().researchExchange}|${ui().researchMarket}`){store.setUi({researchRange:range.dataset.researchRange},{scope:'research-range'});renderDeep(lastDetail)}};
-  const input=e=>{if(e.target.matches('[data-research-search]')){store.setUi({researchSearch:e.target.value},{scope:'research-search'});const list=filteredRows();ensureSelected(list);renderList(list);renderDetail()}};
-  return{mount(r){root=r;root.addEventListener('click',click);root.addEventListener('input',input);unsub=store.subscribe((_,m)=>{if(m.type==='snapshot')render()})},render,destroy(){seq++;lastDetail=null;lastDetailKey='';unsub?.();root?.removeEventListener('click',click);root?.removeEventListener('input',input);root=null}};
+  function planHtml(detail){
+    if(!detail)return loading('매매 계획을 불러오는 중입니다.');
+    const data=detail.data||{},plan=data.trade_plan||{},signal=data.signal||{},diag=signal.diagnostics||{},memory=Array.isArray(data.market_memory)?data.market_memory:[],latest=memory[memory.length-1]||{};
+    return`<section class="decision-first-plan"><header><div><span>다음 행동을 볼 때</span><h3>가격 기준 4개만 먼저 확인</h3></div><small>현재 전략 계산값</small></header><div class="decision-first-plan-grid"><span><small>다음 진입/추가매수</small><b>${price(n(plan.next_add_price)||n(plan.expected_entry_price))}</b></span><span><small>목표가</small><b>${price(plan.target_price)}</b></span><span><small>손절 기준</small><b>${price(plan.hard_stop_price)}</b></span><span><small>분할 진행</small><b>${n(plan.completed_entries)} / ${n(plan.expected_total_entries)}</b></span></div><div class="decision-first-context"><span><small>현재 되돌림</small><b>${pct(diag.pullback_pct)}</b></span><span><small>최근 변동성</small><b>${n(diag.volatility_pct).toFixed(2)}%</b></span><span><small>BTC 흐름</small><b class="${tone(latest.btc_return_pct??diag.btc_return_pct)}">${valPct(latest.btc_return_pct??diag.btc_return_pct)}</b></span><span><small>코인 vs BTC·ETH</small><b class="${tone(latest.asset_vs_majors_pct)}">${valPct(latest.asset_vs_majors_pct)}</b></span></div></section>`;
+  }
+
+  function historyHtml(detail){
+    if(!detail)return loading('가격과 판단 이력을 불러오는 중입니다.');
+    const data=detail.data||{},fills=Array.isArray(data.fills)?data.fills:[],feedback=Array.isArray(data.feedback)?data.feedback:[],eq=Array.isArray(data.equity_history)?data.equity_history:[],memory=Array.isArray(data.market_memory)?data.market_memory:[],range=ui().researchRange||'24h';
+    return`<section class="decision-first-history"><div class="history-toolbar"><div><span>가장 먼저</span><h3>가격과 체결 흐름</h3><p>판단 점수와 가상계좌 곡선은 상세 모드에서 추가로 봅니다.</p></div>${rangeControl('data-research-range',range)}</div><div class="history-stack">${priceFillChart(memory,fills,{range})}<div class="decision-first-secondary-chart">${scoreHistoryChart(memory,{range})}</div><div class="decision-first-secondary-chart">${simpleLineChart('가상계좌 자산곡선',eq,'equity_krw',{range,className:'primary',suffix:'원'})}</div></div><div class="detail-columns decision-first-history-records"><section><header><h3>최근 가상체결</h3></header>${fills.length?fills.slice(0,8).map(f=>`<div class="event-row"><b>${f.side==='buy'?'매수':'매도'}</b><span>${price(f.price)}</span><strong class="${tone(f.realized_pnl)}">${f.side==='sell'?`${n(f.realized_pnl)>=0?'+':''}${money(f.realized_pnl)}`:money(f.krw)}</strong><small>${dt(f.ts)}</small></div>`).join(''):'<p class="muted">체결 없음</p>'}</section><section class="decision-first-detail-only"><header><h3>최근 학습 변화</h3></header>${feedback.length?feedback.slice(0,6).map(f=>`<div class="learning-item"><b class="${tone(f.outcome_return_pct)}">${pct(f.outcome_return_pct)}</b><span>${esc(f.note||'학습 기준 조정')}</span><small>${dt(f.ts)}</small></div>`).join(''):'<p class="muted">학습 기록 없음</p>'}</section></div></section>`;
+  }
+
+  function renderDetailBody(row=currentRow(),holding=row?findHolding(store.get(),row.market):null,detail=cachedDetail()){
+    const body=root?.querySelector('#researchDetailBody');if(!body||!row)return;
+    root?.querySelectorAll('[data-research-detail-tab]').forEach(button=>{const active=button.dataset.researchDetailTab===detailTab;button.classList.toggle('active',active);button.setAttribute('aria-pressed',active?'true':'false')});
+    if(detailTab==='plan'){body.innerHTML=planHtml(detail);return}
+    if(detailTab==='history'){body.innerHTML=historyHtml(detail);return}
+    body.innerHTML=summaryHtml(row,holding);
+  }
+
+  async function renderDetail({refreshDetail=true}={}){
+    const box=root?.querySelector('#researchDetail');if(!box)return;
+    const ex=ui().researchExchange,market=ui().researchMarket,row=findMarket(store.get(),ex,market);
+    if(!row){seq++;lastDetail=null;lastDetailKey='';box.innerHTML=empty('현재 조건에서 선택할 코인이 없습니다.','왼쪽 검색 또는 판단 필터를 변경하세요.');return}
+    const holding=findHolding(store.get(),market),key=`${ex}|${market}`,cached=lastDetailKey===key?lastDetail:null;
+    box.innerHTML=`<article class="decision-first-hero"><div class="decision-first-conclusion"><span>먼저 볼 것</span><h3>${esc(decisionLabel(row))}</h3><p>${esc(row.state_label||'현재 시장과 진입 조건을 함께 반영한 판단입니다.')}</p></div><div class="decision-first-vitals"><span><small>진입 타이밍</small><b>${n(row.entry_score).toFixed(0)}</b></span><span><small>기회점수</small><b>${n(row.opportunity_score).toFixed(0)}</b></span><span><small>시장 분위기</small><b>${n(row.regime_score).toFixed(0)}</b></span></div><div class="price-stack"><span>${esc(row.symbol||market)} · ${ex==='upbit'?'업비트':'빗썸'}</span><b>${price(row.price)}</b><strong class="${tone(row.return_pct)}">${pct(row.return_pct)}</strong></div></article><nav class="decision-first-tabs" aria-label="코인 상세 보기">${tabButton('summary','요약')}${tabButton('plan','매매 계획')}${tabButton('history','이력')}</nav><section id="researchDetailBody" class="decision-first-body"></section>`;
+    renderDetailBody(row,holding,cached);
+    if(cached&&!refreshDetail)return;
+    const requestId=++seq;
+    try{
+      const detail=await getMarketDetail(ex,market);
+      if(requestId!==seq||ui().researchMarket!==market||ui().researchExchange!==ex)return;
+      lastDetail=detail;lastDetailKey=key;renderDetailBody(row,holding,detail);
+    }catch(err){
+      if(requestId===seq&&(detailTab==='plan'||detailTab==='history')){
+        const body=root?.querySelector('#researchDetailBody');if(body)body.innerHTML=empty('상세 연구 데이터를 불러오지 못했습니다.',err.message)
+      }
+    }
+  }
+
+  function refreshSnapshot(){
+    if(!root?.querySelector('.decision-first-workspace')){render();return}
+    renderMasterSummary();updateFilterState();
+    const list=filteredRows();ensureSelected(list);renderList(list);renderSecondaryResearch();renderDetail({refreshDetail:false});
+  }
+
+  const click=e=>{
+    const ex=e.target.closest('[data-research-exchange]');
+    if(ex){lastDetail=null;lastDetailKey='';store.setUi({researchExchange:ex.dataset.researchExchange,researchMarket:''},{scope:'research'});render();return}
+    const f=e.target.closest('[data-research-filter]');
+    if(f){const previous=ui().researchMarket;store.setUi({researchFilter:f.dataset.researchFilter},{scope:'research'});updateFilterState();const list=filteredRows();ensureSelected(list);renderList(list);renderDetail({refreshDetail:previous!==ui().researchMarket});return}
+    const row=e.target.closest('[data-research-market]');
+    if(row){const market=row.dataset.researchMarket;if(market===ui().researchMarket)return;store.setUi({researchMarket:market},{scope:'research'});selectListRow(market);renderDetail({refreshDetail:true});return}
+    const tab=e.target.closest('[data-research-detail-tab]');
+    if(tab){detailTab=tab.dataset.researchDetailTab||'summary';renderDetailBody();return}
+    const range=e.target.closest('[data-research-range]');
+    if(range&&cachedDetail()){store.setUi({researchRange:range.dataset.researchRange},{scope:'research-range'});renderDetailBody();return}
+  };
+
+  const input=e=>{
+    if(e.target.matches('[data-research-search]')){const previous=ui().researchMarket;store.setUi({researchSearch:e.target.value},{scope:'research-search'});const list=filteredRows();ensureSelected(list);renderList(list);renderDetail({refreshDetail:previous!==ui().researchMarket})}
+  };
+
+  return{
+    mount(r){root=r;root.addEventListener('click',click);root.addEventListener('input',input);unsub=store.subscribe((_,m)=>{if(m.type==='snapshot')refreshSnapshot()})},
+    render,
+    destroy(){seq++;lastDetail=null;lastDetailKey='';unsub?.();root?.removeEventListener('click',click);root?.removeEventListener('input',input);root=null}
+  };
 }

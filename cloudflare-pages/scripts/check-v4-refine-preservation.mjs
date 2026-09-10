@@ -10,7 +10,6 @@ const strategy=read('public/modules/pages/strategy.js');
 const sectors=read('public/modules/pages/sectors-v36.js');
 const records=read('public/modules/pages/records.js');
 const system=read('public/modules/pages/system.js');
-const lens=read('public/modules/shared/coin-decision-lens-v4-refine.js');
 const drilldown=read('public/modules/shared/strategy-drilldown-v4.js');
 const viewport=read('public/modules/shared/viewport-handoff-v4.js');
 const css=read('public/modules/styles/v4-refine-v1.css');
@@ -30,9 +29,9 @@ check('interaction layout loads after refine',index.includes('interaction-layout
 
 check('research workspace remains',research.includes('research-workspace')&&research.includes('research-detail'));
 check('research listing study remains',research.includes('listing-history-panel'));
-check('research current decision remains',research.includes('decision-hero'));
-check('research paper reference remains',research.includes('paper-inline'));
-check('research btc eth context remains',research.includes('major-context'));
+check('research current decision remains',research.includes('decision-first-conclusion'));
+check('research paper reference remains',research.includes('PAPER 참고'));
+check('research btc eth context remains',research.includes('BTC 흐름')&&research.includes('코인 vs BTC·ETH'));
 check('research current trade plan remains',research.includes('trade_plan'));
 check('research charts and records remain',research.includes('history-stack')&&research.includes('detail-columns'));
 
@@ -46,12 +45,7 @@ check('themes remain',sectors.includes('sector-layout')&&sectors.includes('secto
 check('records remain',records.includes('records'));
 check('system remains',system.includes('operations-grid')&&system.includes('component-panel'));
 
-check('decision lens is additive',main.includes('installCoinDecisionLens')&&lens.includes("hero.after(panel)"));
-check('decision modes exist',['short','swing','dca'].every(value=>lens.includes(`['${value}'`)));
-check('six timeframes exist',['15m','30m','1h','4h','1d','1w'].every(value=>lens.includes(`['${value}'`)));
-check('missing timeframe values are not fabricated',lens.includes('시간 기준별 별도 계산값은 계산기가 연결되기 전에는 만들지 않습니다'));
-check('decision lens observer cannot self-loop on unchanged selected label',lens.includes('selected.textContent!==selectedLabel')&&lens.includes('if(selected&&selected.textContent!==selectedLabel)selected.textContent=selectedLabel'));
-check('decision lens cache version is refreshed',main.includes("coin-decision-lens-v4-refine.js?v=2"));
+check('obsolete decision lens is not installed',!main.includes('installCoinDecisionLens'));
 check('strategy context is carried to coin detail',drilldown.includes('researchSourceStrategyExperiment')&&drilldown.includes('researchSourceStrategyLabel'));
 check('strategy coin click lands on requested decision result',drilldown.includes("viewport:handoff")&&drilldown.includes("selector:'#researchDetail'")&&drilldown.includes('force:true'));
 check('viewport handoff is installed from main entry',main.includes('installViewportHandoff')&&main.includes("./shared/viewport-handoff-v4.js?v=2"));
@@ -62,7 +56,7 @@ check('viewport handoff settles after continuity restoration',viewport.includes(
 check('viewport handoff respects compact displays and reduced motion',viewport.includes("(max-width: 900px)")&&viewport.includes('prefers-reduced-motion: reduce'));
 check('viewport handoff is event driven without mutation observer',!viewport.includes('MutationObserver')&&viewport.includes("root.addEventListener('click',click)"));
 check('reader mode rerender preserves current viewport',main.includes('patchPreservingUi')&&main.includes("'.strategy-table'"));
-check('interaction cache version is refreshed',index.includes('/modules/main.js?v=90'));
+check('interaction cache version is refreshed',index.includes('/modules/main.js?v=91'));
 
 check('coin page prioritizes workspace before historical panels',interaction.includes('>.research-workspace{order:1')&&interaction.includes('>.listing-history-panel:not([data-dex-launch-panel]){order:2'));
 check('asset page prioritizes selection and detail before long history',interaction.includes('>.asset-workspace{order:2')&&interaction.includes('>.asset-history-panel{order:3'));
@@ -72,7 +66,7 @@ check('desktop paper controls remain compact before master detail',interaction.i
 check('desktop strategy click keeps list and selected result together',interaction.includes('grid-template-columns:minmax(430px,1.3fr) minmax(320px,.7fr)!important')&&interaction.includes('max-height:calc(100dvh - 270px)!important')&&interaction.includes('position:sticky!important'));
 check('1024 class display has explicit split layout',interaction.includes('@media(min-width:901px) and (max-width:1080px)'));
 check('stacked displays bound selection lists before handoff',interaction.includes('max-height:44dvh!important'));
-check('mobile keeps basic detail control reachable',interaction.includes('.reader-mode-control{display:inline-flex!important}'));
+check('mobile keeps basic detail control reachable',interaction.includes('.reader-mode-control{display:inline-flex!important'));
 check('detail destinations account for sticky header',interaction.includes('#researchDetail,#assetDetail,#paperDetail,#strategyDetail,#paperBody,#strategyBody{scroll-margin-top:180px}'));
 
 check('secondary nav is centered and more visible',css.includes('.journey-nav{justify-content:center!important')&&css.includes('min-width:132px!important'));
