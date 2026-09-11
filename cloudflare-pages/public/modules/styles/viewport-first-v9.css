@@ -1,6 +1,6 @@
 /* Viewport handoff support after goal-first IA.
    This layer owns shell geometry and compact list-to-detail handoff only.
-   Vertical scrolling belongs to the document. */
+   Scroll ownership is defined by the canonical interaction layer: bounded master rail + document detail. */
 
 :root{--shell-header-offset:112px}
 
@@ -17,15 +17,12 @@
 #pageRoot[data-page-route="assets"] .asset-detail-hero,
 #pageRoot[data-page-route="paper"] .paper-detail-hero{margin-bottom:0!important}
 
-/* Explicitly neutralize older page CSS that created nested vertical scroll regions. */
-#pageRoot[data-page-route="research"] .research-master,
-#pageRoot[data-page-route="research"] .research-master .master-list,
-#pageRoot[data-page-route="assets"] .asset-master,
-#pageRoot[data-page-route="assets"] .allocation-list,
-#pageRoot[data-page-route="assets"] .asset-holdings-list,
-#pageRoot[data-page-route="paper"] .paper-master,
-#pageRoot[data-page-route="paper"] .paper-master #paperList,
-#pageRoot[data-page-route="strategy"] .strategy-workspace>.strategy-table,
+/* Do not override canonical master-rail scrolling here.
+   Result panes stay in document flow and are never height-trapped. */
+#pageRoot[data-page-route="research"] .research-detail,
+#pageRoot[data-page-route="assets"] .asset-detail,
+#pageRoot[data-page-route="paper"] .paper-detail,
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell,
 #pageRoot[data-page-route="strategy"] .strategy-v5-detail-panels{
   height:auto!important;
   max-height:none!important;
