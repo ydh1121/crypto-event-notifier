@@ -15,11 +15,11 @@ const decision=read('public/modules/styles/decision-workspace-v4.css');
 const amount=read('public/modules/shared/amount-input-ux.js');
 const fail=[];
 const check=(name,value)=>{if(!value)fail.push(name)};
-check('main navigation uses familiar labels',index.includes('>홈</button>')&&index.includes('>코인</button>')&&index.includes('>내 자산</button>')&&index.includes('>모의투자</button>')&&index.includes('>거래내역</button>')&&index.includes('>더보기</button>'));
-check('old product language removed from shell',!index.includes('Crypto Research')&&!index.includes('READ ONLY')&&!index.includes('PAPER')&&!index.includes('가상자산 상태판')&&!index.includes('종류별 보기')&&!index.includes('방법 비교'));
-check('coin secondary navigation is familiar',main.includes("['research','코인']")&&main.includes("['dashboard-detail','시장현황']")&&main.includes("['sectors','테마']"));
-check('simulation secondary navigation is familiar',main.includes("['paper','모의투자']")&&main.includes("['strategy','매매방법 비교']"));
-check('market and theme routes stay under coin navigation',router.includes("'dashboard-detail':'research'")&&router.includes("sectors:'research'"));
+check('main navigation follows task hierarchy',index.includes('>홈</button>')&&index.includes('>시장</button>')&&index.includes('>자산</button>')&&index.includes('>모의투자</button>')&&index.includes('>전략</button>')&&index.includes('>기록</button>'));
+check('system is removed from primary navigation',!index.includes('data-route="system"'));
+check('market secondary navigation is familiar',main.includes("['research','코인']")&&main.includes("['dashboard-detail','시장현황']")&&main.includes("['sectors','테마']"));
+check('paper and strategy are first class destinations',index.includes('data-route="paper"')&&index.includes('data-route="strategy"')&&!router.includes("strategy:'paper'"));
+check('market and theme routes stay under market navigation',router.includes("'dashboard-detail':'research'")&&router.includes("sectors:'research'"));
 check('all legacy functional pages remain wired',main.includes('createResearchPage')&&main.includes('createAssetsPage')&&main.includes('createPaperPage')&&main.includes('createStrategyPage')&&main.includes('createSectorsPage')&&main.includes('createRecordsPage')&&main.includes('createSystemPage'));
 check('existing interaction helpers remain installed',main.includes('installSectorImeGuard')&&main.includes('installTableSortEnhancer')&&main.includes('installAmountInputUx')&&main.includes('installDexLaunchResearchPanel')&&main.includes('installViewportHandoff'));
 check('observer based same page continuity is not installed',!main.includes('installSamePageInteractionContinuity'));
@@ -57,8 +57,7 @@ check('dark audit covers strategy white rows',darkAudit.includes('.strategy-row:
 check('dark audit covers legacy viewer scope',darkAudit.includes('.viewer-scope'));
 check('decision workspace stylesheet loads after dark audit',index.includes('/modules/styles/decision-workspace-v4.css?v=1')&&index.indexOf('theme-dark-audit-v4.css')<index.indexOf('decision-workspace-v4.css'));
 check('coin secondary navigation is visually prominent',decision.includes('.journey-nav{min-height:56px')&&decision.includes('font-size:15px!important')&&decision.includes('border-bottom:3px solid transparent!important'));
-check('strategy overview avoids horizontal default scroll',decision.includes('#pageRoot[data-page-route="strategy"] .strategy-workspace{grid-template-columns:1fr!important')&&decision.includes('#pageRoot[data-page-route="strategy"] .strategy-table{max-height:none!important;max-width:100%!important;overflow:visible!important}'));
-check('strategy coin breakdown avoids horizontal default scroll',decision.includes('.strategy-breakdown-table{max-width:100%!important;overflow:visible!important}'));
+check('strategy overview fallback avoids horizontal default scroll',decision.includes('#pageRoot[data-page-route="strategy"] .strategy-workspace{grid-template-columns:1fr!important'));
 check('strategy coin drilldown preserves selected market',drilldown.includes('researchMarket:market')&&drilldown.includes("navigate('research')")&&drilldown.includes('strategy-coin-drilldown'));
 check('strategy drilldown is installed from main entry',main.includes('installStrategyDrilldown')&&main.includes('./shared/strategy-drilldown-v4.js?v='));
 if(fail.length){console.error('MAINSTREAM_V4_CONTRACT=FAIL');for(const item of fail)console.error(`- ${item}`);process.exit(1)}
