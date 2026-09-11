@@ -1,144 +1,429 @@
-/* V4 interaction layout: judge every click by the result visible on the user's real display. */
+/* Canonical interaction geometry / control language.
+   This file loads last and owns layout, overlap prevention and control spacing. */
 
-/* Coin: selection + current judgment first. Historical research remains intact below. */
+:root{
+  --ui-control-h:38px;
+  --ui-control-r:8px;
+  --ui-control-gap:8px;
+  --ui-panel-r:12px;
+  --ui-section-gap:18px;
+}
+
+.app-header{
+  z-index:100!important;
+}
+.app-header-inner{
+  max-width:1540px!important;
+  min-width:0!important;
+}
+.app-main{
+  width:min(1540px,100%)!important;
+  min-width:0!important;
+  padding-left:28px!important;
+  padding-right:28px!important;
+}
+
+/* Only the shell header is sticky. Page panels use normal document flow. */
+#pageRoot .research-master,
+#pageRoot .research-detail,
+#pageRoot .asset-master,
+#pageRoot .asset-detail,
+#pageRoot .paper-master,
+#pageRoot .paper-detail,
+#pageRoot .strategy-table,
+#pageRoot .strategy-detail,
+#pageRoot .strategy-v5-detail-shell,
+#pageRoot .strategy-v5-rail-head,
+#pageRoot .compare-columns{
+  position:static!important;
+  top:auto!important;
+}
+#pageRoot .research-detail,
+#pageRoot .asset-detail,
+#pageRoot .paper-detail,
+#pageRoot .strategy-detail,
+#pageRoot .strategy-v5-detail-shell,
+#pageRoot .strategy-v5-detail-panels{
+  max-height:none!important;
+  overflow:visible!important;
+  overscroll-behavior:auto!important;
+  scrollbar-gutter:auto!important;
+}
+
+/* Workspaces: selection and result share one grid, without nested result scrolling. */
+#pageRoot[data-page-route="research"] .research-workspace,
+#pageRoot[data-page-route="research"] .decision-first-workspace{
+  grid-template-columns:minmax(270px,315px) minmax(0,1fr)!important;
+  gap:28px!important;
+  align-items:start!important;
+  min-height:0!important;
+}
+#pageRoot[data-page-route="assets"] .asset-workspace,
+#pageRoot[data-page-route="paper"] .paper-workspace{
+  grid-template-columns:minmax(280px,330px) minmax(0,1fr)!important;
+  gap:28px!important;
+  align-items:start!important;
+  min-height:0!important;
+}
+#pageRoot[data-page-route="strategy"] .strategy-workspace,
+#pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"]{
+  grid-template-columns:minmax(270px,310px) minmax(0,1fr)!important;
+  gap:28px!important;
+  align-items:start!important;
+  min-height:0!important;
+}
+
+/* Selection rails may scroll; result panes do not create a second viewport. */
+#pageRoot[data-page-route="research"] .research-master,
+#pageRoot[data-page-route="assets"] .asset-master,
+#pageRoot[data-page-route="paper"] .paper-master{
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  overflow:visible!important;
+}
+#pageRoot[data-page-route="research"] .research-master .master-list,
+#pageRoot[data-page-route="assets"] .asset-holdings-list,
+#pageRoot[data-page-route="paper"] .paper-master #paperList,
+#pageRoot[data-page-route="strategy"] .strategy-workspace>.strategy-table,
+#pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"]>.strategy-table{
+  max-height:62dvh!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  overscroll-behavior:contain!important;
+  scrollbar-gutter:stable!important;
+}
+#pageRoot[data-page-route="assets"] .allocation-list{
+  max-height:150px!important;
+  overflow:auto!important;
+}
+
+/* Page order: primary workspace before historical / specialist material. */
 #pageRoot[data-page-route="research"]{display:flex;flex-direction:column}
-#pageRoot[data-page-route="research"]>.page-head{order:0}
-#pageRoot[data-page-route="research"]>.research-workspace{order:1;margin-top:0!important;min-height:0!important}
-#pageRoot[data-page-route="research"]>.listing-history-panel:not([data-dex-launch-panel]){order:2;margin-top:28px;margin-bottom:0!important}
-#pageRoot[data-page-route="research"]>[data-dex-launch-panel]{order:3;margin-top:18px;margin-bottom:0!important}
+#pageRoot[data-page-route="research"]>.page-head,
+#pageRoot[data-page-route="research"]>.page-head-v6{order:0}
+#pageRoot[data-page-route="research"]>.research-workspace{order:1}
+#pageRoot[data-page-route="research"]>.decision-first-extra-research{order:2}
+#pageRoot[data-page-route="research"]>.listing-history-panel:not([data-dex-launch-panel]){order:3}
+#pageRoot[data-page-route="research"]>[data-dex-launch-panel]{order:4}
 
-/* Assets: summary -> selectable holdings + selected result -> long history. */
 #pageRoot[data-page-route="assets"]{display:flex;flex-direction:column}
-#pageRoot[data-page-route="assets"]>.page-head{order:0}
+#pageRoot[data-page-route="assets"]>.page-head,
+#pageRoot[data-page-route="assets"]>.page-head-v6{order:0}
 #pageRoot[data-page-route="assets"]>.asset-kpis{order:1}
-#pageRoot[data-page-route="assets"]>.asset-workspace{order:2;margin-top:0!important}
-#pageRoot[data-page-route="assets"]>.asset-history-panel{order:3;margin-top:28px!important}
+#pageRoot[data-page-route="assets"]>.asset-workspace{order:2}
+#pageRoot[data-page-route="assets"]>.asset-history-panel{order:3;margin-top:30px!important}
 
-/* Click targets must land below the real sticky header, not underneath it. */
-#researchDetail,#assetDetail,#paperDetail,#strategyDetail,#paperBody,#strategyBody{scroll-margin-top:180px}
-
-/* Desktop interaction model: the thing clicked and its result share the viewport. */
-@media(min-width:901px){
-  #pageRoot[data-page-route="research"] .research-workspace{
-    grid-template-columns:minmax(280px,330px) minmax(0,1fr)!important;
-    gap:18px!important;
-    align-items:start!important;
-  }
-  #pageRoot[data-page-route="research"] .research-master .master-list{max-height:calc(100dvh - 390px)!important}
-
-  #pageRoot[data-page-route="assets"] .asset-workspace{
-    grid-template-columns:minmax(280px,340px) minmax(0,1fr)!important;
-    gap:18px!important;
-    align-items:start!important;
-  }
-  #pageRoot[data-page-route="assets"] .allocation-list{max-height:150px!important}
-  #pageRoot[data-page-route="assets"] .asset-holdings-list{max-height:calc(100dvh - 405px)!important}
-
-  #pageRoot[data-page-route="paper"] .paper-strategy-filter{
-    padding:9px 12px!important;
-    margin-bottom:8px!important;
-  }
-  #pageRoot[data-page-route="paper"] .paper-toolbar{
-    grid-template-columns:auto minmax(150px,1fr) minmax(160px,190px) auto!important;
-    gap:8px!important;
-    margin-bottom:8px!important;
-  }
-  #pageRoot[data-page-route="paper"] .paper-toolbar>div{grid-column:auto!important}
-  #pageRoot[data-page-route="paper"] .paper-filter{margin-bottom:8px!important}
-  #pageRoot[data-page-route="paper"] .paper-workspace{
-    grid-template-columns:minmax(280px,340px) minmax(0,1fr)!important;
-    gap:18px!important;
-    min-height:0!important;
-    align-items:start!important;
-  }
-  #pageRoot[data-page-route="paper"] .paper-master #paperList{max-height:calc(100dvh - 420px)!important}
-
-  /* Research, assets and paper now behave like one desktop workbench instead of a long stacked document. */
-  #pageRoot[data-page-route="research"] .research-detail,
-  #pageRoot[data-page-route="assets"] .asset-detail,
-  #pageRoot[data-page-route="paper"] .paper-detail{
-    position:sticky!important;
-    top:156px!important;
-    align-self:start!important;
-    min-width:0!important;
-    max-height:calc(100dvh - 176px)!important;
-    overflow:auto!important;
-    overscroll-behavior:contain;
-    scrollbar-gutter:stable;
-  }
-
-  #pageRoot[data-page-route="strategy"] .strategy-workspace{
-    grid-template-columns:minmax(430px,1.3fr) minmax(320px,.7fr)!important;
-    gap:18px!important;
-    align-items:start!important;
-  }
-  #pageRoot[data-page-route="strategy"] .strategy-table{
-    min-width:0!important;
-    min-height:360px!important;
-    max-height:calc(100dvh - 270px)!important;
-    overflow:auto!important;
-    overscroll-behavior:contain;
-  }
-  #pageRoot[data-page-route="strategy"] .strategy-detail{
-    position:sticky!important;
-    top:156px!important;
-    align-self:start!important;
-    min-width:0!important;
-    max-height:calc(100dvh - 176px)!important;
-    overflow:auto!important;
-  }
+/* Canonical tab language: navigation is flat, not a pill cluster. */
+.journey-nav,
+.subnav,
+#pageRoot .strategy-subnav,
+#pageRoot .decision-first-tabs,
+#pageRoot .strategy-v5-detail-tabs{
+  display:flex!important;
+  align-items:center!important;
+  gap:22px!important;
+  width:100%!important;
+  min-height:44px!important;
+  margin:0 0 18px!important;
+  padding:0!important;
+  overflow-x:auto!important;
+  border:0!important;
+  border-bottom:1px solid var(--line)!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.journey-nav{
+  justify-content:center!important;
+  margin:0!important;
+  padding:0 20px!important;
+}
+.journey-nav button,
+.subnav button,
+#pageRoot .strategy-subnav button,
+#pageRoot .decision-first-tabs button,
+#pageRoot .strategy-v5-detail-tabs button{
+  position:relative!important;
+  flex:0 0 auto!important;
+  min-width:0!important;
+  min-height:44px!important;
+  margin:0!important;
+  padding:0 1px!important;
+  border:0!important;
+  border-bottom:2px solid transparent!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  color:var(--muted)!important;
+  font-size:13px!important;
+  font-weight:700!important;
+  white-space:nowrap!important;
+}
+.journey-nav button.active,
+.subnav button.active,
+#pageRoot .strategy-subnav button.active,
+#pageRoot .decision-first-tabs button.active,
+#pageRoot .strategy-v5-detail-tabs button.active{
+  color:var(--ink)!important;
+  border-bottom-color:var(--accent)!important;
+  background:transparent!important;
+  box-shadow:none!important;
 }
 
-/* 1024-class displays need the same interaction model without cramped text. */
-@media(min-width:901px) and (max-width:1080px){
-  #pageRoot[data-page-route="research"] .research-workspace{grid-template-columns:minmax(250px,29%) minmax(0,1fr)!important}
-  #pageRoot[data-page-route="assets"] .asset-workspace{grid-template-columns:minmax(250px,30%) minmax(0,1fr)!important}
-  #pageRoot[data-page-route="paper"] .paper-workspace{grid-template-columns:minmax(250px,30%) minmax(0,1fr)!important}
-  #pageRoot[data-page-route="strategy"] .strategy-workspace{grid-template-columns:minmax(410px,1.25fr) minmax(300px,.75fr)!important}
-  #pageRoot[data-page-route="strategy"] .strategy-detail-kpis{grid-template-columns:1fr 1fr!important}
+/* Canonical selection controls: separated buttons, never fused capsules. */
+.segmented,
+.reader-mode-control,
+.chip-row{
+  display:flex!important;
+  align-items:center!important;
+  flex-wrap:wrap!important;
+  gap:var(--ui-control-gap)!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.segmented button,
+.reader-mode-control button,
+.chip-row button{
+  min-height:var(--ui-control-h)!important;
+  margin:0!important;
+  padding:8px 12px!important;
+  border:1px solid var(--line)!important;
+  border-radius:var(--ui-control-r)!important;
+  background:var(--surface)!important;
+  box-shadow:none!important;
+  color:var(--muted)!important;
+  font-size:12px!important;
+  font-weight:700!important;
+  white-space:nowrap!important;
+}
+.segmented button:hover,
+.reader-mode-control button:hover,
+.chip-row button:hover{
+  border-color:var(--line-strong)!important;
+  background:var(--surface2)!important;
+  color:var(--ink)!important;
+}
+.segmented button.active,
+.reader-mode-control button.active,
+.chip-row button.active{
+  border-color:rgba(0,102,204,.28)!important;
+  background:var(--accent2)!important;
+  color:var(--accent)!important;
+  box-shadow:none!important;
 }
 
-/* Stacked displays: selection stays compact, then the viewport hands off to the result. */
-@media(max-width:900px){
-  .reader-mode-control{display:inline-flex!important}
+/* Canonical action buttons. */
+.soft-button,
+.paper-next button,
+.paper-toolbar button,
+.compare-toolbar button,
+.avg-actions button,
+.amount-quick-buttons button,
+.direct-presets button,
+[data-paper-reset],
+[data-compare-reset]{
+  min-height:var(--ui-control-h)!important;
+  margin:0!important;
+  padding:8px 12px!important;
+  border:1px solid var(--line)!important;
+  border-radius:var(--ui-control-r)!important;
+  background:var(--surface)!important;
+  box-shadow:none!important;
+  color:var(--ink)!important;
+  font-size:12px!important;
+  font-weight:700!important;
+}
+.soft-button:hover,
+.paper-next button:hover,
+.paper-toolbar button:hover,
+.compare-toolbar button:hover,
+.avg-actions button:hover,
+.amount-quick-buttons button:hover,
+.direct-presets button:hover{
+  border-color:var(--line-strong)!important;
+  background:var(--surface2)!important;
+  color:var(--ink)!important;
+}
+.soft-button.primary{
+  border-color:var(--accent)!important;
+  background:var(--accent)!important;
+  color:#fff!important;
+}
 
+/* Inputs share one geometry. */
+.search,
+.paper-toolbar input,
+.paper-toolbar select,
+.compare-toolbar input,
+.compare-toolbar select,
+.calculator-field input,
+.holding-budget-head input,
+.sector-search input{
+  min-height:42px!important;
+  border:1px solid var(--line)!important;
+  border-radius:var(--ui-control-r)!important;
+  background:var(--surface)!important;
+  box-shadow:none!important;
+}
+
+/* Toolbars always reserve space between controls. */
+.paper-toolbar,
+.compare-toolbar,
+.strategy-breakdown-controls,
+.avg-actions,
+.paper-next>div:last-child,
+.amount-quick-buttons,
+.direct-presets{
+  gap:var(--ui-control-gap)!important;
+}
+.paper-toolbar{
+  grid-template-columns:auto minmax(180px,1fr) minmax(180px,220px) auto!important;
+  margin-bottom:14px!important;
+}
+.compare-toolbar{
+  grid-template-columns:minmax(220px,1fr) minmax(190px,230px) auto!important;
+  margin-bottom:14px!important;
+}
+
+/* Panel geometry: one radius scale, no accidental overlap. */
+.section-panel,
+.paper-combined,
+.exchange-paper-grid>article,
+.paper-next,
+.paper-strategy-filter,
+.paper-master,
+.paper-detail-hero,
+.paper-detail-kpis>span,
+.trade-plan-panel,
+.compare-head,
+.compare-table,
+.asset-master,
+.asset-detail-hero,
+.asset-detail-grid>span,
+.asset-research-sides>article,
+.direct-average-panel,
+.averaging-calculator,
+.holding-plan-panel,
+.profit-plan,
+#pageRoot .strategy-v5-detail-shell,
+#pageRoot .strategy-workspace>.strategy-table{
+  border-radius:var(--ui-panel-r)!important;
+  box-shadow:none!important;
+}
+
+/* Remove cramped equal-card walls from basic mode where one result should dominate. */
+html[data-reader-mode="simple"] #pageRoot[data-page-route="assets"] .asset-detail-grid,
+html[data-reader-mode="simple"] #pageRoot[data-page-route="paper"] .paper-detail-kpis{
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+}
+html[data-reader-mode="simple"] #pageRoot[data-page-route="assets"] .asset-detail-grid>span:nth-child(n+5),
+html[data-reader-mode="simple"] #pageRoot[data-page-route="paper"] .paper-detail-kpis>span:nth-child(n+5){
+  display:none!important;
+}
+
+/* Strategy: the right pane is a normal document section; local tabs only swap content. */
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell{
+  display:block!important;
+  min-height:0!important;
+  border:1px solid var(--line)!important;
+}
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-panels{
+  min-height:0!important;
+}
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell .strategy-detail,
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell .strategy-breakdown,
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell .strategy-evidence{
+  padding:22px!important;
+}
+#pageRoot[data-page-route="strategy"] .strategy-v5-rail-head{
+  z-index:auto!important;
+}
+
+/* Never let a target land under the sticky shell. */
+#researchDetail,#assetDetail,#paperDetail,#strategyDetail,#paperBody,#strategyBody{
+  scroll-margin-top:150px!important;
+}
+
+@media(max-width:1180px){
+  .app-header-inner{
+    grid-template-columns:auto minmax(0,1fr) auto!important;
+    gap:14px!important;
+  }
+  .main-nav button{padding-left:9px!important;padding-right:9px!important}
   #pageRoot[data-page-route="research"] .research-workspace,
+  #pageRoot[data-page-route="research"] .decision-first-workspace,
   #pageRoot[data-page-route="assets"] .asset-workspace,
   #pageRoot[data-page-route="paper"] .paper-workspace,
-  #pageRoot[data-page-route="strategy"] .strategy-workspace{gap:18px!important}
-
-  #pageRoot[data-page-route="research"] .research-master .master-list,
-  #pageRoot[data-page-route="assets"] .asset-holdings-list,
-  #pageRoot[data-page-route="paper"] .paper-master #paperList{max-height:44dvh!important}
-
-  #pageRoot[data-page-route="research"] .research-detail,
-  #pageRoot[data-page-route="assets"] .asset-detail,
-  #pageRoot[data-page-route="paper"] .paper-detail,
-  #pageRoot[data-page-route="strategy"] .strategy-detail{
-    position:static!important;
-    top:auto!important;
-    max-height:none!important;
-    overflow:visible!important;
+  #pageRoot[data-page-route="strategy"] .strategy-workspace,
+  #pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"]{
+    grid-template-columns:minmax(245px,30%) minmax(0,1fr)!important;
+    gap:20px!important;
   }
-
-  #pageRoot[data-page-route="strategy"] .strategy-table{
-    min-height:0!important;
-    max-height:none!important;
-    overflow:visible!important;
-  }
-
-  #researchDetail,#assetDetail,#paperDetail,#strategyDetail{padding-top:4px}
 }
 
-/* Mobile keeps the Basic/Detail control reachable because Basic hides secondary V4 evidence. */
-@media(max-width:620px){
-  .header-tools{gap:6px!important;justify-content:flex-end!important;flex-wrap:wrap!important}
-  .reader-mode-control{padding:2px!important}
-  .reader-mode-control button{min-height:36px!important;padding:6px 8px!important;font-size:12px!important}
-  .theme-toggle,.logout{min-height:36px!important}
+@media(max-width:980px){
+  .app-header-inner{
+    grid-template-columns:1fr auto!important;
+    grid-template-areas:"brand tools" "nav nav"!important;
+  }
+  .main-nav{grid-area:nav!important}
+  .header-tools{grid-area:tools!important;gap:8px!important}
+  .app-main{padding-left:18px!important;padding-right:18px!important}
+}
 
-  #pageRoot[data-page-route="research"] .decision-hero,
-  #pageRoot[data-page-route="assets"] .asset-detail-hero,
-  #pageRoot[data-page-route="paper"] .paper-detail-hero,
-  #pageRoot[data-page-route="strategy"] .strategy-detail{padding:14px!important}
+@media(max-width:900px){
+  #pageRoot[data-page-route="research"] .research-workspace,
+  #pageRoot[data-page-route="research"] .decision-first-workspace,
+  #pageRoot[data-page-route="assets"] .asset-workspace,
+  #pageRoot[data-page-route="paper"] .paper-workspace,
+  #pageRoot[data-page-route="strategy"] .strategy-workspace,
+  #pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"]{
+    display:block!important;
+  }
+  #pageRoot[data-page-route="research"] .research-master,
+  #pageRoot[data-page-route="assets"] .asset-master,
+  #pageRoot[data-page-route="paper"] .paper-master,
+  #pageRoot[data-page-route="strategy"] .strategy-workspace>.strategy-table{
+    margin-bottom:24px!important;
+  }
+  #pageRoot[data-page-route="research"] .research-master .master-list,
+  #pageRoot[data-page-route="assets"] .asset-holdings-list,
+  #pageRoot[data-page-route="paper"] .paper-master #paperList,
+  #pageRoot[data-page-route="strategy"] .strategy-workspace>.strategy-table{
+    max-height:44dvh!important;
+  }
+  .paper-toolbar,
+  .compare-toolbar{
+    grid-template-columns:1fr 1fr!important;
+  }
+  .paper-toolbar>div{grid-column:1/-1!important}
+}
+
+@media(max-width:620px){
+  .app-main{padding-left:14px!important;padding-right:14px!important}
+  .header-tools{width:100%!important;justify-content:flex-start!important;flex-wrap:wrap!important}
+  .journey-nav,
+  .subnav,
+  #pageRoot .strategy-subnav,
+  #pageRoot .decision-first-tabs,
+  #pageRoot .strategy-v5-detail-tabs{
+    gap:18px!important;
+  }
+  .paper-toolbar,
+  .compare-toolbar{
+    grid-template-columns:1fr!important;
+  }
+  .paper-toolbar>div{grid-column:auto!important}
+  html[data-reader-mode="simple"] #pageRoot[data-page-route="assets"] .asset-detail-grid,
+  html[data-reader-mode="simple"] #pageRoot[data-page-route="paper"] .paper-detail-kpis{
+    grid-template-columns:1fr!important;
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  *{scroll-behavior:auto!important}
 }

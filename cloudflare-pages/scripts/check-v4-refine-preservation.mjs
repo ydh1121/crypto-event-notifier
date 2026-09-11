@@ -24,8 +24,8 @@ check('all v4 functional pages remain wired',['createResearchPage','createAssets
 check('coin market theme group remains',main.includes("['research','코인']")&&main.includes("['dashboard-detail','시장현황']")&&main.includes("['sectors','테마']"));
 check('paper strategy group remains',main.includes("['paper','모의투자']")&&main.includes("['strategy','매매방법 비교']"));
 check('v4 style stack remains',['mainstream-v4.css','layout-fixes-v4.css','theme-dark-v4.css','theme-dark-audit-v4.css','decision-workspace-v4.css'].every(value=>index.includes(value)));
-check('refine layer loads after v4',index.includes('v4-refine-v1.css')&&index.indexOf('decision-workspace-v4.css')<index.indexOf('v4-refine-v1.css'));
-check('interaction layout loads after refine',index.includes('interaction-layout-v4.css?v=2')&&index.indexOf('v4-refine-v1.css')<index.indexOf('interaction-layout-v4.css'));
+check('refine layer remains after v4',index.includes('v4-refine-v1.css')&&index.indexOf('decision-workspace-v4.css')<index.indexOf('v4-refine-v1.css'));
+check('canonical interaction layer loads last',index.includes('interaction-layout-v4.css?v=3')&&index.indexOf('decision-first-v7.css')<index.indexOf('interaction-layout-v4.css'));
 
 check('research workspace remains',research.includes('research-workspace')&&research.includes('research-detail'));
 check('research listing study remains',research.includes('listing-history-panel'));
@@ -53,21 +53,20 @@ check('compact list selections reveal their detail result',['[data-research-mark
 check('paper summary action reveals the newly selected tab result',viewport.includes(".paper-next [data-paper-tab]")&&viewport.includes("reveal(root,'#paperBody',{force:true})"));
 check('viewport handoff retries after synchronous rerenders',viewport.includes('retries=6')&&viewport.includes('remaining-=1')&&viewport.includes('if(remaining>0)attempt()'));
 check('viewport handoff settles after continuity restoration',viewport.includes('requestAnimationFrame(()=>{')&&viewport.includes('settled=root.querySelector(selector)')&&viewport.includes('settle:true'));
-check('viewport handoff respects compact displays and reduced motion',viewport.includes("(max-width: 900px)")&&viewport.includes('prefers-reduced-motion: reduce'));
+check('viewport handoff respects compact displays and reduced motion',viewport.includes('(max-width: 900px)')&&viewport.includes('prefers-reduced-motion: reduce'));
 check('viewport handoff is event driven without mutation observer',!viewport.includes('MutationObserver')&&viewport.includes("root.addEventListener('click',click)"));
-check('reader mode rerender preserves current viewport',main.includes('patchPreservingUi')&&main.includes("'.strategy-table'"));
-check('interaction cache version is refreshed',index.includes('/modules/main.js?v=92'));
+check('reader mode deliberate rerender preserves current viewport',main.includes('patchPreservingUi')&&main.includes("'.strategy-table'"));
+check('main cache version is refreshed',index.includes('/modules/main.js?v=93'));
 
-check('coin page prioritizes workspace before historical panels',interaction.includes('>.research-workspace{order:1')&&interaction.includes('>.listing-history-panel:not([data-dex-launch-panel]){order:2'));
+check('coin page prioritizes workspace before historical panels',interaction.includes('Page order: primary workspace')&&interaction.includes('>.research-workspace{order:1'));
 check('asset page prioritizes selection and detail before long history',interaction.includes('>.asset-workspace{order:2')&&interaction.includes('>.asset-history-panel{order:3'));
-check('desktop research selection and result share one viewport',interaction.includes('grid-template-columns:minmax(280px,330px) minmax(0,1fr)!important'));
-check('desktop asset selection and result share one viewport',interaction.includes('grid-template-columns:minmax(280px,340px) minmax(0,1fr)!important'));
-check('desktop paper controls remain compact before master detail',interaction.includes('.paper-toolbar')&&interaction.includes('grid-template-columns:auto minmax(150px,1fr) minmax(160px,190px) auto!important'));
-check('desktop strategy click keeps list and selected result together',interaction.includes('grid-template-columns:minmax(430px,1.3fr) minmax(320px,.7fr)!important')&&interaction.includes('max-height:calc(100dvh - 270px)!important')&&interaction.includes('position:sticky!important'));
-check('1024 class display has explicit split layout',interaction.includes('@media(min-width:901px) and (max-width:1080px)'));
-check('stacked displays bound selection lists before handoff',interaction.includes('max-height:44dvh!important'));
-check('mobile keeps basic detail control reachable',interaction.includes('.reader-mode-control{display:inline-flex!important'));
-check('detail destinations account for sticky header',interaction.includes('#researchDetail,#assetDetail,#paperDetail,#strategyDetail,#paperBody,#strategyBody{scroll-margin-top:180px}'));
+check('desktop research selection and result share one viewport',interaction.includes('grid-template-columns:minmax(270px,315px) minmax(0,1fr)!important'));
+check('desktop asset selection and result share one viewport',interaction.includes('grid-template-columns:minmax(280px,330px) minmax(0,1fr)!important'));
+check('paper controls reserve control gaps',interaction.includes('.paper-toolbar')&&interaction.includes('gap:var(--ui-control-gap)!important'));
+check('desktop strategy keeps list and selected result together',interaction.includes('grid-template-columns:minmax(270px,310px) minmax(0,1fr)!important'));
+check('result panes do not become nested viewports',interaction.includes('.strategy-v5-detail-panels')&&interaction.includes('overflow:visible!important'));
+check('stacked displays bound selection rails before handoff',interaction.includes('max-height:44dvh!important'));
+check('detail destinations account for sticky shell',interaction.includes('#researchDetail,#assetDetail,#paperDetail,#strategyDetail,#paperBody,#strategyBody'));
 
 check('secondary nav is centered and more visible',css.includes('.journey-nav{justify-content:center!important')&&css.includes('min-width:132px!important'));
 check('all strategy metrics are explicitly restored',css.includes('.strategy-row>span')&&css.includes('display:block!important')&&css.includes("content:'손익비'")&&css.includes("content:'승률'")&&css.includes("content:'검증'"));

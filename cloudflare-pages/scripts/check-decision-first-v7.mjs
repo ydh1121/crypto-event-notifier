@@ -9,7 +9,8 @@ const check=(name,value)=>{if(!value)fail.push(name)};
 
 check('decision-first stylesheet is loaded',index.includes('/modules/styles/decision-first-v7.css?v=1'));
 check('decision-first stylesheet loads after visual QA',index.indexOf('visual-qa-v6.css')<index.indexOf('decision-first-v7.css'));
-check('main cache is refreshed for V7',index.includes('/modules/main.js?v=92'));
+check('canonical interaction layer loads after decision-first',index.indexOf('decision-first-v7.css')<index.indexOf('interaction-layout-v4.css'));
+check('main cache is refreshed for V8',index.includes('/modules/main.js?v=93'));
 check('research module cache is refreshed',main.includes("./pages/research.js?v=42"));
 
 check('inert decision lens is not installed',!main.includes('installCoinDecisionLens'));
@@ -21,7 +22,7 @@ check('secondary listing research is collapsed',research.includes('<details clas
 
 check('coin selection updates detail without full page render',research.includes("selectListRow(market);renderDetail({refreshDetail:true})"));
 check('filter updates list locally',research.includes('updateFilterState();const list=filteredRows();ensureSelected(list);renderList(list)'));
-check('filter keeps current detail in place when selection survives',research.includes("else patchDetailLive();return"));
+check('filter keeps current detail in place when selection survives',research.includes('else patchDetailLive();return'));
 check('snapshot uses local refresh path',research.includes("if(m.type==='snapshot')refreshSnapshot()"));
 check('snapshot live values patch in place',research.includes('function patchDetailLive()')&&research.includes('data-research-live="decision"')&&research.includes('data-research-live="price"'));
 check('snapshot avoids unconditional detail rerender',research.includes("if(previousMarket!==ui().researchMarket||!patchDetailLive())renderDetail({refreshDetail:previousMarket!==ui().researchMarket})"));

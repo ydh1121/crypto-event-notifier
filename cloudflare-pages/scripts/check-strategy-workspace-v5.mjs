@@ -4,13 +4,14 @@ const index=read('public/index.html');
 const main=read('public/modules/main.js');
 const strategy=read('public/modules/pages/strategy.js');
 const css=read('public/modules/styles/strategy-native-v5.css');
+const interaction=read('public/modules/styles/interaction-layout-v4.css');
 const fail=[];
 const check=(name,value)=>{if(!value)fail.push(name)};
 
 check('native strategy stylesheet is loaded',index.includes('/modules/styles/strategy-native-v5.css?v=1'));
-check('native strategy stylesheet loads after interaction layout',index.indexOf('interaction-layout-v4.css')<index.indexOf('strategy-native-v5.css'));
+check('native strategy stylesheet loads before canonical interaction layer',index.indexOf('strategy-native-v5.css')<index.indexOf('interaction-layout-v4.css'));
 check('temporary strategy DOM patch is not loaded',!index.includes('strategy-workspace-v5.js'));
-check('main cache version is refreshed',index.includes('/modules/main.js?v=92'));
+check('main cache version is refreshed',index.includes('/modules/main.js?v=93'));
 check('strategy module cache version is refreshed',main.includes("./pages/strategy.js?v=47"));
 check('overview renders native master detail workspace',strategy.includes('data-strategy-workspace-v5="ready"')&&strategy.includes('strategy-v5-detail-shell'));
 check('three local strategy detail tabs exist',['summary','coins','evidence'].every(value=>strategy.includes(`item('${value}'`)));
@@ -24,12 +25,14 @@ check('overview is master detail, not wide strategy table',css.includes('grid-te
 check('strategy rail suppresses legacy pseudo-table labels',css.includes('.strategy-v5-strategy-item>span::before')&&css.includes('content:none!important'));
 check('selected strategy has clear active rail',css.includes('border-left-color:var(--accent)!important'));
 check('detail uses local tabs',css.includes('.strategy-v5-detail-tabs'));
-check('detail uses one bounded desktop scroll area',css.includes('.strategy-v5-detail-panels')&&css.includes('overflow:auto!important'));
+check('native layer keeps one detail shell',css.includes('.strategy-v5-detail-shell'));
+check('canonical layer removes nested detail viewport',interaction.includes('.strategy-v5-detail-panels')&&interaction.includes('overflow:visible!important'));
+check('canonical layer removes sticky strategy detail shell',interaction.includes('.strategy-v5-detail-shell')&&interaction.includes('position:static!important'));
 check('summary has one visually dominant metric',css.includes('.strategy-detail-kpis>span:first-child')&&css.includes('font-size:28px!important'));
 check('coin detail restores a dense desktop table',css.includes('.strategy-breakdown-table .strategy-coin-row.columns')&&css.includes('min-width:820px!important'));
 check('paper benchmark avoids six equal cards',css.includes('.strategy-paper-kpis>span:nth-child(1)')&&css.includes('grid-column:span 6!important'));
-check('mobile stacks master and detail',css.includes('@media(max-width:900px)')&&css.includes('grid-template-columns:1fr!important'));
-check('reduced motion is honored',css.includes('@media(prefers-reduced-motion:reduce)'));
+check('mobile stacks master and detail',interaction.includes('@media(max-width:900px)')&&interaction.includes('display:block!important'));
+check('reduced motion is honored',css.includes('@media(prefers-reduced-motion:reduce)')||interaction.includes('@media(prefers-reduced-motion:reduce)'));
 check('user-facing strategy copy removes Adaptive label',!strategy.includes('Adaptive'));
 
 if(fail.length){console.error('STRATEGY_WORKSPACE_V5=FAIL');for(const item of fail)console.error(`- ${item}`);process.exit(1)}

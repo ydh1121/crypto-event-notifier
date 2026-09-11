@@ -47,17 +47,14 @@ function replaceText(value){
   for(const[from,to]of REPLACEMENTS)out=out.split(from).join(to);
   return out;
 }
-
 function rawElement(element){return !element||element.closest?.('[data-raw-text]')}
 function skipTextElement(element){return rawElement(element)||['SCRIPT','STYLE','CODE','PRE','TEXTAREA','INPUT','SELECT'].includes(element.tagName)}
 function skipAttributes(element){return rawElement(element)||['SCRIPT','STYLE','CODE','PRE'].includes(element.tagName)}
-
 function translateTextNode(node){
   if(node.nodeType!==Node.TEXT_NODE||skipTextElement(node.parentElement))return;
   const next=replaceText(node.nodeValue);
   if(next!==node.nodeValue)node.nodeValue=next;
 }
-
 function translateElement(element){
   if(!(element instanceof Element)||skipAttributes(element))return;
   for(const attr of['placeholder','aria-label','title']){
@@ -67,10 +64,12 @@ function translateElement(element){
   }
   if(!skipTextElement(element))for(const node of element.childNodes)if(node.nodeType===Node.TEXT_NODE)translateTextNode(node);
 }
-
-function walk(root){
-  if(root instanceof Element)translateElement(root);
-  const walker=document.createTreeWalker(root,NodeFilter.SHOW_ELEMENT|NodeFilter.SHOW_TEXT);
+function walk(target){
+  if(!target)return;
+  if(target.nodeType===Node.TEXT_NODE){translateTextNode(target);return}
+  if(!(target instanceof Element||target instanceof Document||target instanceof DocumentFragment))return;
+  if(target instanceof Element)translateElement(target);
+  const walker=document.createTreeWalker(target,NodeFilter.SHOW_ELEMENT|NodeFilter.SHOW_TEXT);
   let node=walker.nextNode();
   while(node){
     if(node.nodeType===Node.TEXT_NODE)translateTextNode(node);
@@ -79,18 +78,26 @@ function walk(root){
   }
 }
 
+export function refreshMainstreamUi(target=document.body){walk(target)}
+
 export function installMainstreamUi(root=document.body){
-  if(!root||root.dataset?.mainstreamUi==='1')return;
+  if(!root||root.dataset?.mainstreamUi==='1')return()=>{};
   if(root.dataset)root.dataset.mainstreamUi='1';
-  walk(root);
-  const observer=new MutationObserver(records=>{
-    for(const record of records){
-      if(record.type==='characterData')translateTextNode(record.target);
-      for(const node of record.addedNodes){
-        if(node.nodeType===Node.TEXT_NODE)translateTextNode(node);
-        else if(node.nodeType===Node.ELEMENT_NODE)walk(node);
-      }
-    }
-  });
-  observer.observe(root,{childList:true,subtree:true,characterData:true});
+  let queued=false,pending=root;
+  const flush=()=>{
+    queued=false;
+    const target=pending||root;
+    pending=null;
+    walk(target);
+  };
+  const queue=target=>{
+    pending=target instanceof Node?target:root;
+    if(queued)return;
+    queued=true;
+    queueMicrotask(flush);
+  };
+  const refresh=event=>queue(event?.detail?.node||event?.target||root);
+  root.addEventListener('ui:refresh',refresh);
+  queue(root);
+  return()=>root.removeEventListener('ui:refresh',refresh);
 }

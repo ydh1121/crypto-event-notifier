@@ -21,7 +21,8 @@ check('coin secondary navigation is familiar',main.includes("['research','코인
 check('simulation secondary navigation is familiar',main.includes("['paper','모의투자']")&&main.includes("['strategy','매매방법 비교']"));
 check('market and theme routes stay under coin navigation',router.includes("'dashboard-detail':'research'")&&router.includes("sectors:'research'"));
 check('all legacy functional pages remain wired',main.includes('createResearchPage')&&main.includes('createAssetsPage')&&main.includes('createPaperPage')&&main.includes('createStrategyPage')&&main.includes('createSectorsPage')&&main.includes('createRecordsPage')&&main.includes('createSystemPage'));
-check('existing interaction helpers remain installed',main.includes('installSectorImeGuard')&&main.includes('installTableSortEnhancer')&&main.includes('installSamePageInteractionContinuity')&&main.includes('installAmountInputUx')&&main.includes('installDexLaunchResearchPanel'));
+check('existing interaction helpers remain installed',main.includes('installSectorImeGuard')&&main.includes('installTableSortEnhancer')&&main.includes('installAmountInputUx')&&main.includes('installDexLaunchResearchPanel')&&main.includes('installViewportHandoff'));
+check('observer based same page continuity is not installed',!main.includes('installSamePageInteractionContinuity'));
 check('new home is portfolio and transaction oriented',home.includes("sectionHead('시장현황'")&&home.includes("sectionHead('코인'")&&home.includes("sectionHead('내 자산'")&&home.includes("sectionHead('최근 거래'"));
 check('home avoids invented jargon',!home.includes('참고점수')&&!home.includes('시장 흐름')&&!home.includes('가상매매')&&!home.includes('리서치')&&!home.includes('전략')&&!home.includes('PAPER'));
 check('terminology normalizer covers legacy jargon',words.includes("['리서치','코인 정보']")&&words.includes("['섹터','테마']")&&words.includes("['PAPER','모의투자']")&&words.includes("['전략','매매방법']")&&words.includes("['평단','평균 매수가']")&&words.includes("['물타기','추가매수']")&&words.includes("['익절','수익 실현']")&&words.includes("['손절','손실 제한']"));
@@ -42,10 +43,10 @@ check('table cells can shrink without text collision',layout.includes('.mainstre
 check('dark mode stylesheet loads after layout',index.includes('/modules/styles/theme-dark-v4.css?v=1')&&index.indexOf('layout-fixes-v4.css')<index.indexOf('theme-dark-v4.css'));
 check('dark audit stylesheet loads after base dark mode',index.includes('/modules/styles/theme-dark-audit-v4.css?v=1')&&index.indexOf('theme-dark-v4.css')<index.indexOf('theme-dark-audit-v4.css'));
 check('dark mode controls exist before and after login',index.includes('class="auth-theme-toggle" data-theme-toggle')&&index.includes('class="theme-toggle" data-theme-toggle'));
-check('dark mode is installed from main entry',main.includes("installThemeToggle")&&main.includes("./shared/theme.js?v=1"));
-check('dark mode persists user choice',theme.includes("localStorage.setItem(STORAGE_KEY,next)")&&theme.includes("localStorage.getItem(STORAGE_KEY)"));
-check('dark mode follows system until user chooses',theme.includes("prefers-color-scheme: dark")&&theme.includes("if(savedTheme())return"));
-check('dark mode updates browser chrome',theme.includes("meta[name=\"theme-color\"]")&&theme.includes("#111214"));
+check('dark mode is installed from main entry',main.includes('installThemeToggle')&&main.includes("./shared/theme.js?v=1"));
+check('dark mode persists user choice',theme.includes('localStorage.setItem(STORAGE_KEY,next)')&&theme.includes('localStorage.getItem(STORAGE_KEY)'));
+check('dark mode follows system until user chooses',theme.includes('prefers-color-scheme: dark')&&theme.includes('if(savedTheme())return'));
+check('dark mode updates browser chrome',theme.includes('meta[name="theme-color"]')&&theme.includes('#111214'));
 check('dark mode covers shell and legacy surfaces',dark.includes('html[data-theme="dark"] .app-header')&&dark.includes('html[data-theme="dark"] .research-master')&&dark.includes('html[data-theme="dark"] .paper-master')&&dark.includes('html[data-theme="dark"] .records-feed'));
 check('dark audit covers dashboard light surfaces',darkAudit.includes('.priority-item')&&darkAudit.includes('.summary-tile')&&darkAudit.includes('.allocation-donut::after'));
 check('dark audit covers chart light surfaces',darkAudit.includes('.mini-chart')&&darkAudit.includes('.major-context>div')&&darkAudit.includes('.history-range button.active')&&darkAudit.includes('.fill-marker'));

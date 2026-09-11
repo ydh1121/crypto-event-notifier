@@ -1,4 +1,3 @@
-import{patchPreservingUi}from'../shared/ui-continuity.js';
 const ROUTES=new Set(['dashboard','dashboard-detail','research','assets','paper','strategy','sectors','records','system']);
 const NAV_PARENT={
   'dashboard-detail':'research',
@@ -39,9 +38,19 @@ export function createRouter({store,root,nav,pages,onChange}){
   function syncNav(name){const active=navRouteFor(name);nav?.querySelectorAll('[data-route]').forEach(b=>b.classList.toggle('active',b.dataset.route===active))}
   function go(name,{replace=false}={}){
     if(!ROUTES.has(name))name='dashboard';
-    if(currentName===name){patchPreservingUi(root,()=>current?.render?.(),{scrollSelectors:['[data-preserve-scroll]']});syncNav(name);onChange?.(name);return}
+    if(currentName===name){syncNav(name);onChange?.(name);return}
     carryContext(store,currentName,name);
-    current?.destroy?.();currentName=name;store.setUi({route:name},{scope:'router'});syncNav(name);root.innerHTML='';current=pages[name]?.();if(!current)throw new Error(`unknown page ${name}`);current.mount(root);current.render();onChange?.(name);if(!replace)window.scrollTo({top:0,left:0,behavior:'auto'})
+    current?.destroy?.();
+    currentName=name;
+    store.setUi({route:name},{scope:'router'});
+    syncNav(name);
+    root.innerHTML='';
+    current=pages[name]?.();
+    if(!current)throw new Error(`unknown page ${name}`);
+    current.mount(root);
+    current.render();
+    onChange?.(name);
+    if(!replace)window.scrollTo({top:0,left:0,behavior:'auto'});
   }
   nav?.addEventListener('click',e=>{const b=e.target.closest('[data-route]');if(b)go(b.dataset.route)});
   return{go,current:()=>currentName,render:()=>current?.render?.()};

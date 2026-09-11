@@ -1,20 +1,20 @@
 import{store}from'./core/store.js';
-import{createRouter}from'./core/router.js';
+import{createRouter}from'./core/router.js?v=2';
 import{createAuth}from'./core/auth.js';
 import{createSnapshotPoller}from'./core/snapshot.js';
 import{esc}from'./shared/format.js';
 import{installSectorImeGuard}from'./shared/sector-ime-guard.js?v=37';
 import{installTableSortEnhancer}from'./shared/table-sort-enhancer.js?v=37';
-import{installSamePageInteractionContinuity,patchPreservingUi}from'./shared/ui-continuity.js?v=38';
-import{installAmountInputUx}from'./shared/amount-input-ux.js?v=1';
-import{installMainstreamUi}from'./shared/mainstream-ui.js?v=1';
+import{patchPreservingUi}from'./shared/ui-continuity.js?v=38';
+import{installAmountInputUx}from'./shared/amount-input-ux.js?v=2';
+import{installMainstreamUi}from'./shared/mainstream-ui.js?v=2';
 import{installThemeToggle}from'./shared/theme.js?v=1';
 import{installStrategyDrilldown}from'./shared/strategy-drilldown-v4.js?v=3';
 import{installViewportHandoff}from'./shared/viewport-handoff-v4.js?v=2';
 import{createHomePage}from'./pages/v4/home.js?v=2';
 import{createDashboardPage}from'./pages/dashboard.js';
 import{createResearchPage}from'./pages/research.js?v=42';
-import{installDexLaunchResearchPanel}from'./pages/dex-launch-panel.js?v=44';
+import{installDexLaunchResearchPanel}from'./pages/dex-launch-panel.js?v=45';
 import{createAssetsPage}from'./pages/assets.js?v=49';
 import{createPaperPage}from'./pages/paper.js?v=46';
 import{createStrategyPage}from'./pages/strategy.js?v=47';
@@ -31,11 +31,20 @@ const nav=document.getElementById('mainNav');
 const journey=document.getElementById('journeyNav');
 const reader=document.getElementById('readerModeControl');
 
-installSamePageInteractionContinuity(root);
 installAmountInputUx(root);
 installDexLaunchResearchPanel({store,root});
 installMainstreamUi(document.body);
 installViewportHandoff({root});
+
+let refreshQueued=false;
+function queueUiRefresh(){
+  if(refreshQueued)return;
+  refreshQueued=true;
+  queueMicrotask(()=>{
+    refreshQueued=false;
+    root?.dispatchEvent(new CustomEvent('ui:refresh',{bubbles:true,detail:{node:root}}));
+  });
+}
 
 let router=null;
 const pages={
@@ -64,6 +73,7 @@ function renderJourney(name){
   const items=GROUPS[name]||[];
   journey.classList.toggle('hidden',!items.length);
   journey.innerHTML=items.map(([route,label])=>`<button data-journey-route="${route}" class="${route===name?'active':''}">${label}</button>`).join('');
+  queueUiRefresh();
 }
 
 function readerMode(){return store.get().ui.readerMode==='detail'?'detail':'simple'}
@@ -86,18 +96,19 @@ reader?.addEventListener('click',event=>{
   patchPreservingUi(root,()=>router?.render(),{
     scrollSelectors:['[data-preserve-scroll]','.master-list','.asset-holdings-list','#paperList','.strategy-table'],
   });
+  queueUiRefresh();
 });
 journey?.addEventListener('click',event=>{
   const button=event.target.closest('[data-journey-route]');
   if(button)router.go(button.dataset.journeyRoute);
 });
 
-router=createRouter({store,root,nav,pages,onChange:renderJourney});
+router=createRouter({store,root,nav,pages,onChange:name=>{renderJourney(name);queueUiRefresh()}});
 installStrategyDrilldown({store,root,navigate:name=>router.go(name)});
 const poller=createSnapshotPoller({store,onUnauthorized:()=>auth.showAuth()});
 const auth=createAuth({
   store,
-  onReady(){poller.start();router.go(store.get().ui.route||'dashboard',{replace:true});renderShell()},
+  onReady(){poller.start();router.go(store.get().ui.route||'dashboard',{replace:true});renderShell();queueUiRefresh()},
   onLogout(){poller.stop()},
 });
 
@@ -112,6 +123,7 @@ function renderShell(){
 store.subscribe((_,meta)=>{
   if(['snapshot','error','user','session-reset'].includes(meta.type))renderShell();
   if(meta.type==='ui'&&meta.scope==='reader-mode')renderReader();
+  if(['snapshot','ui','error','user','session-reset'].includes(meta.type))queueUiRefresh();
 });
 document.getElementById('userMenuBtn')?.addEventListener('click',()=>router.go('system'));
 renderReader();
