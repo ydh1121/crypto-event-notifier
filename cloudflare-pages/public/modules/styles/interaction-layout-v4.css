@@ -1,6 +1,6 @@
 /* Canonical interaction geometry / control language.
    This file owns final layout, overlap prevention and control spacing.
-   Goal-first IA: one content width, one vertical document scroll, one primary answer. */
+   Goal-first IA: one content width, explicit scroll ownership, one primary answer. */
 
 :root{
   --ui-control-h:38px;
@@ -35,14 +35,10 @@
   margin-right:0!important;
 }
 
-/* Only the shell header is sticky. Page regions remain in document flow. */
-#pageRoot .research-master,
+/* Result panes stay in normal document flow. Selection rails may own bounded scroll. */
 #pageRoot .research-detail,
-#pageRoot .asset-master,
 #pageRoot .asset-detail,
-#pageRoot .paper-master,
 #pageRoot .paper-detail,
-#pageRoot .strategy-table,
 #pageRoot .strategy-detail,
 #pageRoot .strategy-v5-detail-shell,
 #pageRoot .strategy-v5-rail-head,
@@ -51,18 +47,10 @@
   top:auto!important;
 }
 
-/* One vertical scroll belongs to the document. Internal panes never trap wheel/touch scroll. */
-#pageRoot .research-master,
-#pageRoot .research-master .master-list,
+/* Detail content is read with the page. Never trap the result in a second vertical viewport. */
 #pageRoot .research-detail,
-#pageRoot .asset-master,
-#pageRoot .asset-holdings-list,
-#pageRoot .allocation-list,
 #pageRoot .asset-detail,
-#pageRoot .paper-master,
-#pageRoot .paper-master #paperList,
 #pageRoot .paper-detail,
-#pageRoot .strategy-workspace>.strategy-table,
 #pageRoot .strategy-detail,
 #pageRoot .strategy-v5-detail-shell,
 #pageRoot .strategy-v5-detail-panels{
@@ -73,12 +61,37 @@
   overscroll-behavior:auto!important;
   scrollbar-gutter:auto!important;
 }
+
+/* A master-detail screen needs the selectable rail to remain usable while the detail gets long.
+   The rail owns one bounded scroll; children do not create extra nested scrollers. */
 #pageRoot .research-master .master-list,
 #pageRoot .asset-holdings-list,
 #pageRoot .allocation-list,
-#pageRoot .paper-master #paperList,
-#pageRoot .strategy-workspace>.strategy-table{
+#pageRoot .paper-master #paperList{
+  height:auto!important;
+  max-height:none!important;
+  overflow-y:visible!important;
   overflow-x:hidden!important;
+  overscroll-behavior:auto!important;
+  scrollbar-gutter:auto!important;
+}
+
+@media(min-width:901px){
+  #pageRoot[data-page-route="research"] .research-master,
+  #pageRoot[data-page-route="assets"] .asset-master,
+  #pageRoot[data-page-route="paper"] .paper-master,
+  #pageRoot[data-page-route="strategy"] .strategy-workspace>.strategy-table,
+  #pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"]>.strategy-table{
+    position:sticky!important;
+    top:calc(var(--shell-header-offset,112px) + 16px)!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:calc(100dvh - var(--shell-header-offset,112px) - 32px)!important;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    overscroll-behavior:contain!important;
+    scrollbar-gutter:stable!important;
+  }
 }
 
 /* All selection/result workspaces share one geometry. */
@@ -320,10 +333,23 @@ html[data-reader-mode="simple"] #pageRoot[data-page-route="paper"] .paper-detail
   #pageRoot[data-page-route="paper"] .paper-workspace,
   #pageRoot[data-page-route="strategy"] .strategy-workspace,
   #pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"]{display:block!important}
+
   #pageRoot[data-page-route="research"] .research-master,
   #pageRoot[data-page-route="assets"] .asset-master,
   #pageRoot[data-page-route="paper"] .paper-master,
-  #pageRoot[data-page-route="strategy"] .strategy-workspace>.strategy-table{margin-bottom:24px!important}
+  #pageRoot[data-page-route="strategy"] .strategy-workspace>.strategy-table,
+  #pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"]>.strategy-table{
+    position:static!important;
+    top:auto!important;
+    height:auto!important;
+    max-height:min(52dvh,520px)!important;
+    margin-bottom:24px!important;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    overscroll-behavior:contain!important;
+    scrollbar-gutter:stable!important;
+  }
+
   #pageRoot[data-page-route="research"] .decision-first-hero{
     grid-template-columns:1fr!important;
     grid-template-areas:"price" "conclusion" "vitals"!important;
