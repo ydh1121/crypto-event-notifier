@@ -10,8 +10,8 @@ const interaction=read('public/modules/styles/interaction-layout-v4.css');
 const fail=[];
 const check=(name,value)=>{if(!value)fail.push(name)};
 
-check('V8 build marker exists',index.includes('2026.09.11-v4.8.0-stability-layout'));
-check('main cache refreshed',index.includes('/modules/main.js?v=93'));
+check('current build preserves V8 baseline',index.includes('2026.09.11-v4.9.0-viewport-first'));
+check('main cache refreshed',index.includes('/modules/main.js?v=94'));
 check('canonical interaction layer loads last',index.includes('/modules/styles/interaction-layout-v4.css?v=3')&&index.indexOf('decision-first-v7.css')<index.indexOf('interaction-layout-v4.css'));
 check('router cache refreshed',main.includes("./core/router.js?v=2"));
 check('event driven amount ux loaded',main.includes("./shared/amount-input-ux.js?v=2"));
