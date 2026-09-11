@@ -11,15 +11,29 @@ Every screen must have one primary question. Existing functions are mapped under
 ## 2. Global interaction rules
 
 1. One shared content width for header, page title and page body.
-2. One vertical document scroll. Internal vertical scroll containers are not used for master lists, result panes or cards.
-3. Horizontal scrolling is allowed only for data tables that cannot reasonably collapse.
-4. The shell header is the only sticky region. Page panels and list rails are not sticky.
-5. Every page has one first-priority answer above secondary evidence.
-6. Navigation uses user goals, not implementation names.
-7. A selected coin must expose its current price immediately in the first detail block.
-8. Controls have three roles only: navigation tabs, selection controls, primary/secondary actions.
-9. Historical evidence, diagnostics and specialist research are secondary layers and must not compete with the primary decision.
-10. Source order must match visual order. CSS `order` is not used to repair information architecture.
+2. Scroll ownership is explicit. The document owns long-form result/detail reading. A bounded master selection rail may own its own vertical scroll when the list must remain usable beside a long detail pane.
+3. Result panes, cards and arbitrary content blocks do not get independent vertical scroll containers.
+4. Horizontal scrolling is allowed for data tables that cannot reasonably collapse.
+5. The shell header is sticky. On desktop master-detail screens, the selection rail may also be sticky so the user can continue changing the selected item while reading a long detail pane.
+6. Every page has one first-priority answer above secondary evidence.
+7. Navigation uses user goals, not implementation names.
+8. A selected coin must expose its current price immediately in the first detail block.
+9. Controls have three roles only: navigation tabs, selection controls, primary/secondary actions.
+10. Historical evidence, diagnostics and specialist research are secondary layers and must not compete with the primary decision.
+11. Source order must match visual order. CSS `order` is not used to repair information architecture.
+
+### Scroll ownership rule
+
+Use bounded vertical scrolling only where it solves an actual navigation problem:
+
+- Research coin list: bounded selection rail.
+- Assets holdings list/rail: bounded selection rail.
+- Paper market list: bounded selection rail.
+- Strategy experiment list: bounded selection rail.
+- Large comparison/trade tables: horizontal scrolling as needed.
+- Selected result/detail content: document scrolling, not an internal height trap.
+
+Desktop master-detail behavior is therefore **sticky bounded rail + document-flow detail**. Mobile behavior is **bounded list + explicit list-to-detail handoff**.
 
 ## 3. Functional hierarchy
 
@@ -192,7 +206,8 @@ When an existing component conflicts with this hierarchy:
 - Keep the underlying function/data if useful.
 - Move it to the responsible screen or a secondary layer.
 - Do not preserve its old location merely to avoid code changes.
-- Do not solve ordering with CSS `order` or nested scroll containers.
+- Do not create arbitrary nested scroll containers. Bounded selection rails are allowed because they preserve simultaneous list/detail navigation.
+- Do not solve ordering with CSS `order`.
 - Do not add another global override stylesheet to repair a page-specific contradiction.
 
 This document is the gate for subsequent UI work. Screen changes are evaluated against this hierarchy before visual polish.
