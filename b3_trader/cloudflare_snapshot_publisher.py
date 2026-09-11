@@ -69,7 +69,8 @@ def _compact_market(
     row: dict[str, Any], *, exchange: str = "", strategy: str = "adaptive"
 ) -> dict[str, Any]:
     keys = (
-        "key", "exchange", "strategy", "market", "symbol", "name", "price", "equity_krw",
+        "key", "exchange", "strategy", "market", "symbol", "name", "price",
+        "change_24h_pct", "turnover_24h", "liquidity_score", "equity_krw",
         "return_pct", "cash_krw", "position_value_krw", "position_cost_krw", "position_avg_price",
         "unrealized_pnl_krw", "realized_pnl_krw", "max_drawdown_pct", "closed_trades",
         "win_rate_pct", "opportunity_score", "regime_score", "entry_score", "suggested_weight_pct",
