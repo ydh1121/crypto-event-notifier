@@ -62,8 +62,7 @@
   scrollbar-gutter:auto!important;
 }
 
-/* A master-detail screen needs the selectable rail to remain usable while the detail gets long.
-   The rail owns one bounded scroll; children do not create extra nested scrollers. */
+/* A master-detail screen needs the selectable rail to remain usable while the detail gets long. */
 #pageRoot .research-master .master-list,
 #pageRoot .asset-holdings-list,
 #pageRoot .allocation-list,
@@ -77,7 +76,6 @@
 }
 
 @media(min-width:901px){
-  #pageRoot[data-page-route="research"] .research-master,
   #pageRoot[data-page-route="assets"] .asset-master,
   #pageRoot[data-page-route="paper"] .paper-master,
   #pageRoot[data-page-route="strategy"] .strategy-workspace>.strategy-table,
@@ -92,11 +90,32 @@
     overscroll-behavior:contain!important;
     scrollbar-gutter:stable!important;
   }
+
+  /* Exchange-style market rail: controls stay visible and only the market list scrolls. */
+  #pageRoot[data-page-route="research"] .research-master{
+    position:sticky!important;
+    top:calc(var(--shell-header-offset,112px) + 16px)!important;
+    height:calc(100dvh - var(--shell-header-offset,112px) - 32px)!important;
+    min-height:420px!important;
+    max-height:calc(100dvh - var(--shell-header-offset,112px) - 32px)!important;
+    overflow:hidden!important;
+    display:flex!important;
+    flex-direction:column!important;
+    scrollbar-gutter:auto!important;
+  }
+  #pageRoot[data-page-route="research"] .research-master .master-list{
+    flex:1 1 auto!important;
+    min-height:0!important;
+    height:auto!important;
+    max-height:none!important;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    overscroll-behavior:contain!important;
+    scrollbar-gutter:stable!important;
+  }
 }
 
-/* All selection/result workspaces share one geometry. */
-#pageRoot[data-page-route="research"] .research-workspace,
-#pageRoot[data-page-route="research"] .decision-first-workspace,
+/* All selection/result workspaces share the same outer rhythm. */
 #pageRoot[data-page-route="assets"] .asset-workspace,
 #pageRoot[data-page-route="paper"] .paper-workspace,
 #pageRoot[data-page-route="strategy"] .strategy-workspace,
@@ -109,6 +128,23 @@
   max-width:none!important;
   min-height:0!important;
 }
+#pageRoot[data-page-route="research"] .research-workspace,
+#pageRoot[data-page-route="research"] .decision-first-workspace{
+  display:grid!important;
+  grid-template-columns:minmax(340px,360px) minmax(0,1fr)!important;
+  gap:28px!important;
+  align-items:start!important;
+  width:100%!important;
+  max-width:none!important;
+  min-height:0!important;
+}
+
+/* Source/visual ordering: primary workspace must precede specialist research. */
+#pageRoot[data-page-route="research"]{display:flex!important;flex-direction:column!important}
+#pageRoot[data-page-route="research"]>.page-head,
+#pageRoot[data-page-route="research"]>.page-head-v6{order:0!important}
+#pageRoot[data-page-route="research"]>.research-workspace{order:1!important}
+#pageRoot[data-page-route="research"]>.decision-first-extra-research{order:3!important;margin-top:30px!important}
 
 /* Asset source order is legacy; keep visual priority until the page module is decomposed. */
 #pageRoot[data-page-route="assets"]{display:flex;flex-direction:column}
@@ -118,37 +154,122 @@
 #pageRoot[data-page-route="assets"]>.asset-workspace{order:2}
 #pageRoot[data-page-route="assets"]>.asset-history-panel{order:3;margin-top:30px!important}
 
-/* Coin identity: current price is an instrument header, not buried evidence. */
-#pageRoot[data-page-route="research"] .decision-first-hero{
-  grid-template-columns:minmax(170px,.34fr) minmax(320px,1fr) auto!important;
+/* Market page should read like a trading workspace, not a score catalogue. */
+#pageRoot[data-page-route="research"]>.page-head,
+#pageRoot[data-page-route="research"]>.page-head-v6{margin-bottom:16px!important}
+#pageRoot[data-page-route="research"] .decision-first-market-pulse{
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:0!important;
+  margin:0 0 10px!important;
+  border-bottom:1px solid var(--line)!important;
+}
+#pageRoot[data-page-route="research"] .decision-first-market-pulse>span{
+  padding:4px 8px 9px!important;
+  border:0!important;
+}
+#pageRoot[data-page-route="research"] .decision-first-market-pulse>span:first-child{padding-left:0!important}
+#pageRoot[data-page-route="research"] .decision-first-market-pulse small{font-size:10px!important}
+#pageRoot[data-page-route="research"] .decision-first-market-pulse b{font-size:15px!important}
+#pageRoot[data-page-route="research"] .research-master .search{margin-bottom:8px!important}
+#pageRoot[data-page-route="research"] #researchFilters{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:6px!important;
+  width:100%!important;
+  margin:0 0 10px!important;
+  overflow:visible!important;
+}
+#pageRoot[data-page-route="research"] #researchFilters button{
+  width:100%!important;
+  min-width:0!important;
+  min-height:32px!important;
+  padding:5px 6px!important;
+  font-size:11px!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+}
+#pageRoot[data-page-route="research"] .market-list-columns{
+  flex:0 0 auto!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1.2fr) minmax(92px,.8fr) 60px!important;
+  gap:10px!important;
+  align-items:center!important;
+  padding:7px 9px!important;
+  color:var(--muted)!important;
+  border-top:1px solid var(--line)!important;
+  border-bottom:1px solid var(--line)!important;
+  font-size:10px!important;
+  font-weight:700!important;
+}
+#pageRoot[data-page-route="research"] .market-list-columns span:nth-child(2),
+#pageRoot[data-page-route="research"] .market-list-columns span:nth-child(3){text-align:right!important}
+#pageRoot[data-page-route="research"] .market-quote-list{gap:0!important;padding-right:2px!important}
+#pageRoot[data-page-route="research"] .market-quote-row{
+  display:grid!important;
+  grid-template-columns:minmax(0,1.2fr) minmax(92px,.8fr) 60px!important;
+  gap:10px!important;
+  align-items:center!important;
+  min-height:58px!important;
+  padding:8px 9px!important;
+  border-radius:6px!important;
+  border-bottom:1px solid color-mix(in srgb,var(--line) 72%,transparent)!important;
+}
+#pageRoot[data-page-route="research"] .market-quote-row>span{display:block!important;min-width:0!important}
+#pageRoot[data-page-route="research"] .market-asset-cell b,
+#pageRoot[data-page-route="research"] .market-price-cell b{display:block!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+#pageRoot[data-page-route="research"] .market-asset-cell b{font-size:13px!important}
+#pageRoot[data-page-route="research"] .market-asset-cell small{display:block!important;margin-top:3px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;font-size:10px!important}
+#pageRoot[data-page-route="research"] .market-price-cell{text-align:right!important}
+#pageRoot[data-page-route="research"] .market-price-cell b{font-size:12px!important;font-variant-numeric:tabular-nums!important}
+#pageRoot[data-page-route="research"] .market-price-cell small{display:block!important;margin-top:3px!important;font-size:9px!important;color:var(--muted)!important}
+#pageRoot[data-page-route="research"] .market-change-cell{text-align:right!important;font-size:12px!important;font-variant-numeric:tabular-nums!important}
+
+/* Coin identity: quote first, then decision, then scores. */
+#pageRoot[data-page-route="research"] .decision-first-hero.market-quote-hero{
+  grid-template-columns:minmax(250px,.7fr) minmax(320px,1.25fr) minmax(190px,.55fr)!important;
   grid-template-areas:"price conclusion vitals"!important;
-  align-items:start!important;
-  gap:28px!important;
+  align-items:center!important;
+  gap:30px!important;
+  padding:18px 0 22px!important;
 }
 #pageRoot[data-page-route="research"] .decision-first-hero .price-stack{
   grid-area:price!important;
   min-width:0!important;
-  padding-right:24px!important;
+  padding-right:28px!important;
   border-right:1px solid var(--line)!important;
   text-align:left!important;
 }
-#pageRoot[data-page-route="research"] .decision-first-hero .price-stack span{
-  display:block!important;
-  margin-bottom:6px!important;
-  color:var(--muted)!important;
-  font-size:12px!important;
-  font-weight:700!important;
-}
-#pageRoot[data-page-route="research"] .decision-first-hero .price-stack b{
+#pageRoot[data-page-route="research"] .market-quote-identity{display:flex!important;align-items:baseline!important;gap:8px!important;margin-bottom:8px!important;min-width:0!important}
+#pageRoot[data-page-route="research"] .market-quote-identity>b{font-size:15px!important;line-height:1.2!important;letter-spacing:0!important}
+#pageRoot[data-page-route="research"] .market-quote-identity>span{display:block!important;min-width:0!important;margin:0!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;color:var(--muted)!important;font-size:11px!important;font-weight:600!important}
+#pageRoot[data-page-route="research"] .decision-first-hero .market-current-price{
   display:block!important;
   margin:0!important;
-  font-size:clamp(30px,3vw,44px)!important;
+  font-size:clamp(36px,3.2vw,48px)!important;
   line-height:1!important;
   letter-spacing:-.045em!important;
   font-variant-numeric:tabular-nums!important;
 }
-#pageRoot[data-page-route="research"] .decision-first-conclusion{grid-area:conclusion!important}
-#pageRoot[data-page-route="research"] .decision-first-vitals{grid-area:vitals!important;align-self:start!important}
+#pageRoot[data-page-route="research"] .market-change-line{display:flex!important;align-items:center!important;gap:9px!important;margin-top:8px!important}
+#pageRoot[data-page-route="research"] .market-change-line strong{font-size:14px!important;font-variant-numeric:tabular-nums!important}
+#pageRoot[data-page-route="research"] .market-change-line span{margin:0!important;color:var(--muted)!important;font-size:11px!important;font-weight:600!important}
+#pageRoot[data-page-route="research"] .decision-first-conclusion{grid-area:conclusion!important;min-width:0!important}
+#pageRoot[data-page-route="research"] .decision-first-conclusion>span{margin-bottom:5px!important;font-size:10px!important}
+#pageRoot[data-page-route="research"] .decision-first-conclusion h3{font-size:clamp(26px,2.3vw,34px)!important;line-height:1.1!important}
+#pageRoot[data-page-route="research"] .decision-first-conclusion p{margin-top:7px!important;font-size:12px!important}
+#pageRoot[data-page-route="research"] .decision-first-vitals{
+  grid-area:vitals!important;
+  align-self:center!important;
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:12px!important;
+  min-width:0!important;
+}
+#pageRoot[data-page-route="research"] .decision-first-vitals>span{min-width:0!important;text-align:right!important}
+#pageRoot[data-page-route="research"] .decision-first-vitals small{margin-bottom:4px!important;font-size:9px!important}
+#pageRoot[data-page-route="research"] .decision-first-vitals b{font-size:17px!important}
+#pageRoot[data-page-route="research"] .decision-first-tabs{margin-bottom:0!important}
+#pageRoot[data-page-route="research"] .decision-first-body{padding-top:18px!important}
 
 /* Canonical tab language: navigation is flat, not a pill cluster. */
 .journey-nav,
@@ -306,8 +427,6 @@ html[data-reader-mode="simple"] #pageRoot[data-page-route="paper"] .paper-detail
 #researchDetail,#assetDetail,#paperDetail,#strategyDetail,#strategyBody{scroll-margin-top:calc(var(--shell-header-offset,112px) + 12px)!important}
 
 @media(max-width:1180px){
-  #pageRoot[data-page-route="research"] .research-workspace,
-  #pageRoot[data-page-route="research"] .decision-first-workspace,
   #pageRoot[data-page-route="assets"] .asset-workspace,
   #pageRoot[data-page-route="paper"] .paper-workspace,
   #pageRoot[data-page-route="strategy"] .strategy-workspace,
@@ -315,10 +434,18 @@ html[data-reader-mode="simple"] #pageRoot[data-page-route="paper"] .paper-detail
     grid-template-columns:minmax(245px,270px) minmax(0,1fr)!important;
     gap:20px!important;
   }
-  #pageRoot[data-page-route="research"] .decision-first-hero{
-    grid-template-columns:minmax(160px,.38fr) minmax(0,1fr)!important;
-    grid-template-areas:"price conclusion" "vitals vitals"!important;
+  #pageRoot[data-page-route="research"] .research-workspace,
+  #pageRoot[data-page-route="research"] .decision-first-workspace{
+    grid-template-columns:minmax(290px,310px) minmax(0,1fr)!important;
+    gap:20px!important;
   }
+  #pageRoot[data-page-route="research"] .decision-first-hero.market-quote-hero{
+    grid-template-columns:minmax(220px,.65fr) minmax(0,1fr)!important;
+    grid-template-areas:"price conclusion" "vitals vitals"!important;
+    align-items:start!important;
+  }
+  #pageRoot[data-page-route="research"] .decision-first-vitals{justify-self:start!important;grid-template-columns:repeat(3,90px)!important}
+  #pageRoot[data-page-route="research"] .decision-first-vitals>span{text-align:left!important}
 }
 
 @media(max-width:980px){
@@ -350,18 +477,22 @@ html[data-reader-mode="simple"] #pageRoot[data-page-route="paper"] .paper-detail
     scrollbar-gutter:stable!important;
   }
 
-  #pageRoot[data-page-route="research"] .decision-first-hero{
+  #pageRoot[data-page-route="research"] .decision-first-hero.market-quote-hero{
     grid-template-columns:1fr!important;
     grid-template-areas:"price" "conclusion" "vitals"!important;
     gap:18px!important;
   }
   #pageRoot[data-page-route="research"] .decision-first-hero .price-stack{padding-right:0!important;padding-bottom:16px!important;border-right:0!important;border-bottom:1px solid var(--line)!important}
+  #pageRoot[data-page-route="research"] .decision-first-vitals{grid-template-columns:repeat(3,minmax(72px,1fr))!important}
   .paper-toolbar,.compare-toolbar{grid-template-columns:1fr 1fr!important}.paper-toolbar>div{grid-column:1/-1!important}
 }
 
 @media(max-width:620px){
   .header-tools{width:auto!important;justify-content:flex-end!important;flex-wrap:nowrap!important}
   .journey-nav,.subnav,#pageRoot .strategy-subnav,#pageRoot .decision-first-tabs,#pageRoot .strategy-v5-detail-tabs{gap:18px!important}
+  #pageRoot[data-page-route="research"] #researchFilters{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  #pageRoot[data-page-route="research"] .market-list-columns,
+  #pageRoot[data-page-route="research"] .market-quote-row{grid-template-columns:minmax(0,1.2fr) minmax(86px,.8fr) 58px!important}
   .paper-toolbar,.compare-toolbar{grid-template-columns:1fr!important}.paper-toolbar>div{grid-column:auto!important}
   html[data-reader-mode="simple"] #pageRoot[data-page-route="assets"] .asset-detail-grid,
   html[data-reader-mode="simple"] #pageRoot[data-page-route="paper"] .paper-detail-kpis{grid-template-columns:1fr!important}
