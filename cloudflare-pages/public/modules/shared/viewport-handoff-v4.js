@@ -48,11 +48,16 @@ export function installViewportHandoff({root}){
     if(!compactViewport()||!target||!config)return;
     removeReturnBars(root);
     const bar=document.createElement('div');
+    const button=document.createElement('button');
+    const context=document.createElement('span');
     bar.className='viewport-return-bar';
     bar.setAttribute('role','navigation');
     bar.setAttribute('aria-label','목록으로 돌아가기');
-    const context=rowContext(hit);
-    bar.innerHTML=`<button type="button" data-viewport-back>← ${config.backLabel}</button><span>${context||'선택한 항목 상세'}</span>`;
+    button.type='button';
+    button.dataset.viewportBack='1';
+    button.textContent=`← ${config.backLabel}`;
+    context.textContent=rowContext(hit)||'선택한 항목 상세';
+    bar.append(button,context);
     target.prepend(bar);
     returnState={source:config.source,trigger:hit};
   }
