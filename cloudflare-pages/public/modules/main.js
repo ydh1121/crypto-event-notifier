@@ -1,5 +1,5 @@
 import{store}from'./core/store.js';
-import{createRouter}from'./core/router.js?v=2';
+import{createRouter}from'./core/router.js?v=3';
 import{createAuth}from'./core/auth.js';
 import{createSnapshotPoller}from'./core/snapshot.js';
 import{esc}from'./shared/format.js';
@@ -17,7 +17,7 @@ import{createResearchPage}from'./pages/research.js?v=42';
 import{installDexLaunchResearchPanel}from'./pages/dex-launch-panel.js?v=45';
 import{createAssetsPage}from'./pages/assets.js?v=49';
 import{createPaperPage}from'./pages/paper.js?v=46';
-import{createStrategyPage}from'./pages/strategy.js?v=47';
+import{createStrategyPage}from'./pages/strategy.js?v=48';
 import{createSectorsPage}from'./pages/sectors-v36.js?v=46';
 import{createRecordsPage}from'./pages/records.js?v=48';
 import{createSystemPage}from'./pages/system.js?v=35';
@@ -63,8 +63,6 @@ const GROUPS={
   research:[['research','코인'],['dashboard-detail','시장현황'],['sectors','테마']],
   'dashboard-detail':[['research','코인'],['dashboard-detail','시장현황'],['sectors','테마']],
   sectors:[['research','코인'],['dashboard-detail','시장현황'],['sectors','테마']],
-  paper:[['paper','모의투자'],['strategy','매매방법 비교']],
-  strategy:[['paper','모의투자'],['strategy','매매방법 비교']],
 };
 
 function renderJourney(name){
