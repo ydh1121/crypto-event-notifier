@@ -12,7 +12,7 @@ check('visual QA layer is loaded',index.includes('/modules/styles/visual-qa-v6.c
 check('visual QA layer follows strategy native layer',index.indexOf('strategy-native-v5.css')<index.indexOf('visual-qa-v6.css'));
 check('decision-first layer follows visual QA',index.indexOf('visual-qa-v6.css')<index.indexOf('decision-first-v7.css'));
 check('canonical interaction layer supersedes visual QA geometry',index.indexOf('visual-qa-v6.css')<index.indexOf('interaction-layout-v4.css'));
-check('main entry cache is refreshed',index.includes('/modules/main.js?v=95'));
+check('main entry cache is refreshed',index.includes('/modules/main.js?v=96'));
 check('home module cache is refreshed',main.includes("./pages/v4/home.js?v=2"));
 check('wide dashboard uses viewport',css.includes('max-width:1540px!important'));
 check('wide dashboard keeps reasonable side padding',css.includes('padding-left:28px!important')&&css.includes('padding-right:28px!important'));
@@ -21,6 +21,8 @@ check('home separates market and asset regions',home.includes('home-market-secti
 check('home separates coin and recent trade regions',home.includes('home-coins-section')&&home.includes('home-trades-section'));
 check('V6 repaired desktop result panes',css.includes('#pageRoot[data-page-route="research"] .research-detail')&&css.includes('#pageRoot[data-page-route="assets"] .asset-detail')&&css.includes('#pageRoot[data-page-route="paper"] .paper-detail'));
 check('canonical layer owns final result scrolling',interaction.includes('max-height:none!important')&&interaction.includes('overflow-y:visible!important'));
+check('market list has quote columns instead of score-only rows',interaction.includes('.market-list-columns')&&interaction.includes('.market-quote-row')&&interaction.includes('.market-change-cell'));
+check('market filter buttons cannot collapse into clipped bars',interaction.includes('#researchFilters')&&interaction.includes('grid-template-columns:repeat(3,minmax(0,1fr))!important')&&interaction.includes('min-height:32px!important'));
 check('asset budget input gets protected width',css.includes('.holding-budget-head')&&css.includes('minmax(220px,280px)!important'));
 check('strategy legacy grid cannot rearrange V5 rail',css.includes('.strategy-row.strategy-v5-strategy-item:not(.columns)')&&css.includes('grid-template-columns:minmax(0,1fr)!important'));
 check('strategy rail facts are explicitly two columns',css.includes('.strategy-v5-strategy-item>.strategy-v5-item-facts')&&css.includes('grid-template-columns:repeat(2,minmax(0,1fr))!important'));
