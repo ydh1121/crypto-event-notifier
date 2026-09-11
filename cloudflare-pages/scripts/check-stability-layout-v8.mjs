@@ -9,9 +9,9 @@ const dex=read('public/modules/pages/dex-launch-panel.js');
 const interaction=read('public/modules/styles/interaction-layout-v4.css');
 const fail=[];
 const check=(name,value)=>{if(!value)fail.push(name)};
-check('current build preserves stability baseline',index.includes('2026.09.12-v5.0.1-scroll-ownership'));
-check('main cache refreshed',index.includes('/modules/main.js?v=95'));
-check('canonical interaction layer refreshed',index.includes('/modules/styles/interaction-layout-v4.css?v=5')&&index.indexOf('decision-first-v7.css')<index.indexOf('interaction-layout-v4.css'));
+check('current build preserves stability baseline',index.includes('2026.09.12-v5.1.0-market-workspace'));
+check('main cache refreshed',index.includes('/modules/main.js?v=96'));
+check('canonical interaction layer refreshed',index.includes('/modules/styles/interaction-layout-v4.css?v=6')&&index.indexOf('decision-first-v7.css')<index.indexOf('interaction-layout-v4.css'));
 check('router cache refreshed',main.includes("./core/router.js?v=3"));
 check('event driven amount ux loaded',main.includes("./shared/amount-input-ux.js?v=2"));
 check('event driven text normalizer loaded',main.includes("./shared/mainstream-ui.js?v=2"));
@@ -24,11 +24,11 @@ check('dex panel has no mutation observer',!dex.includes('MutationObserver')&&de
 check('same route click does not rerender whole page',router.includes('if(currentName===name){syncNav(name);onChange?.(name);return}')&&!router.includes('patchPreservingUi'));
 check('shell header and desktop selection rails may be sticky',interaction.includes('.app-header{z-index:100!important}')&&interaction.includes('@media(min-width:901px)')&&interaction.includes('position:sticky!important'));
 check('result panes use document flow',interaction.includes('Detail content is read with the page')&&interaction.includes('.strategy-v5-detail-panels')&&interaction.includes('max-height:none!important')&&interaction.includes('overflow-y:visible!important'));
-check('selection rails own bounded scroll without nested child scroll',interaction.includes('Selection rails may own bounded scroll')&&interaction.includes('overflow-y:auto!important')&&interaction.includes('.asset-holdings-list')&&interaction.includes('overflow-y:visible!important'));
+check('research keeps controls visible while market list scrolls',interaction.includes('Exchange-style market rail')&&interaction.includes('overflow:hidden!important')&&interaction.includes('.research-master .master-list')&&interaction.includes('flex:1 1 auto!important')&&interaction.includes('overflow-y:auto!important'));
 check('canonical tabs are flat',interaction.includes('Canonical tab language')&&interaction.includes('border-bottom:2px solid transparent!important'));
 check('segmented controls are separated',interaction.includes('Canonical selection controls')&&interaction.includes('gap:var(--ui-control-gap)!important')&&interaction.includes('border-radius:var(--ui-control-r)!important'));
 check('action buttons share one geometry',interaction.includes('Canonical action buttons')&&interaction.includes('min-height:var(--ui-control-h)!important'));
-check('desktop workspaces share one protected gap',interaction.includes('gap:28px!important'));
+check('desktop workspaces keep protected gaps',interaction.includes('gap:28px!important'));
 check('mobile stacks workspaces with bounded list scroll',interaction.includes('@media(max-width:900px)')&&interaction.includes('display:block!important')&&interaction.includes('max-height:min(52dvh,520px)!important'));
 if(fail.length){console.error('STABILITY_LAYOUT_V8=FAIL');for(const item of fail)console.error(`- ${item}`);process.exit(1)}
 console.log('STABILITY_LAYOUT_V8=PASS');
