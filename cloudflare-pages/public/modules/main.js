@@ -10,7 +10,7 @@ import{installAmountInputUx}from'./shared/amount-input-ux.js?v=2';
 import{installMainstreamUi}from'./shared/mainstream-ui.js?v=2';
 import{installThemeToggle}from'./shared/theme.js?v=1';
 import{installStrategyDrilldown}from'./shared/strategy-drilldown-v4.js?v=3';
-import{installViewportHandoff}from'./shared/viewport-handoff-v4.js?v=2';
+import{installViewportHandoff}from'./shared/viewport-handoff-v4.js?v=3';
 import{createHomePage}from'./pages/v4/home.js?v=2';
 import{createDashboardPage}from'./pages/dashboard.js';
 import{createResearchPage}from'./pages/research.js?v=42';
