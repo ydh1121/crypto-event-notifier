@@ -2,7 +2,6 @@ const ROUTES=new Set(['dashboard','dashboard-detail','research','assets','paper'
 const NAV_PARENT={
   'dashboard-detail':'research',
   sectors:'research',
-  strategy:'paper',
 };
 export function navRouteFor(name){return NAV_PARENT[name]||name}
 export function routeContextFor(ui,name){
