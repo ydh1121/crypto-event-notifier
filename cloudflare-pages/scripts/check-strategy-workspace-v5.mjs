@@ -12,7 +12,7 @@ const check=(name,value)=>{if(!value)fail.push(name)};
 check('native strategy stylesheet is loaded',index.includes('/modules/styles/strategy-native-v5.css?v=1'));
 check('native strategy stylesheet loads before canonical interaction layer',index.indexOf('strategy-native-v5.css')<index.indexOf('interaction-layout-v4.css'));
 check('temporary strategy DOM patch is not loaded',!index.includes('strategy-workspace-v5.js'));
-check('main cache version is refreshed',index.includes('/modules/main.js?v=95'));
+check('main cache version is refreshed',index.includes('/modules/main.js?v=96'));
 check('strategy module cache version is refreshed',main.includes("./pages/strategy.js?v=48"));
 check('overview renders native master detail workspace',strategy.includes('data-strategy-workspace-v5="ready"')&&strategy.includes('strategy-v5-detail-shell'));
 check('four local strategy evidence tabs exist',['summary','coins','trades','evidence'].every(value=>strategy.includes(`item('${value}'`)));
@@ -23,7 +23,7 @@ check('deep tab promotes simple mode to detail',strategy.includes("[data-reader-
 check('mobile has explicit strategy list return',strategy.includes('data-strategy-v5-back')&&css.includes('.strategy-v5-back'));
 check('strategy trade selector exists',selectors.includes('strategyTradeRows')&&selectors.includes('strategy_trades'));
 check('strategy trade panel has explicit missing-data state',strategy.includes('체결 원장이 아직 Snapshot에 제공되지 않습니다'));
-check('canonical workspace uses shared rail width',interaction.includes('grid-template-columns:minmax(280px,300px) minmax(0,1fr)!important'));
+check('canonical non-market workspace uses shared rail width',interaction.includes('grid-template-columns:minmax(280px,300px) minmax(0,1fr)!important'));
 check('canonical layer removes nested detail viewport',interaction.includes('.strategy-v5-detail-panels')&&interaction.includes('overflow-y:visible!important'));
 check('canonical layer removes sticky strategy detail shell',interaction.includes('.strategy-v5-detail-shell')&&interaction.includes('position:static!important'));
 check('trade ledger allows horizontal table overflow only',interaction.includes('.strategy-trade-table')&&interaction.includes('overflow-x:auto'));
