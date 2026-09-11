@@ -1,0 +1,34 @@
+import fs from'node:fs';
+const read=path=>fs.readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
+const repoRead=path=>fs.readFileSync(new URL(`../../${path}`,import.meta.url),'utf8');
+const index=read('public/index.html');
+const main=read('public/modules/main.js');
+const research=read('public/modules/pages/research.js');
+const interaction=read('public/modules/styles/interaction-layout-v4.css');
+const scoped=repoRead('b3_trader/scoped_paper_store.py');
+const publisher=repoRead('b3_trader/cloudflare_snapshot_publisher.py');
+const fail=[];
+const check=(name,value)=>{if(!value)fail.push(name)};
+
+check('V11 market workspace build marker exists',index.includes('2026.09.12-v5.1.0-market-workspace'));
+check('market workspace assets are cache refreshed',index.includes('/modules/main.js?v=96')&&index.includes('/modules/styles/interaction-layout-v4.css?v=6')&&main.includes("./pages/research.js?v=43"));
+
+check('market list has exchange-style quote columns',research.includes('market-list-columns')&&research.includes('market-quote-row')&&research.includes('market-price-cell')&&research.includes('market-change-cell'));
+check('selected instrument starts with ticker and current price',research.includes('market-quote-identity')&&research.includes('market-current-price')&&research.includes('data-research-live="price"'));
+check('selected instrument exposes actual market change field',research.includes('quoteChangePct')&&research.includes('change_24h_pct')&&research.includes('data-research-live="market-change"'));
+check('detail API is a valid market-change fallback',research.includes('signal.change_24h_pct')&&research.includes('latest.change_24h_pct'));
+check('paper account return is semantically separated',research.includes('PAPER 수익률')&&!research.includes('data-research-live="return"'));
+check('missing quote change is not replaced with paper performance',research.includes("return value===null?'—'")||research.includes("value===null?'—'"));
+
+check('market filter controls cannot visually collapse',interaction.includes('#researchFilters')&&interaction.includes('grid-template-columns:repeat(3,minmax(0,1fr))!important')&&interaction.includes('min-height:32px!important'));
+check('market rail gives quote columns enough width',interaction.includes('grid-template-columns:minmax(340px,360px) minmax(0,1fr)!important'));
+check('only market rows scroll while controls remain visible',interaction.includes('Exchange-style market rail')&&interaction.includes('overflow:hidden!important')&&interaction.includes('.research-master .master-list')&&interaction.includes('flex:1 1 auto!important')&&interaction.includes('overflow-y:auto!important'));
+check('quote is visually dominant over decision scores',interaction.includes('.market-current-price')&&interaction.includes('font-size:clamp(36px,3.2vw,48px)!important')&&interaction.includes('grid-template-areas:"price conclusion vitals"'));
+check('secondary research is after the trading workspace',interaction.includes('>.research-workspace{order:1!important')&&interaction.includes('>.decision-first-extra-research{order:3!important'));
+
+check('scoped leaderboard selects real quote fields',scoped.includes('s.price,s.change_24h_pct,s.turnover_24h,s.liquidity_score'));
+check('scoped leaderboard returns real quote fields',scoped.includes('"change_24h_pct": round(_num(row.get("change_24h_pct")), 4)')&&scoped.includes('"turnover_24h": round(_num(row.get("turnover_24h")), 2)')&&scoped.includes('"liquidity_score": round(_num(row.get("liquidity_score")), 2)'));
+check('snapshot compact market preserves quote fields',publisher.includes('"change_24h_pct", "turnover_24h", "liquidity_score"'));
+
+if(fail.length){console.error('MARKET_WORKSPACE_V11=FAIL');for(const item of fail)console.error(`- ${item}`);process.exit(1)}
+console.log('MARKET_WORKSPACE_V11=PASS');
