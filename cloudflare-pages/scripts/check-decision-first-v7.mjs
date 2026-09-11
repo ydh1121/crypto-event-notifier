@@ -10,7 +10,7 @@ const check=(name,value)=>{if(!value)fail.push(name)};
 check('decision-first stylesheet is loaded',index.includes('/modules/styles/decision-first-v7.css?v=1'));
 check('decision-first stylesheet loads after visual QA',index.indexOf('visual-qa-v6.css')<index.indexOf('decision-first-v7.css'));
 check('canonical interaction layer loads after decision-first',index.indexOf('decision-first-v7.css')<index.indexOf('interaction-layout-v4.css'));
-check('main cache is refreshed for V8',index.includes('/modules/main.js?v=93'));
+check('main cache is refreshed for current build',index.includes('/modules/main.js?v=94'));
 check('research module cache is refreshed',main.includes("./pages/research.js?v=42"));
 
 check('inert decision lens is not installed',!main.includes('installCoinDecisionLens'));
