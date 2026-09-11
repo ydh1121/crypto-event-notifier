@@ -24,9 +24,10 @@ check('market secondary group remains',main.includes("['research','코인']")&&m
 check('paper and strategy are no longer fused into secondary navigation',!main.includes("paper:[['paper','모의투자']")&&!main.includes("strategy:[['paper','모의투자']"));
 check('v4 style stack remains',['mainstream-v4.css','layout-fixes-v4.css','theme-dark-v4.css','theme-dark-audit-v4.css','decision-workspace-v4.css'].every(value=>index.includes(value)));
 check('refine layer remains after v4',index.includes('v4-refine-v1.css')&&index.indexOf('decision-workspace-v4.css')<index.indexOf('v4-refine-v1.css'));
-check('canonical interaction layer is refreshed',index.includes('interaction-layout-v4.css?v=5')&&index.indexOf('decision-first-v7.css')<index.indexOf('interaction-layout-v4.css'));
+check('canonical interaction layer is refreshed',index.includes('interaction-layout-v4.css?v=6')&&index.indexOf('decision-first-v7.css')<index.indexOf('interaction-layout-v4.css'));
 
 check('research workspace remains',research.includes('research-workspace')&&research.includes('research-detail'));
+check('research market quote list is first class',research.includes('market-list-columns')&&research.includes('market-quote-row')&&research.includes('market-current-price'));
 check('research listing study remains',research.includes('listing-history-panel'));
 check('research current decision remains',research.includes('decision-first-conclusion'));
 check('research current trade plan remains',research.includes('trade_plan'));
@@ -47,12 +48,14 @@ check('strategy coin click lands on requested decision result',drilldown.include
 check('viewport handoff remains event driven',main.includes('installViewportHandoff')&&!viewport.includes('MutationObserver')&&viewport.includes("root.addEventListener('click',click)"));
 check('compact selections still reveal detail',['[data-research-market]','#researchDetail','[data-asset-market]','#assetDetail','[data-paper-market]','#paperDetail','[data-strategy-key]','#strategyDetail'].every(value=>viewport.includes(value)));
 check('paper action reveals body',viewport.includes(".paper-next [data-paper-tab]")&&viewport.includes("reveal('#paperBody',{force:true})"));
-check('main cache version is refreshed',index.includes('/modules/main.js?v=95'));
+check('main cache version is refreshed',index.includes('/modules/main.js?v=96'));
 
-check('workspaces use one master-detail geometry',interaction.includes('grid-template-columns:minmax(280px,300px) minmax(0,1fr)!important'));
-check('master rails own bounded vertical scroll',interaction.includes('Selection rails may own bounded scroll')&&interaction.includes('max-height:calc(100dvh - var(--shell-header-offset,112px) - 32px)!important')&&interaction.includes('overflow-y:auto!important'));
+check('non-market workspaces keep shared rail geometry',interaction.includes('grid-template-columns:minmax(280px,300px) minmax(0,1fr)!important'));
+check('market workspace receives quote-capable rail width',interaction.includes('grid-template-columns:minmax(340px,360px) minmax(0,1fr)!important'));
+check('research controls remain fixed while market rows scroll',interaction.includes('Exchange-style market rail')&&interaction.includes('.research-master .master-list')&&interaction.includes('flex:1 1 auto!important')&&interaction.includes('overflow-y:auto!important'));
 check('result detail remains document flow',interaction.includes('Detail content is read with the page')&&interaction.includes('.strategy-v5-detail-panels')&&interaction.includes('overflow-y:visible!important'));
-check('coin current price is promoted',interaction.includes('grid-template-areas:"price conclusion vitals"')&&interaction.includes('.decision-first-hero .price-stack b'));
+check('coin current price is promoted',interaction.includes('grid-template-areas:"price conclusion vitals"')&&interaction.includes('.market-current-price'));
+check('secondary research follows primary workspace',interaction.includes('>.decision-first-extra-research{order:3!important'));
 check('paper controls reserve control gaps',interaction.includes('.paper-toolbar')&&interaction.includes('gap:var(--ui-control-gap)!important'));
 check('detail destinations account for sticky shell',interaction.includes('#researchDetail,#assetDetail,#paperDetail,#strategyDetail,#strategyBody'));
 
