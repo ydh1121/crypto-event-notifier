@@ -48,15 +48,15 @@ check('system remains',system.includes('operations-grid')&&system.includes('comp
 check('obsolete decision lens is not installed',!main.includes('installCoinDecisionLens'));
 check('strategy context is carried to coin detail',drilldown.includes('researchSourceStrategyExperiment')&&drilldown.includes('researchSourceStrategyLabel'));
 check('strategy coin click lands on requested decision result',drilldown.includes("viewport:handoff")&&drilldown.includes("selector:'#researchDetail'")&&drilldown.includes('force:true'));
-check('viewport handoff is installed from main entry',main.includes('installViewportHandoff')&&main.includes("./shared/viewport-handoff-v4.js?v=2"));
+check('viewport handoff is installed from main entry',main.includes('installViewportHandoff')&&main.includes("./shared/viewport-handoff-v4.js?v=3"));
 check('compact list selections reveal their detail result',['[data-research-market]','#researchDetail','[data-asset-market]','#assetDetail','[data-paper-market]','#paperDetail','[data-strategy-key]','#strategyDetail'].every(value=>viewport.includes(value)));
-check('paper summary action reveals the newly selected tab result',viewport.includes(".paper-next [data-paper-tab]")&&viewport.includes("reveal(root,'#paperBody',{force:true})"));
+check('paper summary action reveals the newly selected tab result',viewport.includes(".paper-next [data-paper-tab]")&&viewport.includes("reveal('#paperBody',{force:true})"));
 check('viewport handoff retries after synchronous rerenders',viewport.includes('retries=6')&&viewport.includes('remaining-=1')&&viewport.includes('if(remaining>0)attempt()'));
 check('viewport handoff settles after continuity restoration',viewport.includes('requestAnimationFrame(()=>{')&&viewport.includes('settled=root.querySelector(selector)')&&viewport.includes('settle:true'));
 check('viewport handoff respects compact displays and reduced motion',viewport.includes('(max-width: 900px)')&&viewport.includes('prefers-reduced-motion: reduce'));
 check('viewport handoff is event driven without mutation observer',!viewport.includes('MutationObserver')&&viewport.includes("root.addEventListener('click',click)"));
 check('reader mode deliberate rerender preserves current viewport',main.includes('patchPreservingUi')&&main.includes("'.strategy-table'"));
-check('main cache version is refreshed',index.includes('/modules/main.js?v=93'));
+check('main cache version is refreshed',index.includes('/modules/main.js?v=94'));
 
 check('coin page prioritizes workspace before historical panels',interaction.includes('Page order: primary workspace')&&interaction.includes('>.research-workspace{order:1'));
 check('asset page prioritizes selection and detail before long history',interaction.includes('>.asset-workspace{order:2')&&interaction.includes('>.asset-history-panel{order:3'));
