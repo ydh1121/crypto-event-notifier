@@ -249,7 +249,8 @@ class ScopedPaperStore(MultiExchangeStore):
     def leaderboard(self, limit: int = 5000) -> list[dict[str, Any]]:
         rows = self.conn.execute(
             """SELECT a.*,p.closed_trades,p.wins,p.ema_return_pct,p.version,p.base_weight_pct,p.max_position_pct,
-                      s.price,s.opportunity_score,s.trade_intent,s.regime_score,s.entry_score,s.ts AS signal_ts,
+                      s.price,s.change_24h_pct,s.turnover_24h,s.liquidity_score,
+                      s.opportunity_score,s.trade_intent,s.regime_score,s.entry_score,s.ts AS signal_ts,
                       s.suggested_weight_pct
                FROM research_accounts_mx a
                LEFT JOIN research_profiles_mx p
@@ -285,6 +286,9 @@ class ScopedPaperStore(MultiExchangeStore):
                     "win_rate_pct": round(wins / closed * 100.0, 2) if closed else 0.0,
                     "ema_return_pct": round(_num(row.get("ema_return_pct")), 4),
                     "profile_version": int(row.get("version") or 1), "price": round(current_price, 12),
+                    "change_24h_pct": round(_num(row.get("change_24h_pct")), 4),
+                    "turnover_24h": round(_num(row.get("turnover_24h")), 2),
+                    "liquidity_score": round(_num(row.get("liquidity_score")), 2),
                     "opportunity_score": round(_num(row.get("opportunity_score")), 2),
                     "regime_score": round(_num(row.get("regime_score")), 2),
                     "entry_score": round(_num(row.get("entry_score")), 2),
