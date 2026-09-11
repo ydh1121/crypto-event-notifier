@@ -33,6 +33,20 @@ export function allCandidateRows(state){const out=[];for(const ex of['bithumb','
 export function strategyLab(state){return fullPublic(state).strategy_lab||{}}
 export function strategyRows(state,exchange){const all=Array.isArray(strategyLab(state).experiments)?strategyLab(state).experiments:[];return all.filter(r=>r.exchange===exchange)}
 export function strategyEquityHistory(state,experimentId){const rows=strategyLab(state).strategy_equity_history?.[experimentId];return Array.isArray(rows)?rows.map(v=>({ts:n(v?.[0]),equity_krw:n(v?.[1]),return_pct:n(v?.[2]),drawdown_pct:n(v?.[3]),realized_pnl:n(v?.[4])})):[]}
+export function strategyTradeRows(state,experimentId){
+  const lab=strategyLab(state),id=String(experimentId||'');
+  const sources=[lab.strategy_trades,lab.trades,lab.fills];
+  let rows=[];
+  for(const source of sources){
+    if(Array.isArray(source)){rows=source.filter(row=>String(row?.experiment_id??row?.strategy_experiment_id??row?.[0]??'')===id);if(rows.length)break;continue}
+    const selected=source&&typeof source==='object'?source[id]:null;
+    if(Array.isArray(selected)){rows=selected;break}
+  }
+  return rows.map(row=>{
+    if(Array.isArray(row))return{ts:n(row?.[0]),market:String(row?.[1]||''),side:String(row?.[2]||''),price:n(row?.[3]),qty:n(row?.[4]),pnl_krw:n(row?.[5]),fee_krw:n(row?.[6]),status:String(row?.[7]||'')};
+    return{ts:n(row?.ts??row?.timestamp??row?.time),market:String(row?.market||row?.symbol||''),side:String(row?.side||row?.action||''),price:n(row?.price??row?.fill_price),qty:n(row?.qty??row?.volume??row?.size),pnl_krw:n(row?.pnl_krw??row?.realized_pnl??row?.realized_pnl_krw),fee_krw:n(row?.fee_krw??row?.fee),status:String(row?.status||'')};
+  }).sort((a,b)=>b.ts-a.ts);
+}
 export function strategyCoinMatrix(state,exchange='bithumb'){const rows=strategyLab(state).coin_matrix?.[exchange];return Array.isArray(rows)?rows:[]}
 export function strategyCoinRows(state,exchange,market){const item=strategyCoinMatrix(state,exchange).find(x=>x.market===market);if(!item||!Array.isArray(item.rows))return[];const experiments=new Map(strategyRows(state,exchange).map(x=>[x.experiment_id,x]));return item.rows.map(v=>{const exp=experiments.get(v?.[0])||{};return{experiment_id:String(v?.[0]||''),style:String(v?.[1]||''),label:exp.label||v?.[1]||'',return_pct:n(v?.[2]),realized_pnl:n(v?.[3]),unrealized_pnl:n(v?.[4]),max_drawdown_pct:n(v?.[5]),closed_trades:n(v?.[6]),wins:n(v?.[7]),active:Boolean(v?.[8])}})}
 export function paperPortfolioHistory(state,scope='combined'){const rows=strategyLab(state).paper_history?.[scope];return Array.isArray(rows)?rows.map(v=>({ts:n(v?.[0]),equity_krw:n(v?.[1]),pnl_krw:n(v?.[2]),return_pct:n(v?.[3]),drawdown_pct:n(v?.[4]),active_positions:n(v?.[5])})):[]}
