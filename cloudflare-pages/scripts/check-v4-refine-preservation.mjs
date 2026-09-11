@@ -24,7 +24,7 @@ check('market secondary group remains',main.includes("['research','코인']")&&m
 check('paper and strategy are no longer fused into secondary navigation',!main.includes("paper:[['paper','모의투자']")&&!main.includes("strategy:[['paper','모의투자']"));
 check('v4 style stack remains',['mainstream-v4.css','layout-fixes-v4.css','theme-dark-v4.css','theme-dark-audit-v4.css','decision-workspace-v4.css'].every(value=>index.includes(value)));
 check('refine layer remains after v4',index.includes('v4-refine-v1.css')&&index.indexOf('decision-workspace-v4.css')<index.indexOf('v4-refine-v1.css'));
-check('canonical interaction layer is refreshed',index.includes('interaction-layout-v4.css?v=4')&&index.indexOf('decision-first-v7.css')<index.indexOf('interaction-layout-v4.css'));
+check('canonical interaction layer is refreshed',index.includes('interaction-layout-v4.css?v=5')&&index.indexOf('decision-first-v7.css')<index.indexOf('interaction-layout-v4.css'));
 
 check('research workspace remains',research.includes('research-workspace')&&research.includes('research-detail'));
 check('research listing study remains',research.includes('listing-history-panel'));
@@ -50,10 +50,10 @@ check('paper action reveals body',viewport.includes(".paper-next [data-paper-tab
 check('main cache version is refreshed',index.includes('/modules/main.js?v=95'));
 
 check('workspaces use one master-detail geometry',interaction.includes('grid-template-columns:minmax(280px,300px) minmax(0,1fr)!important'));
-check('vertical document flow is canonical',interaction.includes('One vertical scroll belongs to the document')&&interaction.includes('overflow-y:visible!important'));
+check('master rails own bounded vertical scroll',interaction.includes('Selection rails may own bounded scroll')&&interaction.includes('max-height:calc(100dvh - var(--shell-header-offset,112px) - 32px)!important')&&interaction.includes('overflow-y:auto!important'));
+check('result detail remains document flow',interaction.includes('Detail content is read with the page')&&interaction.includes('.strategy-v5-detail-panels')&&interaction.includes('overflow-y:visible!important'));
 check('coin current price is promoted',interaction.includes('grid-template-areas:"price conclusion vitals"')&&interaction.includes('.decision-first-hero .price-stack b'));
 check('paper controls reserve control gaps',interaction.includes('.paper-toolbar')&&interaction.includes('gap:var(--ui-control-gap)!important'));
-check('strategy result pane does not become nested viewport',interaction.includes('.strategy-v5-detail-panels')&&interaction.includes('overflow-y:visible!important'));
 check('detail destinations account for sticky shell',interaction.includes('#researchDetail,#assetDetail,#paperDetail,#strategyDetail,#strategyBody'));
 
 check('secondary nav legacy visual rules remain available',css.includes('.journey-nav{justify-content:center!important'));
