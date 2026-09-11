@@ -1,0 +1,273 @@
+/* V9 viewport-first layout.
+   Judge every interaction by what the user can actually see immediately after a click.
+   Target displays: desktop 1280, compact desktop 1024, mobile 430. */
+
+:root{
+  --shell-header-offset:112px;
+  --viewport-rail-max:560px;
+  --viewport-rail-compact:420px;
+}
+
+/* Arrival targets must never hide under the sticky shell. */
+#researchDetail,
+#assetDetail,
+#paperDetail,
+#strategyDetail,
+#paperBody,
+#strategyBody{
+  scroll-margin-top:calc(var(--shell-header-offset) + 12px)!important;
+}
+
+/* The first visible result should read as one answer, not a wall of equal cards. */
+#pageRoot[data-page-route="research"] .decision-first-detail,
+#pageRoot[data-page-route="assets"] .asset-detail,
+#pageRoot[data-page-route="paper"] .paper-detail,
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell{
+  min-width:0!important;
+}
+
+#pageRoot[data-page-route="research"] .decision-first-hero,
+#pageRoot[data-page-route="assets"] .asset-detail-hero,
+#pageRoot[data-page-route="paper"] .paper-detail-hero{
+  margin-bottom:0!important;
+}
+
+#pageRoot[data-page-route="research"] .decision-first-body,
+#pageRoot[data-page-route="assets"] .asset-detail,
+#pageRoot[data-page-route="paper"] .paper-detail{
+  scroll-margin-top:calc(var(--shell-header-offset) + 12px)!important;
+}
+
+/* Selection rails fit the remaining display instead of forcing the whole page down. */
+#pageRoot[data-page-route="research"] .research-master .master-list{
+  max-height:min(50dvh,var(--viewport-rail-max))!important;
+}
+#pageRoot[data-page-route="paper"] .paper-master #paperList,
+#pageRoot[data-page-route="strategy"] .strategy-workspace>.strategy-table,
+#pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"]>.strategy-table{
+  max-height:min(56dvh,var(--viewport-rail-max))!important;
+}
+#pageRoot[data-page-route="assets"] .allocation-list{
+  max-height:118px!important;
+}
+#pageRoot[data-page-route="assets"] .asset-holdings-list{
+  max-height:min(36dvh,350px)!important;
+}
+
+/* A compact mobile handoff bar keeps the list context available after a row opens. */
+.viewport-return-bar{
+  display:none;
+}
+
+/* 1024-class displays: use a two-row shell so navigation and account controls never collide. */
+@media(max-width:1180px) and (min-width:901px){
+  :root{
+    --shell-header-offset:154px;
+    --viewport-rail-max:500px;
+  }
+
+  .app-header-inner{
+    grid-template-columns:minmax(0,1fr) auto!important;
+    grid-template-areas:"brand tools" "nav nav"!important;
+    gap:8px 14px!important;
+    padding-top:8px!important;
+    padding-bottom:8px!important;
+  }
+  .brand{grid-area:brand!important}
+  .header-tools{grid-area:tools!important;justify-self:end!important}
+  .main-nav{
+    grid-area:nav!important;
+    display:grid!important;
+    grid-template-columns:repeat(6,minmax(0,1fr))!important;
+    width:100%!important;
+    gap:0!important;
+    border-top:1px solid var(--line)!important;
+  }
+  .main-nav button{
+    min-width:0!important;
+    min-height:42px!important;
+    padding:0 6px!important;
+    text-align:center!important;
+    white-space:nowrap!important;
+  }
+  .app-main{
+    padding-top:16px!important;
+    padding-left:20px!important;
+    padding-right:20px!important;
+  }
+  .page-head-v6,
+  .page-head{
+    margin-bottom:12px!important;
+  }
+
+  #pageRoot[data-page-route="research"] .research-workspace,
+  #pageRoot[data-page-route="research"] .decision-first-workspace,
+  #pageRoot[data-page-route="assets"] .asset-workspace,
+  #pageRoot[data-page-route="paper"] .paper-workspace,
+  #pageRoot[data-page-route="strategy"] .strategy-workspace,
+  #pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"]{
+    grid-template-columns:minmax(232px,27%) minmax(0,1fr)!important;
+    gap:18px!important;
+  }
+
+  #pageRoot[data-page-route="research"] .decision-first-conclusion h3{
+    font-size:clamp(27px,3vw,36px)!important;
+  }
+  #pageRoot[data-page-route="research"] .decision-first-hero{
+    gap:18px!important;
+    padding-bottom:18px!important;
+  }
+  #pageRoot[data-page-route="research"] .decision-first-tabs{
+    padding-top:12px!important;
+  }
+  #pageRoot[data-page-route="research"] .decision-first-body{
+    padding-top:16px!important;
+  }
+
+  #pageRoot[data-page-route="assets"] .asset-holdings-list{
+    max-height:min(31dvh,300px)!important;
+  }
+  #pageRoot[data-page-route="assets"] .asset-detail-hero,
+  #pageRoot[data-page-route="paper"] .paper-detail-hero{
+    padding:14px!important;
+  }
+  #pageRoot[data-page-route="assets"] .asset-detail-grid>span,
+  #pageRoot[data-page-route="paper"] .paper-detail-kpis>span{
+    padding:10px!important;
+  }
+}
+
+/* Single-column layouts: row click -> result, with an explicit way back to the list. */
+@media(max-width:900px){
+  :root{
+    --shell-header-offset:160px;
+    --viewport-rail-compact:44dvh;
+  }
+
+  .viewport-return-bar{
+    position:sticky;
+    top:calc(var(--shell-header-offset) + 6px);
+    z-index:24;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    min-height:44px;
+    margin:0 0 14px;
+    padding:6px 0 8px;
+    border-bottom:1px solid var(--line);
+    background:var(--surface);
+  }
+  .viewport-return-bar button{
+    flex:0 0 auto;
+    min-height:34px;
+    padding:0;
+    border:0;
+    border-radius:0;
+    background:transparent;
+    color:var(--accent);
+    font-size:13px;
+    font-weight:750;
+  }
+  .viewport-return-bar span{
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    color:var(--muted);
+    font-size:12px;
+    text-align:right;
+  }
+
+  #pageRoot[data-page-route="research"] .research-master .master-list,
+  #pageRoot[data-page-route="paper"] .paper-master #paperList,
+  #pageRoot[data-page-route="strategy"] .strategy-workspace>.strategy-table{
+    max-height:var(--viewport-rail-compact)!important;
+  }
+  #pageRoot[data-page-route="assets"] .allocation-list{
+    max-height:105px!important;
+  }
+  #pageRoot[data-page-route="assets"] .asset-holdings-list{
+    max-height:34dvh!important;
+  }
+
+  #pageRoot[data-page-route="research"] .decision-first-hero,
+  #pageRoot[data-page-route="assets"] .asset-detail-hero,
+  #pageRoot[data-page-route="paper"] .paper-detail-hero{
+    padding-top:4px!important;
+  }
+
+  #pageRoot[data-page-route="research"] .decision-first-conclusion h3{
+    font-size:clamp(26px,8vw,34px)!important;
+  }
+
+  #pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell{
+    margin-top:0!important;
+  }
+  #pageRoot[data-page-route="strategy"] .strategy-v5-detail-tabs{
+    margin-bottom:12px!important;
+  }
+}
+
+/* 430px-class phones: preserve tappable controls and make the destination unmistakable. */
+@media(max-width:620px){
+  :root{
+    --shell-header-offset:188px;
+    --viewport-rail-compact:40dvh;
+  }
+
+  .app-header-inner{
+    grid-template-columns:minmax(0,1fr) auto!important;
+    grid-template-areas:"brand tools" "nav nav"!important;
+  }
+  .main-nav{
+    display:grid!important;
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  }
+  .main-nav button{
+    min-height:42px!important;
+  }
+  .header-tools{
+    width:auto!important;
+    justify-self:end!important;
+    flex-wrap:nowrap!important;
+  }
+  .reader-mode-control{
+    display:none!important;
+  }
+  .app-main{
+    padding-top:14px!important;
+    padding-left:12px!important;
+    padding-right:12px!important;
+  }
+
+  .viewport-return-bar{
+    top:calc(var(--shell-header-offset) + 4px);
+    margin-bottom:12px;
+  }
+
+  #pageRoot[data-page-route="research"] .decision-first-market-pulse{
+    margin-bottom:10px!important;
+  }
+  #pageRoot[data-page-route="research"] .decision-first-tabs,
+  #pageRoot[data-page-route="strategy"] .strategy-v5-detail-tabs{
+    gap:16px!important;
+  }
+
+  #pageRoot[data-page-route="assets"] .asset-holdings-list{
+    max-height:31dvh!important;
+  }
+}
+
+/* Short desktop displays need tighter vertical budgets even when width is generous. */
+@media(min-width:901px) and (max-height:760px){
+  :root{--viewport-rail-max:430px}
+  #pageRoot[data-page-route="research"] .research-master .master-list{max-height:42dvh!important}
+  #pageRoot[data-page-route="paper"] .paper-master #paperList,
+  #pageRoot[data-page-route="strategy"] .strategy-workspace>.strategy-table{max-height:48dvh!important}
+  #pageRoot[data-page-route="assets"] .asset-holdings-list{max-height:29dvh!important}
+}
+
+html[data-theme="dark"] .viewport-return-bar{
+  background:#111317;
+}
