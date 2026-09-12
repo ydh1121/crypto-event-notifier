@@ -18,11 +18,11 @@ export function createPaperPage({store}){
     if(!root)return;
     const state=store.get();
     if(!state.snapshot){
-      root.innerHTML=pageHead('가상매매 성적','현재 매매 방식의 가상 성적을 확인합니다.')+loading('가상매매 데이터를 불러오는 중입니다.');
+      root.innerHTML=pageHead('모의투자','현재 가상계좌와 선택 코인의 포지션을 확인합니다.')+loading('가상매매 데이터를 불러오는 중입니다.');
       return;
     }
     const strategy=paperStrategy(state,ui().paperExchange||'bithumb');
-    root.innerHTML=`${pageHead('가상매매 성적','현재 실행 중인 가상매매 결과를 전체·코인별·거래소별로 봅니다.')}${scopeBanner('paper',{strategy})}<nav class="subnav"><button data-paper-tab="summary" class="${ui().paperTab==='summary'?'active':''}">전체 요약</button><button data-paper-tab="coins" class="${ui().paperTab==='coins'?'active':''}">코인별</button><button data-paper-tab="compare" class="${ui().paperTab==='compare'?'active':''}">거래소별</button></nav><section id="paperBody"></section>`;
+    root.innerHTML=`${pageHead('모의투자','가상계좌 전체 현황 → 코인별 포지션 → 현재 매매 계획 순서로 봅니다.')}${scopeBanner('paper',{strategy})}<nav class="subnav"><button data-paper-tab="summary" class="${ui().paperTab==='summary'?'active':''}">전체 요약</button><button data-paper-tab="coins" class="${ui().paperTab==='coins'?'active':''}">코인별</button><button data-paper-tab="compare" class="${ui().paperTab==='compare'?'active':''}">거래소별</button></nav><section id="paperBody"></section>`;
     renderTab();
   }
 
@@ -95,8 +95,8 @@ export function createPaperPage({store}){
     if(!box)return;
     const ex=ui().paperExchange;
     box.innerHTML=list.length?list.slice(0,180).map(r=>{
-      const strategy=strategyLabel(paperStrategy(store.get(),ex,r));
-      return`<button data-paper-market="${esc(r.market)}" class="paper-row ${r.market===selected?'selected':''}"><span><b>${esc(r.symbol||r.market)}</b><small>${esc(strategy)} · ${esc(stateLabel(r))} · ${n(r.closed_trades)}회</small></span><strong class="${tone(r.return_pct)}">${pct(r.return_pct)}</strong></button>`;
+      const strategy=strategyLabel(paperStrategy(store.get(),ex,r)),position=r.has_position?money(r.position_value_krw):'미보유';
+      return`<button data-paper-market="${esc(r.market)}" class="paper-row paper-position-row ${r.market===selected?'selected':''}"><span><b>${esc(r.symbol||r.market)}</b><small>${esc(strategy)} · ${esc(stateLabel(r))} · ${n(r.closed_trades)}회</small></span><strong><b>${position}</b><small class="${tone(r.return_pct)}">${pct(r.return_pct)}</small></strong></button>`;
     }).join(''):empty('조건에 맞는 코인이 없습니다.');
   }
 
@@ -111,8 +111,8 @@ export function createPaperPage({store}){
       box.innerHTML=empty('조건에 맞는 코인을 선택하세요.');
       return;
     }
-    const id=++seq,key=`${ex}|${market}`,strategy=strategyLabel(paperStrategy(store.get(),ex,row));
-    box.innerHTML=`<article class="paper-detail-hero"><div><span>${ex==='upbit'?'업비트':'빗썸'} · ${esc(strategy)} 실행 가상매매</span><h3>${esc(row.symbol||market)}</h3><p>${esc(stateLabel(row))}</p></div><div><span>전체 수익률</span><b class="${tone(row.return_pct)}">${pct(row.return_pct)}</b><small>평가액 ${money(row.equity_krw)}</small></div></article><div class="paper-detail-kpis"><span><small>실행 전략</small><b>${esc(strategy)}</b></span><span><small>남은 현금</small><b>${money(row.cash_krw)}</b></span><span><small>현재 보유금액</small><b>${money(row.position_value_krw)}</b></span><span><small>평균 매수가</small><b>${row.position_avg_price?price(row.position_avg_price):'-'}</b></span><span><small>미실현 손익</small><b class="${tone(row.unrealized_pnl_krw)}">${n(row.unrealized_pnl_krw)>=0?'+':''}${money(row.unrealized_pnl_krw)}</b></span><span><small>실현 손익</small><b class="${tone(row.realized_pnl_krw)}">${n(row.realized_pnl_krw)>=0?'+':''}${money(row.realized_pnl_krw)}</b></span><span><small>완료 거래 / 승률</small><b>${n(row.closed_trades)}회 · ${n(row.win_rate_pct).toFixed(1)}%</b></span></div><section id="paperDeep">${loading('매매 계획과 체결 이력을 불러오는 중입니다.')}</section>`;
+    const id=++seq,key=`${ex}|${market}`,strategy=strategyLabel(paperStrategy(store.get(),ex,row)),position=row.has_position?money(row.position_value_krw):'미보유';
+    box.innerHTML=`<article class="paper-detail-hero paper-position-hero"><div><span>${ex==='upbit'?'업비트':'빗썸'} · ${esc(strategy)} 실행 가상매매</span><h3>${esc(row.symbol||market)}</h3><p>${esc(stateLabel(row))} · 현재가 ${price(row.price)}</p></div><div class="paper-position-primary"><span>현재 가상 포지션</span><b>${position}</b><small>평단 ${row.position_avg_price?price(row.position_avg_price):'-'} · 누적 수익률 <em class="${tone(row.return_pct)}">${pct(row.return_pct)}</em></small></div></article><div class="paper-detail-kpis"><span><small>현재 보유금액</small><b>${money(row.position_value_krw)}</b></span><span><small>평균 매수가</small><b>${row.position_avg_price?price(row.position_avg_price):'-'}</b></span><span><small>미실현 손익</small><b class="${tone(row.unrealized_pnl_krw)}">${n(row.unrealized_pnl_krw)>=0?'+':''}${money(row.unrealized_pnl_krw)}</b></span><span><small>남은 현금</small><b>${money(row.cash_krw)}</b></span><span><small>누적 수익률</small><b class="${tone(row.return_pct)}">${pct(row.return_pct)}</b></span><span><small>실현 손익</small><b class="${tone(row.realized_pnl_krw)}">${n(row.realized_pnl_krw)>=0?'+':''}${money(row.realized_pnl_krw)}</b></span><span><small>실행 전략</small><b>${esc(strategy)}</b></span><span><small>완료 거래 / 승률</small><b>${n(row.closed_trades)}회 · ${n(row.win_rate_pct).toFixed(1)}%</b></span></div><section id="paperDeep">${loading('매매 계획과 체결 이력을 불러오는 중입니다.')}</section>`;
     try{
       const detail=await getMarketDetail(ex,market);
       if(id!==seq||ui().paperMarket!==market)return;
