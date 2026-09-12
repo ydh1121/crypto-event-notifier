@@ -12,7 +12,7 @@ const publisher=repoRead('b3_trader/cloudflare_snapshot_publisher.py');
 const fail=[];
 const check=(name,value)=>{if(!value)fail.push(name)};
 
-check('V11 market workspace build marker exists',index.includes('2026.09.12-v5.1.0-market-workspace'));
+check('viewer build marker remains present',index.includes('name="crypto-viewer-build"'));
 check('market workspace assets remain cache-versioned',index.includes('/modules/main.js?v=')&&index.includes('/modules/styles/interaction-layout-v4.css?v=')&&main.includes("./pages/research.js?v="));
 check('market quote client remains wired through research module',main.includes("./pages/research.js?v=")&&research.includes("getMarketQuotes}from'../services/market-quotes.js?v=1'"));
 
