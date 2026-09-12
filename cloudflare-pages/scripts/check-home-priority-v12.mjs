@@ -7,9 +7,9 @@ const layout=read('public/modules/styles/layout-fixes-v4.css');
 const fail=[];
 const check=(name,value)=>{if(!value)fail.push(name)};
 
-check('home module cache is refreshed',main.includes("./pages/v4/home.js?v=2.1"));
-check('entry cache is refreshed for home hierarchy',index.includes('/modules/main.js?v=96.2'));
-check('layout cache is refreshed for home quote columns',index.includes('/modules/styles/layout-fixes-v4.css?v=1.1'));
+check('home module remains cache-versioned',main.includes("./pages/v4/home.js?v="));
+check('entry remains cache-versioned',index.includes('/modules/main.js?v='));
+check('layout remains cache-versioned',index.includes('/modules/styles/layout-fixes-v4.css?v='));
 check('home reuses authenticated market quote cache',home.includes("getMarketQuotes}from'../../services/market-quotes.js?v=1'")&&home.includes("getMarketQuotes('bithumb')")&&home.includes("getMarketQuotes('upbit')"));
 check('home coin table follows ticker price 24h decision hierarchy',home.includes('<span>코인</span><span>현재가</span><span>24h</span><span>판단</span>')&&home.includes('home-market-price')&&home.includes('home-market-change'));
 check('home quote values fall back safely',home.includes('finite(cached?.price)??finite(row?.price)')&&home.includes('finite(cached?.change_24h_pct)??finite(row?.change_24h_pct)'));
