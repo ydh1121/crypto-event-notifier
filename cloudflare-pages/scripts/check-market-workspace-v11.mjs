@@ -4,6 +4,8 @@ const repoRead=path=>fs.readFileSync(new URL(`../../${path}`,import.meta.url),'u
 const index=read('public/index.html');
 const main=read('public/modules/main.js');
 const research=read('public/modules/pages/research.js');
+const quotesService=read('public/modules/services/market-quotes.js');
+const quotesApi=read('functions/api/market-quotes.ts');
 const interaction=read('public/modules/styles/interaction-layout-v4.css');
 const scoped=repoRead('b3_trader/scoped_paper_store.py');
 const publisher=repoRead('b3_trader/cloudflare_snapshot_publisher.py');
@@ -12,6 +14,7 @@ const check=(name,value)=>{if(!value)fail.push(name)};
 
 check('V11 market workspace build marker exists',index.includes('2026.09.12-v5.1.0-market-workspace'));
 check('market workspace assets are cache refreshed',index.includes('/modules/main.js?v=96')&&index.includes('/modules/styles/interaction-layout-v4.css?v=6')&&main.includes("./pages/research.js?v=43"));
+check('market quote client is cache-busted through research module',index.includes('/modules/main.js?v=96.1')&&main.includes("./pages/research.js?v=43.1"));
 
 check('market list has exchange-style quote columns',research.includes('market-list-columns')&&research.includes('market-quote-row')&&research.includes('market-price-cell')&&research.includes('market-change-cell'));
 check('selected instrument starts with ticker and current price',research.includes('market-quote-identity')&&research.includes('market-current-price')&&research.includes('data-research-live="price"'));
@@ -19,6 +22,13 @@ check('selected instrument exposes actual market change field',research.includes
 check('detail API is a valid market-change fallback',research.includes('signal.change_24h_pct')&&research.includes('latest.change_24h_pct'));
 check('paper account return is semantically separated',research.includes('PAPER 수익률')&&!research.includes('data-research-live="return"'));
 check('missing quote change is not replaced with paper performance',research.includes("return value===null?'—'")||research.includes("value===null?'—'"));
+
+check('D1 quote endpoint requires a viewer session',quotesApi.includes('requireSession')&&quotesApi.includes("AUTH_REQUIRED"));
+check('D1 quote endpoint reads existing market detail cache only',quotesApi.includes('FROM market_details')&&quotesApi.includes('WHERE exchange=? AND strategy=?')&&!quotesApi.includes('fetch('));
+check('D1 quote endpoint extracts real market fields',quotesApi.includes('signal.price')&&quotesApi.includes('signal.change_24h_pct')&&quotesApi.includes('signal.turnover_24h'));
+check('quote client caches bounded reads',quotesService.includes('/api/market-quotes?exchange=')&&quotesService.includes('now-hit.ts<15000')&&quotesService.includes('new Map'));
+check('research hydrates list from quote cache',research.includes("getMarketQuotes}from'../services/market-quotes.js?v=1'")&&research.includes('quoteMap=new Map()')&&research.includes('cachedQuote(row)'));
+check('snapshot refresh also refreshes quote cache',research.includes('function refreshSnapshot()')&&research.includes('loadQuotes();'));
 
 check('market filter controls cannot visually collapse',interaction.includes('#researchFilters')&&interaction.includes('grid-template-columns:repeat(3,minmax(0,1fr))!important')&&interaction.includes('min-height:32px!important'));
 check('market rail gives quote columns enough width',interaction.includes('grid-template-columns:minmax(340px,360px) minmax(0,1fr)!important'));
