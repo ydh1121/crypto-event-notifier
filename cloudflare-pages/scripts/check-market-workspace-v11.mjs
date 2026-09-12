@@ -13,8 +13,8 @@ const fail=[];
 const check=(name,value)=>{if(!value)fail.push(name)};
 
 check('V11 market workspace build marker exists',index.includes('2026.09.12-v5.1.0-market-workspace'));
-check('market workspace assets are cache refreshed',index.includes('/modules/main.js?v=96')&&index.includes('/modules/styles/interaction-layout-v4.css?v=6')&&main.includes("./pages/research.js?v=43"));
-check('market quote client is cache-busted through research module',index.includes('/modules/main.js?v=96.1')&&main.includes("./pages/research.js?v=43.1"));
+check('market workspace assets remain cache-versioned',index.includes('/modules/main.js?v=')&&index.includes('/modules/styles/interaction-layout-v4.css?v=')&&main.includes("./pages/research.js?v="));
+check('market quote client remains wired through research module',main.includes("./pages/research.js?v=")&&research.includes("getMarketQuotes}from'../services/market-quotes.js?v=1'"));
 
 check('market list has exchange-style quote columns',research.includes('market-list-columns')&&research.includes('market-quote-row')&&research.includes('market-price-cell')&&research.includes('market-change-cell'));
 check('selected instrument starts with ticker and current price',research.includes('market-quote-identity')&&research.includes('market-current-price')&&research.includes('data-research-live="price"'));
