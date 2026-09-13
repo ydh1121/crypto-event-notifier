@@ -524,3 +524,46 @@ html[data-theme="dark"] #pageRoot[data-page-route="strategy"] .strategy-paper-kp
 @media(prefers-reduced-motion:reduce){
   #pageRoot[data-page-route="strategy"] .strategy-v5-strategy-item{transition:none!important}
 }
+
+/* V14 strategy hierarchy: status and risk-adjusted result should scan before supporting statistics. */
+#pageRoot[data-page-route="strategy"] .strategy-overview-summary{
+  min-height:0!important;
+  margin:0 0 8px!important;
+  padding:0 0 9px!important;
+  border-bottom:1px solid var(--line)!important;
+}
+#pageRoot[data-page-route="strategy"] .strategy-overview-summary b{font-size:14px!important}
+#pageRoot[data-page-route="strategy"] .strategy-sort-note{margin:0 0 10px!important}
+#pageRoot[data-page-route="strategy"] .strategy-v5-strategy-item{gap:7px!important;padding-top:10px!important;padding-bottom:10px!important}
+#pageRoot[data-page-route="strategy"] .strategy-v5-item-copy b{font-size:15px!important}
+#pageRoot[data-page-route="strategy"] .strategy-v5-item-facts>span:first-child b{font-size:17px!important;line-height:1.1!important}
+#pageRoot[data-page-route="strategy"] .strategy-v5-item-facts em{
+  justify-self:start!important;
+  padding:3px 6px!important;
+  border:1px solid var(--line)!important;
+  border-radius:999px!important;
+  background:var(--surface2)!important;
+  font-weight:750!important;
+}
+html[data-reader-mode="simple"] #pageRoot[data-page-route="strategy"] .strategy-v5-item-copy small{display:none!important}
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell .strategy-detail header h3{font-size:30px!important}
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell .strategy-detail-kpis{
+  grid-template-columns:repeat(10,minmax(0,1fr))!important;
+  margin-top:16px!important;
+}
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell .strategy-detail-kpis>span:nth-child(1){grid-column:span 4!important}
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell .strategy-detail-kpis>span:nth-child(2){grid-column:span 3!important;border-right:1px solid var(--line)!important}
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell .strategy-detail-kpis>span:nth-child(3){grid-column:span 3!important;border-right:0!important}
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell .strategy-detail-kpis>span:nth-child(n+4){grid-column:span 2!important;border-bottom:0!important}
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell .strategy-detail-kpis>span:nth-child(5){border-right:1px solid var(--line)!important}
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell .strategy-detail-kpis>span:nth-child(8){border-right:0!important}
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell .strategy-detail-kpis>span:first-child b{font-size:32px!important}
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell .strategy-detail-kpis>span:nth-child(3) b{font-size:22px!important}
+
+@media(max-width:1080px){
+  #pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell .strategy-detail-kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  #pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell .strategy-detail-kpis>span{grid-column:auto!important}
+}
+@media(max-width:620px){
+  #pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell .strategy-detail-kpis{grid-template-columns:1fr!important}
+}
