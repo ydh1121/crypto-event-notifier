@@ -32,7 +32,8 @@ check('records counters are compact support strip',recordsCss.includes('.records
 check('records insight stays visible beside long feed on desktop',recordsCss.includes('.records-insight')&&recordsCss.includes('position:sticky!important'));
 check('records audience switch is flat navigation',audienceCss.includes('V14 audience switch')&&audienceCss.includes('border-bottom:2px solid transparent!important')&&audienceCss.includes('background:transparent!important'));
 
-check('legacy asset order rules are gone from content priority layer',!priorityCss.includes('#pageRoot[data-page-route="assets"]>.asset-kpis{order:')&&!priorityCss.includes('#pageRoot[data-page-route="assets"]>.asset-workspace{order:')&&!priorityCss.includes('#pageRoot[data-page-route="assets"]>.asset-history-panel{\n  order:'));
+const assetOrderRule=/#pageRoot\[data-page-route="assets"\][^\{]*\{[^\}]*\border\s*:/s;
+check('legacy asset order rules are gone from content priority layer',!assetOrderRule.test(priorityCss));
 check('legacy asset order rules remain gone from canonical interaction layer',!interaction.includes('>.asset-workspace{order:2')&&!interaction.includes('>.asset-history-panel{order:3'));
 
 if(fail.length){console.error('STRATEGY_RECORDS_PRIORITY_V14=FAIL');for(const item of fail)console.error(`- ${item}`);process.exit(1)}
