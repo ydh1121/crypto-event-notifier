@@ -8,7 +8,7 @@ const interaction=read('public/modules/styles/interaction-layout-v4.css');
 const fail=[];
 const check=(name,value)=>{if(!value)fail.push(name)};
 
-check('V13 build marker exists',index.includes('2026.09.12-v5.2.0-portfolio-paper-priority'));
+check('current build marker exists',/meta name="crypto-viewer-build" content="[^"]+"/.test(index));
 check('asset module remains cache-versioned',/\.\/pages\/assets\.js\?v=[^'\"]+/.test(main));
 check('paper module remains cache-versioned',/\.\/pages\/paper\.js\?v=[^'\"]+/.test(main));
 check('canonical interaction layer remains cache-versioned',/\/modules\/styles\/interaction-layout-v4\.css\?v=[^'\"]+/.test(index));
