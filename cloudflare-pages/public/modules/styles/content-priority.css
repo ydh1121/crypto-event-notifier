@@ -14,11 +14,9 @@
   margin-top:28px;
 }
 
-#pageRoot[data-page-route="assets"]>.page-head-v6{order:0}
-#pageRoot[data-page-route="assets"]>.asset-kpis{order:1}
-#pageRoot[data-page-route="assets"]>.asset-workspace{order:2}
+/* Assets now emit canonical DOM order directly: summary → workspace → history.
+   Do not re-order asset sections in CSS. */
 #pageRoot[data-page-route="assets"]>.asset-history-panel{
-  order:3;
   margin-top:28px;
 }
 
