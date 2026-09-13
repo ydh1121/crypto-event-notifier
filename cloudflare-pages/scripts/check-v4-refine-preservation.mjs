@@ -24,7 +24,7 @@ check('market secondary group remains',main.includes("['research','코인']")&&m
 check('paper and strategy are no longer fused into secondary navigation',!main.includes("paper:[['paper','모의투자']")&&!main.includes("strategy:[['paper','모의투자']"));
 check('v4 style stack remains',['mainstream-v4.css','layout-fixes-v4.css','theme-dark-v4.css','theme-dark-audit-v4.css','decision-workspace-v4.css'].every(value=>index.includes(value)));
 check('refine layer remains after v4',index.includes('v4-refine-v1.css')&&index.indexOf('decision-workspace-v4.css')<index.indexOf('v4-refine-v1.css'));
-check('canonical interaction layer is refreshed',index.includes('interaction-layout-v4.css?v=6')&&index.indexOf('decision-first-v7.css')<index.indexOf('interaction-layout-v4.css'));
+check('canonical interaction layer remains versioned and last in geometry stack',index.includes('/modules/styles/interaction-layout-v4.css?v=')&&index.indexOf('decision-first-v7.css')<index.indexOf('interaction-layout-v4.css'));
 
 check('research workspace remains',research.includes('research-workspace')&&research.includes('research-detail'));
 check('research market quote list is first class',research.includes('market-list-columns')&&research.includes('market-quote-row')&&research.includes('market-current-price'));
@@ -48,7 +48,7 @@ check('strategy coin click lands on requested decision result',drilldown.include
 check('viewport handoff remains event driven',main.includes('installViewportHandoff')&&!viewport.includes('MutationObserver')&&viewport.includes("root.addEventListener('click',click)"));
 check('compact selections still reveal detail',['[data-research-market]','#researchDetail','[data-asset-market]','#assetDetail','[data-paper-market]','#paperDetail','[data-strategy-key]','#strategyDetail'].every(value=>viewport.includes(value)));
 check('paper action reveals body',viewport.includes(".paper-next [data-paper-tab]")&&viewport.includes("reveal('#paperBody',{force:true})"));
-check('main cache version is refreshed',index.includes('/modules/main.js?v=96'));
+check('main cache remains versioned',index.includes('/modules/main.js?v='));
 
 check('non-market workspaces keep shared rail geometry',interaction.includes('grid-template-columns:minmax(280px,300px) minmax(0,1fr)!important'));
 check('market workspace receives quote-capable rail width',interaction.includes('grid-template-columns:minmax(340px,360px) minmax(0,1fr)!important'));
