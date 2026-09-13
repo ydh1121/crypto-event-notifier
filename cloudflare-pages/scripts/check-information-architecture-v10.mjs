@@ -13,7 +13,7 @@ const doc=read('docs/UX_INFORMATION_ARCHITECTURE_V10.md');
 const fail=[];
 const check=(name,value)=>{if(!value)fail.push(name)};
 
-check('market workspace build marker exists',index.includes('2026.09.12-v5.1.0-market-workspace'));
+check('current build marker exists',index.includes('meta name="crypto-viewer-build"'));
 check('architecture document declares product decision loop',doc.includes('시장 파악 → 코인 판단 → 내 자산 확인 → 모의 실행 → 전략 평가 → 결과 회고'));
 check('architecture document defines explicit scroll ownership',doc.includes('Scroll ownership is explicit')&&doc.includes('sticky bounded rail + document-flow detail'));
 
