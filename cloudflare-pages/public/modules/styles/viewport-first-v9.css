@@ -26,6 +26,8 @@
 #pageRoot[data-page-route="strategy"] .strategy-v5-detail-panels{
   height:auto!important;
   max-height:none!important;
+  overflow:visible!important;
+  overflow-x:visible!important;
   overflow-y:visible!important;
   overscroll-behavior:auto!important;
 }
@@ -126,6 +128,66 @@
   #pageRoot[data-page-route="research"] .decision-first-market-pulse{margin-bottom:10px!important}
   #pageRoot[data-page-route="research"] .decision-first-tabs,
   #pageRoot[data-page-route="strategy"] .strategy-v5-detail-tabs{gap:16px!important}
+}
+
+/* V15 clipping / scroll-ownership hardening.
+   A detail/result surface must expand with the document; only selection rails and
+   deliberately horizontal data tables may own scroll. */
+.page-head-meta,
+.header-tools{min-width:0!important;max-width:100%!important}
+.page-head-meta{flex-wrap:wrap!important}
+.page-head-meta>*{max-width:100%!important}
+.header-tools>button,
+.header-tools>.reader-mode-control{min-width:0!important;flex:0 1 auto!important}
+
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell,
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-panels,
+#pageRoot[data-page-route="strategy"] .strategy-matrix-detail{
+  position:static!important;
+  top:auto!important;
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  overflow:visible!important;
+  overflow-x:visible!important;
+  overflow-y:visible!important;
+  overscroll-behavior:auto!important;
+  scrollbar-gutter:auto!important;
+}
+
+#pageRoot[data-page-route="strategy"] .strategy-breakdown-table,
+#pageRoot[data-page-route="strategy"] .strategy-trade-table{
+  max-width:100%!important;
+  overflow-x:auto!important;
+  overflow-y:visible!important;
+  -webkit-overflow-scrolling:touch!important;
+}
+
+#pageRoot[data-page-route="records"] .records-toolbar>*{min-width:0!important;max-width:100%!important}
+#pageRoot[data-page-route="records"] .records-toolbar button{white-space:nowrap!important}
+
+@media(max-width:900px){
+  #pageRoot[data-page-route="records"] .records-toolbar{
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+  }
+  #pageRoot[data-page-route="records"] .records-toolbar input{
+    grid-column:1/-1!important;
+  }
+  #pageRoot[data-page-route="records"] .records-toolbar button{
+    width:100%!important;
+  }
+}
+
+@media(max-width:620px){
+  #pageRoot[data-page-route="records"] .records-toolbar{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+  #pageRoot[data-page-route="records"] .records-toolbar input,
+  #pageRoot[data-page-route="records"] .records-toolbar select,
+  #pageRoot[data-page-route="records"] .records-toolbar button{
+    grid-column:1!important;
+    width:100%!important;
+  }
 }
 
 html[data-theme="dark"] .viewport-return-bar{background:#111317}
