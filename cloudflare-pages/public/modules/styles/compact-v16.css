@@ -1,0 +1,45 @@
+/* V16: compact functional copy, rail containment and sort controls. */
+
+/* Remove prose that repeats what nearby controls/numbers already say. */
+.page-head-v6 p,.page-head p,
+.strategy-context-line,.strategy-sort-note,.strategy-v5-rail-head small,.strategy-detail-next,
+.strategy-breakdown-head p,.strategy-trade-head p,.strategy-evidence-head p,
+.holding-plan-head p,.holding-plan-note,.calculator-head p,.calculator-note,
+.profit-plan-head p,.profit-stage p,.profit-plan-note,.local-management-note p,
+.asset-history-note,.paper-next p,.trade-plan-panel header p,
+.records-scope-switch>p,.records-insight header p,.records-live-note,
+.listing-history-head p,.listing-no-source{display:none!important}
+
+/* Keep section headers terse. */
+.page-head-v6,.page-head{margin-bottom:12px!important}
+.page-head-v6 h2,.page-head h2{margin-bottom:0!important}
+
+/* Rail must never leak controls/rows outside its right edge. */
+#pageRoot .research-master,#pageRoot .asset-master,#pageRoot .paper-master,
+#pageRoot[data-page-route="strategy"] .strategy-table{min-width:0!important;max-width:100%!important;overflow-x:hidden!important}
+#pageRoot .research-master *,#pageRoot .asset-master *,#pageRoot .paper-master *{box-sizing:border-box}
+#pageRoot .research-master button,#pageRoot .asset-master button,#pageRoot .paper-master button{max-width:100%!important;min-width:0!important}
+#pageRoot .market-quote-row,#pageRoot .asset-quote-row,#pageRoot .paper-position-row{width:100%!important;min-width:0!important}
+#pageRoot .market-asset-cell,#pageRoot .market-price-cell,#pageRoot .asset-quote-row>span,#pageRoot .asset-quote-row>strong{min-width:0!important}
+#pageRoot .market-asset-cell b,#pageRoot .market-asset-cell small,#pageRoot .asset-quote-row>span b,#pageRoot .asset-quote-row>span small{overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+
+.rail-sort-v16{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:3px;width:100%;padding:5px 0 7px;overflow:hidden}
+.rail-sort-v16 button{display:flex!important;align-items:center!important;justify-content:center!important;gap:3px!important;width:100%!important;min-width:0!important;min-height:28px!important;padding:3px 4px!important;border:0!important;border-radius:6px!important;background:transparent!important;color:var(--muted)!important;font-size:10px!important;font-weight:700!important;white-space:nowrap!important}
+.rail-sort-v16 button:hover{background:var(--surface2)!important}
+.rail-sort-v16 button.active{color:var(--accent)!important;background:var(--accent2)!important}
+.rail-sort-v16 i{font-style:normal!important;font-size:9px!important}
+.rail-search-empty-v16{padding:18px 8px;color:var(--muted);font-size:12px;text-align:center}
+
+#pageRoot[data-page-route="research"] .research-master{padding-right:0!important}
+#pageRoot[data-page-route="research"] .market-list-columns,
+#pageRoot[data-page-route="research"] .market-quote-row{grid-template-columns:minmax(0,1.2fr) minmax(78px,.8fr) 54px!important;gap:7px!important}
+#pageRoot[data-page-route="research"] .market-price-cell b{font-size:11px!important}
+
+#pageRoot[data-page-route="assets"] .asset-list-head{margin-bottom:2px!important}
+#pageRoot[data-page-route="assets"] .rail-sort-v16{grid-template-columns:repeat(5,minmax(0,1fr));grid-auto-flow:row}
+#pageRoot[data-page-route="assets"] .asset-quote-row{grid-template-columns:minmax(0,1fr) minmax(88px,.65fr)!important;gap:8px!important}
+
+@media(max-width:620px){
+  .rail-sort-v16{gap:2px}.rail-sort-v16 button{font-size:9px!important;padding:3px 2px!important}
+  #pageRoot[data-page-route="assets"] .rail-sort-v16{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
