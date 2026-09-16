@@ -3,7 +3,7 @@ const SORT_KEY='cryptoViewerRailSortV16';
 const SEARCH_KEY='cryptoViewerRailSearchV16';
 function readJson(key){try{return JSON.parse(localStorage.getItem(key)||'{}')}catch{return{}}}
 function writeJson(key,value){try{localStorage.setItem(key,JSON.stringify(value))}catch{}}
-const sortState=readJson(SORT_KEY),searchState=readJson(SEARCH_KEY);
+const sortState={research:{field:'opportunity',dir:'desc',type:'number'},assets:{field:'value',dir:'desc',type:'number'},...readJson(SORT_KEY)},searchState=readJson(SEARCH_KEY);
 function text(node){return String(node?.textContent||'').trim()}
 function numeric(raw){const value=String(raw||'').replace(/,/g,'').trim();const match=value.match(/[-+]?\d+(?:\.\d+)?/);return match?Number(match[0]):0}
 function compare(a,b,type){if(type==='text')return String(a).localeCompare(String(b),'ko',{numeric:true,sensitivity:'base'});return Number(a)-Number(b)}
@@ -19,4 +19,4 @@ function enhance(){scheduled=false;enhanceResearch();enhanceAssets()}
 function schedule(){if(scheduled)return;scheduled=true;queueMicrotask(enhance)}
 function onClick(event){const button=event.target.closest('[data-rail-sort-key]');if(!button)return;const bar=button.closest('[data-rail-sort]'),key=bar?.dataset.railSort;if(!key)return;const field=button.dataset.railSortKey,type=button.dataset.railSortType||'number',current=sortState[key];const dir=current?.field===field?(current.dir==='desc'?'asc':'desc'):(type==='text'?'asc':'desc');sortState[key]={field,dir,type};writeJson(SORT_KEY,sortState);schedule()}
 function onInputCapture(event){const input=event.target.closest?.('[data-research-search]');if(!input)return;event.stopPropagation();searchState.research=input.value;writeJson(SEARCH_KEY,searchState);applyResearchSearch()}
-export function installRailControlsV16(){if(installed)return;installed=true;document.addEventListener('click',onClick);document.addEventListener('input',onInputCapture,true);observer=new MutationObserver(schedule);observer.observe(document.documentElement,{childList:true,subtree:true});document.addEventListener('ui:refresh',schedule);enhance()}
+export function installRailControlsV16({store}={}){if(installed)return;installed=true;if(store?.get?.().ui?.researchSearch)store.setUi({researchSearch:''},{scope:'v16-search-reset'});document.addEventListener('click',onClick);document.addEventListener('input',onInputCapture,true);observer=new MutationObserver(schedule);observer.observe(document.documentElement,{childList:true,subtree:true});document.addEventListener('ui:refresh',schedule);enhance()}
