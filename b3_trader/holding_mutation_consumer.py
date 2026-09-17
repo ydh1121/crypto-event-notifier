@@ -99,6 +99,20 @@ def _positive_number(value: Any, *, code: str) -> float:
     return number
 
 
+def _receipt_result(conn: sqlite3.Connection, mutation_id: str) -> dict[str, Any] | None:
+    row = conn.execute(
+        "SELECT result_json FROM holding_mutation_receipts WHERE mutation_id=? LIMIT 1",
+        (mutation_id,),
+    ).fetchone()
+    if not row:
+        return None
+    try:
+        value = json.loads(str(row["result_json"] or "{}"))
+    except (TypeError, json.JSONDecodeError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
 def apply_mutation(journal_db: str, mutation: dict[str, Any]) -> dict[str, Any]:
     mutation_id = str(mutation.get("id") or "")
     exchange = str(mutation.get("exchange") or "").lower()
@@ -120,6 +134,22 @@ def apply_mutation(journal_db: str, mutation: dict[str, Any]) -> dict[str, Any]:
     conn.row_factory = sqlite3.Row
     try:
         with conn:
+            # Local receipt is in the same canonical DB transaction as the holding update.
+            # If Cloudflare ACK is lost, reclaiming the same mutation returns this result
+            # instead of applying the averaging rounds twice.
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS holding_mutation_receipts (
+                    mutation_id TEXT PRIMARY KEY,
+                    applied_ts REAL NOT NULL,
+                    result_json TEXT NOT NULL
+                )
+                """
+            )
+            existing = _receipt_result(conn, mutation_id)
+            if existing is not None:
+                return existing
+
             row, columns = _holding_row(conn, market)
             current_revision = float(row.get("updated_ts") or 0.0)
             if expected_revision > 0 and abs(current_revision - expected_revision) > 0.000001:
@@ -160,27 +190,31 @@ def apply_mutation(journal_db: str, mutation: dict[str, Any]) -> dict[str, Any]:
                 final_avg = total_cost / total_volume if total_volume > 0 else 0.0
 
             updated_ts = time.time()
+            rate = FEE_RATES[exchange]
+            result = {
+                "mutation_id": mutation_id,
+                "market": market,
+                "exchange": exchange,
+                "action": action,
+                "before_volume": before_volume,
+                "before_avg_price": before_avg,
+                "final_volume": final_volume,
+                "final_avg_price": final_avg,
+                "applied_rounds": applied_rounds,
+                "buy_gross_krw": buy_gross,
+                "buy_fee_krw": buy_gross * rate,
+                "fee_rate": rate,
+                "updated_ts": updated_ts,
+            }
             conn.execute(
                 "UPDATE manual_holdings SET volume=?,avg_price=?,updated_ts=? WHERE market=?",
                 (final_volume, final_avg, updated_ts, market),
             )
-
-        rate = FEE_RATES[exchange]
-        return {
-            "mutation_id": mutation_id,
-            "market": market,
-            "exchange": exchange,
-            "action": action,
-            "before_volume": before_volume,
-            "before_avg_price": before_avg,
-            "final_volume": final_volume,
-            "final_avg_price": final_avg,
-            "applied_rounds": applied_rounds,
-            "buy_gross_krw": buy_gross,
-            "buy_fee_krw": buy_gross * rate,
-            "fee_rate": rate,
-            "updated_ts": updated_ts,
-        }
+            conn.execute(
+                "INSERT INTO holding_mutation_receipts(mutation_id,applied_ts,result_json) VALUES(?,?,?)",
+                (mutation_id, updated_ts, json.dumps(result, ensure_ascii=False, separators=(",", ":"))),
+            )
+        return result
     finally:
         conn.close()
 
@@ -234,8 +268,8 @@ def process_once(settings: Settings | None = None) -> dict[str, Any]:
     try:
         _request_json(runtime_url, token, method="POST", payload={"id": mutation_id, "status": "applied", "result": result})
     except MutationRejected as exc:
-        # Local SQLite is already canonical at this point. A retry is safe because the
-        # expected revision will reject duplicate application after a lost ACK.
+        # Local SQLite is already canonical. The receipt makes a reclaimed request
+        # idempotent, so a later retry can ACK the same result without a second write.
         return {"status": "applied_ack_pending", "processed": True, "id": mutation_id, "result": result, "error_code": exc.code}
     return {"status": "applied", "processed": True, "id": mutation_id, "result": result}
 
