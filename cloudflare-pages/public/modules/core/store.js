@@ -15,7 +15,7 @@ if(!['simple','detail'].includes(String(state.ui.readerMode)))state.ui.readerMod
 if(!['user','system'].includes(String(state.ui.recordsScope)))state.ui.recordsScope='user';
 const listeners=new Set();
 let exchangeDefaultApplied=false;
-const LIVE_PATCH_ROUTES=new Set(['dashboard','assets','paper','strategy']);
+const LIVE_PATCH_ROUTES=new Set(['dashboard','research','assets','paper','strategy','records','system']);
 function persist(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state.ui))}catch{}}
 function emit(meta={}){for(const fn of listeners){try{fn(state,meta)}catch(err){console.error('store listener',err)}}}
 function defaultExchange(snapshot){const list=Array.isArray(snapshot?.private?.manual_holdings?.holdings)?snapshot.private.manual_holdings.holdings:[];if(!snapshot?.private_visible||!list.length)return'bithumb';const totals={bithumb:0,upbit:0};for(const row of list){const ex=String(row?.exchange||'bithumb').toLowerCase();if(!(ex in totals))continue;const value=Math.max(0,Number(row?.value_krw||row?.invested_krw||0));totals[ex]+=Number.isFinite(value)?value:0}return totals.upbit>totals.bithumb?'upbit':'bithumb'}
