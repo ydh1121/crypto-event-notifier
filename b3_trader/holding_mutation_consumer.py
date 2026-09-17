@@ -13,6 +13,7 @@ from urllib.request import Request, urlopen
 
 from dotenv import load_dotenv
 
+from .cloudflare_snapshot_publisher import CloudflareSnapshotPublisher
 from .config import Settings
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -219,6 +220,20 @@ def apply_mutation(journal_db: str, mutation: dict[str, Any]) -> dict[str, Any]:
         conn.close()
 
 
+def _publish_after_mutation(result: dict[str, Any]) -> dict[str, Any]:
+    try:
+        publication = CloudflareSnapshotPublisher().publish_once()
+        result["snapshot_publish_status"] = str(publication.get("status") or "unknown")
+        result["snapshot_private_holdings_enabled"] = bool(publication.get("private_holdings_enabled"))
+    except Exception as exc:
+        # The canonical SQLite write is already committed. Do not roll it back because
+        # the viewer publisher is temporarily unavailable; normal publisher cycles can
+        # still deliver the canonical row later.
+        result["snapshot_publish_status"] = "error"
+        result["snapshot_publish_error"] = str(exc)[:240]
+    return result
+
+
 def process_once(settings: Settings | None = None) -> dict[str, Any]:
     load_dotenv(REPO_ROOT / ".env", override=True)
     settings = settings or Settings()
@@ -265,6 +280,7 @@ def process_once(settings: Settings | None = None) -> dict[str, Any]:
             pass
         return {"status": "rejected", "processed": True, "id": mutation_id, "error_code": code, "error": message}
 
+    result = _publish_after_mutation(result)
     try:
         _request_json(runtime_url, token, method="POST", payload={"id": mutation_id, "status": "applied", "result": result})
     except MutationRejected as exc:
