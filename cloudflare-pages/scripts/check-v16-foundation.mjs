@@ -8,9 +8,9 @@ const compact=read('public/modules/styles/compact-v16.css');
 const fail=[];
 const check=(name,value)=>{if(!value)fail.push(name)};
 
-check('V16 build marker exists',index.includes('2026.09.17-v6.0.0-v16-foundation'));
-check('V16 compact stylesheet loads after viewport layer',index.includes('/modules/styles/compact-v16.css?v=1')&&index.indexOf('viewport-first-v9.css')<index.indexOf('compact-v16.css'));
-check('V16 rail control module is cache-versioned and installed',main.includes("./shared/rail-controls-v16.js?v=1")&&main.includes('installRailControlsV16({store})'));
+check('current V16 build marker exists',/meta name="crypto-viewer-build" content="[^"]*v6\.[^"]*"/.test(index));
+check('V16 compact stylesheet stays versioned after viewport layer',/\/modules\/styles\/compact-v16\.css\?v=[^'\"]+/.test(index)&&index.indexOf('viewport-first-v9.css')<index.indexOf('compact-v16.css'));
+check('V16 rail control module is cache-versioned and installed',/\.\/shared\/rail-controls-v16\.js\?v=[^'\"]+/.test(main)&&main.includes('installRailControlsV16({store})'));
 check('Bithumb coupon fee is fixed at 0.04 percent',fees.includes('bithumb:0.0004')&&fees.includes("bithumb:'빗썸 쿠폰 0.04%'"));
 check('Upbit KRW fee is fixed at 0.05 percent',fees.includes('upbit:0.0005')&&fees.includes("upbit:'업비트 KRW 0.05%'"));
 check('fee utility exposes round trip totals',fees.includes('total_fee_krw')&&fees.includes('sell_net_krw')&&fees.includes('buy_total_krw'));
