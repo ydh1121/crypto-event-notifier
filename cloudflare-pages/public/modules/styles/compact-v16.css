@@ -1,4 +1,4 @@
-/* V16: compact functional copy, rail containment and sort controls. */
+/* V16: compact functional copy, rail containment, sort controls and live patch motion. */
 
 /* Remove prose that repeats what nearby controls/numbers already say. */
 .page-head-v6 p,.page-head p,
@@ -38,6 +38,15 @@
 #pageRoot[data-page-route="assets"] .asset-list-head{margin-bottom:2px!important}
 #pageRoot[data-page-route="assets"] .rail-sort-v16{grid-template-columns:repeat(5,minmax(0,1fr));grid-auto-flow:row}
 #pageRoot[data-page-route="assets"] .asset-quote-row{grid-template-columns:minmax(0,1fr) minmax(88px,.65fr)!important;gap:8px!important}
+
+/* Existing DOM stays mounted. Only changed values flash briefly. */
+.live-value-tick-v16{animation:v16ValueTick .34s ease-out}
+@keyframes v16ValueTick{0%{background:color-mix(in srgb,var(--accent) 16%,transparent)}100%{background:transparent}}
+
+/* New table/list rows enter without replacing the surrounding region. */
+.live-row-enter-v16,.live-enter{animation:v16RowEnter .28s cubic-bezier(.2,.8,.2,1)}
+@keyframes v16RowEnter{0%{opacity:0;transform:translateY(-8px);max-height:0}55%{opacity:1;max-height:96px}100%{opacity:1;transform:translateY(0);max-height:160px}}
+@media(prefers-reduced-motion:reduce){.live-value-tick-v16,.live-row-enter-v16,.live-enter{animation:none!important}}
 
 @media(max-width:620px){
   .rail-sort-v16{gap:2px}.rail-sort-v16 button{font-size:9px!important;padding:3px 2px!important}
