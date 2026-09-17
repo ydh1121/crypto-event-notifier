@@ -8,7 +8,13 @@
 .profit-plan-head p,.profit-stage p,.profit-plan-note,.local-management-note p,
 .asset-history-note,.paper-next p,.trade-plan-panel header p,
 .records-scope-switch>p,.records-insight header p,.records-live-note,
-.listing-history-head p,.listing-no-source{display:none!important}
+.listing-history-head p,.listing-no-source,
+.market-overview header p,.watch-panel header p,.sector-dashboard header p,
+.strategy-validity header p,.strategy-validity>p,.dashboard-activity header p,
+.dashboard-pulse header p,.pulse-guide,
+.operation-card>p,.component-panel>header p,[data-ci-panel]>header p,
+.sector-rank>header p,.sector-history-head p,.sector-method,
+.decision-first-conclusion p,.strategy-paper-head p,.compare-head p{display:none!important}
 
 /* Keep section headers terse. */
 .page-head-v6,.page-head{margin-bottom:12px!important}
