@@ -34,10 +34,14 @@ export const onRequestGet: PagesFunction<Env> = async ({request, env}) => {
     ).first<Record<string, unknown>>();
     if (!row) return json({ok: true, mutation: null});
 
-    await env.DB.prepare(
+    const claim = await env.DB.prepare(
       `UPDATE holding_mutations SET status='claimed',claimed_at=?,updated_at=?
        WHERE id=? AND status='pending'`,
     ).bind(now, now, row.id).run();
+    if (!Number(claim.meta.changes || 0)) {
+      // Another trusted consumer won the compare-and-set claim.
+      return json({ok: true, mutation: null});
+    }
 
     let payload: unknown = {};
     try { payload = JSON.parse(String(row.payload_json || '{}')); } catch {}
