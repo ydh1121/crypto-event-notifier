@@ -13,6 +13,7 @@ import{installStrategyDrilldown}from'./shared/strategy-drilldown-v4.js?v=3';
 import{installViewportHandoff}from'./shared/viewport-handoff-v4.js?v=3';
 import{installRailControlsV16}from'./shared/rail-controls-v16.js?v=1';
 import{installLivePatchV16}from'./shared/live-patch-v16.js?v=1';
+import{installRemainingLivePatchV16}from'./shared/live-patch-remaining-v16.js?v=1';
 import{createHomePage}from'./pages/v4/home.js?v=2.1';
 import{createDashboardPage}from'./pages/dashboard.js';
 import{createResearchPage}from'./pages/research.js?v=43.1';
@@ -35,6 +36,7 @@ const journey=document.getElementById('journeyNav');
 const reader=document.getElementById('readerModeControl');
 
 installLivePatchV16({store,root});
+installRemainingLivePatchV16({store,root});
 installAmountInputUx(root);
 installDexLaunchResearchPanel({store,root});
 installMainstreamUi(document.body);
@@ -125,7 +127,7 @@ function renderShell(){
 store.subscribe((_,meta)=>{
   if(['snapshot','error','user','session-reset'].includes(meta.type))renderShell();
   if(meta.type==='ui'&&meta.scope==='reader-mode')renderReader();
-  if(['snapshot','ui','error','user','session-reset'].includes(meta.type))queueUiRefresh();
+  if(['snapshot','snapshot-live','ui','error','user','session-reset'].includes(meta.type))queueUiRefresh();
 });
 document.getElementById('userMenuBtn')?.addEventListener('click',()=>router.go('system'));
 renderReader();
