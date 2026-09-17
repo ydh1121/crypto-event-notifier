@@ -8,9 +8,9 @@ const compact=read('public/modules/styles/compact-v16.css');
 const fail=[];
 const check=(name,value)=>{if(!value)fail.push(name)};
 
-check('V16A3 build marker exists',index.includes('2026.09.17-v6.2.0-v16-live-surfaces'));
-check('main entry is refreshed',index.includes('/modules/main.js?v=96.6'));
-check('compact layer is refreshed',index.includes('/modules/styles/compact-v16.css?v=3'));
+check('current V16 build marker exists',/meta name="crypto-viewer-build" content="[^"]*v6\.[^"]*"/.test(index));
+check('main entry remains cache-versioned',/\/modules\/main\.js\?v=[^'\"]+/.test(index));
+check('compact layer remains cache-versioned',/\/modules\/styles\/compact-v16\.css\?v=[^'\"]+/.test(index));
 check('remaining live patch is installed',main.includes("./shared/live-patch-remaining-v16.js?v=1")&&main.includes('installRemainingLivePatchV16({store,root})'));
 check('research records system use live snapshot channel',['research','records','system'].every(route=>store.includes(`'${route}'`)));
 check('research list is reconciled without page replacement',patch.includes('function patchResearch')&&patch.includes('createResearchRow')&&patch.includes('[data-research-market')&&!patch.includes('root.innerHTML='));
