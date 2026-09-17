@@ -107,7 +107,7 @@ export const onRequestPost: PagesFunction<Env> = async ({request, env}) => {
   if (!exchange || !market || !['set_holding', 'apply_averaging'].includes(action)) {
     return error(422, 'INVALID_HOLDING_MUTATION', '거래소·코인·반영 종류를 확인하세요.');
   }
-  if (expectedRevision === null || expectedRevision < 0) {
+  if (expectedRevision === null || expectedRevision <= 0) {
     return error(422, 'REVISION_REQUIRED', '현재 보유정보 revision이 필요합니다.');
   }
   if (idempotencyKey.length < 8 || idempotencyKey.length > 120) {
@@ -140,25 +140,31 @@ export const onRequestPost: PagesFunction<Env> = async ({request, env}) => {
   const id = crypto.randomUUID();
   try {
     const existing = await env.DB.prepare(
-      `SELECT id,created_at,updated_at,applied_at,status,exchange,market,action,expected_revision,
+      `SELECT id,actor_user_id,created_at,updated_at,applied_at,status,exchange,market,action,expected_revision,
               result_json,error_code,error_message
        FROM holding_mutations WHERE idempotency_key=? LIMIT 1`,
     ).bind(idempotencyKey).first<Record<string, unknown>>();
-    if (existing) return json({ok: true, deduplicated: true, mutation: publicRow(existing)});
+    if (existing) {
+      if (String(existing.actor_user_id || '') !== session.user.id) {
+        return error(409, 'IDEMPOTENCY_CONFLICT', '다른 요청에서 사용된 중복 방지 키입니다.');
+      }
+      return json({ok: true, deduplicated: true, mutation: publicRow(existing)});
+    }
 
-    await env.DB.prepare(
-      `INSERT INTO holding_mutations(
-        id,idempotency_key,actor_user_id,created_at,updated_at,status,exchange,market,action,
-        expected_revision,payload_json,result_json,error_code,error_message
-      ) VALUES(?,?,?,?,?,'pending',?,?,?,?,?,'{}','','')`,
-    ).bind(
-      id, idempotencyKey, session.user.id, now, now, exchange, market, action,
-      expectedRevision, JSON.stringify(payload),
-    ).run();
-
-    await env.DB.prepare(
-      `INSERT INTO audit_log(ts,actor_user_id,action,detail_json) VALUES(?,?,?,?)`,
-    ).bind(now, session.user.id, 'holding_mutation_queued', JSON.stringify({id, exchange, market, action})).run();
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO holding_mutations(
+          id,idempotency_key,actor_user_id,created_at,updated_at,status,exchange,market,action,
+          expected_revision,payload_json,result_json,error_code,error_message
+        ) VALUES(?,?,?,?,?,'pending',?,?,?,?,?,'{}','','')`,
+      ).bind(
+        id, idempotencyKey, session.user.id, now, now, exchange, market, action,
+        expectedRevision, JSON.stringify(payload),
+      ),
+      env.DB.prepare(
+        `INSERT INTO audit_log(ts,actor_user_id,action,detail_json) VALUES(?,?,?,?)`,
+      ).bind(now, session.user.id, 'holding_mutation_queued', JSON.stringify({id, exchange, market, action})),
+    ]);
 
     return json({ok: true, deduplicated: false, mutation: {
       id, created_at: now, updated_at: now, applied_at: null, status: 'pending', exchange, market,
