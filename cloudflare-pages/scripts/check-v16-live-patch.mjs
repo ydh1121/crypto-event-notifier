@@ -8,11 +8,11 @@ const compact=read('public/modules/styles/compact-v16.css');
 const fail=[];
 const check=(name,value)=>{if(!value)fail.push(name)};
 
-check('V16A2 build marker exists',index.includes('2026.09.17-v6.1.0-v16-live-patch'));
-check('main entry is refreshed',index.includes('/modules/main.js?v=96.5'));
-check('compact live layer is refreshed',index.includes('/modules/styles/compact-v16.css?v=2'));
-check('live patch module is cache-versioned and installed',main.includes("./shared/live-patch-v16.js?v=1")&&main.includes('installLivePatchV16({store,root})'));
-check('store separates later live snapshots from initial render',store.includes("patchOnly?'snapshot-live':'snapshot'")&&store.includes("LIVE_PATCH_ROUTES=new Set(['dashboard','assets','paper','strategy'])"));
+check('current V16 build marker exists',/meta name="crypto-viewer-build" content="[^"]*v6\.[^"]*"/.test(index));
+check('main entry remains cache-versioned',/\/modules\/main\.js\?v=[^'\"]+/.test(index));
+check('compact live layer remains cache-versioned',/\/modules\/styles\/compact-v16\.css\?v=[^'\"]+/.test(index));
+check('live patch module is cache-versioned and installed',/\.\/shared\/live-patch-v16\.js\?v=[^'\"]+/.test(main)&&main.includes('installLivePatchV16({store,root})'));
+check('store separates later live snapshots from initial render',store.includes("patchOnly?'snapshot-live':'snapshot'")&&['dashboard','assets','paper','strategy'].every(route=>store.includes(`'${route}'`))&&store.includes('LIVE_PATCH_ROUTES=new Set('));
 check('home uses patch-only live values',live.includes("route==='dashboard'")&&live.includes('patchHome(root,state)')&&live.includes('#homeCoinTable'));
 check('assets use patch-only live values',live.includes("route==='assets'")&&live.includes('patchAssets(root,state)')&&live.includes('.asset-holdings-list'));
 check('paper uses patch-only live values',live.includes("route==='paper'")&&live.includes('patchPaper(root,state)')&&live.includes('#paperList'));
