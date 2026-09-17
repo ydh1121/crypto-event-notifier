@@ -21,7 +21,7 @@ const checks=[
  ['claim compare-and-set is checked',runtimeApi.includes('claim.meta.changes')&&runtimeApi.includes('Another trusted consumer won')],
  ['migration is explicit',migration.includes('CREATE TABLE IF NOT EXISTS holding_mutations')&&!ownerApi.includes('CREATE TABLE')&&!runtimeApi.includes('CREATE TABLE')],
  ['canonical local sqlite update',consumer.includes('UPDATE manual_holdings SET volume=?,avg_price=?,updated_ts=?')],
- ['current exchange preserved',consumer.includes('EXCHANGE_CONFLICT')&&ui.includes('const holdingExchange=holding=>')&&!ui.includes("holding.exchange||'bithumb'"))],
+ ['current exchange preserved',consumer.includes('EXCHANGE_CONFLICT')&&ui.includes('const holdingExchange=holding=>')&&!ui.includes("holding.exchange||'bithumb'")],
  ['selected averaging rounds',ui.includes('data-avg-actual-apply')&&ui.includes('data-apply-selected-rounds')&&consumer.includes('apply_averaging')],
  ['actual holding edit',ui.includes('data-holding-edit-volume')&&ui.includes('data-holding-edit-avg')&&ui.includes('data-save-holding')],
  ['take profit target',ui.includes('data-take-profit-price')],
