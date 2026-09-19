@@ -28,7 +28,7 @@ const checks=[
  ['legacy exchange is owner-selected',ui.includes('data-holding-edit-exchange')&&ui.includes('exchangeDrafts')&&ui.includes('거래소 선택 필요')],
  ['legacy exchange is canonically backfilled',consumer.includes('exchange_backfilled')&&consumer.includes('SET volume=?,avg_price=?,exchange=?,updated_ts=?')],
  ['canonical confirmation includes exchange',ui.includes('exchangeOk=!result.exchange||holdingExchange(holding)===String(result.exchange).toLowerCase()')],
- ['live asset rail preserves unspecified exchange',livePatch.includes("exchange==='bithumb'?'빗썸':'거래소 미지정'")&&!livePatch.includes("==='upbit'?'업비트':'빗썸'"))],
+ ['live asset rail preserves unspecified exchange',livePatch.includes("exchange==='bithumb'?'빗썸':'거래소 미지정'")&&!livePatch.includes("==='upbit'?'업비트':'빗썸'")],
  ['selected averaging rounds',ui.includes('data-avg-actual-apply')&&ui.includes('data-apply-selected-rounds')&&consumer.includes('apply_averaging')],
  ['actual holding edit',ui.includes('data-holding-edit-volume')&&ui.includes('data-holding-edit-avg')&&ui.includes('data-save-holding')],
  ['take profit target',ui.includes('data-take-profit-price')],
