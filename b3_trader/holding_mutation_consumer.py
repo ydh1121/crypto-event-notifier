@@ -157,8 +157,11 @@ def apply_mutation(journal_db: str, mutation: dict[str, Any]) -> dict[str, Any]:
                 raise MutationRejected("REVISION_CONFLICT", "화면을 연 뒤 보유정보가 변경되었습니다. 최신값을 다시 확인하세요.")
 
             stored_exchange = str(row.get("exchange") or "").strip().lower()
+            if stored_exchange and stored_exchange not in FEE_RATES:
+                raise MutationRejected("EXCHANGE_INVALID", "저장된 거래소 값이 올바르지 않습니다.")
             if stored_exchange in FEE_RATES and stored_exchange != exchange:
                 raise MutationRejected("EXCHANGE_CONFLICT", "저장된 거래소와 반영 요청 거래소가 다릅니다.")
+            exchange_backfilled = "exchange" in columns and not stored_exchange
 
             before_volume = max(0.0, float(row.get("volume") or 0.0))
             before_avg = max(0.0, float(row.get("avg_price") or 0.0))
@@ -196,6 +199,7 @@ def apply_mutation(journal_db: str, mutation: dict[str, Any]) -> dict[str, Any]:
                 "mutation_id": mutation_id,
                 "market": market,
                 "exchange": exchange,
+                "exchange_backfilled": exchange_backfilled,
                 "action": action,
                 "before_volume": before_volume,
                 "before_avg_price": before_avg,
@@ -207,10 +211,16 @@ def apply_mutation(journal_db: str, mutation: dict[str, Any]) -> dict[str, Any]:
                 "fee_rate": rate,
                 "updated_ts": updated_ts,
             }
-            conn.execute(
-                "UPDATE manual_holdings SET volume=?,avg_price=?,updated_ts=? WHERE market=?",
-                (final_volume, final_avg, updated_ts, market),
-            )
+            if exchange_backfilled:
+                conn.execute(
+                    "UPDATE manual_holdings SET volume=?,avg_price=?,exchange=?,updated_ts=? WHERE market=?",
+                    (final_volume, final_avg, exchange, updated_ts, market),
+                )
+            else:
+                conn.execute(
+                    "UPDATE manual_holdings SET volume=?,avg_price=?,updated_ts=? WHERE market=?",
+                    (final_volume, final_avg, updated_ts, market),
+                )
             conn.execute(
                 "INSERT INTO holding_mutation_receipts(mutation_id,applied_ts,result_json) VALUES(?,?,?)",
                 (mutation_id, updated_ts, json.dumps(result, ensure_ascii=False, separators=(",", ":"))),
