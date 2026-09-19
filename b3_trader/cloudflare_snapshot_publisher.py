@@ -9,11 +9,13 @@ from typing import Any
 
 from dotenv import load_dotenv
 
+from .bithumb_client import BithumbClient
 from .config import Settings
 from .http_retry import post_with_retry
 from .multi_exchange_store import BITHUMB_CUTOVER_MIGRATION
 from .research_control import platform_snapshot
 from .strategy_lab_snapshot import read_strategy_lab_snapshot
+from .user_tools import holding_api_market, holding_base_currency, holding_quote_currency, normalize_holding_market
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEMO_STATUS_PATH = REPO_ROOT / "dashboard/runtime-demo.json"
@@ -128,76 +130,138 @@ def _journal_path(journal_db: str) -> Path:
     return path if path.is_absolute() else REPO_ROOT / path
 
 
-def _manual_holdings(journal_db: str, price_by_market: dict[str, float]) -> dict[str, Any]:
+def _manual_holding_markets(journal_db: str) -> list[str]:
     path = _journal_path(journal_db)
     if not path.exists():
-        return {
-            "holdings": [], "invested_krw": 0.0, "value_krw": 0.0, "pnl_krw": 0.0,
-            "holding_count": 0, "priced_holding_count": 0, "valuation_complete": True,
-        }
+        return []
+    conn = sqlite3.connect(str(path), timeout=10)
+    try:
+        exists = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='manual_holdings' LIMIT 1").fetchone()
+        if not exists:
+            return []
+        rows = conn.execute("SELECT market FROM manual_holdings WHERE volume > 0 ORDER BY market").fetchall()
+    except sqlite3.Error:
+        return []
+    finally:
+        conn.close()
+    markets: list[str] = []
+    for row in rows:
+        try:
+            markets.append(normalize_holding_market(str(row[0] or "")))
+        except ValueError:
+            continue
+    return markets
+
+
+def _supplement_manual_holding_prices(
+    journal_db: str,
+    price_by_market: dict[str, float],
+) -> tuple[dict[str, float], dict[str, float]]:
+    prices = dict(price_by_market)
+    quote_to_krw: dict[str, float] = {"KRW": 1.0}
+    btc_krw = max(0.0, _number(prices.get("KRW-BTC")))
+    if btc_krw > 0:
+        quote_to_krw["BTC"] = btc_krw
+    btc_holdings = [market for market in _manual_holding_markets(journal_db) if holding_quote_currency(market) == "BTC"]
+    if not btc_holdings:
+        return prices, quote_to_krw
+    api_to_holding: dict[str, str] = {}
+    for market in btc_holdings:
+        if _number(prices.get(market)) <= 0:
+            api_to_holding[holding_api_market(market)] = market
+    if "BTC" not in quote_to_krw:
+        api_to_holding["KRW-BTC"] = "__BTC_KRW__"
+    if not api_to_holding:
+        return prices, quote_to_krw
+    try:
+        rows = BithumbClient(timeout=5.0).tickers(list(api_to_holding))
+    except Exception:
+        return prices, quote_to_krw
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        api_market = str(row.get("market") or "").upper()
+        trade_price = max(0.0, _number(row.get("trade_price")))
+        if trade_price <= 0:
+            continue
+        target = api_to_holding.get(api_market)
+        if target == "__BTC_KRW__":
+            quote_to_krw["BTC"] = trade_price
+        elif target:
+            prices[target] = trade_price
+    return prices, quote_to_krw
+
+
+def _manual_holdings(
+    journal_db: str,
+    price_by_market: dict[str, float],
+    quote_to_krw: dict[str, float] | None = None,
+) -> dict[str, Any]:
+    quote_rates = {"KRW": 1.0, **(quote_to_krw or {})}
+    path = _journal_path(journal_db)
+    if not path.exists():
+        return {"holdings": [], "invested_krw": 0.0, "value_krw": 0.0, "pnl_krw": 0.0, "holding_count": 0, "priced_holding_count": 0, "valuation_complete": True, "has_non_krw_holdings": False}
     conn = sqlite3.connect(str(path), timeout=10)
     conn.row_factory = sqlite3.Row
     try:
-        exists = conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='manual_holdings' LIMIT 1"
-        ).fetchone()
+        exists = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='manual_holdings' LIMIT 1").fetchone()
         if not exists:
-            return {
-                "holdings": [], "invested_krw": 0.0, "value_krw": 0.0, "pnl_krw": 0.0,
-                "holding_count": 0, "priced_holding_count": 0, "valuation_complete": True,
-            }
-        columns = {
-            str(row["name"])
-            for row in conn.execute("PRAGMA table_info(manual_holdings)").fetchall()
-        }
+            return {"holdings": [], "invested_krw": 0.0, "value_krw": 0.0, "pnl_krw": 0.0, "holding_count": 0, "priced_holding_count": 0, "valuation_complete": True, "has_non_krw_holdings": False}
+        columns = {str(row["name"]) for row in conn.execute("PRAGMA table_info(manual_holdings)").fetchall()}
         exchange_select = "exchange" if "exchange" in columns else "NULL AS exchange"
-        rows = conn.execute(
-            f"SELECT market,volume,avg_price,{exchange_select},updated_ts FROM manual_holdings ORDER BY market"
-        ).fetchall()
+        rows = conn.execute(f"SELECT market,volume,avg_price,{exchange_select},updated_ts FROM manual_holdings ORDER BY market").fetchall()
     finally:
         conn.close()
-
     items: list[dict[str, Any]] = []
-    invested_total = 0.0
-    value_total = 0.0
-    holding_count = 0
-    priced_holding_count = 0
+    invested_total = value_total = 0.0
+    holding_count = priced_holding_count = 0
+    has_non_krw_holdings = False
     for source in rows:
         row = dict(source)
+        market = str(row.get("market") or "")
+        try:
+            quote_currency = holding_quote_currency(market)
+            base_currency = holding_base_currency(market)
+            api_market = holding_api_market(market)
+        except ValueError:
+            quote_currency, base_currency, api_market = "KRW", market.removeprefix("KRW-"), market
+        has_non_krw_holdings = has_non_krw_holdings or quote_currency != "KRW"
         volume = max(0.0, _number(row.get("volume")))
         avg_price = max(0.0, _number(row.get("avg_price")))
-        current_price = max(0.0, _number(price_by_market.get(str(row.get("market")))))
+        current_price = max(0.0, _number(price_by_market.get(market)))
+        quote_krw = max(0.0, _number(quote_rates.get(quote_currency)))
         exchange = str(row.get("exchange") or "").strip().lower()
         if exchange not in {"bithumb", "upbit"}:
             exchange = ""
-        invested = volume * avg_price
-        value = volume * current_price if current_price > 0 else 0.0
-        pnl = value - invested if current_price > 0 else 0.0
-        pnl_pct = pnl / invested * 100.0 if invested > 0 and current_price > 0 else 0.0
+        invested_quote = volume * avg_price
+        value_quote = volume * current_price if current_price > 0 else 0.0
+        pnl_quote = value_quote - invested_quote if current_price > 0 else 0.0
+        pnl_pct = pnl_quote / invested_quote * 100.0 if invested_quote > 0 and current_price > 0 else 0.0
+        invested_krw = invested_quote * quote_krw if quote_krw > 0 else 0.0
+        value_krw = value_quote * quote_krw if current_price > 0 and quote_krw > 0 else 0.0
+        pnl_krw = pnl_quote * quote_krw if current_price > 0 and quote_krw > 0 else 0.0
         if volume > 0:
             holding_count += 1
-            if current_price > 0:
+            if current_price > 0 and quote_krw > 0:
                 priced_holding_count += 1
-        invested_total += invested
-        value_total += value
-        items.append(
-            {
-                "market": row.get("market"), "exchange": exchange or None,
-                "volume": volume, "avg_price": avg_price,
-                "current_price": current_price, "invested_krw": round(invested, 2),
-                "value_krw": round(value, 2), "unrealized_pnl_krw": round(pnl, 2),
-                "unrealized_pnl_pct": round(pnl_pct, 4), "updated_ts": row.get("updated_ts"),
-            }
-        )
+        invested_total += invested_krw
+        value_total += value_krw
+        items.append({
+            "market": market, "api_market": api_market, "base_currency": base_currency, "quote_currency": quote_currency,
+            "exchange": exchange or None, "volume": volume, "avg_price": avg_price, "current_price": current_price,
+            "current_price_quote": current_price, "quote_to_krw": round(quote_krw, 8),
+            "invested_quote": round(invested_quote, 12), "value_quote": round(value_quote, 12),
+            "unrealized_pnl_quote": round(pnl_quote, 12), "invested_krw": round(invested_krw, 2),
+            "value_krw": round(value_krw, 2), "unrealized_pnl_krw": round(pnl_krw, 2),
+            "unrealized_pnl_pct": round(pnl_pct, 4), "updated_ts": row.get("updated_ts"),
+        })
     valuation_complete = holding_count == priced_holding_count
     return {
-        "holdings": items,
-        "invested_krw": round(invested_total, 2),
-        "value_krw": round(value_total, 2),
+        "holdings": items, "invested_krw": round(invested_total, 2), "value_krw": round(value_total, 2),
         "pnl_krw": round(value_total - invested_total, 2) if valuation_complete else 0.0,
-        "holding_count": holding_count,
-        "priced_holding_count": priced_holding_count,
-        "valuation_complete": valuation_complete,
+        "holding_count": holding_count, "priced_holding_count": priced_holding_count,
+        "valuation_complete": valuation_complete, "has_non_krw_holdings": has_non_krw_holdings,
+        "valuation_basis": "current_quote_to_krw" if has_non_krw_holdings else "krw",
     }
 
 
@@ -540,6 +604,7 @@ class CloudflareSnapshotPublisher:
             str(row.get("market")): _number(row.get("price"))
             for row in leaderboard if row.get("market")
         }
+        price_by_market, quote_to_krw = _supplement_manual_holding_prices(self.settings.journal_db, price_by_market)
         recent_bithumb = (
             _recent_scoped_records("bithumb")
             if _migration_applied(BITHUMB_CUTOVER_MIGRATION)
@@ -548,7 +613,7 @@ class CloudflareSnapshotPublisher:
         recent_upbit = _recent_scoped_records("upbit")
         strategy_lab = read_strategy_lab_snapshot(DEMO_DB_PATH)
         journal_records = _journal_records(self.settings.journal_db)
-        manual_holdings = _manual_holdings(self.settings.journal_db, price_by_market)
+        manual_holdings = _manual_holdings(self.settings.journal_db, price_by_market, quote_to_krw)
         _record_manual_holdings_snapshot(self.settings.journal_db, manual_holdings)
         public_payload = {
             "version": 3,
