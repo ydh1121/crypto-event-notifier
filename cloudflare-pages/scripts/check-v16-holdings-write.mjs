@@ -2,6 +2,7 @@ import fs from'node:fs';
 const read=path=>fs.readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
 const index=read('public/index.html'),main=read('public/modules/main.js'),ui=read('public/modules/shared/holdings-write-v16.js'),fees=read('public/modules/shared/trading-fees-v16.js'),service=read('public/modules/services/holding-mutations-v16.js'),ownerApi=read('functions/api/holding-mutations.ts'),runtimeApi=read('functions/api/holding-mutations-runtime.ts'),migration=read('migrations/0007_holding_mutations.sql');
 const consumer=fs.readFileSync(new URL('../../b3_trader/holding_mutation_consumer.py',import.meta.url),'utf8');
+const userTools=fs.readFileSync(new URL('../../b3_trader/user_tools.py',import.meta.url),'utf8');
 const livePatch=read('public/modules/shared/live-patch-v16.js');
 const checks=[
  ['current V16B build marker',/crypto-viewer-build" content="[^"]*v16b-holdings-write/.test(index)],
@@ -31,6 +32,7 @@ const checks=[
  ['mutation history can be listed after reload',service.includes('listHoldingMutations')&&service.includes("fetch('/api/holding-mutations'")],
  ['latest mutation status is restored per market',ui.includes('hydrateMutationHistory')&&ui.includes('response.mutations')&&ui.includes('seen.has(market)')],
  ['mutation history is isolated by owner session',ui.includes("historyActor")&&ui.includes('pendingByMarket.clear()')&&ui.includes("store.get().user?.id")],
+ ['manual holding market contract is strict',ownerApi.includes('/^KRW-[A-Z0-9]+$/')&&ui.includes('/^KRW-[A-Z0-9]+$/')&&userTools.includes('market = normalize_market(market)')],
  ['live asset rail preserves unspecified exchange',livePatch.includes("exchange==='bithumb'?'빗썸':'거래소 미지정'")&&!livePatch.includes("==='upbit'?'업비트':'빗썸'")],
  ['selected averaging rounds',ui.includes('data-avg-actual-apply')&&ui.includes('data-apply-selected-rounds')&&consumer.includes('apply_averaging')],
  ['actual holding edit',ui.includes('data-holding-edit-volume')&&ui.includes('data-holding-edit-avg')&&ui.includes('data-save-holding')],

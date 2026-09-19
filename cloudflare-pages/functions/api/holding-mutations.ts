@@ -31,7 +31,7 @@ function cleanExchange(value: unknown): Exchange | null {
 
 function cleanMarket(value: unknown): string {
   const market = String(value || '').trim().toUpperCase();
-  return /^KRW-[A-Z0-9._-]{1,24}$/.test(market) ? market : '';
+  return /^KRW-[A-Z0-9]+$/.test(market) ? market : '';
 }
 
 function cleanFinite(value: unknown): number | null {

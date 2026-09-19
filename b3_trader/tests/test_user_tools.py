@@ -32,6 +32,12 @@ def test_user_tools_store_holding_and_plan(tmp_path):
     with pytest.raises(ValueError, match="exchange must be one of"):
         store.set_holding("KRW-B3", volume=1.0, avg_price=1.0, exchange="okx")
 
+    with pytest.raises(ValueError, match="plain Bithumb KRW market codes"):
+        store.set_holding("KRW-ETH/BTC", volume=1.0, avg_price=1.0)
+
+    with pytest.raises(ValueError, match="plain Bithumb KRW market codes"):
+        store.set_plan("KRW-ETH/BTC", [{"price": 1.0, "amount_krw": 1_000.0}])
+
     plan = store.set_plan(
         "KRW-B3",
         [
