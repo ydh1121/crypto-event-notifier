@@ -97,3 +97,44 @@ def test_incomplete_manual_holdings_valuation_is_not_recorded(tmp_path: Path) ->
     assert summary["valuation_complete"] is False
     assert _record_manual_holdings_snapshot(str(path), summary, now=20_000.0) is False
     assert _manual_holdings_history(str(path))["points"] == []
+
+
+def test_btc_quote_holding_uses_quote_and_current_krw_conversion(tmp_path: Path) -> None:
+    path = tmp_path / "journal.sqlite3"
+    conn = sqlite3.connect(path)
+    try:
+        with conn:
+            conn.execute(
+                """
+                CREATE TABLE manual_holdings (
+                    market TEXT PRIMARY KEY,
+                    volume REAL NOT NULL,
+                    avg_price REAL NOT NULL,
+                    exchange TEXT,
+                    updated_ts REAL NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                "INSERT INTO manual_holdings(market,volume,avg_price,exchange,updated_ts) VALUES (?,?,?,?,?)",
+                ("KRW-ETH/BTC", 0.02, 0.04, "bithumb", 3_000.0),
+            )
+    finally:
+        conn.close()
+
+    summary = _manual_holdings(str(path), {"KRW-ETH/BTC": 0.05}, {"BTC": 100_000_000.0})
+    item = summary["holdings"][0]
+    assert item["api_market"] == "BTC-ETH"
+    assert item["base_currency"] == "ETH"
+    assert item["quote_currency"] == "BTC"
+    assert item["current_price"] == 0.05
+    assert item["invested_quote"] == 0.0008
+    assert item["value_quote"] == 0.001
+    assert item["unrealized_pnl_quote"] == 0.0002
+    assert item["quote_to_krw"] == 100_000_000.0
+    assert item["invested_krw"] == 80_000.0
+    assert item["value_krw"] == 100_000.0
+    assert item["unrealized_pnl_krw"] == 20_000.0
+    assert item["unrealized_pnl_pct"] == 25.0
+    assert summary["valuation_complete"] is True
+    assert summary["has_non_krw_holdings"] is True
