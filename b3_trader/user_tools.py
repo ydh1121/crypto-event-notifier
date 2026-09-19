@@ -32,6 +32,21 @@ def holding_quote_currency(value: str) -> str:
     return pair.split("/", 1)[1] if "/" in pair else "KRW"
 
 
+def holding_base_currency(value: str) -> str:
+    market = normalize_holding_market(value)
+    pair = market.split("-", 1)[1]
+    return pair.split("/", 1)[0]
+
+
+def holding_api_market(value: str) -> str:
+    market = normalize_holding_market(value)
+    pair = market.split("-", 1)[1]
+    if "/" not in pair:
+        return market
+    base, quote = pair.split("/", 1)
+    return f"{quote}-{base}"
+
+
 def _normalize_holding_exchange(value: Any) -> str | None:
     if value is None:
         return None
