@@ -14,7 +14,7 @@ import{installViewportHandoff}from'./shared/viewport-handoff-v4.js?v=3';
 import{installRailControlsV16}from'./shared/rail-controls-v16.js?v=1';
 import{installLivePatchV16}from'./shared/live-patch-v16.js?v=2';
 import{installRemainingLivePatchV16}from'./shared/live-patch-remaining-v16.js?v=1';
-import{installHoldingsWriteV16}from'./shared/holdings-write-v16.js?v=3';
+import{installHoldingsWriteV16}from'./shared/holdings-write-v16.js?v=4';
 import{createHomePage}from'./pages/v4/home.js?v=2.1';
 import{createDashboardPage}from'./pages/dashboard.js';
 import{createResearchPage}from'./pages/research.js?v=43.1';
