@@ -5,7 +5,7 @@ import{strategyLabel}from'./viewer-context.js?v=46';
 
 let installed=false;
 
-function exchangeLabel(value){return String(value||'').toLowerCase()==='upbit'?'업비트':'빗썸'}
+function exchangeLabel(value){const exchange=String(value||'').trim().toLowerCase();return exchange==='upbit'?'업비트':exchange==='bithumb'?'빗썸':'거래소 미지정'}
 function symbol(row){return String(row?.symbol||row?.market||'').replace(/^KRW-/,'')||'-'}
 function homeStateLabel(row){const kind=decisionKind(row);if(kind==='buy')return'매수 관심';if(kind==='wait')return'가격 대기';if(kind==='risk')return'주의';if(kind==='holding')return'보유 중';return'관심'}
 function finite(value){if(value===null||value===undefined||value==='')return null;const parsed=Number(value);return Number.isFinite(parsed)?parsed:null}
