@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sqlite3
 import time
 from pathlib import Path
@@ -17,7 +18,24 @@ from .cloudflare_snapshot_publisher import CloudflareSnapshotPublisher
 from .config import Settings
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-FEE_RATES = {"bithumb": 0.0004, "upbit": 0.0005}
+VALID_EXCHANGES = {"bithumb", "upbit"}
+HOLDING_MARKET_PATTERN = re.compile(r"^KRW-[A-Z0-9]+(?:/[A-Z0-9]+)?$")
+
+
+def _quote_currency(market: str) -> str:
+    pair = market.split("-", 1)[1] if "-" in market else market
+    return pair.split("/", 1)[1] if "/" in pair else "KRW"
+
+
+def _fee_profile(exchange: str, market: str) -> tuple[float, str] | None:
+    quote = _quote_currency(market)
+    if exchange == "bithumb" and quote == "BTC":
+        return 0.0, "bithumb_btc_free"
+    if exchange == "bithumb" and quote == "KRW":
+        return 0.0004, "bithumb_coupon_0.04pct"
+    if exchange == "upbit" and quote == "KRW":
+        return 0.0005, "upbit_krw_0.05pct"
+    return None
 
 
 class MutationRejected(RuntimeError):
@@ -122,10 +140,15 @@ def apply_mutation(journal_db: str, mutation: dict[str, Any]) -> dict[str, Any]:
     expected_revision = float(mutation.get("expected_revision") or 0.0)
     payload = mutation.get("payload") if isinstance(mutation.get("payload"), dict) else {}
 
-    if not mutation_id or exchange not in FEE_RATES or not market.startswith("KRW-"):
+    if not mutation_id or exchange not in VALID_EXCHANGES or not HOLDING_MARKET_PATTERN.fullmatch(market):
         raise MutationRejected("INVALID_MUTATION", "반영 요청 식별값이 올바르지 않습니다.")
     if action not in {"set_holding", "apply_averaging"}:
         raise MutationRejected("INVALID_MUTATION_ACTION", "지원하지 않는 보유자산 반영 종류입니다.")
+    fee_profile = _fee_profile(exchange, market)
+    if fee_profile is None:
+        raise MutationRejected("UNSUPPORTED_EXCHANGE_MARKET", "현재 지원하지 않는 거래소·마켓 조합입니다.")
+    if action == "apply_averaging" and _quote_currency(market) != "KRW":
+        raise MutationRejected("QUOTE_AWARE_AVERAGING_REQUIRED", "BTC 마켓 물타기 실제 반영은 BTC 단위 계산기 전환 후 지원합니다.")
 
     path = _journal_path(journal_db)
     if not path.exists():
@@ -157,9 +180,9 @@ def apply_mutation(journal_db: str, mutation: dict[str, Any]) -> dict[str, Any]:
                 raise MutationRejected("REVISION_CONFLICT", "화면을 연 뒤 보유정보가 변경되었습니다. 최신값을 다시 확인하세요.")
 
             stored_exchange = str(row.get("exchange") or "").strip().lower()
-            if stored_exchange and stored_exchange not in FEE_RATES:
+            if stored_exchange and stored_exchange not in VALID_EXCHANGES:
                 raise MutationRejected("EXCHANGE_INVALID", "저장된 거래소 값이 올바르지 않습니다.")
-            if stored_exchange in FEE_RATES and stored_exchange != exchange:
+            if stored_exchange in VALID_EXCHANGES and stored_exchange != exchange:
                 raise MutationRejected("EXCHANGE_CONFLICT", "저장된 거래소와 반영 요청 거래소가 다릅니다.")
             exchange_backfilled = "exchange" in columns and not stored_exchange
 
@@ -194,7 +217,7 @@ def apply_mutation(journal_db: str, mutation: dict[str, Any]) -> dict[str, Any]:
                 final_avg = total_cost / total_volume if total_volume > 0 else 0.0
 
             updated_ts = time.time()
-            rate = FEE_RATES[exchange]
+            rate, fee_policy = fee_profile
             result = {
                 "mutation_id": mutation_id,
                 "market": market,
@@ -209,6 +232,8 @@ def apply_mutation(journal_db: str, mutation: dict[str, Any]) -> dict[str, Any]:
                 "buy_gross_krw": buy_gross,
                 "buy_fee_krw": buy_gross * rate,
                 "fee_rate": rate,
+                "fee_policy": fee_policy,
+                "quote_currency": _quote_currency(market),
                 "updated_ts": updated_ts,
             }
             if exchange_backfilled:

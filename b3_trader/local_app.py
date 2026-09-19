@@ -29,7 +29,7 @@ from .runtime_state import RuntimeState
 from .sync_manager import BackupManager, GitAutoSync
 from .telegram_notify import TelegramNotifier
 from .telegram_settings import TelegramSettingsStore
-from .user_tools import UserToolsStore, calculate_averaging
+from .user_tools import UserToolsStore, calculate_averaging, normalize_holding_market
 
 RESTART_EXIT_CODE = 75
 LOOPBACK_HOSTS = {"127.0.0.1", "::1", "::ffff:127.0.0.1"}
@@ -428,14 +428,14 @@ def create_app() -> FastAPI:
 
     @app.get("/api/holdings/{market:path}", dependencies=[Depends(auth)])
     def get_manual_holding(market: str) -> dict[str, Any]:
-        return holding_with_market_value(normalize_market(market))
+        return holding_with_market_value(normalize_holding_market(market))
 
     @app.put("/api/holdings/{market:path}", dependencies=[Depends(auth)])
     def save_manual_holding(
         market: str,
         payload: dict[str, Any] = Body(...),
     ) -> dict[str, Any]:
-        normalized = normalize_market(market)
+        normalized = normalize_holding_market(market)
         try:
             volume = float(payload.get("volume") or 0.0)
             avg_price = float(payload.get("avg_price") or 0.0)
@@ -468,14 +468,14 @@ def create_app() -> FastAPI:
 
     @app.delete("/api/holdings/{market:path}", dependencies=[Depends(auth)])
     def delete_manual_holding(market: str) -> dict[str, Any]:
-        normalized = normalize_market(market)
+        normalized = normalize_holding_market(market)
         removed = user_tools.delete_holding(normalized)
         journal.record_event("manual_holding_deleted", {"market": normalized})
         return {"ok": True, "removed": removed, "market": normalized}
 
     @app.get("/api/averaging/{market:path}", dependencies=[Depends(auth)])
     def get_averaging_plan(market: str) -> dict[str, Any]:
-        normalized = normalize_market(market)
+        normalized = normalize_holding_market(market)
         holding = user_tools.get_holding(normalized)
         plan = user_tools.get_plan(normalized)
         calculation = calculate_averaging(
@@ -490,7 +490,7 @@ def create_app() -> FastAPI:
         market: str,
         payload: dict[str, Any] = Body(...),
     ) -> dict[str, Any]:
-        normalized = normalize_market(market)
+        normalized = normalize_holding_market(market)
         rows = payload.get("rows") or []
         if not isinstance(rows, list):
             raise HTTPException(status_code=422, detail="rows must be a list")
@@ -509,7 +509,7 @@ def create_app() -> FastAPI:
 
     @app.delete("/api/averaging/{market:path}", dependencies=[Depends(auth)])
     def delete_averaging_plan(market: str) -> dict[str, Any]:
-        normalized = normalize_market(market)
+        normalized = normalize_holding_market(market)
         removed = user_tools.delete_plan(normalized)
         journal.record_event("averaging_plan_deleted", {"market": normalized})
         return {"ok": True, "removed": removed, "market": normalized}

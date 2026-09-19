@@ -8,7 +8,7 @@ import pytest
 from b3_trader.holding_mutation_consumer import MutationRejected, apply_mutation
 
 
-def _database(path: Path, *, exchange: str | None = None) -> None:
+def _database(path: Path, *, exchange: str | None = None, market: str = "KRW-BTC") -> None:
     conn = sqlite3.connect(path)
     try:
         with conn:
@@ -25,17 +25,17 @@ def _database(path: Path, *, exchange: str | None = None) -> None:
             )
             conn.execute(
                 "INSERT INTO manual_holdings(market,volume,avg_price,exchange,updated_ts) VALUES(?,?,?,?,?)",
-                ("KRW-BTC", 1.0, 100.0, exchange, 123.0),
+                (market, 1.0, 100.0, exchange, 123.0),
             )
     finally:
         conn.close()
 
 
-def _mutation(*, mutation_id: str, exchange: str, revision: float) -> dict[str, object]:
+def _mutation(*, mutation_id: str, exchange: str, revision: float, market: str = "KRW-BTC") -> dict[str, object]:
     return {
         "id": mutation_id,
         "exchange": exchange,
-        "market": "KRW-BTC",
+        "market": market,
         "action": "set_holding",
         "expected_revision": revision,
         "payload": {"volume": 2.0, "avg_price": 110.0},
@@ -90,3 +90,30 @@ def test_saved_exchange_cannot_be_changed_by_mutation(tmp_path: Path) -> None:
         conn.close()
 
     assert row == (1.0, 100.0, "upbit", 123.0)
+
+
+def test_bithumb_btc_market_has_zero_fee_and_supports_pair_key(tmp_path: Path) -> None:
+    path = tmp_path / "journal.sqlite3"
+    market = "KRW-ETH/BTC"
+    _database(path, market=market)
+    result = apply_mutation(
+        str(path),
+        _mutation(mutation_id="btc-quote-1", exchange="bithumb", revision=123.0, market=market),
+    )
+    assert result["market"] == market
+    assert result["quote_currency"] == "BTC"
+    assert result["fee_rate"] == 0.0
+    assert result["fee_policy"] == "bithumb_btc_free"
+    assert result["exchange_backfilled"] is True
+
+
+def test_btc_market_averaging_write_is_blocked_until_quote_aware(tmp_path: Path) -> None:
+    path = tmp_path / "journal.sqlite3"
+    market = "KRW-ETH/BTC"
+    _database(path, exchange="bithumb", market=market)
+    mutation = _mutation(mutation_id="btc-avg-1", exchange="bithumb", revision=123.0, market=market)
+    mutation["action"] = "apply_averaging"
+    mutation["payload"] = {"rounds": [{"price": 0.03, "amount_krw": 0.001}]}
+    with pytest.raises(MutationRejected) as excinfo:
+        apply_mutation(str(path), mutation)
+    assert excinfo.value.code == "QUOTE_AWARE_AVERAGING_REQUIRED"

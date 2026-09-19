@@ -2,17 +2,34 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 import threading
 import time
 from typing import Any
 
-from .assets import normalize_market
-
 
 MAX_AVERAGING_ROWS = 20
 VALID_HOLDING_EXCHANGES = {"bithumb", "upbit"}
+HOLDING_MARKET_PATTERN = re.compile(r"^KRW-[A-Z0-9]+(?:/[A-Z0-9]+)?$")
 _EXCHANGE_UNSET = object()
+
+
+def normalize_holding_market(value: str) -> str:
+    market = str(value or "").strip().upper()
+    if not market:
+        raise ValueError("holding market is required")
+    if "-" not in market:
+        market = f"KRW-{market}"
+    if not HOLDING_MARKET_PATTERN.fullmatch(market):
+        raise ValueError("holding market must look like KRW-BTC or KRW-ETH/BTC")
+    return market
+
+
+def holding_quote_currency(value: str) -> str:
+    market = normalize_holding_market(value)
+    pair = market.split("-", 1)[1]
+    return pair.split("/", 1)[1] if "/" in pair else "KRW"
 
 
 def _normalize_holding_exchange(value: Any) -> str | None:
@@ -141,7 +158,7 @@ class UserToolsStore:
         avg_price: float,
         exchange: Any = _EXCHANGE_UNSET,
     ) -> dict[str, Any]:
-        market = normalize_market(market)
+        market = normalize_holding_market(market)
         volume = max(0.0, float(volume))
         avg_price = max(0.0, float(avg_price))
         if exchange is _EXCHANGE_UNSET:
@@ -177,7 +194,9 @@ class UserToolsStore:
         return {"market": market, "rows": rows if isinstance(rows, list) else [], "updated_ts": row["updated_ts"]}
 
     def set_plan(self, market: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
-        market = normalize_market(market)
+        market = normalize_holding_market(market)
+        if holding_quote_currency(market) != "KRW":
+            raise ValueError("BTC quote averaging plan requires quote-aware calculator")
         cleaned: list[dict[str, float]] = []
         for raw in rows[:MAX_AVERAGING_ROWS]:
             try:

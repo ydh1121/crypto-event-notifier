@@ -17,7 +17,17 @@ interface CreatePayload {
   rounds?: AveragingRound[];
 }
 
-const FEE_RATES: Record<Exchange, number> = {bithumb: 0.0004, upbit: 0.0005};
+function quoteCurrency(market: string): string {
+  const pair = market.split("-", 2)[1] || "";
+  return pair.includes("/") ? (pair.split("/", 2)[1] || "KRW") : "KRW";
+}
+function feeProfile(exchange: Exchange, market: string): {rate: number; policy: string} | null {
+  const quote = quoteCurrency(market);
+  if (exchange === "bithumb" && quote === "BTC") return {rate: 0, policy: "bithumb_btc_free"};
+  if (exchange === "bithumb" && quote === "KRW") return {rate: 0.0004, policy: "bithumb_coupon_0.04pct"};
+  if (exchange === "upbit" && quote === "KRW") return {rate: 0.0005, policy: "upbit_krw_0.05pct"};
+  return null;
+}
 
 function missingTable(exc: unknown): boolean {
   const text = String(exc instanceof Error ? exc.message : exc || '').toLowerCase();
@@ -31,7 +41,7 @@ function cleanExchange(value: unknown): Exchange | null {
 
 function cleanMarket(value: unknown): string {
   const market = String(value || '').trim().toUpperCase();
-  return /^KRW-[A-Z0-9]+$/.test(market) ? market : '';
+  return /^KRW-[A-Z0-9]+(?:\/[A-Z0-9]+)?$/.test(market) ? market : '';
 }
 
 function cleanFinite(value: unknown): number | null {
@@ -107,6 +117,11 @@ export const onRequestPost: PagesFunction<Env> = async ({request, env}) => {
   if (!exchange || !market || !['set_holding', 'apply_averaging'].includes(action)) {
     return error(422, 'INVALID_HOLDING_MUTATION', '거래소·코인·반영 종류를 확인하세요.');
   }
+  const fee = feeProfile(exchange, market);
+  if (!fee) return error(422, 'UNSUPPORTED_EXCHANGE_MARKET', '현재 지원하지 않는 거래소·마켓 조합입니다.');
+  if (action === 'apply_averaging' && quoteCurrency(market) !== 'KRW') {
+    return error(422, 'QUOTE_AWARE_AVERAGING_REQUIRED', 'BTC 마켓 물타기 실제 반영은 BTC 단위 계산기 전환 후 지원합니다.');
+  }
   if (expectedRevision === null || expectedRevision <= 0) {
     return error(422, 'REVISION_REQUIRED', '현재 보유정보 revision이 필요합니다.');
   }
@@ -133,8 +148,9 @@ export const onRequestPost: PagesFunction<Env> = async ({request, env}) => {
   }
 
   // Fee is server-owned. Client fee fields are intentionally ignored.
-  payload.fee_rate = FEE_RATES[exchange];
-  payload.fee_policy = exchange === 'bithumb' ? 'bithumb_coupon_0.04pct' : 'upbit_krw_0.05pct';
+  payload.fee_rate = fee.rate;
+  payload.fee_policy = fee.policy;
+  payload.quote_currency = quoteCurrency(market);
 
   const now = Math.floor(Date.now() / 1000);
   const id = crypto.randomUUID();
