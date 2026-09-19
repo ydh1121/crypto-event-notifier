@@ -1,7 +1,8 @@
 import fs from'node:fs';
 const read=path=>fs.readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
-const index=read('public/index.html'),main=read('public/modules/main.js'),ui=read('public/modules/shared/holdings-write-v16.js'),fees=read('public/modules/shared/trading-fees-v16.js'),service=read('public/modules/services/holding-mutations-v16.js'),ownerApi=read('functions/api/holding-mutations.ts'),runtimeApi=read('functions/api/holding-mutations-runtime.ts'),migration=read('migrations/0007_holding_mutations.sql');
+const index=read('public/index.html'),main=read('public/modules/main.js'),assets=read('public/modules/pages/assets.js'),ui=read('public/modules/shared/holdings-write-v16.js'),fees=read('public/modules/shared/trading-fees-v16.js'),service=read('public/modules/services/holding-mutations-v16.js'),ownerApi=read('functions/api/holding-mutations.ts'),runtimeApi=read('functions/api/holding-mutations-runtime.ts'),migration=read('migrations/0007_holding_mutations.sql');
 const consumer=fs.readFileSync(new URL('../../b3_trader/holding_mutation_consumer.py',import.meta.url),'utf8');
+const publisher=fs.readFileSync(new URL('../../b3_trader/cloudflare_snapshot_publisher.py',import.meta.url),'utf8');
 const userTools=fs.readFileSync(new URL('../../b3_trader/user_tools.py',import.meta.url),'utf8');
 const livePatch=read('public/modules/shared/live-patch-v16.js');
 const checks=[
@@ -35,6 +36,10 @@ const checks=[
  ['mutation history is isolated by owner session',ui.includes("historyActor")&&ui.includes('pendingByMarket.clear()')&&ui.includes("store.get().user?.id")],
  ['manual holdings support BTC quote keys',ownerApi.includes('(?:\\/[A-Z0-9]+)?')&&ui.includes('(?:\\/[A-Z0-9]+)?')&&userTools.includes('normalize_holding_market')],
  ['BTC averaging write waits for quote-aware calculator',ownerApi.includes('QUOTE_AWARE_AVERAGING_REQUIRED')&&consumer.includes('QUOTE_AWARE_AVERAGING_REQUIRED')&&ui.includes('BTC 마켓 물타기 실제 반영')],
+ ['BTC pair maps to Bithumb ticker',publisher.includes('holding_api_market')&&publisher.includes('BithumbClient(timeout=5.0).tickers')],
+ ['quote-aware valuation payload',publisher.includes('"quote_currency": quote_currency')&&publisher.includes('"value_quote":')&&publisher.includes('"quote_to_krw":')],
+ ['BTC quote is primary in asset detail',assets.includes('renderQuoteMarketNotice')&&assets.includes('quoteValue(holding.value_quote,quote)')&&assets.includes("isKrw?'투입 원금':quote+' 원금'")],
+ ['non-KRW holdings skip KRW strategy blocks',assets.includes('const analysis=isKrw?')&&assets.includes('KRW PAPER 전략·KRW 예산 물타기 계산은 이 마켓에 적용하지 않습니다.')],
  ['live asset rail preserves unspecified exchange',livePatch.includes("exchange==='bithumb'?'빗썸':'거래소 미지정'")&&!livePatch.includes("==='upbit'?'업비트':'빗썸'")],
  ['selected averaging rounds',ui.includes('data-avg-actual-apply')&&ui.includes('data-apply-selected-rounds')&&consumer.includes('apply_averaging')],
  ['actual holding edit',ui.includes('data-holding-edit-volume')&&ui.includes('data-holding-edit-avg')&&ui.includes('data-save-holding')],
