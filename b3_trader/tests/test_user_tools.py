@@ -2,7 +2,13 @@ import sqlite3
 
 import pytest
 
-from b3_trader.user_tools import UserToolsStore, calculate_averaging
+from b3_trader.user_tools import (
+    UserToolsStore,
+    calculate_averaging,
+    holding_api_market,
+    holding_base_currency,
+    holding_quote_currency,
+)
 
 
 def test_calculate_averaging_updates_average():
@@ -95,3 +101,10 @@ def test_user_tools_store_migrates_legacy_manual_holdings_schema(tmp_path):
     )
     assert saved["exchange"] == "bithumb"
     store.close()
+
+
+def test_manual_holding_pair_market_mapping() -> None:
+    assert holding_base_currency("KRW-ETH/BTC") == "ETH"
+    assert holding_quote_currency("KRW-ETH/BTC") == "BTC"
+    assert holding_api_market("KRW-ETH/BTC") == "BTC-ETH"
+    assert holding_api_market("KRW-B3") == "KRW-B3"
