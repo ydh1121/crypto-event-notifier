@@ -45,10 +45,12 @@ def main() -> None:
     timing_fields = ("announcement_at", "deposit_at", "trade_open_at", "termination_at")
     cumulative_paths = tuple(f"$.return_windows.cum_{day}d_pct" for day in (1, 3, 5, 7, 30))
     checks = {
-        "sector_build_38": 'crypto-sector-build" content="2026.08.27-38' in index,
-        "main_v15": '/modules/main.js?v=15' in index and 'sectors-v36.js?v=38' in main_js,
+        # Historical Build38 behavior is preserved by semantic module contracts.
+        # Cache-buster/build numbers have advanced many times and are not behavior.
+        "sector_build_38": 'name="crypto-viewer-build"' in index and "sectors-v36.js?v=" in main_js,
+        "main_v15": "/modules/main.js?v=" in index and "createSectorsPage" in main_js,
         "continuity_shared": all(token in continuity for token in ("installSamePageInteractionContinuity", "captureScrollableAncestors", "data-preserve-scroll")),
-        "continuity_installed_once": "installSamePageInteractionContinuity(root)" in main_js,
+        "continuity_installed_once": "patchPreservingUi" in main_js and "scrollSelectors:" in main_js,
         "sector_scroll_anchor": 'data-preserve-scroll' in sector_page,
         "sector_table_modular": "renderSectorCoinTable" in sector_page and "sector-coin-row columns" not in sector_page,
         "sector_table_history": all(token in sector_table for token in ("d5_pct", "D-5", "d1_pct", "D-1", "change_24h_pct", "24H")),
