@@ -229,15 +229,24 @@ function Start-MarketFlowStream {
   return $process
 }
 
+function Start-HoldingMutationConsumer {
+  param([string]$PythonPath)
+  $process = Start-Process -FilePath $PythonPath -ArgumentList @("-m", "b3_trader.holding_mutation_consumer", "--interval", "5") -PassThru -WindowStyle Hidden
+  Write-Host "Holding mutation consumer: ON (owner queue -> canonical SQLite, idempotent)" -ForegroundColor Green
+  return $process
+}
+
 $researchSupervisor = $null
 $paperSupervisor = $null
 $forwardScheduler = $null
 $marketFlowStream = $null
+$holdingMutationConsumer = $null
 try {
   $forwardScheduler = Start-ForwardPipelineScheduler -PythonPath $python
   $marketFlowStream = Start-MarketFlowStream -PythonPath $python
   $researchSupervisor = Start-ResearchSupervisor -PythonPath $python
   $paperSupervisor = Start-PaperRuntimeSupervisor -PythonPath $python
+  $holdingMutationConsumer = Start-HoldingMutationConsumer -PythonPath $python
   Write-Host "Starting Crypto Auto Trader..."
   Write-Host "Dashboard will be available at http://127.0.0.1:8765"
   while ($true) {
@@ -245,7 +254,10 @@ try {
     $code = $LASTEXITCODE
     if ($code -eq 0) { break }
     if ($code -eq 75) {
-      Write-Host "GitHub runtime update applied. Restarting trader and PAPER/research/forward/flow supervisors automatically..."
+      Write-Host "GitHub runtime update applied. Restarting trader and PAPER/research/forward/flow/holding supervisors automatically..."
+      if ($holdingMutationConsumer -and -not $holdingMutationConsumer.HasExited) {
+        Stop-Process -Id $holdingMutationConsumer.Id -Force -ErrorAction SilentlyContinue
+      }
       if ($marketFlowStream -and -not $marketFlowStream.HasExited) {
         Stop-Process -Id $marketFlowStream.Id -Force -ErrorAction SilentlyContinue
       }
@@ -263,12 +275,16 @@ try {
       $marketFlowStream = Start-MarketFlowStream -PythonPath $python
       $researchSupervisor = Start-ResearchSupervisor -PythonPath $python
       $paperSupervisor = Start-PaperRuntimeSupervisor -PythonPath $python
+      $holdingMutationConsumer = Start-HoldingMutationConsumer -PythonPath $python
       continue
     }
     Write-Host "Trader stopped with exit code $code. Restarting in 5 seconds..."
     Start-Sleep -Seconds 5
   }
 } finally {
+  if ($holdingMutationConsumer -and -not $holdingMutationConsumer.HasExited) {
+    Stop-Process -Id $holdingMutationConsumer.Id -Force -ErrorAction SilentlyContinue
+  }
   if ($marketFlowStream -and -not $marketFlowStream.HasExited) {
     Stop-Process -Id $marketFlowStream.Id -Force -ErrorAction SilentlyContinue
   }
