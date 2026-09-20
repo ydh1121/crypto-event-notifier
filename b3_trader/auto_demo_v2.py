@@ -58,9 +58,23 @@ def _json_load(value: Any) -> dict[str, Any]:
 
 def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_suffix(path.suffix + ".tmp")
-    temp.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    os.replace(temp, path)
+    temp = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    text = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    temp.write_text(text, encoding="utf-8")
+    try:
+        for attempt in range(6):
+            try:
+                os.replace(temp, path)
+                return
+            except OSError:
+                if attempt >= 5:
+                    raise
+                time.sleep(0.05 * (attempt + 1))
+    finally:
+        try:
+            temp.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 @dataclass
