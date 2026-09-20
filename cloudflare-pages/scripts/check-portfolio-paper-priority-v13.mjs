@@ -19,11 +19,13 @@ check('asset source order is workspace before history',workspacePos>=0&&historyC
 check('asset rail presents holdings before allocation',assets.indexOf('asset-holdings-list')>=0&&assets.indexOf('asset-holdings-list')<assets.indexOf('${renderAllocation(list,summary)}'));
 check('asset holding rows expose current quote and pnl',assets.includes('asset-quote-row')&&assets.includes('quotePrice(item,item.current_price)')&&assets.includes('${pct(item.unrealized_pnl_pct)}'));
 check('asset selected holding promotes current price',assets.includes('asset-position-hero')&&assets.includes('asset-current-price')&&assets.includes('currentQuoted=quotePrice(holding,holding.current_price)')&&assets.includes('${currentQuoted}'));
-const assetCurrent=assets.indexOf('<small>현재가</small>');
-const assetAvg=assets.indexOf('<small>평균 매수가</small>');
-const assetPnl=assets.indexOf('<small>평가손익</small>');
-const assetPct=assets.indexOf('<small>손익률</small>');
-check('asset simple facts are current avg pnl pct in order',assetCurrent>=0&&assetCurrent<assetAvg&&assetAvg<assetPnl&&assetPnl<assetPct);
+const assetHero=assets.indexOf('asset-position-hero');
+const assetCurrent=assets.indexOf('asset-current-price');
+const assetAvg=assets.indexOf('평균 매수가 ${avgQuoted}');
+const assetFacts=assets.indexOf('asset-position-facts');
+const assetPnl=assets.indexOf('<small>평가손익</small>',assetFacts);
+const assetPct=assets.indexOf('<small>손익률</small>',assetFacts);
+check('asset priority is hero current avg before pnl pct facts',assetHero>=0&&assetCurrent>assetHero&&assetAvg>assetCurrent&&assetFacts>assetAvg&&assetPnl>assetFacts&&assetPct>assetPnl);
 check('asset visual order hack is removed',!interaction.includes('Asset source order is legacy')&&!interaction.includes('>.asset-workspace{order:2')&&!interaction.includes('>.asset-history-panel{order:3'));
 check('asset history keeps spacing without order mutation',interaction.includes('Asset module now emits canonical source order')&&interaction.includes('>.asset-history-panel{margin-top:30px!important}'));
 
