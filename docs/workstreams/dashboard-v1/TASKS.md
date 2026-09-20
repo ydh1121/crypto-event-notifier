@@ -184,3 +184,20 @@ Target user: a Korean crypto buyer/seller in their 60s who is not a developer, q
 ## Completion condition
 
 Finish this workstream when mobile/dashboard UX is approved, adaptive per-coin PAPER research has accumulated enough evidence to identify robust candidates rather than lucky short-term winners, backup is verified, phone access is convenient, and the program-level items tracked in `MASTER_ROADMAP.md` have either completed or been explicitly moved to a successor workstream. Real-money execution stays deferred.
+
+
+## L. CRYPTO-WO-20260921-001 single-chat UI system recovery / audit
+
+- [x] Actual Windows checkout reconciled: `b3-auto-trader-phase1` / `e9318be6c47877013e408d10479ea7f3e83f6506`; tracked, staged and untracked state all clean; upstream `origin/b3-auto-trader-phase1`; ahead/behind `0/0`.
+- [x] Production Viewer release at the same code HEAD was already deployed and read back healthy before this audit; latest GitHub `B3 trader tests` and Build 51~71 workflow set are green; PR #1 remains Draft/open.
+- [x] Activated the single-chat Drive harness and reconciled READ FIRST / CURRENT SNAPSHOT / CURRENT BATON / Work Order Ledger with actual Git state.
+- [x] Audited the active Viewer entry graph: 9 current routes (`dashboard`, `dashboard-detail`, `research`, `assets`, `paper`, `strategy`, `sectors`, `records`, `system`) plus global reader/theme/account controls.
+- [x] Completed page / feature / component-family inventory and mapped duplicate entry points, master-detail patterns, global simple/detail behavior, chart/table/filter/search interactions, responsive handoff, accessibility contracts, and live-polling continuity.
+- [x] CSS propagation audit: the current `index.html` loads 37 stylesheets. Across those loaded files there are ~260,399 CSS characters, 2,124 rule blocks, 100 media blocks and 1,874 `!important` declarations. Largest override layers include `strategy-native-v5.css` (448), `interaction-layout-v4.css` (400), `mainstream-v4.css` (146), and `layout-fixes-v4.css` (142).
+- [x] Identified a permanent-contract violation in `shared/rail-controls-v16.js`: a broad document-root `MutationObserver({childList:true,subtree:true})` is still installed even though AGENTS/MODULAR_ARCHITECTURE prohibit broad observer continuity/enhancement loops. No code change was made during the audit.
+- [x] Stable exemplar candidates recorded: Strategy V5 master/detail workspace, Records user-vs-system audience split, Research master/detail + live patch path, V17 Assets position hero/facts/editor handoff, `ui-continuity.js`, scoped live-patch modules, and `viewport-handoff-v4.js` mobile return pattern.
+- [x] Target IA proposed without deleting capability: global `홈 / 코인 / 내 자산 / 모의투자 / 기록 / 더보기`; `코인` local views = `코인 / 시장현황 / 테마`; `모의투자` owns performance + coin view + method/strategy comparison + current execution; `더보기` owns system/account/operations.
+- [x] Target component model proposed: foundations/tokens → primitives → navigation/controls → master-detail/data-view components → page compositions. Page-specific late override CSS is to be reduced incrementally rather than replaced by a big-bang rewrite.
+- [x] Simple/detail model proposed as semantic Primary / Supporting / Advanced disclosure per page; feature access remains preserved and selected object/tab/filter/scroll/focus must survive mode change and polling.
+- [x] QA model fixed for future waves: desktop 1280/1440/1920, tablet 768/900/1024, phone 360/390/430 plus real iPhone Safari; light/dark, keyboard/focus, 200% zoom/reflow, safe-area, touch targets, no page overflow, and polling continuity are required.
+- [ ] NEXT GATE — proposed `CRYPTO-WO-20260921-002`: bounded UI foundation consolidation only. Remove the broad rail MutationObserver, establish canonical shell/control/master-detail tokens/components, add propagation/regression checks, and preserve current page functionality/IA while reducing override ownership. Do not start until WO-001 audit review/approval.
