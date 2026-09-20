@@ -1,0 +1,164 @@
+/* V17 assets: clearer hierarchy, fewer nested cards, stronger position/edit handoff. */
+
+#pageRoot[data-page-route="assets"] .asset-kpis{
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:1px!important;
+  overflow:hidden;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:var(--line);
+  margin-bottom:20px!important;
+}
+#pageRoot[data-page-route="assets"] .asset-kpis .kpi{
+  min-height:78px;
+  padding:14px 16px!important;
+  border-radius:0!important;
+  background:var(--surface)!important;
+}
+#pageRoot[data-page-route="assets"] .asset-kpis .kpi-large{background:var(--surface2)!important}
+#pageRoot[data-page-route="assets"] .asset-kpis .kpi b{font-size:clamp(18px,1.4vw,24px)!important}
+
+#pageRoot[data-page-route="assets"] .asset-workspace{
+  grid-template-columns:310px minmax(0,1fr)!important;
+  gap:24px!important;
+}
+#pageRoot[data-page-route="assets"] .asset-master{
+  top:86px!important;
+  height:calc(100vh - 116px)!important;
+  padding:10px!important;
+  border-radius:14px!important;
+}
+#pageRoot[data-page-route="assets"] .asset-list-head{
+  min-height:32px;
+  padding:0 4px;
+}
+#pageRoot[data-page-route="assets"] .asset-row{
+  min-height:54px;
+  padding:9px 8px!important;
+  border-radius:8px!important;
+}
+#pageRoot[data-page-route="assets"] .asset-row.selected{box-shadow:none!important}
+#pageRoot[data-page-route="assets"] .allocation-panel.compact{
+  margin-top:8px;
+  padding:12px 4px 4px!important;
+  margin-bottom:0!important;
+  border-top:1px solid var(--line);
+  border-bottom:0!important;
+}
+
+#pageRoot[data-page-route="assets"] .asset-detail{gap:16px!important}
+#pageRoot[data-page-route="assets"] .asset-detail-hero{
+  min-height:132px;
+  padding:22px 24px!important;
+  border-radius:14px!important;
+  background:var(--surface2)!important;
+}
+#pageRoot[data-page-route="assets"] .asset-detail-hero h3{
+  margin:4px 0 3px!important;
+  font-size:18px!important;
+}
+#pageRoot[data-page-route="assets"] .asset-current-price{
+  display:block;
+  margin:2px 0 7px;
+  font-size:clamp(30px,3vw,44px)!important;
+  line-height:1!important;
+  letter-spacing:-.045em;
+  font-variant-numeric:tabular-nums;
+}
+#pageRoot[data-page-route="assets"] .asset-detail-value b{
+  font-size:clamp(22px,2vw,30px)!important;
+  font-variant-numeric:tabular-nums;
+}
+
+#pageRoot[data-page-route="assets"] .asset-position-facts{
+  grid-template-columns:repeat(5,minmax(0,1fr))!important;
+  gap:1px!important;
+  overflow:hidden;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--line);
+}
+#pageRoot[data-page-route="assets"] .asset-position-facts>span{
+  min-height:72px;
+  padding:12px 14px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:var(--surface)!important;
+}
+#pageRoot[data-page-route="assets"] .asset-position-facts b{font-size:14px!important}
+
+#pageRoot[data-page-route="assets"] .holding-write-v16{
+  margin:0!important;
+  padding:16px!important;
+  border:0!important;
+  border-radius:12px;
+  background:var(--surface2)!important;
+}
+#pageRoot[data-page-route="assets"] .holding-write-v16 header{
+  align-items:center!important;
+  margin-bottom:12px!important;
+}
+#pageRoot[data-page-route="assets"] .holding-write-v16 h3{font-size:16px!important}
+#pageRoot[data-page-route="assets"] .holding-write-fields{
+  grid-template-columns:minmax(0,1.35fr) minmax(0,1.35fr) minmax(120px,.75fr) minmax(120px,.75fr)!important;
+  gap:8px!important;
+}
+#pageRoot[data-page-route="assets"] .holding-write-fields label>small{
+  min-height:15px;
+  margin-top:-2px;
+  font-size:10px;
+  line-height:1.35;
+  color:var(--tertiary);
+}
+#pageRoot[data-page-route="assets"] .holding-write-actions{
+  margin-top:10px!important;
+}
+#pageRoot[data-page-route="assets"] .holding-write-actions button{
+  min-height:38px!important;
+}
+
+#pageRoot[data-page-route="assets"] .holding-plan-panel,
+#pageRoot[data-page-route="assets"] .direct-average-panel,
+#pageRoot[data-page-route="assets"] .averaging-calculator,
+#pageRoot[data-page-route="assets"] .asset-history-panel{
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  background:transparent!important;
+  padding:18px 0 0!important;
+  border-top:1px solid var(--line)!important;
+}
+#pageRoot[data-page-route="assets"] .holding-plan-status,
+#pageRoot[data-page-route="assets"] .holding-plan-grid>span,
+#pageRoot[data-page-route="assets"] .direct-input-card,
+#pageRoot[data-page-route="assets"] .direct-result-card>span,
+#pageRoot[data-page-route="assets"] .avg-row,
+#pageRoot[data-page-route="assets"] .avg-summary>span{
+  border-color:transparent!important;
+  background:var(--surface2)!important;
+}
+#pageRoot[data-page-route="assets"] .holding-plan-grid{gap:6px!important}
+#pageRoot[data-page-route="assets"] .holding-plan-grid>span{padding:10px 12px!important}
+#pageRoot[data-page-route="assets"] .holding-budget-planner,
+#pageRoot[data-page-route="assets"] .profit-plan{
+  margin-top:2px;
+}
+
+@media(max-width:1180px){
+  #pageRoot[data-page-route="assets"] .asset-workspace{grid-template-columns:280px minmax(0,1fr)!important;gap:16px!important}
+  #pageRoot[data-page-route="assets"] .asset-position-facts{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+  #pageRoot[data-page-route="assets"] .holding-write-fields{grid-template-columns:1fr 1fr!important}
+}
+@media(max-width:900px){
+  #pageRoot[data-page-route="assets"] .asset-kpis{grid-template-columns:1fr 1fr!important}
+  #pageRoot[data-page-route="assets"] .asset-workspace{grid-template-columns:1fr!important}
+  #pageRoot[data-page-route="assets"] .asset-master{position:static!important;height:auto!important;max-height:520px}
+  #pageRoot[data-page-route="assets"] .asset-position-facts{grid-template-columns:1fr 1fr!important}
+}
+@media(max-width:620px){
+  #pageRoot[data-page-route="assets"] .asset-kpis,
+  #pageRoot[data-page-route="assets"] .asset-position-facts,
+  #pageRoot[data-page-route="assets"] .holding-write-fields{grid-template-columns:1fr!important}
+  #pageRoot[data-page-route="assets"] .asset-detail-hero{padding:18px!important}
+  #pageRoot[data-page-route="assets"] .asset-current-price{font-size:34px!important}
+}
