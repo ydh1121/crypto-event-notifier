@@ -1,10 +1,9 @@
 import fs from'node:fs';
 const read=path=>fs.readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
-const index=read('public/index.html'),main=read('public/modules/main.js'),assets=read('public/modules/pages/assets.js'),ui=read('public/modules/shared/holdings-write-v16.js'),fees=read('public/modules/shared/trading-fees-v16.js'),service=read('public/modules/services/holding-mutations-v16.js'),ownerApi=read('functions/api/holding-mutations.ts'),runtimeApi=read('functions/api/holding-mutations-runtime.ts'),migration=read('migrations/0007_holding_mutations.sql');
+const index=read('public/index.html'),main=read('public/modules/main.js'),assets=read('public/modules/pages/assets.js'),ui=read('public/modules/shared/holdings-write-v16.js'),livePatch=read('public/modules/shared/live-patch-v16.js'),assetV17=read('public/modules/styles/assets-v17.css'),fees=read('public/modules/shared/trading-fees-v16.js'),service=read('public/modules/services/holding-mutations-v16.js'),ownerApi=read('functions/api/holding-mutations.ts'),runtimeApi=read('functions/api/holding-mutations-runtime.ts'),migration=read('migrations/0007_holding_mutations.sql');
 const consumer=fs.readFileSync(new URL('../../b3_trader/holding_mutation_consumer.py',import.meta.url),'utf8');
 const publisher=fs.readFileSync(new URL('../../b3_trader/cloudflare_snapshot_publisher.py',import.meta.url),'utf8');
 const userTools=fs.readFileSync(new URL('../../b3_trader/user_tools.py',import.meta.url),'utf8');
-const livePatch=read('public/modules/shared/live-patch-v16.js');
 const storeSource=read('public/modules/core/store.js');
 const checks=[
  ['current V16B build marker',/crypto-viewer-build" content="[^"]*v16b-holdings-write/.test(index)],
@@ -46,6 +45,11 @@ const checks=[
  ['live asset patch keeps quote units',livePatch.includes('holdingEvaluation(item)')&&livePatch.includes('holdingPrice(item,item.current_price)')&&livePatch.includes('holdingPnl(holding)')],
  ['selected averaging rounds',ui.includes('data-avg-actual-apply')&&ui.includes('data-apply-selected-rounds')&&consumer.includes('apply_averaging')],
  ['actual holding edit',ui.includes('data-holding-edit-volume')&&ui.includes('data-holding-edit-avg')&&ui.includes('data-save-holding')],
+ ['zero-volume closeout is accepted end-to-end',ui.includes('closeout=volume===0')&&ui.includes('avg_price:closeout?0:avgPrice')&&ownerApi.includes('volume < 0')&&ownerApi.includes('volume === 0 ? 0 : avgPrice')&&consumer.includes('_nonnegative_number')&&consumer.includes('final_avg = 0.0 if final_volume == 0.0 else requested_avg')],
+ ['zero-volume closeout watcher terminates after holding disappears',ui.includes('closeout=num(mutation?.result?.final_volume)===0')&&ui.includes('if(closeout&&!holding)return')],
+ ['KRW holding prices preserve decimals',assets.includes("quoteCurrency(holding)==='KRW'?price(value)")&&livePatch.includes("holdingQuote(row)==='KRW'?price(value)")],
+ ['asset detail emits write-panel refresh after render',assets.includes("new CustomEvent('ui:refresh'")&&assets.includes("source:'asset-detail-render'")),
+ ['V17 asset hierarchy stylesheet is loaded',index.includes('/modules/styles/assets-v17.css?v=1')&&assetV17.includes('.asset-position-facts')&&assetV17.includes('.holding-write-fields')],
  ['take profit target',ui.includes('data-take-profit-price')],
  ['take profit recalculates after edit',ui.includes("event.target.matches('[data-take-profit-price]')")&&ui.includes('setTimeout(rerender,0)')],
  ['calculator row replacement restores controls',ui.includes("[data-add-avg-row],[data-add-recommended-row],[data-reset-avg],[data-remove-avg]")],
