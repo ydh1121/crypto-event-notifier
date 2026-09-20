@@ -1,4 +1,4 @@
-import{store}from'./core/store.js';
+import{store}from'./core/store.js?v=2';
 import{createRouter}from'./core/router.js?v=3';
 import{createAuth}from'./core/auth.js';
 import{createSnapshotPoller}from'./core/snapshot.js';
@@ -12,7 +12,7 @@ import{installThemeToggle}from'./shared/theme.js?v=1';
 import{installStrategyDrilldown}from'./shared/strategy-drilldown-v4.js?v=3';
 import{installViewportHandoff}from'./shared/viewport-handoff-v4.js?v=3';
 import{installRailControlsV16}from'./shared/rail-controls-v16.js?v=1';
-import{installLivePatchV16}from'./shared/live-patch-v16.js?v=2';
+import{installLivePatchV16}from'./shared/live-patch-v16.js?v=3';
 import{installRemainingLivePatchV16}from'./shared/live-patch-remaining-v16.js?v=1';
 import{installHoldingsWriteV16}from'./shared/holdings-write-v16.js?v=4';
 import{createHomePage}from'./pages/v4/home.js?v=2.1';

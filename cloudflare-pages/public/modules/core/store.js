@@ -20,12 +20,13 @@ function persist(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state.ui)
 function emit(meta={}){for(const fn of listeners){try{fn(state,meta)}catch(err){console.error('store listener',err)}}}
 function defaultExchange(snapshot){const list=Array.isArray(snapshot?.private?.manual_holdings?.holdings)?snapshot.private.manual_holdings.holdings:[];if(!snapshot?.private_visible||!list.length)return'bithumb';const totals={bithumb:0,upbit:0};for(const row of list){const ex=String(row?.exchange||'bithumb').toLowerCase();if(!(ex in totals))continue;const value=Math.max(0,Number(row?.value_krw||row?.invested_krw||0));totals[ex]+=Number.isFinite(value)?value:0}return totals.upbit>totals.bithumb?'upbit':'bithumb'}
 function applyExchangeDefault(snapshot){if(exchangeDefaultApplied)return;exchangeDefaultApplied=true;const exchange=defaultExchange(snapshot);Object.assign(state.ui,{researchExchange:exchange,paperExchange:exchange,strategyExchange:exchange,recordsExchange:exchange,sectorExchange:exchange});persist()}
+function assetNeedsFullRender(snapshot,route){if(route!=='assets'||!snapshot?.private_visible)return false;const rows=Array.isArray(snapshot?.private?.manual_holdings?.holdings)?snapshot.private.manual_holdings.holdings:[],selected=rows.find(row=>String(row?.market||'')===String(state.ui.assetMarket||''));return String(selected?.quote_currency||'KRW').toUpperCase()!=='KRW'}
 export const store={
   get:()=>state,
   subscribe(fn){listeners.add(fn);return()=>listeners.delete(fn)},
   set(patch,meta={}){Object.assign(state,patch);emit(meta)},
   setUser(user){state.user=user||null;emit({type:'user'})},
-  setSnapshot(snapshot,user){const hadSnapshot=Boolean(state.snapshot);state.snapshot=snapshot||null;if(user)state.user=user;state.loading=false;state.error=null;if(snapshot)applyExchangeDefault(snapshot);const route=String(state.ui.route||'dashboard');const patchOnly=hadSnapshot&&LIVE_PATCH_ROUTES.has(route);emit({type:patchOnly?'snapshot-live':'snapshot',route,live:hadSnapshot,patchOnly})},
+  setSnapshot(snapshot,user){const hadSnapshot=Boolean(state.snapshot);state.snapshot=snapshot||null;if(user)state.user=user;state.loading=false;state.error=null;if(snapshot)applyExchangeDefault(snapshot);const route=String(state.ui.route||'dashboard'),fullAssetRender=assetNeedsFullRender(snapshot,route);const patchOnly=hadSnapshot&&LIVE_PATCH_ROUTES.has(route)&&!fullAssetRender;emit({type:patchOnly?'snapshot-live':'snapshot',route,live:hadSnapshot,patchOnly,fullAssetRender})},
   setError(error){state.error=error||null;state.loading=false;emit({type:'error'})},
   setUi(patch,meta={}){Object.assign(state.ui,patch);persist();emit({type:'ui',...meta})},
   resetSession(){state.user=null;state.snapshot=null;state.loading=false;state.error=null;exchangeDefaultApplied=false;emit({type:'session-reset'})}

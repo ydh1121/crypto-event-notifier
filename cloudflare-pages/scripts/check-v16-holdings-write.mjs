@@ -5,6 +5,7 @@ const consumer=fs.readFileSync(new URL('../../b3_trader/holding_mutation_consume
 const publisher=fs.readFileSync(new URL('../../b3_trader/cloudflare_snapshot_publisher.py',import.meta.url),'utf8');
 const userTools=fs.readFileSync(new URL('../../b3_trader/user_tools.py',import.meta.url),'utf8');
 const livePatch=read('public/modules/shared/live-patch-v16.js');
+const storeSource=read('public/modules/core/store.js');
 const checks=[
  ['current V16B build marker',/crypto-viewer-build" content="[^"]*v16b-holdings-write/.test(index)],
  ['holdings write stylesheet remains cache-versioned',/holdings-write-v16\.css\?v=[0-9.]+/.test(index)],
@@ -41,6 +42,8 @@ const checks=[
  ['BTC quote is primary in asset detail',assets.includes('renderQuoteMarketNotice')&&assets.includes('quoteValue(holding.value_quote,quote)')&&assets.includes("isKrw?'투입 원금':quote+' 원금'")],
  ['non-KRW holdings skip KRW strategy blocks',assets.includes('const analysis=isKrw?')&&assets.includes('KRW PAPER 전략·KRW 예산 물타기 계산은 이 마켓에 적용하지 않습니다.')],
  ['live asset rail preserves unspecified exchange',livePatch.includes("exchange==='bithumb'?'빗썸':'거래소 미지정'")&&!livePatch.includes("==='upbit'?'업비트':'빗썸'")],
+ ['BTC asset snapshots force full render',storeSource.includes('assetNeedsFullRender')&&storeSource.includes("quote_currency||'KRW'")&&storeSource.includes('&&!fullAssetRender')],
+ ['live asset patch keeps quote units',livePatch.includes('holdingEvaluation(item)')&&livePatch.includes('holdingPrice(item,item.current_price)')&&livePatch.includes('holdingPnl(holding)')],
  ['selected averaging rounds',ui.includes('data-avg-actual-apply')&&ui.includes('data-apply-selected-rounds')&&consumer.includes('apply_averaging')],
  ['actual holding edit',ui.includes('data-holding-edit-volume')&&ui.includes('data-holding-edit-avg')&&ui.includes('data-save-holding')],
  ['take profit target',ui.includes('data-take-profit-price')],
