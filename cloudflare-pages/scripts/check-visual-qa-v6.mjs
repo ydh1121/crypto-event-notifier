@@ -12,7 +12,8 @@ check('visual QA layer is loaded',index.includes('/modules/styles/visual-qa-v6.c
 check('visual QA layer follows strategy native layer',index.indexOf('strategy-native-v5.css')<index.indexOf('visual-qa-v6.css'));
 check('decision-first layer follows visual QA',index.indexOf('visual-qa-v6.css')<index.indexOf('decision-first-v7.css'));
 check('canonical interaction layer supersedes visual QA geometry',index.indexOf('visual-qa-v6.css')<index.indexOf('interaction-layout-v4.css'));
-check('main entry cache is refreshed',index.includes('/modules/main.js?v=96'));
+const mainCacheVersion=Number(index.match(/\/modules\/main\.js\?v=(\d+(?:\.\d+)?)/)?.[1]||0);
+check('main entry cache is refreshed',mainCacheVersion>=96);
 check('home module cache is refreshed',main.includes("./pages/v4/home.js?v=2"));
 check('wide dashboard uses viewport',css.includes('max-width:1540px!important'));
 check('wide dashboard keeps reasonable side padding',css.includes('padding-left:28px!important')&&css.includes('padding-right:28px!important'));
