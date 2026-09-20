@@ -48,7 +48,7 @@ const checks=[
  ['zero-volume closeout is accepted end-to-end',ui.includes('inputNumber')&&ui.includes('closeout=volume===0')&&ui.includes('avg_price:closeout?0:avgPrice')&&ownerApi.includes("value === null || value === undefined || value === ''")&&ownerApi.includes('volume < 0')&&ownerApi.includes('volume === 0 ? 0 : avgPrice')&&consumer.includes('_nonnegative_number')&&consumer.includes('final_avg = 0.0 if final_volume == 0.0 else requested_avg')],
  ['zero-volume closeout watcher terminates after holding disappears',ui.includes('closeout=num(mutation?.result?.final_volume)===0')&&ui.includes('if(closeout&&!holding)return')],
  ['KRW holding prices preserve decimals',assets.includes("quoteCurrency(holding)==='KRW'?price(value)")&&livePatch.includes("holdingQuote(row)==='KRW'?price(value)")],
- ['asset detail emits write-panel refresh after render',assets.includes("new CustomEvent('ui:refresh'")&&assets.includes("source:'asset-detail-render'")),
+ ['asset detail emits write-panel refresh after render',assets.includes("new CustomEvent('ui:refresh'")&&assets.includes("source:'asset-detail-render'")],
  ['V17 asset hierarchy stylesheet is loaded',index.includes('/modules/styles/assets-v17.css?v=1')&&assetV17.includes('.asset-position-facts')&&assetV17.includes('.holding-write-fields')],
  ['take profit target',ui.includes('data-take-profit-price')],
  ['take profit recalculates after edit',ui.includes("event.target.matches('[data-take-profit-price]')")&&ui.includes('setTimeout(rerender,0)')],
