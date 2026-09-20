@@ -118,6 +118,16 @@ def _positive_number(value: Any, *, code: str) -> float:
     return number
 
 
+def _nonnegative_number(value: Any, *, code: str) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise MutationRejected(code, "0 이상의 숫자가 필요합니다.") from exc
+    if number < 0.0:
+        raise MutationRejected(code, "0 이상의 숫자가 필요합니다.")
+    return number
+
+
 def _receipt_result(conn: sqlite3.Connection, mutation_id: str) -> dict[str, Any] | None:
     row = conn.execute(
         "SELECT result_json FROM holding_mutation_receipts WHERE mutation_id=? LIMIT 1",
@@ -191,8 +201,11 @@ def apply_mutation(journal_db: str, mutation: dict[str, Any]) -> dict[str, Any]:
             buy_gross = 0.0
 
             if action == "set_holding":
-                final_volume = _positive_number(payload.get("volume"), code="INVALID_VOLUME")
-                final_avg = _positive_number(payload.get("avg_price"), code="INVALID_AVG_PRICE")
+                final_volume = _nonnegative_number(payload.get("volume"), code="INVALID_VOLUME")
+                requested_avg = _nonnegative_number(payload.get("avg_price"), code="INVALID_AVG_PRICE")
+                if final_volume > 0.0 and requested_avg <= 0.0:
+                    raise MutationRejected("INVALID_AVG_PRICE", "보유 중인 자산의 평단은 0보다 커야 합니다.")
+                final_avg = 0.0 if final_volume == 0.0 else requested_avg
                 applied_rounds: list[dict[str, float]] = []
             else:
                 rows = payload.get("rounds") if isinstance(payload.get("rounds"), list) else []
