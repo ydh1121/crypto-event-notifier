@@ -8,7 +8,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PAGES_PROJECT: crypto-paper-viewer-ydh1121
+  PAGES_PROJECT: crypto-paper-viewer-ydh1121-cf36
   D1_DATABASE: crypto-paper-viewer
   PRODUCTION_BRANCH: b3-auto-trader-phase1
 
