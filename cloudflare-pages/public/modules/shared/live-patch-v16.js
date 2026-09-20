@@ -8,7 +8,7 @@ let installed=false;
 function exchangeLabel(value){const exchange=String(value||'').trim().toLowerCase();return exchange==='upbit'?'업비트':exchange==='bithumb'?'빗썸':'거래소 미지정'}
 function holdingQuote(row){return String(row?.quote_currency||'KRW').toUpperCase()}
 function quoteNumber(value,unit){const currency=String(unit||'KRW').toUpperCase();return currency==='KRW'?money(value):`${n(value).toLocaleString('ko-KR',{maximumFractionDigits:8})} ${currency}`}
-function holdingPrice(row,value){return quoteNumber(value,holdingQuote(row))}
+function holdingPrice(row,value){return holdingQuote(row)==='KRW'?price(value):quoteNumber(value,holdingQuote(row))}
 function holdingEvaluation(row){const quote=holdingQuote(row);return quote==='KRW'?money(row?.value_krw):`${quoteNumber(row?.value_quote,quote)} · ${money(row?.value_krw)} 환산`}
 function holdingPnl(row){const quote=holdingQuote(row),value=quote==='KRW'?n(row?.unrealized_pnl_krw):n(row?.unrealized_pnl_quote);return `${value>=0?'+':''}${quoteNumber(value,quote)}`}
 function symbol(row){return String(row?.symbol||row?.market||'').replace(/^KRW-/,'')||'-'}
