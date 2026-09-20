@@ -69,6 +69,33 @@ def test_legacy_blank_exchange_is_backfilled_once(tmp_path: Path) -> None:
     assert row[3] == pytest.approx(float(result["updated_ts"]))
 
 
+def test_zero_volume_closeout_sets_volume_and_avg_to_zero(tmp_path: Path) -> None:
+    path = tmp_path / "journal.sqlite3"
+    _database(path, exchange="bithumb")
+
+    mutation = _mutation(mutation_id="closeout-1", exchange="bithumb", revision=123.0)
+    mutation["payload"] = {"volume": 0.0, "avg_price": 100.0}
+
+    result = apply_mutation(str(path), mutation)
+
+    assert result["final_volume"] == 0.0
+    assert result["final_avg_price"] == 0.0
+
+    conn = sqlite3.connect(path)
+    try:
+        row = conn.execute(
+            "SELECT volume,avg_price,exchange,updated_ts FROM manual_holdings WHERE market='KRW-BTC'"
+        ).fetchone()
+    finally:
+        conn.close()
+
+    assert row is not None
+    assert row[0] == 0.0
+    assert row[1] == 0.0
+    assert row[2] == "bithumb"
+    assert row[3] == pytest.approx(float(result["updated_ts"]))
+
+
 def test_saved_exchange_cannot_be_changed_by_mutation(tmp_path: Path) -> None:
     path = tmp_path / "journal.sqlite3"
     _database(path, exchange="upbit")
