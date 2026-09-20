@@ -133,10 +133,10 @@ export const onRequestPost: PagesFunction<Env> = async ({request, env}) => {
   if (action === 'set_holding') {
     const volume = cleanFinite(body.volume);
     const avgPrice = cleanFinite(body.avg_price);
-    if (volume === null || avgPrice === null || volume <= 0 || avgPrice <= 0) {
-      return error(422, 'INVALID_HOLDING_VALUES', '보유수량과 평단은 0보다 커야 합니다.');
+    if (volume === null || avgPrice === null || volume < 0 || avgPrice < 0 || (volume > 0 && avgPrice <= 0)) {
+      return error(422, 'INVALID_HOLDING_VALUES', '보유수량은 0 이상이어야 하며, 보유 중인 자산의 평단은 0보다 커야 합니다.');
     }
-    payload = {volume, avg_price: avgPrice};
+    payload = {volume, avg_price: volume === 0 ? 0 : avgPrice};
   } else {
     const rounds = (Array.isArray(body.rounds) ? body.rounds : []).slice(0, 20).map((row, index) => ({
       round: index + 1,
