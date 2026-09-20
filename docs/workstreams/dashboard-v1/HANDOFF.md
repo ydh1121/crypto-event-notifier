@@ -286,3 +286,63 @@ Generated data remains local/ignored:
 - keep secrets/runtime DB/generated research data ignored/local
 - no public direct exposure of port 8765
 - live execution stays deferred to a separate future workstream
+
+
+## Single-chat UI system audit checkpoint — CRYPTO-WO-20260921-001
+
+Status: AUDIT COMPLETE / IMPLEMENTATION NOT STARTED.
+
+Actual local recovery baseline supplied from the Windows checkout before documentation updates:
+- branch: `b3-auto-trader-phase1`
+- HEAD: `e9318be6c47877013e408d10479ea7f3e83f6506`
+- tracked diff: clean
+- staged diff: clean
+- untracked: none
+- upstream: `origin/b3-auto-trader-phase1`
+- ahead/behind: `0 / 0`
+
+The same code HEAD had already been deployed to Production Pages and the user confirmed the V17 asset changes appeared applied. GitHub CI readback for `e9318be6...` shows `B3 trader tests` and the returned Build 51~71 workflow set completed successfully. PR #1 remains Draft/open.
+
+### UI system audit result
+
+The primary problem is not missing features. It is propagation debt and competing information architecture:
+- active shell exposes 6 top-level buttons plus system/account behind the user menu, while the permanent/product docs use several different conceptual groupings;
+- Research, Assets, PAPER, Strategy, Sectors and Records each evolved their own search/filter/tab/master-detail grammar;
+- `index.html` currently loads 37 CSS stylesheets. The loaded set totals about 260,399 CSS characters, 2,124 rule blocks, 100 media blocks and 1,874 `!important` declarations;
+- late override ownership is concentrated in `strategy-native-v5.css`, `interaction-layout-v4.css`, `mainstream-v4.css`, `layout-fixes-v4.css`, plus subsequent viewport/compact/V17 layers;
+- broad observer debt remains in `shared/rail-controls-v16.js`, which installs a document-root subtree `MutationObserver` contrary to AGENTS/MODULAR_ARCHITECTURE;
+- the global simple/detail mechanism is directionally correct but is mainly CSS visibility gating, not yet a semantic per-page Primary/Supporting/Advanced composition contract.
+
+Stable exemplar candidates to preserve:
+- Strategy V5 master rail + selected-strategy workspace + internal views;
+- Records audience split: `내 매매·판단` vs `시스템·학습`;
+- Research master/detail with local live patches;
+- Assets V17 position hero → facts → holdings editor handoff;
+- `shared/ui-continuity.js` and scoped V16 live-patch ownership;
+- `shared/viewport-handoff-v4.js` explicit mobile return-to-list behavior.
+
+Target IA for the next design-system waves, with no capability deletion:
+- global: `홈 / 코인 / 내 자산 / 모의투자 / 기록 / 더보기`;
+- Coin local navigation: `코인 / 시장현황 / 테마`;
+- Paper local navigation: overall performance / per-coin / method-strategy comparison / current execution;
+- More: system / account / operations.
+
+Target disclosure order on primary operational pages:
+`지금 무엇을 해야 하는가 → 현재 가격·보유·손익 → 왜 그런 판단인가 → 다음 행동 → 고급 분석·근거`.
+
+### External read-only skill evidence used in the audit
+
+- `hueyexe/frontend-agent-skills@2841c079dd8a9c634882227194dc42e25227710d`, MIT: IA/navigation, usability, design-system architecture, interaction patterns, visual hierarchy, accessibility. Adopted task-first IA, labels-as-promises, progressive disclosure, low-specificity token/component ownership, stable wayfinding, semantic/native accessibility. Overridden where project-native DESIGN/TASTES require denser financial presentation and localStorage-based private Viewer state instead of URL-shareable state.
+- `educlopez/ui-craft@ceecc8e1fb0c2befda73da996435900d6dd0c1ac`, MIT: audit/system extraction and dense-dashboard anti-slop. Adopted tabular numerals, operator-density, no decorative chart/card grid. Did not adopt its generic style as a theme.
+- `emilkowalski/skills@85e8e2363b713506e1d5b6e07a0eb2da66be1bc3`, MIT: mobile-native checks. Adopted 16px focused input minimum, safe-area, capability media queries, touch feedback, real-device QA. Design-engineering polish is deferred until structure stabilizes.
+- `microsoft/skills@14655200e871a89c013803b3aa4d88202cb03fc1`, MIT: used only as final review rubric for frictionless action, craft, accessibility and trustworthy errors. Creative-font/gradient/background guidance is rejected where it conflicts with CRYPTO DESIGN/TASTES/system-font/no-decoration rules.
+
+### Exact next gate
+
+Do not begin a broad rewrite. Review/approve the audit, then create/activate `CRYPTO-WO-20260921-002` with a bounded foundation scope:
+1. remove the broad `rail-controls-v16.js` MutationObserver and move enhancements to explicit render/ui:refresh ownership;
+2. establish one canonical token/control/master-detail foundation and regression contract;
+3. migrate only the shared shell/high-frequency primitives first;
+4. no trading/data/PAPER semantic change, no feature deletion, no Production deploy until visual/regression QA passes.
+
+Because this HANDOFF/TASKS update is a documentation-only Git mutation performed through GitHub after the local readback, the user's local checkout will need a fast-forward before the next implementation work begins.
