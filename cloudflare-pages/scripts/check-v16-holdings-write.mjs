@@ -45,7 +45,7 @@ const checks=[
  ['live asset patch keeps quote units',livePatch.includes('holdingEvaluation(item)')&&livePatch.includes('holdingPrice(item,item.current_price)')&&livePatch.includes('holdingPnl(holding)')],
  ['selected averaging rounds',ui.includes('data-avg-actual-apply')&&ui.includes('data-apply-selected-rounds')&&consumer.includes('apply_averaging')],
  ['actual holding edit',ui.includes('data-holding-edit-volume')&&ui.includes('data-holding-edit-avg')&&ui.includes('data-save-holding')],
- ['zero-volume closeout is accepted end-to-end',ui.includes('closeout=volume===0')&&ui.includes('avg_price:closeout?0:avgPrice')&&ownerApi.includes('volume < 0')&&ownerApi.includes('volume === 0 ? 0 : avgPrice')&&consumer.includes('_nonnegative_number')&&consumer.includes('final_avg = 0.0 if final_volume == 0.0 else requested_avg')],
+ ['zero-volume closeout is accepted end-to-end',ui.includes('inputNumber')&&ui.includes('closeout=volume===0')&&ui.includes('avg_price:closeout?0:avgPrice')&&ownerApi.includes("value === null || value === undefined || value === ''")&&ownerApi.includes('volume < 0')&&ownerApi.includes('volume === 0 ? 0 : avgPrice')&&consumer.includes('_nonnegative_number')&&consumer.includes('final_avg = 0.0 if final_volume == 0.0 else requested_avg')],
  ['zero-volume closeout watcher terminates after holding disappears',ui.includes('closeout=num(mutation?.result?.final_volume)===0')&&ui.includes('if(closeout&&!holding)return')],
  ['KRW holding prices preserve decimals',assets.includes("quoteCurrency(holding)==='KRW'?price(value)")&&livePatch.includes("holdingQuote(row)==='KRW'?price(value)")],
  ['asset detail emits write-panel refresh after render',assets.includes("new CustomEvent('ui:refresh'")&&assets.includes("source:'asset-detail-render'")),
