@@ -26,6 +26,11 @@
 #pageRoot .research-master *,#pageRoot .asset-master *,#pageRoot .paper-master *{box-sizing:border-box}
 #pageRoot .research-master button,#pageRoot .asset-master button,#pageRoot .paper-master button{max-width:100%!important;min-width:0!important}
 #pageRoot .market-quote-row,#pageRoot .asset-quote-row,#pageRoot .paper-position-row{width:100%!important;min-width:0!important}
+#pageRoot .asset-holdings-list{overflow-x:hidden!important}
+#pageRoot .asset-quote-row{overflow:hidden!important}
+#pageRoot .asset-quote-row>span{overflow:hidden!important}
+#pageRoot .asset-quote-row>strong{max-width:46%!important;overflow:hidden!important}
+#pageRoot .asset-quote-row>strong>b,#pageRoot .asset-quote-row>strong>small{max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important}
 #pageRoot .market-asset-cell,#pageRoot .market-price-cell,#pageRoot .asset-quote-row>span,#pageRoot .asset-quote-row>strong{min-width:0!important}
 #pageRoot .market-asset-cell b,#pageRoot .market-asset-cell small,#pageRoot .asset-quote-row>span b,#pageRoot .asset-quote-row>span small{overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
 
