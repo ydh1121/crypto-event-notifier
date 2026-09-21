@@ -20,6 +20,7 @@ import{createDashboardPage}from'./pages/dashboard.js';
 import{createResearchPage}from'./pages/research.js?v=43.1';
 import{installDexLaunchResearchPanel}from'./pages/dex-launch-panel.js?v=45';
 import{createAssetsPage}from'./pages/assets.js?v=52';
+import{createLiveTradingPage}from'./pages/live-trading.js?v=1';
 import{createPaperPage}from'./pages/paper.js?v=47';
 import{createStrategyPage}from'./pages/strategy.js?v=48';
 import{createSectorsPage}from'./pages/sectors-v36.js?v=47';
@@ -57,6 +58,7 @@ function queueUiRefresh(){
 
 let router=null;
 const pages={
+  live:()=>createLiveTradingPage({store,navigate:name=>router.go(name)}),
   dashboard:()=>createHomePage({store,navigate:name=>router.go(name)}),
   'dashboard-detail':()=>createDashboardPage({store,navigate:name=>router.go(name)}),
   research:()=>createResearchPage({store}),
@@ -69,9 +71,13 @@ const pages={
 };
 
 const GROUPS={
-  research:[['research','코인'],['dashboard-detail','시장현황'],['sectors','테마']],
-  'dashboard-detail':[['research','코인'],['dashboard-detail','시장현황'],['sectors','테마']],
-  sectors:[['research','코인'],['dashboard-detail','시장현황'],['sectors','테마']],
+  live:[['live','실전매매'],['assets','자산(기존)']],
+  assets:[['live','실전매매'],['assets','자산(기존)']],
+  paper:[['paper','가상매매'],['strategy','전략 비교']],
+  strategy:[['paper','가상매매'],['strategy','전략 비교']],
+  research:[['research','코인 탐색'],['dashboard-detail','시장현황'],['sectors','테마']],
+  'dashboard-detail':[['research','코인 탐색'],['dashboard-detail','시장현황'],['sectors','테마']],
+  sectors:[['research','코인 탐색'],['dashboard-detail','시장현황'],['sectors','테마']],
 };
 
 function renderJourney(name){
@@ -101,7 +107,7 @@ reader?.addEventListener('click',event=>{
   store.setUi({readerMode:mode},{scope:'reader-mode'});
   renderReader();
   patchPreservingUi(root,()=>router?.render(),{
-    scrollSelectors:['[data-preserve-scroll]','.master-list','.asset-holdings-list','#paperList','.strategy-table'],
+    scrollSelectors:['[data-preserve-scroll]','.master-list','.asset-holdings-list','#paperList','.strategy-table','.live-candidate-list','.live-plan-table','.live-calc-table'],
   });
   queueUiRefresh();
 });
@@ -115,7 +121,7 @@ installStrategyDrilldown({store,root,navigate:name=>router.go(name)});
 const poller=createSnapshotPoller({store,onUnauthorized:()=>auth.showAuth()});
 const auth=createAuth({
   store,
-  onReady(){poller.start();router.go(store.get().ui.route||'dashboard',{replace:true});renderShell();queueUiRefresh()},
+  onReady(){poller.start();const initial=store.get().ui.route||'live';router.go(initial==='dashboard'?'live':initial,{replace:true});renderShell();queueUiRefresh()},
   onLogout(){poller.stop()},
 });
 
