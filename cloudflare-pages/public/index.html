@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <meta name="crypto-viewer-build" content="2026.09.21-v6.4.2-v18-ui-foundation">
+  <meta name="crypto-viewer-build" content="2026.09.21-v6.5.0-simplified-trading-v22">
   <title>코인 현황</title>
   <link rel="stylesheet" href="/modules/styles/tokens.css?v=5">
   <link rel="stylesheet" href="/modules/styles/shell.css?v=7">
@@ -33,7 +33,7 @@
   <link rel="stylesheet" href="/modules/styles/layout-fixes-v4.css?v=1.1">
   <link rel="stylesheet" href="/modules/styles/theme-dark-v4.css?v=2">
   <link rel="stylesheet" href="/modules/styles/theme-dark-audit-v4.css?v=1">
-  <link rel="stylesheet" href="/modules/styles/decision-workspace-v4.css?v=1">
+  <link rel="stylesheet" href="/modules/styles/decision-workspace-v4.css?v=2">
   <link rel="stylesheet" href="/modules/styles/v4-refine-v1.css?v=1">
   <link rel="stylesheet" href="/modules/styles/strategy-native-v5.css?v=3">
   <link rel="stylesheet" href="/modules/styles/visual-qa-v6.css?v=1">
@@ -85,11 +85,9 @@
       <div class="app-header-inner">
         <div class="brand"><strong>코인 현황</strong></div>
         <nav id="mainNav" class="main-nav" aria-label="주요 메뉴">
-          <button data-route="dashboard" class="active">홈</button>
-          <button data-route="research">시장</button>
-          <button data-route="assets">자산</button>
-          <button data-route="paper">모의투자</button>
-          <button data-route="strategy">전략</button>
+          <button data-route="live" class="active">실전매매</button>
+          <button data-route="paper">가상매매</button>
+          <button data-route="research">탐색</button>
           <button data-route="records">기록</button>
         </nav>
         <div class="header-tools">
@@ -107,6 +105,6 @@
     <main id="pageRoot" class="app-main"></main>
   </section>
 
-  <script type="module" src="/modules/main.js?v=100.0"></script>
+  <script type="module" src="/modules/main.js?v=101.0"></script>
 </body>
 </html>
