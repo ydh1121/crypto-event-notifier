@@ -377,3 +377,14 @@ Latest GitHub CI at the same HEAD:
 - returned Build 51~71 workflow set = SUCCESS.
 
 Next gate is visual QA only. Use a non-Production preview deployment of this exact HEAD, then verify representative desktop/tablet/phone widths, light/dark, keyboard/focus, simple/detail reader mode, selection/search/sort continuity, and live-polling continuity. Do not deploy Production until this gate is accepted.
+
+
+### WO-002 preview deployment checkpoint
+
+Preview source: `7e19da175c34fc4e6b172581ebf2831bd5426a67` (implementation `3e15a8d...` plus docs-only durable commits).
+
+Preview URLs:
+- deployment: `https://1072960d.crypto-paper-viewer-ydh1121-cf36.pages.dev`
+- alias: `https://qa-v18-ui-foundation.crypto-paper-viewer-ydh1121-cf36.pages.dev`
+
+Production was not deployed. Visual QA must use this preview only and must avoid holdings/runtime write actions. Start with 1440px dark on Home / Coin / Assets / Paper / Strategy / Records, then 390px dark on Coin / Assets / Paper, followed by light mode, keyboard/focus, simple/detail, selection/search/sort, and live-polling continuity.
