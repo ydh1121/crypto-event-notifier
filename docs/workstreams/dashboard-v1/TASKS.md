@@ -255,3 +255,28 @@ Partial findings only — NOT final visual acceptance:
 - [x] Added V18 ownership regression checks and refreshed the mainstream cache contract.
 - [ ] Remote/local regression verification pending at latest repair HEAD.
 - [ ] Re-deploy Preview only after regression verification; Production remains prohibited.
+
+
+## N. CRYPTO-WO-20260921-003 Market + Theme page hierarchy
+
+Parent verified by actual local readback before source mutation:
+- branch `b3-auto-trader-phase1`
+- HEAD `0316ab2a0c542d2ce2c8c14ede9842ab7b63eedb`
+- tracked/staged/untracked = 0/0/0
+- upstream = 0/0
+- full Viewer contract PASS
+- Preview repair deployment/readback PASS; Production unchanged
+
+Scope is intentionally bounded to the desktop evidence already supplied:
+- [x] Market dashboard: reweighted the overview into one primary market surface with actual-assets and PAPER as supporting surfaces instead of three equal cards.
+- [x] Market dashboard: made “지금 볼 코인” the primary intelligence surface; sector flow and strategy validity are supporting stacked surfaces.
+- [x] Responsive fallback: market overview becomes full-width above account/PAPER at <=1100; all surfaces become single-column at <=720.
+- [x] Theme/Sectors: converted the four top summary cards into one fact-strip treatment.
+- [x] Theme/Sectors: retained sector-rank + detail as the two primary panes while removing the permanent third project-info rail.
+- [x] Theme/Sectors: project business/evidence is now native `details/summary` progressive disclosure below the coin table; selecting a coin opens the disclosure explicitly.
+- [x] Theme/Sectors: increased table/rank scan readability and removed the decorative overview gradient.
+- [x] Preserved sector table, sorting, selected coin, project evidence, official links, and research jump.
+- [x] Added `check-page-hierarchy-v19.mjs` and wired it into `npm run typecheck`.
+- [ ] Exact latest-head GitHub CI verification pending.
+- [ ] Actual local fast-forward + full typecheck pending after remote CI.
+- [ ] Preview-only V19 redeploy/readback pending. Production prohibited.
