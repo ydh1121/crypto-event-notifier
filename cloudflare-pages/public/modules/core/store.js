@@ -1,8 +1,8 @@
 const STORAGE_KEY='cryptoViewerUiV6';
 const defaults={
-  route:'dashboard',readerMode:'simple',
-  researchExchange:'bithumb',paperExchange:'bithumb',strategyExchange:'bithumb',sectorExchange:'bithumb',
-  researchMarket:'',assetMarket:'',assetHistoryRange:'7d',paperMarket:'',sectorSelected:'',sectorRange:'24h',sectorCoinMarket:'',sectorCoinSort:'turnover_desc',
+  route:'live',readerMode:'simple',
+  liveExchange:'bithumb',researchExchange:'bithumb',paperExchange:'bithumb',strategyExchange:'bithumb',sectorExchange:'bithumb',
+  liveMarket:'',liveCalculator:'average',researchMarket:'',assetMarket:'',assetHistoryRange:'7d',paperMarket:'',sectorSelected:'',sectorRange:'24h',sectorCoinMarket:'',sectorCoinSort:'turnover_desc',
   researchSearch:'',researchFilter:'all',researchRange:'24h',
   paperTab:'summary',paperSearch:'',paperFilter:'all',paperStrategyFilter:'all',paperSort:'return_desc',paperRange:'24h',paperPortfolioRange:'24h',
   paperCompareSearch:'',paperCompareSort:'gap_desc',
@@ -15,11 +15,11 @@ if(!['simple','detail'].includes(String(state.ui.readerMode)))state.ui.readerMod
 if(!['user','system'].includes(String(state.ui.recordsScope)))state.ui.recordsScope='user';
 const listeners=new Set();
 let exchangeDefaultApplied=false;
-const LIVE_PATCH_ROUTES=new Set(['dashboard','research','assets','paper','strategy','records','system']);
+const LIVE_PATCH_ROUTES=new Set(['live','dashboard','research','assets','paper','strategy','records','system']);
 function persist(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state.ui))}catch{}}
 function emit(meta={}){for(const fn of listeners){try{fn(state,meta)}catch(err){console.error('store listener',err)}}}
 function defaultExchange(snapshot){const list=Array.isArray(snapshot?.private?.manual_holdings?.holdings)?snapshot.private.manual_holdings.holdings:[];if(!snapshot?.private_visible||!list.length)return'bithumb';const totals={bithumb:0,upbit:0};for(const row of list){const ex=String(row?.exchange||'bithumb').toLowerCase();if(!(ex in totals))continue;const value=Math.max(0,Number(row?.value_krw||row?.invested_krw||0));totals[ex]+=Number.isFinite(value)?value:0}return totals.upbit>totals.bithumb?'upbit':'bithumb'}
-function applyExchangeDefault(snapshot){if(exchangeDefaultApplied)return;exchangeDefaultApplied=true;const exchange=defaultExchange(snapshot);Object.assign(state.ui,{researchExchange:exchange,paperExchange:exchange,strategyExchange:exchange,recordsExchange:exchange,sectorExchange:exchange});persist()}
+function applyExchangeDefault(snapshot){if(exchangeDefaultApplied)return;exchangeDefaultApplied=true;const exchange=defaultExchange(snapshot);Object.assign(state.ui,{liveExchange:exchange,researchExchange:exchange,paperExchange:exchange,strategyExchange:exchange,recordsExchange:exchange,sectorExchange:exchange});persist()}
 function assetNeedsFullRender(snapshot,route){if(route!=='assets'||!snapshot?.private_visible)return false;const rows=Array.isArray(snapshot?.private?.manual_holdings?.holdings)?snapshot.private.manual_holdings.holdings:[],selected=rows.find(row=>String(row?.market||'')===String(state.ui.assetMarket||''));return String(selected?.quote_currency||'KRW').toUpperCase()!=='KRW'}
 export const store={
   get:()=>state,
