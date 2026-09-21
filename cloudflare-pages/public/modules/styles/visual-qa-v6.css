@@ -1,0 +1,196 @@
+/* V6 visual QA repair: screenshot-driven layout corrections only. No data or trading logic. */
+
+/* Desktop dashboards should use the available viewport instead of compressing every workspace into 1180px. */
+@media(min-width:1181px){
+  .app-header-inner,
+  .journey-nav,
+  .app-main{
+    max-width:1540px!important;
+  }
+  .app-header-inner,
+  .journey-nav,
+  .app-main{
+    padding-left:28px!important;
+    padding-right:28px!important;
+  }
+}
+
+/* Home is an overview, not one long report. The two columns have independent vertical rhythm. */
+@media(min-width:1000px){
+  #pageRoot[data-page-route="dashboard"] .home-dashboard-grid{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+    gap:28px!important;
+    align-items:start!important;
+  }
+  #pageRoot[data-page-route="dashboard"] .home-dashboard-column{
+    display:grid!important;
+    gap:28px!important;
+    align-content:start!important;
+    min-width:0!important;
+  }
+  #pageRoot[data-page-route="dashboard"] .home-dashboard-column>.mainstream-section{
+    margin-top:0!important;
+  }
+}
+
+/* Research / assets / paper: keep the selectable master visible, but let the result use normal page scroll.
+   This removes the cramped 'scroll inside a scroll' shown in desktop QA screenshots. */
+@media(min-width:901px){
+  #pageRoot[data-page-route="research"] .research-workspace,
+  #pageRoot[data-page-route="assets"] .asset-workspace,
+  #pageRoot[data-page-route="paper"] .paper-workspace{
+    grid-template-columns:minmax(300px,340px) minmax(0,1fr)!important;
+    gap:24px!important;
+    align-items:start!important;
+  }
+
+  #pageRoot[data-page-route="research"] .research-master,
+  #pageRoot[data-page-route="assets"] .asset-master,
+  #pageRoot[data-page-route="paper"] .paper-master{
+    position:sticky!important;
+    top:156px!important;
+    align-self:start!important;
+    height:calc(100dvh - 176px)!important;
+    max-height:calc(100dvh - 176px)!important;
+    overflow:hidden!important;
+  }
+
+  #pageRoot[data-page-route="research"] .research-master .master-list,
+  #pageRoot[data-page-route="assets"] .asset-holdings-list,
+  #pageRoot[data-page-route="paper"] .paper-master #paperList{
+    min-height:0!important;
+    overflow:auto!important;
+    overscroll-behavior:contain!important;
+  }
+
+  #pageRoot[data-page-route="research"] .research-detail,
+  #pageRoot[data-page-route="assets"] .asset-detail,
+  #pageRoot[data-page-route="paper"] .paper-detail{
+    position:static!important;
+    top:auto!important;
+    align-self:start!important;
+    max-height:none!important;
+    overflow:visible!important;
+    scrollbar-gutter:auto!important;
+  }
+
+  #pageRoot[data-page-route="assets"] .holding-budget-head{
+    grid-template-columns:minmax(0,1fr) minmax(220px,280px)!important;
+  }
+  #pageRoot[data-page-route="assets"] .holding-budget-head label{
+    min-width:0!important;
+    max-width:100%!important;
+  }
+}
+
+/* Strategy V5: the legacy V4 table grid had higher specificity and was still rearranging the new rail.
+   Reassert the rail as a true two-block navigation item so labels and metrics never collide. */
+#pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"]{
+  grid-template-columns:minmax(300px,320px) minmax(0,1fr)!important;
+  gap:24px!important;
+}
+#pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"]>.strategy-table{
+  overflow-x:hidden!important;
+}
+#pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"] .strategy-row.strategy-v5-strategy-item:not(.columns){
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:auto auto!important;
+  gap:9px!important;
+  min-width:0!important;
+  width:100%!important;
+  padding:12px!important;
+  align-items:stretch!important;
+}
+#pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"] .strategy-v5-strategy-item>.strategy-v5-item-copy{
+  grid-column:1!important;
+  grid-row:1!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:auto auto!important;
+  gap:3px!important;
+  width:100%!important;
+  min-width:0!important;
+}
+#pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"] .strategy-v5-strategy-item>.strategy-v5-item-facts{
+  grid-column:1!important;
+  grid-row:2!important;
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  grid-template-rows:auto auto!important;
+  gap:5px 14px!important;
+  width:100%!important;
+  min-width:0!important;
+}
+#pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"] .strategy-v5-item-facts>span{
+  grid-column:auto!important;
+  grid-row:auto!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:auto auto!important;
+  gap:1px!important;
+  min-width:0!important;
+}
+#pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"] .strategy-v5-item-copy::before,
+#pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"] .strategy-v5-item-facts::before,
+#pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"] .strategy-v5-item-facts>span::before{
+  display:none!important;
+  content:none!important;
+}
+#pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"] .strategy-v5-item-copy b,
+#pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"] .strategy-v5-item-copy small{
+  display:block!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+#pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"] .strategy-v5-item-facts em{
+  grid-column:1/-1!important;
+  grid-row:2!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+
+/* Theme search must stay on the graphite surface even though build36.css is injected later. */
+html[data-theme="dark"] #pageRoot[data-page-route="sectors"] .sector-search{
+  background:var(--surface)!important;
+  border-color:var(--line)!important;
+  color:var(--text)!important;
+}
+html[data-theme="dark"] #pageRoot[data-page-route="sectors"] .sector-search>span{
+  color:var(--muted)!important;
+}
+html[data-theme="dark"] #pageRoot[data-page-route="sectors"] .sector-search input{
+  background:transparent!important;
+  color:var(--text)!important;
+}
+html[data-theme="dark"] #pageRoot[data-page-route="sectors"] .sector-filter-chips button.active{
+  background:var(--surface2)!important;
+  border-color:rgba(90,168,255,.35)!important;
+}
+
+/* At 1024-class widths keep the master/detail model, but avoid forcing desktop rail widths. */
+@media(min-width:901px) and (max-width:1180px){
+  #pageRoot[data-page-route="strategy"] .strategy-workspace[data-strategy-workspace-v5="ready"]{
+    grid-template-columns:minmax(250px,30%) minmax(0,1fr)!important;
+    gap:18px!important;
+  }
+  #pageRoot[data-page-route="research"] .research-workspace,
+  #pageRoot[data-page-route="assets"] .asset-workspace,
+  #pageRoot[data-page-route="paper"] .paper-workspace{
+    grid-template-columns:minmax(250px,30%) minmax(0,1fr)!important;
+    gap:18px!important;
+  }
+}
+
+@media(max-width:999px){
+  #pageRoot[data-page-route="dashboard"] .home-dashboard-grid,
+  #pageRoot[data-page-route="dashboard"] .home-dashboard-column{
+    display:block!important;
+  }
+  #pageRoot[data-page-route="dashboard"] .home-dashboard-column>.mainstream-section{
+    margin-top:32px!important;
+  }
+}

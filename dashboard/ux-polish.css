@@ -1,0 +1,466 @@
+/* Final interaction/geometry polish. Keep this file loaded last. */
+
+:root{
+  --ux-control-h:46px;
+}
+
+button,input,select,textarea{
+  -webkit-tap-highlight-color:transparent;
+}
+
+.button,.copy-button,.view-tab,.range-control button,.avg-remove,.icon-button{
+  white-space:nowrap;
+  line-height:1.2;
+}
+
+.button,.copy-button{
+  min-height:var(--ux-control-h);
+}
+
+.button{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:0;
+}
+
+.simple-asset-card{
+  display:grid;
+  grid-template-rows:auto minmax(78px,auto) minmax(48px,auto) auto;
+  gap:12px;
+  height:100%;
+}
+.simple-asset-card .simple-decision{
+  margin:0;
+  min-height:78px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+.simple-asset-card .holding-strip{
+  min-height:48px;
+  margin:0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.simple-asset-card .holding-strip.is-empty{
+  color:var(--tertiary);
+  background:transparent;
+  border:1px dashed var(--border-strong);
+}
+.holding-empty-note{font-size:11px;color:var(--tertiary)}
+.simple-asset-card .simple-score-row{margin-top:0}
+
+.asset-grid,.overview-grid,.settings-grid,.personal-tools,.performance-columns,.activity-grid{
+  align-items:stretch;
+}
+.asset-grid>.asset-card,
+.overview-grid>.panel,
+.settings-grid>.panel,
+.performance-columns>.panel,
+.activity-grid>.panel{
+  height:100%;
+}
+
+.score-detail-grid{align-items:stretch}
+.score-detail-grid>.easy-score{height:100%}
+
+.technical-details summary{
+  min-height:46px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.technical-details summary::after{float:none;flex:none}
+
+.ux-toast{
+  position:fixed;
+  left:50%;
+  bottom:calc(28px + var(--safe-bottom));
+  z-index:220;
+  max-width:min(90vw,420px);
+  transform:translate(-50%,14px);
+  opacity:0;
+  pointer-events:none;
+  padding:12px 16px;
+  border-radius:14px;
+  background:rgba(29,29,31,.94);
+  color:#fff;
+  font-size:14px;
+  line-height:1.45;
+  text-align:center;
+  box-shadow:0 12px 30px rgba(0,0,0,.18);
+  backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);
+  transition:opacity .18s ease,transform .18s ease;
+}
+.ux-toast.is-visible{opacity:1;transform:translate(-50%,0)}
+
+.eth-btc-pulse small{line-height:1.4}
+
+@media(max-width:760px){
+  /* iOS Safari zooms focused controls below 16px. */
+  input,select,textarea,
+  .holding-form input,.avg-row input,.dialog-body input,.settings-form input{
+    font-size:16px!important;
+  }
+
+  input,select,textarea{
+    min-height:48px;
+  }
+
+  .button,.copy-button{
+    min-height:46px;
+    font-size:14px;
+  }
+
+  .panel{
+    border-radius:18px;
+  }
+
+  .section-intro,.section-head,.panel-head,.chart-head{
+    gap:12px;
+  }
+
+  .tool-actions,.button-row,.dialog-actions{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+    width:100%;
+  }
+  .tool-actions .button,.button-row .button,.dialog-actions .button{
+    width:100%;
+    min-width:0;
+    padding-inline:10px;
+  }
+
+  .engine-controls{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    width:100%;
+  }
+  .engine-controls .button{width:100%;padding-inline:8px;font-size:13px}
+
+  .simple-asset-card{
+    grid-template-rows:auto auto auto auto;
+    gap:10px;
+  }
+  .simple-asset-card .simple-decision{min-height:0}
+
+  .avg-row{
+    align-items:end;
+  }
+  .avg-row input{
+    min-height:46px;
+    padding:0 10px!important;
+  }
+  .avg-remove{
+    height:46px;
+    min-height:46px;
+  }
+
+  .holding-summary,.avg-summary{
+    align-items:stretch;
+  }
+  .mini-stat{min-height:74px}
+
+  .ux-toast{
+    bottom:calc(88px + var(--safe-bottom));
+    font-size:13px;
+  }
+}
+
+@media(max-width:430px){
+  .tool-actions,.button-row,.dialog-actions{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+
+  .tool-actions .button,.button-row .button,.dialog-actions .button{
+    font-size:13px;
+  }
+
+  .avg-row{
+    grid-template-columns:28px minmax(0,1fr) minmax(0,1fr) 34px;
+    gap:6px;
+    padding:9px;
+  }
+  .avg-row label{font-size:11px}
+  .avg-round{font-size:11px}
+
+  .holding-strip{
+    font-size:12px;
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  .ux-toast{transition:none}
+}
+
+/* --------------------------------------------------------------------------
+   Dashboard UX v2 — decision-first, compact, Photo-eBook-inspired shell
+   -------------------------------------------------------------------------- */
+
+:root{
+  --v2-page:#f5f5f7;
+  --v2-surface:#ffffff;
+  --v2-soft:#f0f0f3;
+  --v2-border:rgba(0,0,0,.055);
+  --v2-ink:#1d1d1f;
+  --v2-secondary:#727277;
+  --v2-shadow:0 8px 28px rgba(26,31,44,.055);
+}
+
+html{background:var(--v2-page)}
+body{background:var(--v2-page);color:var(--v2-ink)}
+body,button,input,select,textarea{word-break:keep-all}
+.app-main{max-width:1240px}
+.panel,.metric-card,.asset-card{
+  border-color:var(--v2-border)!important;
+  box-shadow:var(--v2-shadow)!important;
+}
+.panel-kicker{color:#939399;letter-spacing:.11em}
+
+/* Desktop header: one quiet brand row + compact segmented rail. */
+.app-header{
+  background:rgba(245,245,247,.86)!important;
+  backdrop-filter:blur(28px) saturate(180%);
+  -webkit-backdrop-filter:blur(28px) saturate(180%);
+  border-bottom:1px solid rgba(0,0,0,.04)!important;
+}
+.header-inner{max-width:1240px;padding-block:14px 10px}
+.brand-block .eyebrow{display:none}
+.brand-row h1{font-size:21px!important;letter-spacing:-.025em}
+.view-rail{background:transparent!important;border:0!important;padding:0 0 10px!important}
+.view-rail-inner{
+  width:max-content!important;
+  max-width:calc(100% - 32px);
+  margin-inline:auto;
+  padding:4px!important;
+  gap:2px!important;
+  border-radius:16px;
+  background:#eaeaee;
+  overflow-x:auto;
+  scrollbar-width:none;
+}
+.view-rail-inner::-webkit-scrollbar{display:none}
+.view-tab{
+  min-height:38px!important;
+  padding:0 18px!important;
+  border:0!important;
+  border-radius:12px!important;
+  background:transparent!important;
+  color:#68686d!important;
+  box-shadow:none!important;
+  font-size:13px!important;
+  transition:background .16s ease,color .16s ease,box-shadow .16s ease!important;
+}
+.view-tab.is-active{
+  background:#fff!important;
+  color:var(--v2-ink)!important;
+  box-shadow:0 2px 8px rgba(0,0,0,.07)!important;
+}
+.view-tab .nav-icon{display:none!important}
+
+/* New asset price hero. */
+.asset-detail-panel{overflow:hidden}
+.asset-detail-header.v2-asset-hero{
+  display:block!important;
+  padding:2px 0 4px;
+  margin-bottom:14px!important;
+}
+.v2-asset-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.v2-asset-symbol{font-size:18px;font-weight:760;letter-spacing:-.02em}
+.v2-decision-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-height:30px;padding:0 10px;border-radius:999px;
+  background:#efeff2;color:#57575c;font-size:12px;font-weight:700;
+}
+.v2-decision-badge.good{background:var(--success-soft);color:var(--success)}
+.v2-decision-badge.warn{background:var(--warning-soft);color:#745500}
+.v2-decision-badge.bad{background:var(--danger-soft);color:var(--danger)}
+.v2-current-price{margin-top:16px}
+.v2-current-price>span{display:block;color:var(--v2-secondary);font-size:12px;margin-bottom:3px}
+.v2-current-price strong{
+  display:block;font-size:clamp(42px,5.2vw,58px);line-height:1.02;
+  letter-spacing:-.055em;color:var(--v2-ink);font-weight:760;
+}
+.v2-current-price small{display:block;margin-top:7px;font-size:14px;font-weight:650}
+.v2-holding-line{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:18px;
+}
+.v2-holding-chip{padding:11px 12px;border-radius:14px;background:var(--v2-soft);min-width:0}
+.v2-holding-chip span{display:block;color:var(--v2-secondary);font-size:11px}
+.v2-holding-chip b{display:block;margin-top:3px;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Watch cards: price gets real visual priority. */
+.simple-asset-card{border-radius:22px!important;padding:18px!important;gap:12px!important}
+.v2-card-price{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-top:2px}
+.v2-card-price span{display:block;color:var(--v2-secondary);font-size:11px;margin-bottom:2px}
+.v2-card-price strong{display:block;font-size:25px;line-height:1.08;letter-spacing:-.035em;color:var(--v2-ink)}
+.v2-card-change{font-size:12px;font-weight:700;white-space:nowrap;padding-bottom:2px}
+.simple-asset-card .market-code{display:none}
+.simple-asset-card .simple-decision{background:transparent!important;border:0!important;padding:0!important;min-height:auto!important}
+.simple-asset-card .simple-decision strong{font-size:15px!important}
+.simple-asset-card .simple-decision small{font-size:12px!important;margin-top:4px!important}
+.simple-asset-card .holding-strip{border-top:1px solid var(--v2-border)!important;padding-top:11px!important}
+.simple-asset-card .holding-strip.is-empty{border:0!important;border-top:1px solid var(--v2-border)!important;border-radius:0!important}
+.simple-score-row span{background:var(--v2-soft)!important}
+
+/* Calculator and summaries: keep numbers intact, reduce visual noise. */
+.personal-tools{gap:12px!important}
+.personal-tools>.panel{border-radius:24px!important}
+.tool-head p,.form-note{max-width:46rem}
+.avg-row{background:var(--v2-soft)!important;border-radius:16px!important}
+.mini-stat{background:var(--v2-soft)!important;border-radius:16px!important;overflow:hidden}
+.mini-stat strong{
+  font-size:clamp(18px,2.2vw,25px)!important;
+  line-height:1.15!important;
+  letter-spacing:-.03em;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.entry-guide{border:0!important;background:#eef3ff!important}
+
+/* Charts feel lighter, controls work as one segmented control. */
+.chart-panel{border-radius:24px!important}
+.range-control{padding:3px!important;background:var(--v2-soft)!important;border-radius:14px!important}
+.range-control button{border-radius:11px!important;border:0!important;background:transparent!important;box-shadow:none!important}
+.range-control button.is-active{background:#fff!important;box-shadow:0 2px 8px rgba(0,0,0,.06)!important;color:var(--v2-ink)!important}
+.chart-box{border-color:var(--v2-border)!important;border-radius:18px!important}
+
+/* Settings: remove developer-ish micro labels and make status human-sized. */
+.settings-grid>.panel{border-radius:24px!important}
+.settings-grid .list-item{border-radius:15px!important;background:var(--v2-soft)!important}
+.access-url{
+  min-width:0;overflow:hidden;border-radius:14px!important;background:#fff!important;
+}
+.access-url code{
+  min-width:0;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.phone-warning{border:0!important;border-radius:16px!important}
+
+.v2-status-text{font-weight:700;color:var(--v2-ink)}
+
+@media(max-width:760px){
+  :root{--gutter:14px}
+  body{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))!important}
+
+  /* Header is tiny; navigation becomes a floating bottom dock. */
+  .app-header{
+    position:sticky!important;top:0!important;z-index:100!important;
+    min-height:54px;background:rgba(245,245,247,.88)!important;
+  }
+  .header-inner{padding:10px 16px!important;min-height:54px}
+  .brand-row h1{font-size:18px!important}
+  .header-actions #connectionPill{
+    display:inline-flex!important;min-height:28px!important;padding:0 9px!important;
+    border-radius:999px!important;font-size:10px!important;
+  }
+  .view-rail{
+    position:fixed!important;
+    top:auto!important;
+    left:12px!important;right:12px!important;
+    bottom:calc(10px + env(safe-area-inset-bottom,0px))!important;
+    z-index:180!important;
+    width:auto!important;
+    padding:0!important;
+    border:0!important;
+    background:transparent!important;
+    overflow:visible!important;
+  }
+  .view-rail-inner{
+    width:100%!important;max-width:none!important;margin:0!important;
+    display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;
+    padding:5px!important;gap:2px!important;
+    border:1px solid rgba(255,255,255,.7)!important;
+    border-radius:24px!important;
+    background:rgba(250,250,252,.92)!important;
+    box-shadow:0 14px 42px rgba(21,25,35,.17)!important;
+    backdrop-filter:blur(28px) saturate(180%);
+    -webkit-backdrop-filter:blur(28px) saturate(180%);
+  }
+  .view-tab{
+    min-height:58px!important;padding:5px 2px!important;border-radius:19px!important;
+    display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:3px!important;
+    background:transparent!important;color:#76767c!important;font-size:10px!important;font-weight:650!important;
+  }
+  .view-tab.is-active{
+    background:#fff!important;color:var(--accent)!important;
+    box-shadow:0 3px 12px rgba(24,30,45,.08)!important;
+  }
+  .view-tab .nav-icon{display:block!important;width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .view-tab span:last-child{font-size:10px!important;line-height:1!important}
+
+  .app-main{padding:18px var(--gutter) 26px!important}
+  .section-intro,.section-head{margin-bottom:16px!important}
+  .section-intro h2,.section-head h2{font-size:24px!important;letter-spacing:-.035em}
+  .section-copy,.section-head p{font-size:13px!important}
+  .panel-kicker{display:none!important}
+
+  .kpi-grid{gap:8px!important}.metric-card{border-radius:19px!important;padding:14px!important}
+  .metric-card>strong{font-size:23px!important;letter-spacing:-.035em}
+
+  .asset-head{align-items:center!important}
+  .asset-select-label{font-size:11px!important;color:var(--v2-secondary)!important}
+  .asset-select-label select{height:42px!important;min-height:42px!important;border-radius:12px!important;background:#fff!important}
+
+  .asset-detail-panel{padding:18px!important;border-radius:24px!important}
+  .asset-detail-header.v2-asset-hero{padding-top:0!important}
+  .v2-current-price{margin-top:14px}
+  .v2-current-price strong{font-size:44px!important;line-height:1!important}
+  .v2-current-price small{font-size:13px!important}
+  .v2-holding-line{margin-top:16px}
+
+  .simple-asset-card{padding:16px!important;border-radius:22px!important}
+  .asset-title h3{font-size:20px!important}
+  .v2-card-price strong{font-size:26px!important}
+  .asset-action{max-width:145px!important}
+
+  .personal-tools{gap:10px!important}
+  .personal-tools .panel{padding:17px!important;border-radius:24px!important}
+  .tool-head{margin-bottom:13px!important}
+  .tool-head h3{font-size:20px!important}
+  .tool-head p{font-size:12px!important;line-height:1.5!important}
+  .holding-summary,.avg-summary{gap:8px!important}
+  .mini-stat{padding:13px!important;min-height:82px!important}
+  .mini-stat span{font-size:11px!important}
+  .mini-stat strong{font-size:clamp(17px,5vw,23px)!important}
+
+  .tool-actions{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .tool-actions #clearAveragingPlan{grid-column:1/-1;width:50%!important;justify-self:start}
+  .button{border-radius:14px!important;font-weight:720!important}
+
+  .chart-panel{padding:16px!important;border-radius:24px!important}
+  .chart-head{align-items:center!important}.chart-head h3{font-size:21px!important}
+  .range-control{width:100%;display:grid!important;grid-template-columns:repeat(4,1fr)!important;margin-top:10px}
+  .range-control button{min-height:40px!important;padding:0!important;font-size:12px!important}
+
+  .settings-grid>.panel{padding:17px!important;border-radius:24px!important;margin-bottom:10px!important}
+  .settings-grid h3{font-size:21px!important;letter-spacing:-.025em}
+  .settings-grid .panel-copy{font-size:13px!important;line-height:1.55!important;color:var(--v2-secondary)!important}
+  .settings-grid .list-item{padding:13px 14px!important}
+  .settings-grid .list-item b{font-size:14px!important}
+  .settings-grid .list-item span{font-size:13px!important}
+  .phone-panel .access-card{padding:14px!important;border-radius:18px!important;background:var(--v2-soft)!important;border:0!important}
+  .phone-panel .access-card h4{font-size:15px!important}
+  .phone-panel .access-card p{font-size:12px!important;color:var(--v2-secondary)!important}
+  .access-url{grid-template-columns:minmax(0,1fr) auto!important;padding:4px!important}
+  .access-url code{font-size:12px!important;padding-inline:8px!important}
+  .phone-warning{font-size:12px!important;line-height:1.5!important}
+
+  .technical-details{border-radius:16px!important}
+  .technical-details summary{font-size:13px!important}
+}
+
+@media(max-width:430px){
+  .v2-current-price strong{font-size:41px!important}
+  .v2-holding-chip b{font-size:14px}
+  .v2-card-price strong{font-size:24px!important}
+  .mini-stat strong{font-size:clamp(16px,4.8vw,21px)!important}
+  .avg-summary .mini-stat:nth-child(3) strong{font-size:18px!important}
+  .tool-actions #clearAveragingPlan{width:100%!important}
+}

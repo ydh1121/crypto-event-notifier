@@ -1,0 +1,86 @@
+import {bearer, error, json} from '../lib/http';
+import {exchangeMarketNames} from '../lib/exchange-market-names';
+import type {Env} from '../lib/types';
+
+type BacklogRow = {
+  exchange:string; market:string; korean_name:string; english_name:string;
+  research_status:string; canonical_sector:string; source_count:number;
+  match_confidence:number; updated_at:number; last_verified_at:number;
+  has_korean:number;
+};
+
+const clean=(value:unknown)=>String(value??'').trim();
+const num=(value:unknown)=>{const out=Number(value||0);return Number.isFinite(out)?out:0};
+const generic=new Set(['token','coin','network','protocol','finance','foundation','project','ecosystem','platform','labs','dao']);
+function norm(value:unknown){return clean(value).toLowerCase().replace(/[^a-z0-9가-힣]+/g,'')}
+function tokens(value:unknown){return clean(value).toLowerCase().match(/[a-z0-9]+/g)?.filter(x=>!generic.has(x))||[]}
+function sameName(a:unknown,b:unknown){
+  const left=norm(a),right=norm(b);if(!left||!right)return true;
+  if(left===right)return true;
+  if(left.length>=5&&right.length>=5&&(left.includes(right)||right.includes(left)))return true;
+  const aa=new Set(tokens(a)),bb=new Set(tokens(b));if(!aa.size||!bb.size)return false;
+  let overlap=0;for(const item of aa)if(bb.has(item))overlap++;
+  return overlap/Math.max(aa.size,bb.size)>=.8;
+}
+function qualityReasons(row:BacklogRow,officialEnglish:string):string[]{
+  const out:string[]=[];
+  if(officialEnglish&&!sameName(row.english_name,officialEnglish))out.push('identity_mismatch');
+  if(!Number(row.has_korean||0))out.push('korean_missing');
+  if(['pending','unresolved'].includes(clean(row.research_status)))out.push('research_unresolved');
+  if(!clean(row.canonical_sector)||clean(row.canonical_sector)==='미분류 검토')out.push('sector_unresolved');
+  if(num(row.source_count)<2)out.push('weak_evidence');
+  if(num(row.match_confidence)<.8)out.push('low_match_confidence');
+  return out;
+}
+function cutoffFor(reasons:string[],now:number){
+  if(reasons.includes('identity_mismatch'))return now-5*60;
+  if(reasons.includes('korean_missing')||reasons.includes('research_unresolved'))return now-15*60;
+  if(reasons.includes('sector_unresolved'))return now-60*60;
+  return now-6*60*60;
+}
+function score(reasons:string[]){
+  if(reasons.includes('identity_mismatch'))return 600;
+  if(reasons.includes('korean_missing'))return 500;
+  if(reasons.includes('research_unresolved'))return 400;
+  if(reasons.includes('sector_unresolved'))return 300;
+  if(reasons.includes('weak_evidence'))return 200;
+  if(reasons.includes('low_match_confidence'))return 100;
+  return 0;
+}
+
+export const onRequestGet:PagesFunction<Env>=async({request,env})=>{
+  if(!env.INGEST_TOKEN||bearer(request)!==env.INGEST_TOKEN)return error(401,'INGEST_REQUIRED','프로필 정합성 감사 인증이 필요합니다.');
+  const url=new URL(request.url),requested=Math.max(1,Math.min(80,Math.floor(num(url.searchParams.get('limit'))||48))),now=Math.floor(Date.now()/1000),perExchange=Math.max(1,Math.ceil(requested/2));
+  const query=(exchange:'bithumb'|'upbit')=>env.DB.prepare(`SELECT exchange,market,korean_name,english_name,research_status,canonical_sector,source_count,match_confidence,updated_at,last_verified_at,CASE WHEN business_summary_ko<>'' OR description_ko<>'' THEN 1 ELSE 0 END AS has_korean FROM coin_profile_cache WHERE exchange=? ORDER BY updated_at ASC,market ASC LIMIT 1000`).bind(exchange).all<BacklogRow>();
+  const [bRows,uRows,bNames,uNames]=await Promise.all([query('bithumb'),query('upbit'),exchangeMarketNames('bithumb'),exchangeMarketNames('upbit')]);
+  const audits:{rows:BacklogRow[];names:Map<string,{market:string;korean_name:string;english_name:string}>;exchange:'bithumb'|'upbit'}[]=[
+    {rows:bRows.results||[],names:bNames,exchange:'bithumb'},
+    {rows:uRows.results||[],names:uNames,exchange:'upbit'},
+  ];
+  const queues:Record<'bithumb'|'upbit',Array<BacklogRow&{reasons:string[];audit_score:number}>>={bithumb:[],upbit:[]};
+  const qualityPending={bithumb:0,upbit:0},eligible={bithumb:0,upbit:0},identityMismatch={bithumb:0,upbit:0};
+  for(const audit of audits){
+    for(const row of audit.rows){
+      const official=audit.names.get(clean(row.market).toUpperCase());
+      const reasons=qualityReasons(row,clean(official?.english_name));
+      if(!reasons.length)continue;
+      qualityPending[audit.exchange]++;
+      if(reasons.includes('identity_mismatch'))identityMismatch[audit.exchange]++;
+      if(num(row.updated_at)>cutoffFor(reasons,now))continue;
+      eligible[audit.exchange]++;
+      queues[audit.exchange].push({...row,reasons,audit_score:score(reasons)});
+    }
+    queues[audit.exchange].sort((a,b)=>b.audit_score-a.audit_score||num(a.updated_at)-num(b.updated_at)||clean(a.market).localeCompare(clean(b.market)));
+    queues[audit.exchange]=queues[audit.exchange].slice(0,perExchange);
+  }
+  const balanced:Array<BacklogRow&{reasons:string[];audit_score:number}>=[];
+  for(let offset=0;balanced.length<requested;offset++){
+    let added=false;
+    for(const exchange of ['bithumb','upbit'] as const){const row=queues[exchange][offset];if(row&&balanced.length<requested){balanced.push(row);added=true}}
+    if(!added)break;
+  }
+  const rows=balanced.map(row=>({exchange:clean(row.exchange)==='upbit'?'upbit':'bithumb',market:clean(row.market).toUpperCase(),korean_name:clean(row.korean_name),english_name:clean(row.english_name),research_status:clean(row.research_status)||'pending',canonical_sector:clean(row.canonical_sector),source_count:Math.max(0,Math.round(num(row.source_count))),match_confidence:Math.max(0,Math.min(1,num(row.match_confidence))),updated_at:Math.round(num(row.updated_at)),last_verified_at:Math.round(num(row.last_verified_at)),reasons:row.reasons,audit_score:row.audit_score}));
+  const byExchange={bithumb:rows.filter(x=>x.exchange==='bithumb').length,upbit:rows.filter(x=>x.exchange==='upbit').length};
+  const reasonCounts:Record<string,number>={};for(const row of rows)for(const reason of row.reasons)reasonCounts[reason]=(reasonCounts[reason]||0)+1;
+  return json({ok:true,generated_at:now,rows,by_exchange:byExchange,returned_by_exchange:byExchange,eligible_by_exchange:eligible,quality_pending_by_exchange:qualityPending,cooldown_by_exchange:{bithumb:Math.max(0,qualityPending.bithumb-eligible.bithumb),upbit:Math.max(0,qualityPending.upbit-eligible.upbit)},identity_mismatch_by_exchange:identityMismatch,reasons:reasonCounts,audit_scope:{bithumb:bRows.results?.length||0,upbit:uRows.results?.length||0}});
+};

@@ -1,0 +1,207 @@
+html[data-theme="dark"]{color-scheme:dark}
+
+/* Audit pass: legacy light surfaces that were not covered by the first dark layer. */
+html[data-theme="dark"] .priority-item,
+html[data-theme="dark"] .summary-tile,
+html[data-theme="dark"] .mini-chart,
+html[data-theme="dark"] .detail-columns>section,
+html[data-theme="dark"] .major-context>div,
+html[data-theme="dark"] .viewer-scope,
+html[data-theme="dark"] .deep-section,
+html[data-theme="dark"] .listing-metrics>span,
+html[data-theme="dark"] .asset-research-sides>article,
+html[data-theme="dark"] .paper-strategy-filter,
+html[data-theme="dark"] .sector-coin-table,
+html[data-theme="dark"] .sector-coin-profile,
+html[data-theme="dark"] .sector-method,
+html[data-theme="dark"] .component-diagnostic,
+html[data-theme="dark"] .records-scope-switch button,
+html[data-theme="dark"] .strategy-row{
+  background:var(--surface)!important;
+  border-color:var(--line)!important;
+  color:var(--text)!important;
+  box-shadow:none!important;
+}
+
+html[data-theme="dark"] .summary-tile.primary,
+html[data-theme="dark"] .sector-overview,
+html[data-theme="dark"] .priority-item:hover,
+html[data-theme="dark"] .sector-coin-select:hover,
+html[data-theme="dark"] .watch-row:hover,
+html[data-theme="dark"] .sector-flow-row:hover{
+  background:var(--accent2)!important;
+  border-color:rgba(90,168,255,.22)!important;
+}
+
+html[data-theme="dark"] .holding-plan-grid>span,
+html[data-theme="dark"] .holding-budget-summary>span,
+html[data-theme="dark"] .profit-stage,
+html[data-theme="dark"] .profile-verification>span,
+html[data-theme="dark"] .coin-profile-pending,
+html[data-theme="dark"] .coin-profile-evidence a,
+html[data-theme="dark"] .coin-profile-evidence i,
+html[data-theme="dark"] .coin-profile-links a,
+html[data-theme="dark"] .coin-profile-community a,
+html[data-theme="dark"] .market-state-card,
+html[data-theme="dark"] .paper-exchange-compact>div,
+html[data-theme="dark"] .pulse-kpis>span,
+html[data-theme="dark"] .activity-kind,
+html[data-theme="dark"] .record-type,
+html[data-theme="dark"] .status-badge{
+  background:var(--surface2)!important;
+  border-color:var(--line)!important;
+  color:var(--text)!important;
+}
+
+html[data-theme="dark"] .holding-plan-status.positive,
+html[data-theme="dark"] .profit-stage.reached,
+html[data-theme="dark"] .status-badge.candidate{
+  background:rgba(103,212,130,.10)!important;
+  border-color:rgba(103,212,130,.28)!important;
+  color:var(--good)!important;
+}
+html[data-theme="dark"] .holding-plan-status.negative,
+html[data-theme="dark"] .holding-budget-empty.warning,
+html[data-theme="dark"] .status-badge.rejected{
+  background:rgba(255,119,112,.10)!important;
+  border-color:rgba(255,119,112,.28)!important;
+  color:var(--bad)!important;
+}
+html[data-theme="dark"] .status-badge.warming{
+  background:rgba(231,182,71,.12)!important;
+  border-color:rgba(231,182,71,.28)!important;
+  color:var(--warn)!important;
+}
+html[data-theme="dark"] .status-badge.paused{
+  background:#262b31!important;
+  border-color:var(--line)!important;
+  color:#b6bdc6!important;
+}
+
+html[data-theme="dark"] .amount-quick-buttons button,
+html[data-theme="dark"] .sector-coin-row.columns>button,
+html[data-theme="dark"] .sector-coin-link{
+  background:var(--surface)!important;
+  border-color:var(--line)!important;
+  color:var(--text)!important;
+}
+html[data-theme="dark"] .amount-quick-buttons button:hover,
+html[data-theme="dark"] .amount-quick-buttons button:focus-visible,
+html[data-theme="dark"] .sector-coin-link:hover{
+  background:var(--accent2)!important;
+  color:var(--accent)!important;
+  border-color:rgba(90,168,255,.28)!important;
+}
+
+html[data-theme="dark"] .sector-coin-table>header,
+html[data-theme="dark"] .sector-coin-row.columns,
+html[data-theme="dark"] .compare-columns,
+html[data-theme="dark"] .strategy-row.columns,
+html[data-theme="dark"] .strategy-coin-row.columns,
+html[data-theme="dark"] .strategy-matrix-row.columns{
+  background:#20242a!important;
+  border-color:var(--line)!important;
+  color:#aeb4bc!important;
+  backdrop-filter:none!important;
+}
+html[data-theme="dark"] .sector-coin-select,
+html[data-theme="dark"] .strategy-row:not(.columns),
+html[data-theme="dark"] .strategy-coin-row:not(.columns),
+html[data-theme="dark"] .strategy-matrix-row:not(.columns){
+  background:var(--surface)!important;
+  color:var(--text)!important;
+  border-color:var(--line)!important;
+}
+html[data-theme="dark"] .sector-coin-select.selected,
+html[data-theme="dark"] .strategy-row.selected,
+html[data-theme="dark"] .strategy-market-list button.selected{
+  background:var(--accent2)!important;
+}
+
+html[data-theme="dark"] .history-range button.active{
+  background:#30353b!important;
+  color:#fff!important;
+  box-shadow:none!important;
+}
+html[data-theme="dark"] .score-line>i,
+html[data-theme="dark"] .market-meter i{
+  background:#343941!important;
+}
+html[data-theme="dark"] .spinner{
+  border-color:#3c424b!important;
+  border-top-color:var(--accent)!important;
+}
+html[data-theme="dark"] .score-guide{
+  stroke:#343a43!important;
+}
+html[data-theme="dark"] .fill-marker{
+  stroke:#111214!important;
+}
+html[data-theme="dark"] .mini-chart svg line{
+  stroke:#30353d!important;
+}
+html[data-theme="dark"] .allocation-donut::after{
+  background:var(--surface)!important;
+  box-shadow:0 0 0 1px var(--line)!important;
+}
+
+html[data-theme="dark"] .component-diagnostic[open] summary{
+  background:var(--surface2)!important;
+  border-color:var(--line)!important;
+}
+html[data-theme="dark"] .component-error{
+  background:rgba(255,119,112,.10)!important;
+  border:1px solid rgba(255,119,112,.24)!important;
+  color:#ffc0bc!important;
+}
+html[data-theme="dark"] .component-error b,
+html[data-theme="dark"] .component-error span{
+  color:#ffc0bc!important;
+}
+
+html[data-theme="dark"] .record-type.sell{
+  background:#462523!important;
+  color:#ff938d!important;
+}
+html[data-theme="dark"] .record-type.learning{
+  background:#43371d!important;
+  color:#ebc76a!important;
+}
+html[data-theme="dark"] .record-type.decision{
+  background:#302d50!important;
+  color:#aaa5ff!important;
+}
+html[data-theme="dark"] .record-type.system{
+  background:#2b3036!important;
+  color:#c2c7cd!important;
+}
+html[data-theme="dark"] .records-scope-switch button.active{
+  background:var(--accent2)!important;
+  border-color:rgba(90,168,255,.28)!important;
+  color:var(--accent)!important;
+}
+html[data-theme="dark"] .records-scope-switch button.active small{
+  color:#91bdea!important;
+}
+
+html[data-theme="dark"] .holding-budget-warning{
+  color:#e7b647!important;
+}
+html[data-theme="dark"] .coin-profile-tags i,
+html[data-theme="dark"] .activity-kind,
+html[data-theme="dark"] .viewer-scope em{
+  color:#b9c0c8!important;
+}
+
+/* Any remaining semantic surface that uses a light token should inherit the dark palette. */
+html[data-theme="dark"] .section-panel,
+html[data-theme="dark"] .priority-strip,
+html[data-theme="dark"] .inline-holding,
+html[data-theme="dark"] .paper-inline,
+html[data-theme="dark"] .trade-plan-panel,
+html[data-theme="dark"] .local-management-note,
+html[data-theme="dark"] .holding-plan-panel,
+html[data-theme="dark"] .records-insight{
+  background:var(--surface)!important;
+  border-color:var(--line)!important;
+}

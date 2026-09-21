@@ -1,0 +1,51 @@
+.records-scope-switch{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:12px}.records-scope-switch>div{display:inline-flex;gap:6px;flex-wrap:wrap}.records-scope-switch button{min-height:48px;border:1px solid var(--line);border-radius:11px;background:#fff;padding:8px 12px;text-align:left;display:flex;flex-direction:column;gap:2px;min-width:165px}.records-scope-switch button b{font-size:14px}.records-scope-switch button small{font-size:12px;color:var(--muted)}.records-scope-switch button.active{background:var(--accent2);border-color:rgba(0,102,204,.2);color:var(--accent)}.records-scope-switch button.active small{color:#4b6f94}.records-scope-switch>p{margin:0;color:var(--muted);font-size:13px;line-height:1.45;text-align:right;max-width:480px}@media(max-width:760px){.records-scope-switch{align-items:stretch;flex-direction:column}.records-scope-switch>div{display:grid;grid-template-columns:1fr 1fr;width:100%}.records-scope-switch button{min-width:0;width:100%}.records-scope-switch>p{text-align:left;max-width:none}}@media(max-width:520px){.records-scope-switch>div{grid-template-columns:1fr}.records-scope-switch button{min-height:54px}.records-scope-switch button b{font-size:15px}.records-scope-switch button small{font-size:13px}}
+
+/* V14 audience switch: this is navigation, not a pair of competing cards. */
+#pageRoot[data-page-route="records"] .records-scope-switch{
+  align-items:flex-end!important;
+  gap:18px!important;
+  margin:0 0 10px!important;
+  padding:0!important;
+  border-bottom:1px solid var(--line)!important;
+}
+#pageRoot[data-page-route="records"] .records-scope-switch>div{
+  display:flex!important;
+  gap:20px!important;
+  flex-wrap:nowrap!important;
+}
+#pageRoot[data-page-route="records"] .records-scope-switch button{
+  min-width:0!important;
+  min-height:42px!important;
+  margin:0!important;
+  padding:0 1px 8px!important;
+  border:0!important;
+  border-bottom:2px solid transparent!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+#pageRoot[data-page-route="records"] .records-scope-switch button b{font-size:13px!important}
+#pageRoot[data-page-route="records"] .records-scope-switch button small{font-size:10px!important;color:var(--muted)!important}
+#pageRoot[data-page-route="records"] .records-scope-switch button.active{
+  color:var(--ink)!important;
+  border-bottom-color:var(--accent)!important;
+  background:transparent!important;
+}
+#pageRoot[data-page-route="records"] .records-scope-switch button.active small{color:var(--muted)!important}
+#pageRoot[data-page-route="records"] .records-scope-switch>p{
+  margin:0 0 9px auto!important;
+  max-width:520px!important;
+  font-size:11px!important;
+  text-align:right!important;
+}
+@media(max-width:760px){
+  #pageRoot[data-page-route="records"] .records-scope-switch{align-items:stretch!important;flex-direction:column!important;gap:6px!important}
+  #pageRoot[data-page-route="records"] .records-scope-switch>div{display:flex!important;width:100%!important}
+  #pageRoot[data-page-route="records"] .records-scope-switch button{width:auto!important;flex:0 0 auto!important}
+  #pageRoot[data-page-route="records"] .records-scope-switch>p{margin:0 0 8px!important;text-align:left!important;max-width:none!important}
+}
+@media(max-width:520px){
+  #pageRoot[data-page-route="records"] .records-scope-switch>div{gap:16px!important}
+  #pageRoot[data-page-route="records"] .records-scope-switch button{min-height:44px!important}
+  #pageRoot[data-page-route="records"] .records-scope-switch button small{display:none!important}
+}

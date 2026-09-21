@@ -1,0 +1,143 @@
+import{store}from'./core/store.js?v=2';
+import{createRouter}from'./core/router.js?v=3';
+import{createAuth}from'./core/auth.js';
+import{createSnapshotPoller}from'./core/snapshot.js';
+import{esc}from'./shared/format.js';
+import{installSectorImeGuard}from'./shared/sector-ime-guard.js?v=37';
+import{installTableSortEnhancer}from'./shared/table-sort-enhancer.js?v=37';
+import{patchPreservingUi}from'./shared/ui-continuity.js?v=38';
+import{installAmountInputUx}from'./shared/amount-input-ux.js?v=2';
+import{installMainstreamUi}from'./shared/mainstream-ui.js?v=2';
+import{installThemeToggle}from'./shared/theme.js?v=1';
+import{installStrategyDrilldown}from'./shared/strategy-drilldown-v4.js?v=3';
+import{installViewportHandoff}from'./shared/viewport-handoff-v4.js?v=3';
+import{installRailControlsV16}from'./shared/rail-controls-v16.js?v=2';
+import{installLivePatchV16}from'./shared/live-patch-v16.js?v=4';
+import{installRemainingLivePatchV16}from'./shared/live-patch-remaining-v16.js?v=1';
+import{installHoldingsWriteV16}from'./shared/holdings-write-v16.js?v=5';
+import{createHomePage}from'./pages/v4/home.js?v=2.1';
+import{createDashboardPage}from'./pages/dashboard.js';
+import{createResearchPage}from'./pages/research.js?v=43.1';
+import{installDexLaunchResearchPanel}from'./pages/dex-launch-panel.js?v=45';
+import{createAssetsPage}from'./pages/assets.js?v=52';
+import{createLiveTradingPage}from'./pages/live-trading.js?v=1';
+import{createPaperPage}from'./pages/paper.js?v=47';
+import{createStrategyPage}from'./pages/strategy.js?v=48';
+import{createSectorsPage}from'./pages/sectors-v36.js?v=47';
+import{createRecordsPage}from'./pages/records.js?v=48';
+import{createSystemPage}from'./pages/system.js?v=35';
+
+const root=document.getElementById('pageRoot');
+
+installSectorImeGuard();
+installTableSortEnhancer();
+installThemeToggle();
+installRailControlsV16({store,root});
+
+const nav=document.getElementById('mainNav');
+const journey=document.getElementById('journeyNav');
+const reader=document.getElementById('readerModeControl');
+
+installLivePatchV16({store,root});
+installRemainingLivePatchV16({store,root});
+installHoldingsWriteV16({store,root});
+installAmountInputUx(root);
+installDexLaunchResearchPanel({store,root});
+installMainstreamUi(document.body);
+installViewportHandoff({root});
+
+let refreshQueued=false;
+function queueUiRefresh(){
+  if(refreshQueued)return;
+  refreshQueued=true;
+  queueMicrotask(()=>{
+    refreshQueued=false;
+    root?.dispatchEvent(new CustomEvent('ui:refresh',{bubbles:true,detail:{node:root}}));
+  });
+}
+
+let router=null;
+const pages={
+  live:()=>createLiveTradingPage({store,navigate:name=>router.go(name)}),
+  dashboard:()=>createHomePage({store,navigate:name=>router.go(name)}),
+  'dashboard-detail':()=>createDashboardPage({store,navigate:name=>router.go(name)}),
+  research:()=>createResearchPage({store}),
+  assets:()=>createAssetsPage({store}),
+  paper:()=>createPaperPage({store}),
+  strategy:()=>createStrategyPage({store}),
+  sectors:()=>createSectorsPage({store,navigate:name=>router.go(name)}),
+  records:()=>createRecordsPage({store}),
+  system:()=>createSystemPage({store}),
+};
+
+const GROUPS={
+  live:[['live','실전매매'],['assets','자산(기존)']],
+  assets:[['live','실전매매'],['assets','자산(기존)']],
+  paper:[['paper','가상매매'],['strategy','전략 비교']],
+  strategy:[['paper','가상매매'],['strategy','전략 비교']],
+  research:[['research','코인 탐색'],['dashboard-detail','시장현황'],['sectors','테마']],
+  'dashboard-detail':[['research','코인 탐색'],['dashboard-detail','시장현황'],['sectors','테마']],
+  sectors:[['research','코인 탐색'],['dashboard-detail','시장현황'],['sectors','테마']],
+};
+
+function renderJourney(name){
+  if(root)root.dataset.pageRoute=name;
+  if(!journey)return;
+  const items=GROUPS[name]||[];
+  journey.classList.toggle('hidden',!items.length);
+  journey.innerHTML=items.map(([route,label])=>`<button data-journey-route="${route}" class="${route===name?'active':''}">${label}</button>`).join('');
+  queueUiRefresh();
+}
+
+function readerMode(){return store.get().ui.readerMode==='detail'?'detail':'simple'}
+function renderReader(){
+  const mode=readerMode();
+  document.documentElement.dataset.readerMode=mode;
+  reader?.querySelectorAll('[data-reader-mode]').forEach(button=>{
+    const active=button.dataset.readerMode===mode;
+    button.classList.toggle('active',active);
+    button.setAttribute('aria-pressed',active?'true':'false');
+  });
+}
+reader?.addEventListener('click',event=>{
+  const button=event.target.closest('[data-reader-mode]');
+  if(!button)return;
+  const mode=button.dataset.readerMode==='detail'?'detail':'simple';
+  if(mode===readerMode())return;
+  store.setUi({readerMode:mode},{scope:'reader-mode'});
+  renderReader();
+  patchPreservingUi(root,()=>router?.render(),{
+    scrollSelectors:['[data-preserve-scroll]','.master-list','.asset-holdings-list','#paperList','.strategy-table','.live-candidate-list','.live-plan-table','.live-calc-table'],
+  });
+  queueUiRefresh();
+});
+journey?.addEventListener('click',event=>{
+  const button=event.target.closest('[data-journey-route]');
+  if(button)router.go(button.dataset.journeyRoute);
+});
+
+router=createRouter({store,root,nav,pages,onChange:name=>{renderJourney(name);queueUiRefresh()}});
+installStrategyDrilldown({store,root,navigate:name=>router.go(name)});
+const poller=createSnapshotPoller({store,onUnauthorized:()=>auth.showAuth()});
+const auth=createAuth({
+  store,
+  onReady(){poller.start();const initial=store.get().ui.route||'live';router.go(initial==='dashboard'?'live':initial,{replace:true});renderShell();queueUiRefresh()},
+  onLogout(){poller.stop()},
+});
+
+function renderShell(){
+  const user=store.get().user;
+  const userBtn=document.getElementById('userMenuBtn');
+  if(userBtn){
+    const name=String(user?.display_name||'사용자').trim()||'사용자';
+    userBtn.innerHTML=`<span>${esc(name)}</span><small>${user?.role==='owner'?'관리자':'계정'}</small>`;
+  }
+}
+store.subscribe((_,meta)=>{
+  if(['snapshot','error','user','session-reset'].includes(meta.type))renderShell();
+  if(meta.type==='ui'&&meta.scope==='reader-mode')renderReader();
+  if(['snapshot','snapshot-live','ui','error','user','session-reset'].includes(meta.type))queueUiRefresh();
+});
+document.getElementById('userMenuBtn')?.addEventListener('click',()=>router.go('system'));
+renderReader();
+auth.boot();

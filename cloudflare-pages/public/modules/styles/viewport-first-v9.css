@@ -1,0 +1,194 @@
+/* Viewport handoff support after goal-first IA.
+   This layer owns shell geometry and compact list-to-detail handoff only.
+   Scroll ownership is defined by the canonical interaction layer: bounded master rail + document detail. */
+
+:root{--shell-header-offset:112px}
+html{scroll-padding-top:calc(var(--shell-header-offset) + 16px)}
+
+#researchDetail,#assetDetail,#paperDetail,#strategyDetail,#paperBody,#strategyBody{
+  scroll-margin-top:calc(var(--shell-header-offset) + 12px)!important;
+}
+
+#pageRoot[data-page-route="research"] .decision-first-detail,
+#pageRoot[data-page-route="assets"] .asset-detail,
+#pageRoot[data-page-route="paper"] .paper-detail,
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell{min-width:0!important}
+
+#pageRoot[data-page-route="research"] .decision-first-hero,
+#pageRoot[data-page-route="assets"] .asset-detail-hero,
+#pageRoot[data-page-route="paper"] .paper-detail-hero{margin-bottom:0!important}
+
+/* Do not override canonical master-rail scrolling here.
+   Result panes stay in document flow and are never height-trapped. */
+#pageRoot[data-page-route="research"] .research-detail,
+#pageRoot[data-page-route="assets"] .asset-detail,
+#pageRoot[data-page-route="paper"] .paper-detail,
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell,
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-panels{
+  height:auto!important;
+  max-height:none!important;
+  overflow:visible!important;
+  overflow-x:visible!important;
+  overflow-y:visible!important;
+  overscroll-behavior:auto!important;
+}
+
+.viewport-return-bar{display:none}
+
+@media(max-width:1180px) and (min-width:901px){
+  :root{--shell-header-offset:154px}
+  .app-header-inner{
+    grid-template-columns:minmax(0,1fr) auto!important;
+    grid-template-areas:"brand tools" "nav nav"!important;
+    gap:8px 14px!important;
+    padding-top:8px!important;
+    padding-bottom:8px!important;
+  }
+  .brand{grid-area:brand!important}
+  .header-tools{grid-area:tools!important;justify-self:end!important}
+  .main-nav{
+    grid-area:nav!important;
+    display:grid!important;
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+    width:100%!important;
+    gap:0!important;
+    border-top:1px solid var(--line)!important;
+  }
+  .main-nav button{
+    min-width:0!important;
+    min-height:42px!important;
+    padding:0 6px!important;
+    text-align:center!important;
+    white-space:nowrap!important;
+  }
+  .app-main{padding-top:16px!important}
+  .page-head-v6,.page-head{margin-bottom:12px!important}
+  #pageRoot[data-page-route="research"] .decision-first-conclusion h3{font-size:clamp(27px,3vw,36px)!important}
+  #pageRoot[data-page-route="research"] .decision-first-tabs{padding-top:12px!important}
+  #pageRoot[data-page-route="research"] .decision-first-body{padding-top:16px!important}
+  #pageRoot[data-page-route="assets"] .asset-detail-hero,
+  #pageRoot[data-page-route="paper"] .paper-detail-hero{padding:14px!important}
+  #pageRoot[data-page-route="assets"] .asset-detail-grid>span,
+  #pageRoot[data-page-route="paper"] .paper-detail-kpis>span{padding:10px!important}
+}
+
+/* Single-column layouts: row click hands off to the result, with an explicit return. */
+@media(max-width:900px){
+  :root{--shell-header-offset:160px}
+  .viewport-return-bar{
+    position:sticky;
+    top:calc(var(--shell-header-offset) + 6px);
+    z-index:24;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    min-height:44px;
+    margin:0 0 14px;
+    padding:6px 0 8px;
+    border-bottom:1px solid var(--line);
+    background:var(--surface);
+  }
+  .viewport-return-bar button{
+    flex:0 0 auto;
+    min-height:34px;
+    padding:0;
+    border:0;
+    border-radius:0;
+    background:transparent;
+    color:var(--accent);
+    font-size:13px;
+    font-weight:750;
+  }
+  .viewport-return-bar span{
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    color:var(--muted);
+    font-size:12px;
+    text-align:right;
+  }
+  #pageRoot[data-page-route="research"] .decision-first-conclusion h3{font-size:clamp(26px,8vw,34px)!important}
+  #pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell{margin-top:0!important}
+  #pageRoot[data-page-route="strategy"] .strategy-v5-detail-tabs{margin-bottom:12px!important}
+}
+
+@media(max-width:620px){
+  :root{--shell-header-offset:188px}
+  .app-header-inner{
+    grid-template-columns:minmax(0,1fr) auto!important;
+    grid-template-areas:"brand tools" "nav nav"!important;
+  }
+  .main-nav{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  .main-nav button{min-height:var(--control-touch-h)!important}
+  .header-tools{width:auto!important;justify-self:end!important;flex-wrap:nowrap!important}
+  .reader-mode-control{display:none!important}
+  .app-main{padding-top:14px!important}
+  .viewport-return-bar{top:calc(var(--shell-header-offset) + 4px);margin-bottom:12px}
+  #pageRoot[data-page-route="research"] .decision-first-market-pulse{margin-bottom:10px!important}
+  #pageRoot[data-page-route="research"] .decision-first-tabs,
+  #pageRoot[data-page-route="strategy"] .strategy-v5-detail-tabs{gap:16px!important}
+}
+
+/* V15 clipping / scroll-ownership hardening.
+   A detail/result surface must expand with the document; only selection rails and
+   deliberately horizontal data tables may own scroll. */
+.page-head-meta,
+.header-tools{min-width:0!important;max-width:100%!important}
+.page-head-meta{flex-wrap:wrap!important}
+.page-head-meta>*{max-width:100%!important}
+.header-tools>button,
+.header-tools>.reader-mode-control{min-width:0!important;flex:0 1 auto!important}
+
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell,
+#pageRoot[data-page-route="strategy"] .strategy-v5-detail-panels,
+#pageRoot[data-page-route="strategy"] .strategy-matrix-detail{
+  position:static!important;
+  top:auto!important;
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  overflow:visible!important;
+  overflow-x:visible!important;
+  overflow-y:visible!important;
+  overscroll-behavior:auto!important;
+  scrollbar-gutter:auto!important;
+}
+
+#pageRoot[data-page-route="strategy"] .strategy-breakdown-table,
+#pageRoot[data-page-route="strategy"] .strategy-trade-table{
+  max-width:100%!important;
+  overflow-x:auto!important;
+  overflow-y:visible!important;
+  -webkit-overflow-scrolling:touch!important;
+}
+
+#pageRoot[data-page-route="records"] .records-toolbar>*{min-width:0!important;max-width:100%!important}
+#pageRoot[data-page-route="records"] .records-toolbar button{white-space:nowrap!important}
+
+@media(max-width:900px){
+  #pageRoot[data-page-route="records"] .records-toolbar{
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+  }
+  #pageRoot[data-page-route="records"] .records-toolbar input{
+    grid-column:1/-1!important;
+  }
+  #pageRoot[data-page-route="records"] .records-toolbar button{
+    width:100%!important;
+  }
+}
+
+@media(max-width:620px){
+  #pageRoot[data-page-route="records"] .records-toolbar{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+  #pageRoot[data-page-route="records"] .records-toolbar input,
+  #pageRoot[data-page-route="records"] .records-toolbar select,
+  #pageRoot[data-page-route="records"] .records-toolbar button{
+    grid-column:1!important;
+    width:100%!important;
+  }
+}
+
+html[data-theme="dark"] .viewport-return-bar{background:#111317}

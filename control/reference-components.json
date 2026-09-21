@@ -1,0 +1,183 @@
+{
+  "version": 1,
+  "policy": {
+    "auto_promote": false,
+    "auto_execute_external_code": false,
+    "update_flow": [
+      "detect",
+      "stage",
+      "compatibility_test",
+      "paper_smoke_test",
+      "manual_promote",
+      "health_check",
+      "rollback_on_failure"
+    ]
+  },
+  "components": [
+    {
+      "id": "freqtrade",
+      "category": "trading-engine-reference",
+      "repo": "https://github.com/freqtrade/freqtrade",
+      "purpose": "strategy lifecycle, backtesting, hyper-parameter research and trade engine reference",
+      "watch": true,
+      "runtime_enabled": false,
+      "restart_required": true,
+      "license_review": "pending",
+      "update_policy": "manual-promote-after-tests"
+    },
+    {
+      "id": "hummingbot",
+      "category": "execution-reference",
+      "repo": "https://github.com/hummingbot/hummingbot",
+      "purpose": "market connector and execution architecture reference",
+      "watch": true,
+      "runtime_enabled": false,
+      "restart_required": true,
+      "license_review": "pending",
+      "update_policy": "manual-promote-after-tests"
+    },
+    {
+      "id": "nautilus-trader",
+      "category": "research-execution-reference",
+      "repo": "https://github.com/nautechsystems/nautilus_trader",
+      "purpose": "event-driven trading, simulation and execution architecture reference",
+      "watch": true,
+      "runtime_enabled": false,
+      "restart_required": true,
+      "license_review": "pending",
+      "update_policy": "manual-promote-after-tests"
+    },
+    {
+      "id": "ccxt",
+      "category": "exchange-adapter-reference",
+      "repo": "https://github.com/ccxt/ccxt",
+      "purpose": "cross-exchange market and API normalization reference",
+      "watch": true,
+      "runtime_enabled": false,
+      "restart_required": true,
+      "license_review": "pending",
+      "update_policy": "manual-promote-after-tests"
+    },
+    {
+      "id": "pyupbit",
+      "category": "upbit-adapter-reference",
+      "repo": "https://github.com/sharebook-kr/pyupbit",
+      "purpose": "Upbit public/private API conventions and Python adapter reference",
+      "watch": true,
+      "runtime_enabled": false,
+      "restart_required": true,
+      "license_review": "pending",
+      "update_policy": "manual-promote-after-tests"
+    },
+    {
+      "id": "vectorbt",
+      "category": "backtest-research",
+      "repo": "https://github.com/polakowo/vectorbt",
+      "purpose": "fast vectorized strategy research and parameter sweeps",
+      "watch": true,
+      "runtime_enabled": false,
+      "restart_required": false,
+      "license_review": "pending",
+      "update_policy": "manual-promote-after-tests"
+    },
+    {
+      "id": "qlib",
+      "category": "quant-research",
+      "repo": "https://github.com/microsoft/qlib",
+      "purpose": "quant research workflow and model evaluation reference",
+      "watch": true,
+      "runtime_enabled": false,
+      "restart_required": true,
+      "license_review": "pending",
+      "update_policy": "manual-promote-after-tests"
+    },
+    {
+      "id": "finrl",
+      "category": "reinforcement-learning-reference",
+      "repo": "https://github.com/AI4Finance-Foundation/FinRL",
+      "purpose": "reinforcement-learning research reference; never directly promoted to live trading",
+      "watch": true,
+      "runtime_enabled": false,
+      "restart_required": true,
+      "license_review": "pending",
+      "update_policy": "research-only-manual-promote"
+    },
+    {
+      "id": "fingpt",
+      "category": "financial-language-ai",
+      "repo": "https://github.com/AI4Finance-Foundation/FinGPT",
+      "purpose": "financial text classification and language-feature research reference",
+      "watch": true,
+      "runtime_enabled": false,
+      "restart_required": true,
+      "license_review": "pending",
+      "update_policy": "manual-promote-after-tests"
+    },
+    {
+      "id": "ollama",
+      "category": "local-ai-runtime",
+      "repo": "https://github.com/ollama/ollama",
+      "purpose": "local model serving runtime candidate",
+      "watch": true,
+      "runtime_enabled": false,
+      "restart_required": true,
+      "license_review": "pending",
+      "update_policy": "manual-promote-after-tests"
+    },
+    {
+      "id": "llama-cpp",
+      "category": "local-ai-runtime",
+      "repo": "https://github.com/ggml-org/llama.cpp",
+      "purpose": "lightweight local inference runtime candidate",
+      "watch": true,
+      "runtime_enabled": false,
+      "restart_required": true,
+      "license_review": "pending",
+      "update_policy": "manual-promote-after-tests"
+    },
+    {
+      "id": "openbb",
+      "category": "macro-data-reference",
+      "repo": "https://github.com/OpenBB-finance/OpenBB",
+      "purpose": "macro/financial data ingestion architecture reference",
+      "watch": true,
+      "runtime_enabled": false,
+      "restart_required": true,
+      "license_review": "pending",
+      "update_policy": "manual-promote-after-tests"
+    },
+    {
+      "id": "defillama-adapters",
+      "category": "onchain-reference",
+      "repo": "https://github.com/DefiLlama/DefiLlama-Adapters",
+      "purpose": "on-chain protocol/TVL adapter normalization reference",
+      "watch": true,
+      "runtime_enabled": false,
+      "restart_required": false,
+      "license_review": "pending",
+      "update_policy": "manual-promote-after-tests"
+    },
+    {
+      "id": "duckdb",
+      "category": "local-analytics-storage",
+      "repo": "https://github.com/duckdb/duckdb",
+      "purpose": "local analytical query engine used with Parquet research history",
+      "watch": true,
+      "runtime_enabled": true,
+      "restart_required": true,
+      "license_review": "pending",
+      "update_policy": "python-package-pin"
+    },
+    {
+      "id": "qdrant",
+      "category": "vector-search-candidate",
+      "repo": "https://github.com/qdrant/qdrant",
+      "purpose": "future semantic search over market/news/community memories",
+      "watch": true,
+      "runtime_enabled": false,
+      "restart_required": true,
+      "license_review": "pending",
+      "update_policy": "manual-promote-after-tests"
+    }
+  ]
+}

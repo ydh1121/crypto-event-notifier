@@ -1,0 +1,57 @@
+name: B3 Listing Accelerator Build 48
+
+on:
+  push:
+    branches:
+      - "b3-auto-trader-phase1"
+    paths:
+      - "b3_trader/listing_history_accelerator.py"
+      - "b3_trader/tests/test_listing_history_accelerator_build48.py"
+      - "b3_trader/listing_history_research_cycle.py"
+      - "b3_trader/listing_history_store.py"
+      - "b3_trader/research_control.py"
+      - "b3_trader/research_supervisor.py"
+      - "scripts/check-dex-build42.py"
+      - "scripts/check-dex-supervisor-build43.py"
+      - "scripts/check-dex-cloud-projection-build44.py"
+      - "scripts/check-dex-quality-build45.py"
+      - "scripts/check-dex-backfill-build46.py"
+      - "scripts/check-historical-listing-build47.py"
+      - "scripts/check-listing-accelerator-build48.py"
+      - "scripts/verify-listing-accelerator-build48.py"
+      - ".github/workflows/b3-listing-accelerator-build48.yml"
+  workflow_dispatch:
+
+jobs:
+  build48:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r b3_trader/requirements.txt pytest
+      - name: Compile listing accelerator
+        run: >-
+          python -m py_compile
+          b3_trader/listing_history_accelerator.py
+          scripts/check-listing-accelerator-build48.py
+          scripts/verify-listing-accelerator-build48.py
+      - name: Direct listing accelerator verifier import bootstrap
+        run: python scripts/verify-listing-accelerator-build48.py --import-check
+      - name: Listing accelerator unit tests
+        run: python -m pytest -q b3_trader/tests/test_listing_history_accelerator_build48.py
+      - name: Build 42 regression contract
+        run: python scripts/check-dex-build42.py
+      - name: Build 43 regression contract
+        run: python scripts/check-dex-supervisor-build43.py
+      - name: Build 44 regression contract
+        run: python scripts/check-dex-cloud-projection-build44.py
+      - name: Build 45 regression contract
+        run: python scripts/check-dex-quality-build45.py
+      - name: Build 46 regression contract
+        run: python scripts/check-dex-backfill-build46.py
+      - name: Build 47 regression contract
+        run: python scripts/check-historical-listing-build47.py
+      - name: Build 48 listing accelerator contract
+        run: python scripts/check-listing-accelerator-build48.py

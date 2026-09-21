@@ -1,0 +1,54 @@
+name: B3 DEX Shadow Score V2 Forward Validation Build71
+
+on:
+  push:
+    branches: [b3-auto-trader-phase1]
+    paths:
+      - "b3_trader/dex_shadow_score_validation.py"
+      - "b3_trader/dex_shadow_score_v2_preregistration.py"
+      - "b3_trader/dex_shadow_score_v2_forward.py"
+      - "b3_trader/forward_sample_ledger.py"
+      - "b3_trader/dex_shadow_score_v2_forward_validation.py"
+      - "b3_trader/tests/test_dex_shadow_score_v2_forward_validation_build71.py"
+      - "scripts/check-dex-shadow-score-v2-forward-validation-build71.py"
+      - "scripts/verify-dex-shadow-score-v2-forward-validation-build71.py"
+      - ".github/workflows/b3-dex-shadow-score-v2-forward-validation-build71.yml"
+  pull_request:
+    paths:
+      - "b3_trader/dex_shadow_score_validation.py"
+      - "b3_trader/dex_shadow_score_v2_preregistration.py"
+      - "b3_trader/dex_shadow_score_v2_forward.py"
+      - "b3_trader/forward_sample_ledger.py"
+      - "b3_trader/dex_shadow_score_v2_forward_validation.py"
+      - "b3_trader/tests/test_dex_shadow_score_v2_forward_validation_build71.py"
+      - "scripts/check-dex-shadow-score-v2-forward-validation-build71.py"
+      - "scripts/verify-dex-shadow-score-v2-forward-validation-build71.py"
+      - ".github/workflows/b3-dex-shadow-score-v2-forward-validation-build71.yml"
+
+jobs:
+  build71:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r b3_trader/requirements.txt pytest
+      - name: Compile Build 71
+        run: python -m py_compile b3_trader/dex_shadow_score_v2_forward_validation.py scripts/check-dex-shadow-score-v2-forward-validation-build71.py scripts/verify-dex-shadow-score-v2-forward-validation-build71.py
+      - name: Direct Build 71 verifier import bootstrap
+        run: python scripts/verify-dex-shadow-score-v2-forward-validation-build71.py --import-check
+      - name: Build 71 forward validation unit tests
+        run: python -m pytest -q b3_trader/tests/test_dex_shadow_score_v2_forward_validation_build71.py
+      - name: Build 63 metric regression tests
+        run: python -m pytest -q b3_trader/tests/test_dex_shadow_score_validation_build63.py
+      - name: Build 65 regression contract
+        run: python scripts/check-dex-shadow-score-v2-preregistration-build65.py
+      - name: Build 66 regression contract
+        run: python scripts/check-dex-shadow-score-v2-forward-build66.py
+      - name: Build 69 regression contract
+        run: python scripts/check-dex-forward-pipeline-orchestrator-build69.py
+      - name: Build 70 regression contract
+        run: python scripts/check-dex-forward-sample-ledger-build70.py
+      - name: Build 71 forward validation contract
+        run: python scripts/check-dex-shadow-score-v2-forward-validation-build71.py

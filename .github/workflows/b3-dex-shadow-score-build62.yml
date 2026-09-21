@@ -1,0 +1,59 @@
+name: B3 DEX Shadow Score Build 62
+
+on:
+  push:
+    branches:
+      - b3-auto-trader-phase1
+    paths:
+      - "b3_trader/dex_shadow_score.py"
+      - "b3_trader/tests/test_dex_shadow_score_build62.py"
+      - "scripts/check-dex-shadow-score-build62.py"
+      - "scripts/verify-dex-shadow-score-build62.py"
+      - ".github/workflows/b3-dex-shadow-score-build62.yml"
+  pull_request:
+    branches:
+      - master
+    paths:
+      - "b3_trader/dex_shadow_score.py"
+      - "b3_trader/tests/test_dex_shadow_score_build62.py"
+      - "scripts/check-dex-shadow-score-build62.py"
+      - "scripts/verify-dex-shadow-score-build62.py"
+      - ".github/workflows/b3-dex-shadow-score-build62.yml"
+
+jobs:
+  build62:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r b3_trader/requirements.txt pytest
+      - name: Compile Build 62
+        run: >-
+          python -m py_compile
+          b3_trader/dex_shadow_score.py
+          scripts/check-dex-shadow-score-build62.py
+          scripts/verify-dex-shadow-score-build62.py
+      - name: Direct Build 62 verifier import bootstrap
+        run: python scripts/verify-dex-shadow-score-build62.py --import-check
+      - name: Build 62 shadow score unit tests
+        run: python -m pytest -q b3_trader/tests/test_dex_shadow_score_build62.py
+      - name: Build 53 regression contract
+        run: python scripts/check-dex-shadow-readiness-build53.py
+      - name: Build 54 regression contract
+        run: python scripts/check-dex-shadow-remediation-build54.py
+      - name: Build 55 regression contract
+        run: python scripts/check-dex-shadow-remediation-runner-build55.py
+      - name: Build 57 regression contract
+        run: python scripts/check-dex-temporal-diversity-build57.py
+      - name: Build 58 regression contract
+        run: python scripts/check-temporal-identity-preparation-build58.py
+      - name: Build 59 regression contract
+        run: python scripts/check-dex-launch-recovery-priority-build59.py
+      - name: Build 60 regression contract
+        run: python scripts/check-dex-launch-coverage-audit-build60.py
+      - name: Build 61 regression contract
+        run: python scripts/check-dex-alternate-launch-probe-build61.py
+      - name: Build 62 shadow score contract
+        run: python scripts/check-dex-shadow-score-build62.py
