@@ -15,6 +15,7 @@ This contract reduces propagation debt before any broad page redesign. It does n
 3. `components.css` owns reusable controls and compositions.
 4. Page styles own page-specific content only.
 5. Compatibility/repair layers may preserve existing pages but must not introduce new foundational tokens or duplicate canonical control geometry.
+6. Legacy compatibility layers must not flatten page-owned responsive grids at desktop widths. Page/component owners retain their declared desktop/tablet/mobile grid responsibilities.
 
 New page-local `!important` rules for shared controls require evidence that the shared component cannot express the need.
 
