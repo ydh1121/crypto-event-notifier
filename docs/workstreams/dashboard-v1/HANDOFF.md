@@ -392,7 +392,7 @@ Production was not deployed. Visual QA must use this preview only and must avoid
 
 ### WO-002 partial desktop visual-QA handoff — 2026-09-21
 
-User requested a pause after supplying the desktop screenshot sweep. Treat this as a durable partial-QA checkpoint, not acceptance.
+User stopped screenshot submission after the current desktop sweep; implementation/QA work continues. Treat the supplied screenshots as a durable partial-QA checkpoint, not acceptance.
 
 Observed preserve candidates:
 - Assets V17 hierarchy remains the clearest operational page.
@@ -407,4 +407,4 @@ Observed repair candidates for later bounded waves:
 4. Sticky global/local header stack needs explicit scroll/focus visibility QA; long-page screenshots show content tight to the sticky boundary.
 5. System is operationally useful but visually flat: many equal-weight sections/status rows with weak prioritization.
 
-No source/runtime/Production mutation is authorized from these findings. Continue visual QA only when the user resumes.
+Continue bounded WO-002 QA/foundation repair from these findings. Production remains prohibited; page-level redesign beyond WO-002 foundation scope belongs to a later bounded work order.
