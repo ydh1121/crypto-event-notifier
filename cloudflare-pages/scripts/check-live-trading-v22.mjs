@@ -14,7 +14,7 @@ const check=(name,value)=>{if(!value)fail.push(name)};
 
 check('V22 build marker is active',index.includes('2026.09.21-v6.5.0-simplified-trading-v22'));
 check('primary nav is simplified to four user destinations',
-  ['data-route="live">실전매매','data-route="paper">가상매매','data-route="research">탐색','data-route="records">기록'].every(value=>index.includes(value))&&
+  ['data-route="live"','>실전매매</button>','data-route="paper"','>가상매매</button>','data-route="research"','>탐색</button>','data-route="records"','>기록</button>'].every(value=>index.includes(value))&&
   !index.includes('data-route="assets">자산</button>')&&
   !index.includes('data-route="strategy">전략</button>'));
 
