@@ -314,8 +314,9 @@ Scope is bounded to 360/390/430 safe-area, touch geometry and interaction contin
 - [x] Added `check-mobile-interaction-v21.mjs` to guard focus/selection/scroll/polling continuity contracts without introducing a new render owner.
 - [x] Foundation contract updated with safe-area/touch ownership.
 - [x] Exact code-head CI PASS at `3acfe9367629d3ed69bec48b069bfcb7211c4c17`: B3 trader tests #2853 SUCCESS; cloudflare-pages-viewer, cloudflare-typecheck, python-test and dashboard-smoke all SUCCESS; returned Build 51~71 set SUCCESS.
-- [ ] Actual local fast-forward to latest durable docs head + clean/aligned readback + full `npm run typecheck` including `MOBILE_INTERACTION_V21=PASS` pending.
-- [ ] Preview-only redeploy/readback pending. Production prohibited.
+- [x] Actual local/current readback PASS at `c841bf49bda6b8ddb7fa7d46ca3a147324e0bbb3`: branch `b3-auto-trader-phase1`, tracked/staged/untracked `0/0/0`, upstream `0/0`; full `npm run typecheck` PASS including `MOBILE_INTERACTION_V21=PASS`.
+- [x] Preview-only WO-005 redeploy/readback PASS: deployment `c476bcbe`, alias `qa-v18-ui-foundation`; safe-area and mobile touch geometry assets LIVE. Production not deployed.
+- [x] WO-005 ACCEPTED.
 
 ### V21 stale-contract repair / debt guard
 
@@ -323,3 +324,24 @@ Scope is bounded to 360/390/430 safe-area, touch geometry and interaction contin
 - [x] Kept `interaction-layout-v4.css` at the audited 400 `!important` ceiling: compact touch sizing now flows through `--control-h: var(--control-touch-h)` and owning theme/journey rules instead of six new late overrides.
 - [x] Updated `UI_FOUNDATION_V18` ordering check to be cache-version agnostic while preserving stylesheet-order and debt caps.
 - [x] Updated mainstream dark-mode cache assertion for `theme-dark-v4.css?v=2`.
+
+
+## Q. CRYPTO-WO-20260921-006 Final device interaction QA
+
+TYPE = DEVICE_QA / RELEASE_GATE
+STATUS = ACTIVE
+PARENT = WO-005 accepted preview state
+
+No source mutation is authorized until a reproducible device defect is observed.
+
+- [ ] 390px concentrated QA
+- [ ] 430px concentrated QA
+- [ ] 360px minimum-width overflow sanity
+- [ ] iOS Safari focus zoom / keyboard / safe-area
+- [ ] horizontal rail native momentum
+- [ ] master-detail selection → scroll/focus continuity
+- [ ] live polling preserves selection/search/filter/scroll/open disclosure
+- [ ] light/dark toggle at compact width
+- [ ] simple/detail reader-mode continuity at compact width
+- [ ] 1280–1920 desktop regression sanity after mobile source changes
+- [ ] Production deployment remains prohibited until device gate is accepted.
