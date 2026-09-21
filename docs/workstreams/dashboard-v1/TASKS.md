@@ -345,3 +345,17 @@ No source mutation is authorized until a reproducible device defect is observed.
 - [ ] simple/detail reader-mode continuity at compact width
 - [ ] 1280–1920 desktop regression sanity after mobile source changes
 - [ ] Production deployment remains prohibited until device gate is accepted.
+
+
+## R. CRYPTO-WO-20260921-007 Simplified trading IA rebaseline
+
+STATUS = ACTIVE
+
+- [x] Supersede WO-006 device QA as current WIP; device QA remains a later release gate.
+- [x] Replace the oversized purpose/page tree with a simplified canonical structure centered on `실전매매` and `가상매매`.
+- [x] Primary live-trading page requirements fixed: exchange, ticker, current price, dominant strategy, split entries, split exits, split allocation, averaging calculator, profit-taking calculator, evidence-backed likely-riser recommendations.
+- [x] Primary PAPER coin page requirements fixed: per-strategy account/trade history, BTC/ETH-relative movement, news/indicator/event reactions.
+- [x] All other existing features demoted to 탐색 / 연구·데이터 / 기록 / 운영.
+- [ ] Build one exhaustive existing-capability → canonical-destination mapping table before any further page coding.
+- [ ] Produce low-fidelity wireframe/page component hierarchy only after the mapping table is accepted.
+- [ ] No Production deploy.
