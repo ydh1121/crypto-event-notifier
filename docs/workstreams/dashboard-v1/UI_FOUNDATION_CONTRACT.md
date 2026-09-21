@@ -76,6 +76,7 @@ Allowed:
 - honor `prefers-reduced-motion`
 - preserve selected object, filter, sort, scroll, and focus during live polling/reader-mode transitions
 - sticky shell must reserve browser scroll/focus visibility via `scroll-padding-top` derived from `--shell-header-offset`; focused/anchored content must not land underneath the header stack
+- `viewport-fit=cover` requires shell/auth/journey ownership of `safe-area-inset-*`; compact primary controls use `--control-touch-h` and must remain usable at 360/390/430px without disabling native zoom
 
 ## 7. Stable exemplar preservation
 
