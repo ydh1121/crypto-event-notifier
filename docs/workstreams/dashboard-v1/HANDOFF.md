@@ -634,3 +634,19 @@ Exact-head CI is green:
 - returned Build 51~71 set SUCCESS
 
 Next gate is actual-local fast-forward to the durable docs head, full `npm run typecheck` requiring `SIMPLIFIED_TRADING_V22=PASS`, then Preview-only deploy/readback and focused visual QA. Production remains prohibited.
+
+
+### WO-008 source/contract/preview verification
+
+Source/contract/Preview verification is complete.
+
+- actual local/current: `ba3c59a50962ae1a5bdc41053a75f9e6bf9e1ec7`, clean 0/0 and upstream 0/0
+- full Viewer typecheck PASS including `SIMPLIFIED_TRADING_V22=PASS`
+- Preview deployment: `f18a2c1a.crypto-paper-viewer-ydh1121-cf36.pages.dev`
+- stable alias: `qa-v18-ui-foundation.crypto-paper-viewer-ydh1121-cf36.pages.dev`
+- raw UTF-8 readback PASS on both immutable deployment and alias for all live-trading markers
+- Production not deployed
+
+The earlier `Invoke-WebRequest` Korean-marker failure was a Windows PowerShell decoding false negative, not a missing asset. Do not redeploy for that issue.
+
+Only focused visual acceptance remains for WO-008: one desktop and one 390px screenshot of the new `실전매매` page. Do not reopen broad screenshot sweeps.
