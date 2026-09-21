@@ -533,3 +533,36 @@ Exact code head `3acfe9367629d3ed69bec48b069bfcb7211c4c17` is green:
 Two CI failures during this wave were stale contract assertions, not product regressions: the IA checker still expected pre-safe-area literal padding, and the V18/mainstream checks still expected old cache keys / extra late overrides. The repair kept `interaction-layout-v4.css` at the existing 400-`!important` ceiling by moving mobile touch sizing into canonical tokens and owning theme/journey rules.
 
 Next gate: actual local fast-forward to the latest durable docs head, clean/upstream 0/0 readback, full Viewer typecheck including `MOBILE_INTERACTION_V21=PASS`, then Preview-only deploy/readback. Production remains prohibited.
+
+
+### WO-005 acceptance
+
+WO-005 is ACCEPTED at source/Preview level.
+
+Actual local/current verification:
+- branch `b3-auto-trader-phase1` @ `c841bf49bda6b8ddb7fa7d46ca3a147324e0bbb3`;
+- tracked/staged/untracked = 0/0/0;
+- upstream = 0/0;
+- full Viewer contract PASS including `MOBILE_INTERACTION_V21=PASS`.
+
+Preview verification:
+- deployment `c476bcbe.crypto-paper-viewer-ydh1121-cf36.pages.dev`;
+- alias `qa-v18-ui-foundation.crypto-paper-viewer-ydh1121-cf36.pages.dev`;
+- MOBILE SAFE-AREA ASSETS LIVE;
+- MOBILE TOUCH GEOMETRY LIVE;
+- Production not deployed.
+
+
+## CRYPTO-WO-20260921-006 Final device interaction QA — ACTIVE
+
+This is a verification-only work order. Do not mutate source merely to make the checklist pass.
+
+Primary gate: 390px. Secondary gates: 430px and 360px. Device-specific gate: real iPhone Safari for focus zoom, software keyboard and safe-area behavior.
+
+Continuity checks must include:
+- select coin/holding/PAPER/strategy, scroll into detail, wait through at least one live polling cycle, confirm selection and scroll remain;
+- type in search/filter input, keep focus, wait through polling, confirm value/caret/focus remain;
+- open a disclosure/details block, wait through polling, confirm it stays open;
+- switch simple/detail and light/dark at compact width and confirm layout does not jump into horizontal page overflow.
+
+Any defect must be reproduced before opening a bounded repair WO. Production remains prohibited.
