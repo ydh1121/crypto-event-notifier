@@ -346,3 +346,34 @@ Do not begin a broad rewrite. Review/approve the audit, then create/activate `CR
 4. no trading/data/PAPER semantic change, no feature deletion, no Production deploy until visual/regression QA passes.
 
 Because this HANDOFF/TASKS update is a documentation-only Git mutation performed through GitHub after the local readback, the user's local checkout will need a fast-forward before the next implementation work begins.
+
+
+## CRYPTO-WO-20260921-002 UI foundation consolidation — VERIFY
+
+Current implementation HEAD: `3e15a8d8a1959a99f7a2a8c5ff7196d83571c7a9`.
+
+Implementation/verification result:
+- broad document-root rail `MutationObserver` removed;
+- rail controls use explicit root-scoped render/`ui:refresh` lifecycle;
+- canonical UI geometry tokens live in `tokens.css`;
+- shell/components/interaction layer consume the canonical tokens;
+- additive shared composition primitives and `UI_FOUNDATION_CONTRACT.md` added;
+- V18 regression checker is part of `npm run typecheck`;
+- no trading/data/PAPER/SQLite/real-money semantic change;
+- no Production deployment.
+
+Actual local readback at `3e15a8d...`:
+- branch `b3-auto-trader-phase1`;
+- tracked/staged/untracked = 0/0/0;
+- upstream aligned = 0/0;
+- full `npm run typecheck` PASS through `V16_HOLDINGS_WRITE=PASS` and `[PASS] CRYPTO WO-002 LOCAL FOUNDATION VERIFY`.
+
+Latest GitHub CI at the same HEAD:
+- B3 trader tests run 2750 = SUCCESS;
+- python-test = SUCCESS;
+- cloudflare-typecheck = SUCCESS;
+- cloudflare-pages-viewer = SUCCESS, including Viewer baseline source contract;
+- dashboard-smoke = SUCCESS;
+- returned Build 51~71 workflow set = SUCCESS.
+
+Next gate is visual QA only. Use a non-Production preview deployment of this exact HEAD, then verify representative desktop/tablet/phone widths, light/dark, keyboard/focus, simple/detail reader mode, selection/search/sort continuity, and live-polling continuity. Do not deploy Production until this gate is accepted.
