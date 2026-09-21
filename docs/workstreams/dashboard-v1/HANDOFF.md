@@ -418,3 +418,16 @@ Work continues after the desktop screenshot sweep. Two foundation-level issues w
 2. System desktop hierarchy: retired the old `mainstream-v4.css` one-column override so `records-system.css` again owns the intended 3/2/1 responsive operations grid and 2/1 system summary grid.
 
 These are override/foundation repairs, not the later page-level hierarchy redesign for Market/Theme/PAPER/Strategy. Latest regression verification and Preview re-deploy are still required. Production remains unchanged.
+
+
+## CRYPTO-WO-20260921-003 Market + Theme page hierarchy — IMPLEMENTED / VERIFY
+
+The V18 foundation wave is no longer being expanded. WO-003 uses the user's supplied desktop screenshots as the page-level evidence source and touches only Market dashboard + Theme/Sectors hierarchy.
+
+Implemented:
+- Market dashboard now has deliberate prominence: market state is primary; actual-assets/PAPER are supporting; watch list is primary intelligence; sector/strategy are supporting.
+- Theme/Sectors no longer presents rank + coin table + project profile as three simultaneous desktop rails. Rank + selected-theme detail remain primary, while project evidence moves below the table behind native progressive disclosure and automatically opens on explicit coin selection.
+- No new cards/tabs/chips were added. Data selectors, market/sector data, PAPER/trading logic, SQLite semantics and real-money boundary are unchanged.
+- A dedicated V19 regression contract protects cache lineage, dashboard prominence, two-pane Theme ownership, and project-evidence accessibility.
+
+Source implementation lineage through `ff9253e2c174a8cc5c2f6d77618568c7c5185a89`; documentation commits follow on the same branch. Next gate is exact latest-head CI, then actual local fast-forward/typecheck, then Preview-only redeploy. Production remains prohibited.
