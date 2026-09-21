@@ -277,6 +277,6 @@ Scope is intentionally bounded to the desktop evidence already supplied:
 - [x] Theme/Sectors: increased table/rank scan readability and removed the decorative overview gradient.
 - [x] Preserved sector table, sorting, selected coin, project evidence, official links, and research jump.
 - [x] Added `check-page-hierarchy-v19.mjs` and wired it into `npm run typecheck`.
-- [ ] Exact latest-head GitHub CI verification pending.
-- [ ] Actual local fast-forward + full typecheck pending after remote CI.
+- [x] Exact latest-head GitHub CI verification PASS at `deb3c30385cdcf86604a62a9357c490a6071b522`: B3 trader tests #2800 SUCCESS; dashboard-smoke, cloudflare-typecheck, python-test, cloudflare-pages-viewer all SUCCESS; returned Build 51~71 workflow set SUCCESS.
+- [ ] Actual local fast-forward to `deb3c30385cdcf86604a62a9357c490a6071b522` + clean/aligned readback + full `npm run typecheck` pending.
 - [ ] Preview-only V19 redeploy/readback pending. Production prohibited.
