@@ -1,10 +1,14 @@
-const ROUTES=new Set(['dashboard','dashboard-detail','research','assets','paper','strategy','sectors','records','system']);
+const ROUTES=new Set(['live','dashboard','dashboard-detail','research','assets','paper','strategy','sectors','records','system']);
 const NAV_PARENT={
+  dashboard:'live',
+  assets:'live',
+  strategy:'paper',
   'dashboard-detail':'research',
   sectors:'research',
 };
 export function navRouteFor(name){return NAV_PARENT[name]||name}
 export function routeContextFor(ui,name){
+  if(name==='live')return{exchange:ui.liveExchange,market:ui.liveMarket};
   if(name==='research')return{exchange:ui.researchExchange,market:ui.researchMarket};
   if(name==='sectors')return{exchange:ui.sectorExchange,market:ui.sectorCoinMarket};
   if(name==='paper')return{exchange:ui.paperExchange,market:ui.paperMarket};
@@ -15,7 +19,10 @@ export function routeContextFor(ui,name){
 function carryContext(store,from,to){
   if(!from||from===to)return;
   const ui=store.get().ui,ctx=routeContextFor(ui,from),patch={};
-  if(to==='research'){
+  if(to==='live'){
+    if(ctx.exchange)patch.liveExchange=ctx.exchange;
+    if(ctx.market)patch.liveMarket=ctx.market;
+  }else if(to==='research'){
     if(ctx.exchange)patch.researchExchange=ctx.exchange;
     if(ctx.market)patch.researchMarket=ctx.market;
   }else if(to==='sectors'){
@@ -36,7 +43,7 @@ export function createRouter({store,root,nav,pages,onChange}){
   let current=null,currentName='';
   function syncNav(name){const active=navRouteFor(name);nav?.querySelectorAll('[data-route]').forEach(b=>b.classList.toggle('active',b.dataset.route===active))}
   function go(name,{replace=false}={}){
-    if(!ROUTES.has(name))name='dashboard';
+    if(!ROUTES.has(name))name='live';
     if(currentName===name){syncNav(name);onChange?.(name);return}
     carryContext(store,currentName,name);
     current?.destroy?.();
