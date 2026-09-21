@@ -294,6 +294,6 @@ Scope is bounded to PAPER + Strategy composition only.
 - [x] Strategy detail panels no longer create a nested vertical scroll container; document flow remains canonical.
 - [x] Existing strategy tabs, strategy selection rail, PAPER filters/search/sort, selected market, trade plan, fills, charts and evidence remain available.
 - [x] Added `check-sparse-detail-v20.mjs` and wired it into `npm run typecheck`.
-- [ ] Exact implementation-head CI pending at `c8c13dfa4aa0b175c3d7f58bb92eb17dfb8c3515`.
-- [ ] Actual local fast-forward + full `npm run typecheck` pending after CI.
+- [x] CI PASS for the exact current code at durable head `9f598c70bd3a18c5af2160dc05a721504d01e1fd` (code identical to implementation head `c8c13dfa4...`; only TASKS/HANDOFF docs differ): B3 trader tests #2819 SUCCESS and returned Build 51~71 set SUCCESS.
+- [ ] Actual local fast-forward to the latest durable docs head, clean/aligned readback, full `npm run typecheck`, then Preview-only redeploy/readback pending.
 - [ ] Preview-only redeploy/readback pending. Production prohibited.
