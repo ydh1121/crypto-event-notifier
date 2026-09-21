@@ -302,7 +302,7 @@
   background:transparent!important;
   box-shadow:none!important;
 }
-.journey-nav{justify-content:center!important;margin:0!important;padding:0 var(--content-pad,28px)!important}
+.journey-nav{justify-content:center!important;margin:0!important;padding:0 max(var(--content-pad,28px),env(safe-area-inset-right)) 0 max(var(--content-pad,28px),env(safe-area-inset-left))!important}
 .journey-nav button,
 .subnav button,
 #pageRoot .strategy-subnav button,
@@ -500,9 +500,6 @@ html[data-reader-mode="simple"] #pageRoot[data-page-route="paper"] .paper-detail
 
 @media(max-width:620px){
   .header-tools{width:auto!important;justify-content:flex-end!important;flex-wrap:nowrap!important}
-  .main-nav button,.segmented button,.reader-mode-control button,.chip-row button,.theme-toggle{min-height:var(--control-touch-h)!important}
-  .auth-theme-toggle{top:max(10px,env(safe-area-inset-top))!important;right:max(10px,env(safe-area-inset-right))!important;min-height:var(--control-touch-h)!important}
-  .journey-nav{padding-left:max(var(--content-pad-mobile,12px),env(safe-area-inset-left))!important;padding-right:max(var(--content-pad-mobile,12px),env(safe-area-inset-right))!important}
   .journey-nav,.subnav,#pageRoot .strategy-subnav,#pageRoot .decision-first-tabs,#pageRoot .strategy-v5-detail-tabs{gap:18px!important}
   #pageRoot[data-page-route="research"] #researchFilters{grid-template-columns:repeat(2,minmax(0,1fr))!important}
   #pageRoot[data-page-route="research"] .market-list-columns,
