@@ -40,7 +40,7 @@ check('sticky side panes cannot hide below variable header',layout.includes('.re
 check('legacy workspaces collapse before narrow overlap',layout.includes('@media(max-width:900px)')&&layout.includes('.research-workspace,.asset-workspace,.paper-workspace,.strategy-workspace,.sector-layout,.records-content-grid{grid-template-columns:1fr!important}'));
 check('mobile detail nav avoids horizontal hidden discovery',layout.includes('grid-template-columns:repeat(auto-fit,minmax(88px,1fr))!important'));
 check('table cells can shrink without text collision',layout.includes('.mainstream-table-head>span,.mainstream-table-row>span,.market-summary-row>span,.trade-row>span,.trade-row>time{min-width:0!important}'));
-check('dark mode stylesheet loads after layout',index.includes('/modules/styles/theme-dark-v4.css?v=1')&&index.indexOf('layout-fixes-v4.css')<index.indexOf('theme-dark-v4.css'));
+check('dark mode stylesheet loads after layout',index.includes('/modules/styles/theme-dark-v4.css?v=2')&&index.indexOf('layout-fixes-v4.css')<index.indexOf('theme-dark-v4.css'));
 check('dark audit stylesheet loads after base dark mode',index.includes('/modules/styles/theme-dark-audit-v4.css?v=1')&&index.indexOf('theme-dark-v4.css')<index.indexOf('theme-dark-audit-v4.css'));
 check('dark mode controls exist before and after login',index.includes('class="auth-theme-toggle" data-theme-toggle')&&index.includes('class="theme-toggle" data-theme-toggle'));
 check('dark mode is installed from main entry',main.includes('installThemeToggle')&&main.includes("./shared/theme.js?v=1"));
