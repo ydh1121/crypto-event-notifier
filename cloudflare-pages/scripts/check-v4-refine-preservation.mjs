@@ -20,7 +20,7 @@ const check=(name,value)=>{if(!value)fail.push(name)};
 check('v4 home remains active',main.includes("dashboard:()=>createHomePage"));
 check('market dashboard remains active',main.includes("'dashboard-detail':()=>createDashboardPage"));
 check('all functional pages remain wired',['createResearchPage','createAssetsPage','createPaperPage','createStrategyPage','createSectorsPage','createRecordsPage','createSystemPage'].every(value=>main.includes(value)));
-check('market secondary group remains',main.includes("['research','코인']")&&main.includes("['dashboard-detail','시장현황']")&&main.includes("['sectors','테마']"));
+check('market secondary group remains',main.includes("['research','코인 탐색']")&&main.includes("['dashboard-detail','시장현황']")&&main.includes("['sectors','테마']"));
 check('paper and strategy are no longer fused into secondary navigation',!main.includes("paper:[['paper','모의투자']")&&!main.includes("strategy:[['paper','모의투자']"));
 check('v4 style stack remains',['mainstream-v4.css','layout-fixes-v4.css','theme-dark-v4.css','theme-dark-audit-v4.css','decision-workspace-v4.css'].every(value=>index.includes(value)));
 check('refine layer remains after v4',index.includes('v4-refine-v1.css')&&index.indexOf('decision-workspace-v4.css')<index.indexOf('v4-refine-v1.css'));
