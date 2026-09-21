@@ -11,7 +11,7 @@ import{installMainstreamUi}from'./shared/mainstream-ui.js?v=2';
 import{installThemeToggle}from'./shared/theme.js?v=1';
 import{installStrategyDrilldown}from'./shared/strategy-drilldown-v4.js?v=3';
 import{installViewportHandoff}from'./shared/viewport-handoff-v4.js?v=3';
-import{installRailControlsV16}from'./shared/rail-controls-v16.js?v=1';
+import{installRailControlsV16}from'./shared/rail-controls-v16.js?v=2';
 import{installLivePatchV16}from'./shared/live-patch-v16.js?v=4';
 import{installRemainingLivePatchV16}from'./shared/live-patch-remaining-v16.js?v=1';
 import{installHoldingsWriteV16}from'./shared/holdings-write-v16.js?v=5';
@@ -26,12 +26,13 @@ import{createSectorsPage}from'./pages/sectors-v36.js?v=46';
 import{createRecordsPage}from'./pages/records.js?v=48';
 import{createSystemPage}from'./pages/system.js?v=35';
 
+const root=document.getElementById('pageRoot');
+
 installSectorImeGuard();
 installTableSortEnhancer();
 installThemeToggle();
-installRailControlsV16({store});
+installRailControlsV16({store,root});
 
-const root=document.getElementById('pageRoot');
 const nav=document.getElementById('mainNav');
 const journey=document.getElementById('journeyNav');
 const reader=document.getElementById('readerModeControl');

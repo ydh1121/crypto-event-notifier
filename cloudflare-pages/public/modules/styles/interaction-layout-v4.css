@@ -2,14 +2,6 @@
    This file owns final layout, overlap prevention and control spacing.
    Goal-first IA: one content width, explicit scroll ownership, one primary answer. */
 
-:root{
-  --ui-control-h:38px;
-  --ui-control-r:8px;
-  --ui-control-gap:8px;
-  --ui-panel-r:12px;
-  --ui-section-gap:18px;
-}
-
 .app-header{z-index:100!important}
 .app-header-inner,
 .app-main{
@@ -348,7 +340,7 @@
   display:flex!important;
   align-items:center!important;
   flex-wrap:wrap!important;
-  gap:var(--ui-control-gap)!important;
+  gap:var(--control-gap)!important;
   padding:0!important;
   border:0!important;
   border-radius:0!important;
@@ -356,11 +348,11 @@
   box-shadow:none!important;
 }
 .segmented button,.reader-mode-control button,.chip-row button{
-  min-height:var(--ui-control-h)!important;
+  min-height:var(--control-h)!important;
   margin:0!important;
   padding:8px 12px!important;
   border:1px solid var(--line)!important;
-  border-radius:var(--ui-control-r)!important;
+  border-radius:var(--control-radius)!important;
   background:var(--surface)!important;
   box-shadow:none!important;
   color:var(--muted)!important;
@@ -382,11 +374,11 @@
 
 /* Canonical action buttons. */
 .soft-button,.paper-next button,.paper-toolbar button,.compare-toolbar button,.avg-actions button,.amount-quick-buttons button,.direct-presets button,[data-paper-reset],[data-compare-reset]{
-  min-height:var(--ui-control-h)!important;
+  min-height:var(--control-h)!important;
   margin:0!important;
   padding:8px 12px!important;
   border:1px solid var(--line)!important;
-  border-radius:var(--ui-control-r)!important;
+  border-radius:var(--control-radius)!important;
   background:var(--surface)!important;
   box-shadow:none!important;
   color:var(--ink)!important;
@@ -404,19 +396,19 @@
 .search,.paper-toolbar input,.paper-toolbar select,.compare-toolbar input,.compare-toolbar select,.calculator-field input,.holding-budget-head input,.sector-search input,.strategy-breakdown-controls input,.strategy-breakdown-controls select{
   min-height:42px!important;
   border:1px solid var(--line)!important;
-  border-radius:var(--ui-control-r)!important;
+  border-radius:var(--control-radius)!important;
   background:var(--surface)!important;
   box-shadow:none!important;
 }
 
 /* Toolbars always reserve space between controls. */
-.paper-toolbar,.compare-toolbar,.strategy-breakdown-controls,.avg-actions,.paper-next>div:last-child,.amount-quick-buttons,.direct-presets{gap:var(--ui-control-gap)!important}
+.paper-toolbar,.compare-toolbar,.strategy-breakdown-controls,.avg-actions,.paper-next>div:last-child,.amount-quick-buttons,.direct-presets{gap:var(--control-gap)!important}
 .paper-toolbar{grid-template-columns:auto minmax(180px,1fr) minmax(180px,220px) auto!important;margin-bottom:14px!important}
 .compare-toolbar{grid-template-columns:minmax(220px,1fr) minmax(190px,230px) auto!important;margin-bottom:14px!important}
 
 /* Panel geometry: one radius scale, no accidental overlap. */
 .section-panel,.paper-combined,.exchange-paper-grid>article,.paper-next,.paper-strategy-filter,.paper-master,.paper-detail-hero,.paper-detail-kpis>span,.trade-plan-panel,.compare-head,.compare-table,.asset-master,.asset-detail-hero,.asset-detail-grid>span,.asset-research-sides>article,.direct-average-panel,.averaging-calculator,.holding-plan-panel,.profit-plan,#pageRoot .strategy-v5-detail-shell,#pageRoot .strategy-workspace>.strategy-table{
-  border-radius:var(--ui-panel-r)!important;
+  border-radius:var(--panel-radius)!important;
   box-shadow:none!important;
 }
 

@@ -1,0 +1,36 @@
+import fs from'node:fs';
+const read=path=>fs.readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
+const index=read('public/index.html');
+const main=read('public/modules/main.js');
+const rails=read('public/modules/shared/rail-controls-v16.js');
+const tokens=read('public/modules/styles/tokens.css');
+const shell=read('public/modules/styles/shell.css');
+const components=read('public/modules/styles/components.css');
+const interaction=read('public/modules/styles/interaction-layout-v4.css');
+const mainstream=read('public/modules/styles/mainstream-v4.css');
+const layout=read('public/modules/styles/layout-fixes-v4.css');
+const strategy=read('public/modules/styles/strategy-native-v5.css');
+const contract=read('../docs/workstreams/dashboard-v1/UI_FOUNDATION_CONTRACT.md');
+const fail=[];
+const check=(name,value)=>{if(!value)fail.push(name)};
+const count=(text,pattern)=>(text.match(pattern)||[]).length;
+
+check('V18 build marker is active',index.includes('2026.09.21-v6.4.2-v18-ui-foundation'));
+check('foundation styles remain foundational not a new late layer',index.indexOf('tokens.css?v=4')<index.indexOf('shell.css?v=6')&&index.indexOf('shell.css?v=6')<index.indexOf('components.css?v=4')&&index.indexOf('components.css?v=4')<index.indexOf('charts.css'));
+check('stylesheet count does not grow beyond audited baseline',count(index,/rel="stylesheet"/g)<=37);
+check('rail controls are root scoped',main.includes('installRailControlsV16({store,root})')&&rails.includes('hostRoot=root')&&rails.includes("root.addEventListener('ui:refresh',schedule)"));
+check('rail controls have no broad MutationObserver',!rails.includes('MutationObserver')&&!rails.includes('document.documentElement')&&!rails.includes("document.addEventListener('click'"));
+check('research input interception remains local and selection safe',rails.includes("root.addEventListener('input',onInputCapture,true)")&&rails.includes('event.stopPropagation()')&&rails.includes('row.hidden=!show')&&!rails.includes('researchMarket:'));
+check('canonical geometry tokens live in tokens.css',['--control-h:38px','--control-input-h:42px','--control-touch-h:44px','--control-radius:8px','--control-gap:8px','--panel-radius:12px','--workspace-gap:28px','--master-rail-min:280px','--master-rail-max:360px','--focus-ring:'].every(value=>tokens.includes(value)));
+check('legacy interaction token aliases are retired',!interaction.includes('--ui-control-h:')&&!interaction.includes('--ui-control-r:')&&!interaction.includes('--ui-control-gap:')&&!interaction.includes('--ui-panel-r:')&&interaction.includes('var(--control-h)')&&interaction.includes('var(--control-radius)')&&interaction.includes('var(--control-gap)')&&interaction.includes('var(--panel-radius)'));
+check('shared shell and components consume canonical tokens',shell.includes('var(--control-h)')&&shell.includes('var(--control-radius)')&&shell.includes('var(--control-gap)')&&components.includes('var(--control-input-h)')&&components.includes('var(--control-radius)'));
+check('canonical composition primitives exist',['.ui-toolbar','.ui-master-detail','.ui-master-rail','.ui-detail-pane','.ui-fact-strip','.ui-disclosure','.ui-action'].every(value=>components.includes(value)));
+check('mobile-native foundation preserves zoom and touch behavior',index.includes('viewport-fit=cover')&&tokens.includes('touch-action:manipulation')&&tokens.includes('@media(pointer:coarse)')&&tokens.includes('font-size:16px')&&!index.includes('user-scalable=no')&&!index.includes('maximum-scale=1'));
+check('foundation contract documents lifecycle and stable exemplars',contract.includes('Explicit lifecycle')&&contract.includes('rail-controls-v16.js')&&contract.includes('Stable exemplar preservation'));
+check('mainstream override debt does not grow',count(mainstream,/!important/g)<=146);
+check('layout-fixes override debt does not grow',count(layout,/!important/g)<=142);
+check('interaction-layout override debt does not grow',count(interaction,/!important/g)<=400);
+check('strategy-native override debt does not grow',count(strategy,/!important/g)<=448);
+
+if(fail.length){console.error('UI_FOUNDATION_V18=FAIL');for(const item of fail)console.error(`- ${item}`);process.exit(1)}
+console.log('UI_FOUNDATION_V18=PASS');
