@@ -359,3 +359,18 @@ STATUS = ACTIVE
 - [ ] Build one exhaustive existing-capability → canonical-destination mapping table before any further page coding.
 - [ ] Produce low-fidelity wireframe/page component hierarchy only after the mapping table is accepted.
 - [ ] No Production deploy.
+
+
+### WO-007 planning artifacts
+
+- [x] Created exhaustive 100-row capability map: `EXISTING_CAPABILITY_CANONICAL_MAPPING_V1.md`.
+- [x] Created two-primary-page Low-fi: `SIMPLIFIED_TRADING_LOWFI_SPEC_V1.md`.
+- [x] Primary pages remain only `실전매매` and `가상매매`; 탐색/기록/운영/연구·데이터 are secondary.
+- [x] Identified six primary projection/derivation gaps only: dominant strategy, strategy account state, strategy trade ledger, BTC/ETH-relative history, selected-coin event/reaction memory, recommendation evidence envelope.
+- [x] Reused CODE1 Drive Harness principles: IA/flow before High-fi, flat-scan high-frequency tasks, grouping surface + flat rows, semantic family before tokens, real state/value over helper copy, context preservation, 390px + desktop containment review.
+- [x] Reviewed public Git references read-only: `openexch/trading-ui`, `rampstackco/swiss-style-theme`, `davaded/frontend-art-direction`, `carbon-design-system/carbon`.
+- [x] External references are pattern evidence only; no new UI dependency/library is introduced.
+- [x] Current GitHub connector does not expose authenticated starred-repository enumeration; no repo is falsely labeled as user-starred.
+- [ ] USER REVIEW REQUIRED for mapping and Low-fi hierarchy.
+- [ ] Source/UI implementation remains blocked until user accepts/corrects the planning artifacts.
+- [ ] Production deploy remains prohibited.
