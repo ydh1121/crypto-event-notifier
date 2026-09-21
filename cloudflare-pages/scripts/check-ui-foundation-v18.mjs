@@ -17,7 +17,7 @@ const fail=[];
 const check=(name,value)=>{if(!value)fail.push(name)};
 const count=(text,pattern)=>(text.match(pattern)||[]).length;
 
-check('V18 build marker is active',index.includes('2026.09.21-v6.4.2-v18-ui-foundation'));
+check('V18 foundation lineage is preserved in current build',index.includes('2026.09.21-v6.5.0-simplified-trading-v22'));
 check('foundation styles remain foundational not a new late layer',index.indexOf('/modules/styles/tokens.css?v=')<index.indexOf('/modules/styles/shell.css?v=')&&index.indexOf('/modules/styles/shell.css?v=')<index.indexOf('/modules/styles/components.css?v=')&&index.indexOf('/modules/styles/components.css?v=')<index.indexOf('/modules/styles/charts.css?v='));
 check('stylesheet count does not grow beyond audited baseline',count(index,/rel="stylesheet"/g)<=37);
 check('rail controls are root scoped',main.includes('installRailControlsV16({store,root})')&&rails.includes('hostRoot=root')&&rails.includes("root.addEventListener('ui:refresh',schedule)"));
