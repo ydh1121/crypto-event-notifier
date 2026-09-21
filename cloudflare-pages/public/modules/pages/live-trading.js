@@ -11,6 +11,7 @@ const BUY_INTENTS=new Set(['buy','add','explore','idle_explore']);
 function exchangeLabel(value){return value==='upbit'?'업비트':'빗썸'}
 function symbolOf(row,market=''){return String(row?.symbol||market||'').replace(/^KRW-/,'')}
 function marketKey(exchange,market){return `${exchange}|${market}`}
+function marketChange(row){const value=Number(row?.change_24h_pct);return Number.isFinite(value)?value:null}
 function validationLabel(exp,coinRow,criteria){
   const c=exp?.candidate||{};
   if(exp?.status==='paused'||c.status==='paused')return['일시정지','paused'];
@@ -98,6 +99,7 @@ export function createLiveTradingPage({store,navigate}){
     if(!box)return;
     const ex=exchange(),market=ensureMarket(),row=findMarket(store.get(),ex,market),holding=holdingFor(ex,market),ticker=symbolOf(row,market);
     const holdingHtml=holding?`<div class="live-holding-brief"><span>실제 보유</span><b>${n(holding.volume).toLocaleString('ko-KR',{maximumFractionDigits:8})}개</b><small>평단 ${price(holding.avg_price)} · 평가 ${money(holding.value_krw)} · <em class="${tone(holding.unrealized_pnl_krw)}">${n(holding.unrealized_pnl_krw)>=0?'+':''}${money(holding.unrealized_pnl_krw)}</em></small></div>`:'<div class="live-holding-brief empty"><span>실제 보유</span><b>미보유</b><small>계산기는 수량·평단을 직접 입력할 수 있습니다.</small></div>';
+    const change=marketChange(row);
     box.innerHTML=`
       <div class="live-context-controls">
         <div class="segmented live-exchange" role="group" aria-label="거래소">
@@ -106,7 +108,7 @@ export function createLiveTradingPage({store,navigate}){
         </div>
         <label class="live-market-search"><span>코인</span><input data-live-market-search type="search" value="${esc(ticker)}" autocomplete="off" placeholder="티커 검색"><div id="liveMarketSuggestions" class="live-market-suggestions" hidden></div></label>
       </div>
-      <div class="live-current-quote"><span>${esc(exchangeLabel(ex))} · ${esc(ticker||market)}</span><b data-live-current-price>${price(row?.price)}</b><small>24h <em class="${tone(row?.change_24h_pct??row?.return_pct)}">${pct(row?.change_24h_pct??row?.return_pct)}</em> · 판단 ${esc(decisionLabel(row)||'-')}</small></div>
+      <div class="live-current-quote"><span>${esc(exchangeLabel(ex))} · ${esc(ticker||market)}</span><b data-live-current-price>${price(row?.price)}</b><small>24h <em class="${change===null?'':tone(change)}">${change===null?'-':pct(change)}</em> · 판단 ${esc(decisionLabel(row)||'-')}</small></div>
       ${holdingHtml}`;
   }
 
@@ -128,7 +130,7 @@ export function createLiveTradingPage({store,navigate}){
       const active=row.market===market,intent=String(row.trade_intent||'').toLowerCase(),signal=BUY_INTENTS.has(intent)?'매수 조건 관찰':decisionLabel(row)||'관찰';
       return`<button type="button" data-live-candidate="${esc(row.market)}" data-live-candidate-exchange="${esc(row.__exchange)}" class="live-candidate-row ${active?'selected':''}">
         <span><b>${esc(symbolOf(row,row.market))}</b><small>${esc(signal)} · 기회 ${n(row.opportunity_score).toFixed(0)} · 타이밍 ${n(row.entry_score).toFixed(0)}</small></span>
-        <strong><b>${price(row.price)}</b><small class="${tone(row.change_24h_pct??row.return_pct)}">${pct(row.change_24h_pct??row.return_pct)}</small></strong>
+        <strong><b>${price(row.price)}</b><small class="${tone(row.return_pct)}">PAPER ${pct(row.return_pct)}</small></strong>
       </button>`;
     }).join(''):empty('현재 스캔할 코인이 없습니다.');
   }
@@ -158,12 +160,12 @@ export function createLiveTradingPage({store,navigate}){
   function renderStrategyPlan(){
     const box=root?.querySelector('#liveStrategyPlan');
     if(!box)return;
-    const row=selectedRow(),plan=detailMatches()?currentPlan():{},guide=buildHoldingPlanGuidance({row,plan}),evidence=strategyEvidence(),adaptiveName=currentStrategy();
+    const row=selectedRow(),plan=detailMatches()?currentPlan():{},planReady=detailMatches()&&Object.keys(plan).length>0,guide=buildHoldingPlanGuidance({row,plan}),evidence=strategyEvidence(),adaptiveName=currentStrategy();
     const adaptive=`<div class="live-plan-row live-plan-current">
       <span><b>현재 실행 · ${esc(adaptiveName)}</b><small>실행 PAPER 계획</small></span>
-      <span><small>진입</small><b>${price(guide.nextPrice)}</b><em>${guide.suggestedWeightPct?guide.suggestedWeightPct.toFixed(2)+'%':'비중 미제공'}</em></span>
-      <span><small>익절</small><b>${price(guide.targetPrice)}</b><em>분할 비중 미제공</em></span>
-      <span><small>중단</small><b>${price(guide.stopPrice)}</b><em>${guide.remainingEntries?'남은 분할 '+guide.remainingEntries+'회':'-'}</em></span>
+      <span><small>진입</small><b>${planReady?price(guide.nextPrice):'계획 대기'}</b><em>${planReady&&guide.suggestedWeightPct?guide.suggestedWeightPct.toFixed(2)+'%':'비중 미제공'}</em></span>
+      <span><small>익절</small><b>${planReady?price(guide.targetPrice):'계획 대기'}</b><em>분할 비중 미제공</em></span>
+      <span><small>중단</small><b>${planReady?price(guide.stopPrice):'-'}</b><em>${planReady&&guide.remainingEntries?'남은 분할 '+guide.remainingEntries+'회':'-'}</em></span>
       <span><small>상태</small><b>${esc(guide.status)}</b><em>실거래 주문 아님</em></span>
     </div>`;
     const experimental=evidence.map(({row:r,exp,criteria})=>{
@@ -183,16 +185,15 @@ export function createLiveTradingPage({store,navigate}){
       </div>`;
   }
 
-  async function loadDetail(){
+  async function loadDetail({preserve=false}={}){
     const ex=exchange(),market=ensureMarket(),key=marketKey(ex,market),id=++detailSeq;
-    detail=null;detailFor='';
-    renderStrategyPlan();
+    if(!preserve){detail=null;detailFor='';renderStrategyPlan();}
     try{
       const next=await getMarketDetail(ex,market);
       if(id!==detailSeq||key!==marketKey(exchange(),selectedMarket()))return;
       detail=next;detailFor=key;renderStrategyPlan();renderCalculatorReference();
     }catch{
-      if(id===detailSeq){detail=null;detailFor=key;renderStrategyPlan();renderCalculatorReference()}
+      if(id===detailSeq&&!preserve){detail=null;detailFor=key;renderStrategyPlan();renderCalculatorReference()}
     }
   }
 
@@ -286,8 +287,8 @@ export function createLiveTradingPage({store,navigate}){
   }
   function refreshData(){
     if(!root?.querySelector('[data-live-trading-root]')){render();return}
-    ensureMarket();renderContext();renderCandidates();renderStrategySummary();renderStrategyPlan();
-    if(!detailMatches())loadDetail();
+    ensureMarket();renderContext();renderCandidates();renderStrategySummary();renderStrategyPlan();renderCalculatorReference();
+    loadDetail({preserve:true});
   }
 
   const click=event=>{
