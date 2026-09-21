@@ -597,3 +597,16 @@ Reference translation:
 - Carbon = dense table/state/accessibility reference.
 
 Do not begin source migration until the user accepts or edits this hierarchy. Production remains prohibited.
+
+
+## CRYPTO-WO-20260921-008 — READY / WAITING_LOCAL_PARENT_VERIFY
+
+User continuation released the WO-007 review gate.
+
+Migration authority: `SIMPLIFIED_TRADING_MIGRATION_PLAN_V1.md`.
+
+First bounded implementation is only primary shell + 실전매매 v1. It may reuse existing real data and calculators but must not delete old routes, change PAPER/strategy semantics, invent dominant strategy evidence, change holdings mutation behavior, or add live order submission.
+
+Before any source mutation, actual local must be fast-forwarded to the new durable head and prove branch `b3-auto-trader-phase1`, tracked/staged/untracked 0, upstream 0/0.
+
+Production remains prohibited.
