@@ -579,3 +579,21 @@ Canonical primary destinations are now:
 Everything else is secondary and must be classified under 탐색, 연구/데이터, 기록 or 운영. Do not resume device QA or cosmetic repair as current WIP. First produce the exhaustive mapping table of already-developed capabilities into this simplified structure.
 
 Production remains prohibited.
+
+
+### WO-007 planning checkpoint — capability map + Low-fi ready
+
+Planning artifacts are ready for user review:
+- `docs/workstreams/dashboard-v1/EXISTING_CAPABILITY_CANONICAL_MAPPING_V1.md` — 100 existing/future capabilities mapped to canonical destinations and treatment.
+- `docs/workstreams/dashboard-v1/SIMPLIFIED_TRADING_LOWFI_SPEC_V1.md` — only two primary user pages: 실전매매 / 가상매매.
+
+The Low-fi deliberately removes the generic Home/dashboard as a required primary destination. 실전매매 contains selector → dominant strategy → split entry/exit/weights → averaging/profit calculator → compact rising-candidate list. 가상매매 keeps the selected coin context and switches only among 전략 / BTC·ETH / 이벤트.
+
+Reference translation:
+- CODE1 Harness = flow/IA discipline, flat scan, anti-card nesting, context preservation.
+- openexch/trading-ui = persistent instrument context + adjacent task surfaces, not its live-order semantics.
+- swiss-style-theme = dense grid/alignment/hairline hierarchy.
+- frontend-art-direction = real data before decorative dashboard polish.
+- Carbon = dense table/state/accessibility reference.
+
+Do not begin source migration until the user accepts or edits this hierarchy. Production remains prohibited.
