@@ -215,3 +215,13 @@ Finish this workstream when mobile/dashboard UX is approved, adaptive per-coin P
 - [x] GitHub `B3 trader tests` run 2750 PASS: python-test, cloudflare-typecheck, cloudflare-pages-viewer, dashboard-smoke all SUCCESS; returned Build 51~71 set SUCCESS.
 - [ ] VISUAL QA GATE — preview-only deployment/readback, then desktop 1280/1440/1920, tablet 768/900/1024, phone 360/390/430, light/dark, keyboard/focus, reader-mode, selection/sort/search and live polling continuity.
 - [ ] Production deployment remains prohibited until visual QA is accepted.
+
+
+### WO-002 preview visual-QA checkpoint
+
+- [x] Non-Production Pages preview deployed from actual local `7e19da175c34fc4e6b172581ebf2831bd5426a67`.
+- [x] Deployment URL: `https://1072960d.crypto-paper-viewer-ydh1121-cf36.pages.dev`.
+- [x] Stable preview alias: `https://qa-v18-ui-foundation.crypto-paper-viewer-ydh1121-cf36.pages.dev`.
+- [x] Wrangler explicitly used preview branch `qa-v18-ui-foundation`; Production branch was not deployed.
+- [ ] Visual QA pending: desktop 1440 dark first, then representative phone 390 dark, then light/keyboard/focus/reader-mode/search/sort/polling continuity.
+- [ ] No write-action testing against holdings/PAPER/runtime mutation endpoints during visual QA.
