@@ -378,18 +378,31 @@ STATUS = ACTIVE
 
 ## S. CRYPTO-WO-20260921-008 Primary shell + 실전매매 composition v1
 
-STATUS = READY / WAITING_LOCAL_PARENT_VERIFY
+STATUS = VERIFY_LOCAL_AND_PREVIEW
 
 PARENT REMOTE = current durable branch head after WO-007 acceptance docs
 
 - [x] WO-007 planning accepted; migration order fixed in `SIMPLIFIED_TRADING_MIGRATION_PLAN_V1.md`.
-- [ ] Fresh actual-local branch/head/clean/upstream verification.
-- [ ] Implement new primary `실전매매` composition without deleting old routes.
-- [ ] Primary visible navigation becomes 실전매매 / 가상매매 / 탐색 / 기록; 운영 stays utility/admin.
-- [ ] Reuse actual holdings, current quote, candidate/watch data, PAPER/strategy evidence, averaging/profit tools.
-- [ ] Never invent dominant strategy; weak/absent evidence displays insufficient state.
-- [ ] Preserve all existing PAPER/holdings/data semantics and polling continuity.
-- [ ] Add bounded route/composition contract.
-- [ ] Full typecheck/CI.
+- [x] Fresh actual-local parent verification PASS at `fd527d7b026c7c483ae9dd152eef836808db6392`: branch `b3-auto-trader-phase1`, tracked/staged/untracked `0/0/0`, upstream `0/0`.
+- [x] Implemented new primary `실전매매` composition at code head `169ca445ef4a93103fc548f642bacc5de675a77b`; all legacy routes/modules remain wired.
+- [x] Primary visible navigation is now `실전매매 / 가상매매 / 탐색 / 기록`; 운영 remains owner/account utility.
+- [x] Live page reuses actual holdings/current quote/watch candidates/PAPER detail/strategy-lab results plus canonical averaging and profit-protection utilities.
+- [x] Dominant-strategy UI is evidence-safe: one Gate candidate may be shown only as `우세 후보`; multiple/absent candidates show compare/insufficient state; no return-only winner is invented.
+- [x] PAPER/strategy/holdings-write/data semantics preserved; `live` is a patch route with page-owned `snapshot-live` refresh, calculator inputs are not overwritten by polling.
+- [x] Added `SIMPLIFIED_TRADING_V22` contract and refreshed stale IA/viewport/mobile/build-lineage contracts without deleting prior gates.
+- [x] Exact code-head CI PASS at `169ca445ef4a93103fc548f642bacc5de675a77b`: B3 trader tests #2925 SUCCESS; cloudflare-pages-viewer/cloudflare-typecheck/python-test/dashboard-smoke SUCCESS; returned Build 51~71 set SUCCESS.
 - [ ] Preview-only QA.
+- [ ] Production prohibited.
+
+### WO-008 implementation notes
+
+- New route: `live`.
+- Desktop primary composition: exchange/ticker/current price/holding context → observation candidates → strategy evidence/plan → one-mode-at-a-time averaging/profit calculator.
+- Candidate block is explicitly `상승 관찰 후보`, not final recommendation; BTC·ETH/event evidence envelope remains WO-011.
+- Strategy-specific entry/exit projections that do not exist in Snapshot display `projection 대기` / `비중 미제공`; no synthetic targets are generated.
+- Current PAPER 24h label no longer falls back to cumulative PAPER return; missing 24h data displays `-`.
+- Old Assets/PAPER/Strategy/Market pages remain reachable through secondary journeys during migration.
+- [ ] Actual local fast-forward to latest durable docs head + full Viewer typecheck pending.
+- [ ] Preview-only deployment/readback pending.
+- [ ] Visual QA at desktop + 390px pending.
 - [ ] Production prohibited.
