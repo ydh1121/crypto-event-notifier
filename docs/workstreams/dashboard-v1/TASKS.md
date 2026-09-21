@@ -391,7 +391,7 @@ PARENT REMOTE = current durable branch head after WO-007 acceptance docs
 - [x] PAPER/strategy/holdings-write/data semantics preserved; `live` is a patch route with page-owned `snapshot-live` refresh, calculator inputs are not overwritten by polling.
 - [x] Added `SIMPLIFIED_TRADING_V22` contract and refreshed stale IA/viewport/mobile/build-lineage contracts without deleting prior gates.
 - [x] Exact code-head CI PASS at `169ca445ef4a93103fc548f642bacc5de675a77b`: B3 trader tests #2925 SUCCESS; cloudflare-pages-viewer/cloudflare-typecheck/python-test/dashboard-smoke SUCCESS; returned Build 51~71 set SUCCESS.
-- [ ] Preview-only QA.
+- [x] Preview-only deployment/readback PASS: deployment `f18a2c1a`, alias `qa-v18-ui-foundation`; UTF-8 raw-byte readback confirmed all V22 live-trading markers. Production not deployed.
 - [ ] Production prohibited.
 
 ### WO-008 implementation notes
@@ -402,7 +402,7 @@ PARENT REMOTE = current durable branch head after WO-007 acceptance docs
 - Strategy-specific entry/exit projections that do not exist in Snapshot display `projection 대기` / `비중 미제공`; no synthetic targets are generated.
 - Current PAPER 24h label no longer falls back to cumulative PAPER return; missing 24h data displays `-`.
 - Old Assets/PAPER/Strategy/Market pages remain reachable through secondary journeys during migration.
-- [ ] Actual local fast-forward to latest durable docs head + full Viewer typecheck pending.
-- [ ] Preview-only deployment/readback pending.
-- [ ] Visual QA at desktop + 390px pending.
+- [x] Actual local/current readback PASS at `ba3c59a50962ae1a5bdc41053a75f9e6bf9e1ec7`: branch `b3-auto-trader-phase1`, tracked/staged/untracked `0/0/0`, upstream `0/0`; full `npm run typecheck` PASS including `SIMPLIFIED_TRADING_V22=PASS`.
+- [x] Preview-only deployment/readback PASS at `f18a2c1a` and stable alias; first PowerShell text readback was a Windows charset false negative, raw UTF-8 byte decoding passed both immutable deployment and alias.
+- [ ] Focused visual QA pending: one desktop screenshot + one 390px screenshot of the new `실전매매` page only.
 - [ ] Production prohibited.
