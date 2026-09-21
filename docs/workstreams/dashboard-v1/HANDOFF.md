@@ -486,3 +486,35 @@ The first implementation-head B3 test run was superseded/cancelled by subsequent
 - returned Build 51~71 workflow set = SUCCESS
 
 Next gate: actual local fast-forward to the latest durable head, clean/upstream readback, full `npm run typecheck` including `SPARSE_DETAIL_V20=PASS`, then Preview-only redeploy/readback. Production remains prohibited.
+
+
+### WO-004 acceptance
+
+WO-004 is ACCEPTED.
+
+Actual local/current verification at `b72ef6424121431562d53bd0c1e5351b184db90a`:
+- tracked/staged/untracked = 0/0/0;
+- upstream = 0/0;
+- full Viewer contract PASS including `SPARSE_DETAIL_V20=PASS`.
+
+Preview verification:
+- deployment `9d55cef5.crypto-paper-viewer-ydh1121-cf36.pages.dev`;
+- alias `qa-v18-ui-foundation.crypto-paper-viewer-ydh1121-cf36.pages.dev`;
+- PAPER content-height repair LIVE;
+- Strategy sparse-detail repair LIVE;
+- Production not deployed.
+
+
+## CRYPTO-WO-20260921-005 Mobile & interaction continuity — IMPLEMENTED / VERIFY
+
+Source changes:
+- shell horizontal/top/bottom safe-area ownership;
+- 100dvh fallback for app/auth surfaces;
+- 360-safe three-column main nav with text containment;
+- canonical 44px compact primary control height;
+- safe-area-aware auth theme toggle and journey rail;
+- V21 regression contract covering native zoom, coarse-pointer 16px inputs, focus/selection/scroll restore, snapshot-live patch ownership and durable search/filter/selection state.
+
+No new navigation controller, polling owner, page IA, trading semantics or Production deployment was introduced.
+
+Next gate: exact-head CI, then actual local fast-forward/typecheck including `MOBILE_INTERACTION_V21=PASS`, then Preview-only redeploy/readback. Real iPhone Safari device QA remains a final acceptance gate after source-level contracts pass.
