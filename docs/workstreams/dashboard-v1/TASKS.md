@@ -1,5 +1,45 @@
 # Dashboard v1 workstream tasks
 
+## Successor CURRENT — CRYPTO-WO-20260921-RECOVERY-001
+
+**Status: BLOCKED_LOCAL_EVIDENCE. V22 / WO-008 was rejected by the user.**
+This block supersedes earlier visual-acceptance/next-page checkpoints below.
+
+- Authority: the user's full project successor directive; existing functions/data must be preserved. Complete coin × strategy workflows from the actual journal before further UI work.
+- Source baseline actually read: `b3-auto-trader-phase1@56b9361f352eedce2e543b3baca36952b2397d76`. PR #1 was open, draft, unmerged.
+- Current Windows HEAD, worktree, canonical DB size/count/freshness and running processes: **UNKNOWN**. This session runs in a Linux workspace without the user's Windows checkout or a remote PC execution tool. Do not promote this workspace or the remote branch into local authority.
+- Canonical DB remains `b3_trader/data/auto_demo.sqlite3`. No replacement DB was created. No application source, runtime, holdings, strategy/PAPER semantics, migration, deployment or order change was performed.
+- This isolated recovery branch changes only TASKS/HANDOFF. Do not switch the running PC to it or merge it automatically.
+
+### Findings established from existing source
+
+1. `strategy_lab_snapshot.py` publishes experiment/metrics/coin-matrix/equity aggregates, but no complete trade ledger.
+2. `strategy_lab_market.py` reads at most 80 trades **across all experiments for a coin**, then discards all but the latest trade for each experiment. Its output also omits account volume. This is not a complete per-strategy journal contract.
+3. The Viewer trade selector reads summary-level `strategy_trades/trades/fills`; a source-backed complete account/ledger path is still unconnected.
+4. Strategy Lab buy `krw` is the fee-inclusive cash debit; sell `krw` is net proceeds. Reconciliation must not charge fees twice. Global strategy metrics must stay separate from coin-specific metrics.
+5. Trade fills alone do not establish maximum drawdown; intermediate marking history must also be checked.
+
+### Prepared local evidence collection
+
+Standalone deliverable: `CRYPTO_READ_ONLY.zip`, SHA-256 `23483470926a53d45b2d8a604c05bb4cf57fd313d0c4e8394c13fc1c6770d9ea`.
+It is distributed privately with this task, outside the Git checkout, so creating diagnostics does not precede the required application-source gate.
+
+It uses Python stdlib, SQLite `mode=ro` + `query_only` + a write-denying authorizer; no app-module imports, DB initialization, Git pull, restart, upload or order operations.
+It collects 20-table aggregates/schema/time ranges, BTC/ETH/OHLCV/event coverage, safe process/component metadata, two observations 45 seconds apart, and Bithumb/B3/aggressive account ↔ full ledger reconciliation with global metrics in a separate scope.
+If B3 has no trades, a populated account is checked separately and is never substituted as B3 evidence.
+
+Focused verification: **7 tests passed** on temporary fixtures: missing DB not created; SQL/pragma/attach writes denied and fixture file unchanged; WAL-visible committed data plus transaction consistency; fee-inclusive replay; incomplete ledger detection; absent-table UNKNOWN semantics; actual Strategy Lab schema with exchange/coin isolation and mismatch detection.
+Windows process discovery and the user's canonical DB execution remain unverified. These fixture results are not product acceptance.
+
+### Exact next action
+
+Have the prepared `RUN_READ_ONLY.cmd` executed on the user's existing Windows PC outside the repository and receive `CRYPTO_LOCAL_CURRENT_*.json`.
+Then compare actual local source hashes/HEAD against the remote baseline, inspect counts/freshness/runtime, and select the first vertical slice from actual evidence. Do not ask for another product-design plan.
+If the ledger is valid, connect bounded per-coin/per-experiment account + complete paginated ledger + scoped performance through producer/API/service to the coin strategy view, preserving existing execution rules and actual holdings. Validate DB ↔ Viewer numbers before acceptance.
+If actual corruption or stopped collection is found, prioritize that cause; do not restart processes or change semantics without the relevant authority.
+Production deploy, live order activation, destructive DB changes and automatic merge remain outside this task's authority.
+
+
 Status legend: `[ ]` pending · `[-]` active · `[x]` complete · `[>]` deferred to later workstream
 
 Program-level roadmap: `docs/workstreams/dashboard-v1/MASTER_ROADMAP.md`
