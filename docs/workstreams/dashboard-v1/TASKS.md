@@ -295,5 +295,24 @@ Scope is bounded to PAPER + Strategy composition only.
 - [x] Existing strategy tabs, strategy selection rail, PAPER filters/search/sort, selected market, trade plan, fills, charts and evidence remain available.
 - [x] Added `check-sparse-detail-v20.mjs` and wired it into `npm run typecheck`.
 - [x] CI PASS for the exact current code at durable head `9f598c70bd3a18c5af2160dc05a721504d01e1fd` (code identical to implementation head `c8c13dfa4...`; only TASKS/HANDOFF docs differ): B3 trader tests #2819 SUCCESS and returned Build 51~71 set SUCCESS.
-- [ ] Actual local fast-forward to the latest durable docs head, clean/aligned readback, full `npm run typecheck`, then Preview-only redeploy/readback pending.
+- [x] Actual local/current readback PASS at `b72ef6424121431562d53bd0c1e5351b184db90a`: branch `b3-auto-trader-phase1`, tracked/staged/untracked `0/0/0`, upstream `0/0`; full `npm run typecheck` PASS including `PAGE_HIERARCHY_V19=PASS` and `SPARSE_DETAIL_V20=PASS`.
+- [x] Preview-only WO-004 redeploy/readback PASS: deployment `9d55cef5`, alias `qa-v18-ui-foundation`; PAPER content-height repair LIVE; Strategy sparse-detail repair LIVE. Production not deployed.
+- [x] WO-004 ACCEPTED.
+
+
+## P. CRYPTO-WO-20260921-005 Mobile & interaction continuity
+
+Scope is bounded to 360/390/430 safe-area, touch geometry and interaction continuity.
+
+- [x] Added shell-side `safe-area-inset-left/right/top/bottom` handling while preserving `viewport-fit=cover`.
+- [x] App shell/auth use dynamic viewport height fallback (`100vh` + `100dvh`).
+- [x] Compact global navigation uses `repeat(3,minmax(0,1fr))`, bounded text overflow and canonical `--control-touch-h`.
+- [x] Compact main-nav / segmented / reader-mode / chips / theme controls are forced to canonical touch height at <=620px.
+- [x] Auth theme toggle and horizontal journey navigation respect notch-side safe areas.
+- [x] Existing coarse-pointer 16px form-input rule and native zoom remain preserved.
+- [x] Existing viewport return bar remains >=44px.
+- [x] Added `check-mobile-interaction-v21.mjs` to guard focus/selection/scroll/polling continuity contracts without introducing a new render owner.
+- [x] Foundation contract updated with safe-area/touch ownership.
+- [ ] Exact-head CI pending.
+- [ ] Actual local fast-forward + full `npm run typecheck` pending after CI.
 - [ ] Preview-only redeploy/readback pending. Production prohibited.
