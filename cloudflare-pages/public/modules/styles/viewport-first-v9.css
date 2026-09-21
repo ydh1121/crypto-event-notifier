@@ -3,6 +3,7 @@
    Scroll ownership is defined by the canonical interaction layer: bounded master rail + document detail. */
 
 :root{--shell-header-offset:112px}
+html{scroll-padding-top:calc(var(--shell-header-offset) + 16px)}
 
 #researchDetail,#assetDetail,#paperDetail,#strategyDetail,#paperBody,#strategyBody{
   scroll-margin-top:calc(var(--shell-header-offset) + 12px)!important;
