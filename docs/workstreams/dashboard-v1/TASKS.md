@@ -243,3 +243,15 @@ Partial findings only — NOT final visual acceptance:
 - [ ] REPAIR candidate: System page is operationally complete but visually reads as a long stack of equal-weight cards/rows; status/priority grouping needs later component migration, not a WO-002 foundation rewrite.
 - [ ] Screenshot intake stops at the supplied desktop set for now; work continues. Phone/light/keyboard/focus/polling checks remain pending and are not interpreted as cancelled.
 - [ ] Production remains prohibited.
+
+
+### WO-002 desktop evidence bounded foundation repair
+
+- [x] Corrected the earlier interpretation: screenshot intake stopped, work did not pause.
+- [x] Added dynamic shell `scroll-padding-top` derived from `--shell-header-offset` so anchor/focus navigation does not land beneath the sticky header stack.
+- [x] Bumped `viewport-first-v9.css` cache key and added a V18 regression assertion for sticky-shell scroll/focus visibility.
+- [x] Removed legacy `mainstream-v4.css` rules that forced `.operations-grid` and `.system-grid` to one column at all desktop widths.
+- [x] Restored canonical System responsive ownership from `records-system.css`: operations 3 columns desktop / 2 below 1180 / 1 below 620; system summary 2 columns desktop / 1 below 820.
+- [x] Added V18 ownership regression checks and refreshed the mainstream cache contract.
+- [ ] Remote/local regression verification pending at latest repair HEAD.
+- [ ] Re-deploy Preview only after regression verification; Production remains prohibited.
