@@ -24,7 +24,7 @@ check('market secondary group remains coherent',main.includes("['research','코�
 check('paper and strategy secondary fusion is removed',!main.includes("paper:[['paper','모의투자']")&&!main.includes("strategy:[['paper','모의투자']"));
 
 check('shell exposes one content width token',shell.includes('--content-max:1540px')&&shell.includes('width:min(var(--content-max),100%)'));
-check('header and main share content padding token',shell.includes('--content-pad:28px')&&shell.includes('padding:0 var(--content-pad)')&&shell.includes('padding:22px var(--content-pad) 48px'));
+check('header and main share content padding token',shell.includes('--content-pad:28px')&&shell.includes('padding:0 max(var(--content-pad),env(safe-area-inset-right)) 0 max(var(--content-pad),env(safe-area-inset-left))')&&shell.includes('padding:22px max(var(--content-pad),env(safe-area-inset-right)) calc(48px + env(safe-area-inset-bottom)) max(var(--content-pad),env(safe-area-inset-left))'));
 check('market rail gets quote-capable width while other rails stay compact',interaction.includes('grid-template-columns:minmax(340px,360px) minmax(0,1fr)!important')&&interaction.includes('grid-template-columns:minmax(280px,300px) minmax(0,1fr)!important'));
 check('desktop market controls remain fixed while quote list scrolls',interaction.includes('Exchange-style market rail')&&interaction.includes('.research-master .master-list')&&interaction.includes('flex:1 1 auto!important')&&interaction.includes('overflow-y:auto!important'));
 check('result detail uses document flow',interaction.includes('Detail content is read with the page')&&interaction.includes('max-height:none!important')&&interaction.includes('overflow-y:visible!important'));
