@@ -169,13 +169,12 @@
 /* Detail stays in place; only its local tab changes. */
 #pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell{
   position:sticky!important;
-  top:156px!important;
-  display:grid!important;
-  grid-template-rows:auto minmax(0,1fr)!important;
+  top:calc(var(--shell-header-offset,112px) + 8px)!important;
+  display:block!important;
   min-width:0!important;
-  min-height:440px!important;
-  max-height:calc(100dvh - 176px)!important;
-  overflow:hidden!important;
+  min-height:0!important;
+  max-height:none!important;
+  overflow:visible!important;
   border:1px solid var(--line)!important;
   border-radius:6px!important;
   background:var(--surface)!important;
@@ -212,9 +211,9 @@
 #pageRoot[data-page-route="strategy"] .strategy-v5-back{display:none!important;margin-left:auto!important}
 #pageRoot[data-page-route="strategy"] .strategy-v5-detail-panels{
   min-height:0!important;
-  overflow:auto!important;
-  overscroll-behavior:contain!important;
-  scrollbar-gutter:stable!important;
+  overflow:visible!important;
+  overscroll-behavior:auto!important;
+  scrollbar-gutter:auto!important;
 }
 #pageRoot[data-page-route="strategy"] .strategy-v5-panel[hidden]{display:none!important}
 #pageRoot[data-page-route="strategy"] .strategy-v5-detail-shell .strategy-detail,
