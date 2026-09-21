@@ -281,3 +281,19 @@ Scope is intentionally bounded to the desktop evidence already supplied:
 - [x] Actual local/current readback PASS at `7e29f78a7a20009fe741b35756cf38d2cdc96fef`: branch `b3-auto-trader-phase1`, tracked/staged/untracked `0/0/0`, upstream `0/0`; full `npm run typecheck` PASS including `PAGE_HIERARCHY_V19=PASS`.
 - [x] Preview-only V19 redeploy/readback PASS: deployment `14c1a46b`, alias `qa-v18-ui-foundation`; `dashboard.css?v=4`, `sectors.css?v=3`, `main.js?v=100.0` live. Production not deployed.
 - [x] WO-003 ACCEPTED. Market + Theme page-hierarchy scope closed; remaining PAPER/Strategy sparse-detail work moves to a new bounded WO.
+
+
+## O. CRYPTO-WO-20260921-004 PAPER + Strategy sparse-detail hierarchy
+
+Scope is bounded to PAPER + Strategy composition only.
+
+- [x] PAPER workspace no longer forces `min-height: calc(100vh - 265px)`; detail height follows actual content.
+- [x] PAPER master rail remains independently bounded/sticky, but uses responsive `--shell-header-offset` and `max-height` rather than forcing the workspace/detail height.
+- [x] PAPER list owns its own bounded scroll area without imposing viewport height on the detail pane.
+- [x] Strategy detail shell no longer owns a fixed `440px` minimum or viewport max-height; it is content-height driven.
+- [x] Strategy detail panels no longer create a nested vertical scroll container; document flow remains canonical.
+- [x] Existing strategy tabs, strategy selection rail, PAPER filters/search/sort, selected market, trade plan, fills, charts and evidence remain available.
+- [x] Added `check-sparse-detail-v20.mjs` and wired it into `npm run typecheck`.
+- [ ] Exact implementation-head CI pending at `c8c13dfa4aa0b175c3d7f58bb92eb17dfb8c3515`.
+- [ ] Actual local fast-forward + full `npm run typecheck` pending after CI.
+- [ ] Preview-only redeploy/readback pending. Production prohibited.
