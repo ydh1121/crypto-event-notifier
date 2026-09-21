@@ -201,3 +201,17 @@ Finish this workstream when mobile/dashboard UX is approved, adaptive per-coin P
 - [x] Simple/detail model proposed as semantic Primary / Supporting / Advanced disclosure per page; feature access remains preserved and selected object/tab/filter/scroll/focus must survive mode change and polling.
 - [x] QA model fixed for future waves: desktop 1280/1440/1920, tablet 768/900/1024, phone 360/390/430 plus real iPhone Safari; light/dark, keyboard/focus, 200% zoom/reflow, safe-area, touch targets, no page overflow, and polling continuity are required.
 - [ ] NEXT GATE — proposed `CRYPTO-WO-20260921-002`: bounded UI foundation consolidation only. Remove the broad rail MutationObserver, establish canonical shell/control/master-detail tokens/components, add propagation/regression checks, and preserve current page functionality/IA while reducing override ownership. Do not start until WO-001 audit review/approval.
+
+
+## M. CRYPTO-WO-20260921-002 UI foundation consolidation verify
+
+- [x] Actual local parent verified at `c5b1c893b25e45b69f3fe2de68ff9a48847d7a98`, clean/aligned 0/0 before implementation.
+- [x] Removed the broad document-root `MutationObserver` from `shared/rail-controls-v16.js`; rail enhancement is now scoped to `#pageRoot` and explicit `ui:refresh` lifecycle.
+- [x] Established canonical shared UI geometry tokens in `tokens.css` and consumed them from shell/components/interaction layers.
+- [x] Added additive composition primitives and `UI_FOUNDATION_CONTRACT.md`; no new late CSS layer was added.
+- [x] Added `check-ui-foundation-v18.mjs` and wired it into `npm run typecheck`.
+- [x] Refreshed stale V4/V8/V16 regression assertions to the canonical V18 token/build lineage without weakening functional checks.
+- [x] Actual local verification PASS at `3e15a8d8a1959a99f7a2a8c5ff7196d83571c7a9`; worktree clean/aligned and every Viewer contract PASS including `UI_FOUNDATION_V18` and `V16_HOLDINGS_WRITE`.
+- [x] GitHub `B3 trader tests` run 2750 PASS: python-test, cloudflare-typecheck, cloudflare-pages-viewer, dashboard-smoke all SUCCESS; returned Build 51~71 set SUCCESS.
+- [ ] VISUAL QA GATE — preview-only deployment/readback, then desktop 1280/1440/1920, tablet 768/900/1024, phone 360/390/430, light/dark, keyboard/focus, reader-mode, selection/sort/search and live polling continuity.
+- [ ] Production deployment remains prohibited until visual QA is accepted.
