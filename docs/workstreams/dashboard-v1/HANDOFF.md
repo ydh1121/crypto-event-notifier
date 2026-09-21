@@ -477,3 +477,12 @@ Changes are composition-only:
 - No PAPER execution semantics, strategy semantics, data contracts, SQLite behavior, holdings writes, or real-money boundaries changed.
 
 Regression contract `SPARSE_DETAIL_V20` is wired into the Viewer typecheck. Next gate is exact-head CI, then local reproduction and Preview-only deploy. Production remains prohibited.
+
+
+### WO-004 exact-current CI gate
+
+The first implementation-head B3 test run was superseded/cancelled by subsequent docs-only commits. The exact current branch head `9f598c70bd3a18c5af2160dc05a721504d01e1fd` contains the same WO-004 code (only TASKS/HANDOFF differ from `c8c13dfa4...`) and has green CI:
+- B3 trader tests #2819 = SUCCESS
+- returned Build 51~71 workflow set = SUCCESS
+
+Next gate: actual local fast-forward to the latest durable head, clean/upstream readback, full `npm run typecheck` including `SPARSE_DETAIL_V20=PASS`, then Preview-only redeploy/readback. Production remains prohibited.
