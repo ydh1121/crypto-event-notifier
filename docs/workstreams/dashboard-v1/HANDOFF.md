@@ -518,3 +518,18 @@ Source changes:
 No new navigation controller, polling owner, page IA, trading semantics or Production deployment was introduced.
 
 Next gate: exact-head CI, then actual local fast-forward/typecheck including `MOBILE_INTERACTION_V21=PASS`, then Preview-only redeploy/readback. Real iPhone Safari device QA remains a final acceptance gate after source-level contracts pass.
+
+
+### WO-005 exact-head CI gate
+
+Exact code head `3acfe9367629d3ed69bec48b069bfcb7211c4c17` is green:
+- B3 trader tests #2853 = SUCCESS
+- cloudflare-pages-viewer = SUCCESS
+- cloudflare-typecheck = SUCCESS
+- python-test = SUCCESS
+- dashboard-smoke = SUCCESS
+- returned Build 51~71 workflow set = SUCCESS
+
+Two CI failures during this wave were stale contract assertions, not product regressions: the IA checker still expected pre-safe-area literal padding, and the V18/mainstream checks still expected old cache keys / extra late overrides. The repair kept `interaction-layout-v4.css` at the existing 400-`!important` ceiling by moving mobile touch sizing into canonical tokens and owning theme/journey rules.
+
+Next gate: actual local fast-forward to the latest durable docs head, clean/upstream 0/0 readback, full Viewer typecheck including `MOBILE_INTERACTION_V21=PASS`, then Preview-only deploy/readback. Production remains prohibited.
