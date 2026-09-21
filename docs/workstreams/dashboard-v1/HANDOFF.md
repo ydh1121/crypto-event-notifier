@@ -610,3 +610,27 @@ First bounded implementation is only primary shell + 실전매매 v1. It may reu
 Before any source mutation, actual local must be fast-forwarded to the new durable head and prove branch `b3-auto-trader-phase1`, tracked/staged/untracked 0, upstream 0/0.
 
 Production remains prohibited.
+
+
+## CRYPTO-WO-20260921-008 — IMPLEMENTED / VERIFY_LOCAL_AND_PREVIEW
+
+Implementation code head: `169ca445ef4a93103fc548f642bacc5de675a77b`.
+
+What changed:
+- added primary `live` route and `live-trading.js`;
+- primary nav is now 실전매매 / 가상매매 / 탐색 / 기록;
+- legacy Assets remains under 실전매매 journey; Strategy remains under 가상매매 journey; Market/Theme remain under 탐색;
+- selected live context persists `liveExchange/liveMarket/liveCalculator`;
+- current actual holding, current quote, observation candidates, current PAPER plan, strategy-lab per-coin results, averaging calculator and profit calculator are composed on one page;
+- missing strategy-specific split targets/weights remain explicit projection gaps rather than fabricated values;
+- `live` polling refreshes data-owned surfaces while calculator input state stays untouched.
+
+Exact-head CI is green:
+- B3 trader tests #2925 SUCCESS
+- cloudflare-pages-viewer SUCCESS
+- cloudflare-typecheck SUCCESS
+- python-test SUCCESS
+- dashboard-smoke SUCCESS
+- returned Build 51~71 set SUCCESS
+
+Next gate is actual-local fast-forward to the durable docs head, full `npm run typecheck` requiring `SIMPLIFIED_TRADING_V22=PASS`, then Preview-only deploy/readback and focused visual QA. Production remains prohibited.
