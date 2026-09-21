@@ -313,6 +313,13 @@ Scope is bounded to 360/390/430 safe-area, touch geometry and interaction contin
 - [x] Existing viewport return bar remains >=44px.
 - [x] Added `check-mobile-interaction-v21.mjs` to guard focus/selection/scroll/polling continuity contracts without introducing a new render owner.
 - [x] Foundation contract updated with safe-area/touch ownership.
-- [ ] Exact-head CI pending.
-- [ ] Actual local fast-forward + full `npm run typecheck` pending after CI.
+- [x] Exact code-head CI PASS at `3acfe9367629d3ed69bec48b069bfcb7211c4c17`: B3 trader tests #2853 SUCCESS; cloudflare-pages-viewer, cloudflare-typecheck, python-test and dashboard-smoke all SUCCESS; returned Build 51~71 set SUCCESS.
+- [ ] Actual local fast-forward to latest durable docs head + clean/aligned readback + full `npm run typecheck` including `MOBILE_INTERACTION_V21=PASS` pending.
 - [ ] Preview-only redeploy/readback pending. Production prohibited.
+
+### V21 stale-contract repair / debt guard
+
+- [x] Updated `INFORMATION_ARCHITECTURE_V10` to recognize the safe-area-aware shared content padding contract instead of the retired literal padding string.
+- [x] Kept `interaction-layout-v4.css` at the audited 400 `!important` ceiling: compact touch sizing now flows through `--control-h: var(--control-touch-h)` and owning theme/journey rules instead of six new late overrides.
+- [x] Updated `UI_FOUNDATION_V18` ordering check to be cache-version agnostic while preserving stylesheet-order and debt caps.
+- [x] Updated mainstream dark-mode cache assertion for `theme-dark-v4.css?v=2`.
