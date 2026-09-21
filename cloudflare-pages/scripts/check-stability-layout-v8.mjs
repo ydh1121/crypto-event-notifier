@@ -26,8 +26,8 @@ check('shell header and desktop selection rails may be sticky',interaction.inclu
 check('result panes use document flow',interaction.includes('Detail content is read with the page')&&interaction.includes('.strategy-v5-detail-panels')&&interaction.includes('max-height:none!important')&&interaction.includes('overflow-y:visible!important'));
 check('research keeps controls visible while market list scrolls',interaction.includes('Exchange-style market rail')&&interaction.includes('overflow:hidden!important')&&interaction.includes('.research-master .master-list')&&interaction.includes('flex:1 1 auto!important')&&interaction.includes('overflow-y:auto!important'));
 check('canonical tabs are flat',interaction.includes('Canonical tab language')&&interaction.includes('border-bottom:2px solid transparent!important'));
-check('segmented controls are separated',interaction.includes('Canonical selection controls')&&interaction.includes('gap:var(--ui-control-gap)!important')&&interaction.includes('border-radius:var(--ui-control-r)!important'));
-check('action buttons share one geometry',interaction.includes('Canonical action buttons')&&interaction.includes('min-height:var(--ui-control-h)!important'));
+check('segmented controls are separated',interaction.includes('Canonical selection controls')&&interaction.includes('gap:var(--control-gap)!important')&&interaction.includes('border-radius:var(--control-radius)!important'));
+check('action buttons share one geometry',interaction.includes('Canonical action buttons')&&interaction.includes('min-height:var(--control-h)!important'));
 check('desktop workspaces keep protected gaps',interaction.includes('gap:28px!important'));
 check('mobile stacks workspaces with bounded list scroll',interaction.includes('@media(max-width:900px)')&&interaction.includes('display:block!important')&&interaction.includes('max-height:min(52dvh,520px)!important'));
 if(fail.length){console.error('STABILITY_LAYOUT_V8=FAIL');for(const item of fail)console.error(`- ${item}`);process.exit(1)}
