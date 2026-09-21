@@ -56,7 +56,7 @@ check('research controls remain fixed while market rows scroll',interaction.incl
 check('result detail remains document flow',interaction.includes('Detail content is read with the page')&&interaction.includes('.strategy-v5-detail-panels')&&interaction.includes('overflow-y:visible!important'));
 check('coin current price is promoted',interaction.includes('grid-template-areas:"price conclusion vitals"')&&interaction.includes('.market-current-price'));
 check('secondary research follows primary workspace',interaction.includes('>.decision-first-extra-research{order:3!important'));
-check('paper controls reserve control gaps',interaction.includes('.paper-toolbar')&&interaction.includes('gap:var(--ui-control-gap)!important'));
+check('paper controls reserve canonical control gaps',interaction.includes('.paper-toolbar')&&interaction.includes('gap:var(--control-gap)!important'));
 check('detail destinations account for sticky shell',interaction.includes('#researchDetail,#assetDetail,#paperDetail,#strategyDetail,#strategyBody'));
 
 check('secondary nav legacy visual rules remain available',css.includes('.journey-nav{justify-content:center!important'));
