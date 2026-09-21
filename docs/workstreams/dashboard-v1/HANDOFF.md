@@ -566,3 +566,16 @@ Continuity checks must include:
 - switch simple/detail and light/dark at compact width and confirm layout does not jump into horizontal page overflow.
 
 Any defect must be reproduced before opening a bounded repair WO. Production remains prohibited.
+
+
+## CRYPTO-WO-20260921-007 Simplified trading IA rebaseline — ACTIVE
+
+The previous broad page tree was rejected as over-expanded and likely to recreate the same UX failure.
+
+Canonical primary destinations are now:
+- 실전매매: exchange/ticker/current price → dominant strategy → split entry/exit/weight → averaging/profit calculators → evidence-backed likely-riser shortlist.
+- 가상매매: selected coin → strategy tabs with account/trade history → BTC/ETH-relative movement → news/indicator/event reaction.
+
+Everything else is secondary and must be classified under 탐색, 연구/데이터, 기록 or 운영. Do not resume device QA or cosmetic repair as current WIP. First produce the exhaustive mapping table of already-developed capabilities into this simplified structure.
+
+Production remains prohibited.
