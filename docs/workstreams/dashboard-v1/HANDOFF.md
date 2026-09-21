@@ -408,3 +408,13 @@ Observed repair candidates for later bounded waves:
 5. System is operationally useful but visually flat: many equal-weight sections/status rows with weak prioritization.
 
 Continue bounded WO-002 QA/foundation repair from these findings. Production remains prohibited; page-level redesign beyond WO-002 foundation scope belongs to a later bounded work order.
+
+
+### WO-002 bounded desktop foundation repair
+
+Work continues after the desktop screenshot sweep. Two foundation-level issues were repaired without changing page semantics:
+
+1. Sticky-shell focus/anchor visibility: `viewport-first-v9.css` now sets document `scroll-padding-top` from the responsive `--shell-header-offset`, with regression coverage.
+2. System desktop hierarchy: retired the old `mainstream-v4.css` one-column override so `records-system.css` again owns the intended 3/2/1 responsive operations grid and 2/1 system summary grid.
+
+These are override/foundation repairs, not the later page-level hierarchy redesign for Market/Theme/PAPER/Strategy. Latest regression verification and Preview re-deploy are still required. Production remains unchanged.
