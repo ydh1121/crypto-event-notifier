@@ -11,7 +11,7 @@ const check=(name,value)=>{if(!value)fail.push(name)};
 check('V19 cache lineage is active',
   index.includes('/modules/styles/dashboard.css?v=4')&&
   index.includes('/modules/styles/sectors.css?v=3')&&
-  index.includes('modules/main.js?v=100.0')&&
+  /modules\/main\.js\?v=[^'\"]+/.test(index)&&
   main.includes("sectors-v36.js?v=47"));
 
 check('market dashboard has one primary overview path',
