@@ -32,7 +32,7 @@ check('new visual layer explicitly removes shadows',css.includes('box-shadow:non
 check('mobile navigation exposes all six items',css.includes('grid-template-columns:repeat(3,1fr)!important'));
 check('simple mode keeps advanced internal sections hidden',css.includes('html[data-reader-mode="simple"] [data-dex-launch-panel]')&&css.includes('.component-panel'));
 check('amount presets remain available',amount.includes("[100_000_000,'1억원']")&&amount.includes("dispatchEvent(new Event('input',{bubbles:true}))"));
-check('layout repair stylesheet is loaded after visual layer',index.includes('/modules/styles/mainstream-v4.css?v=1')&&index.includes('/modules/styles/layout-fixes-v4.css?v=1')&&index.indexOf('mainstream-v4.css')<index.indexOf('layout-fixes-v4.css'));
+check('layout repair stylesheet is loaded after visual layer',index.includes('/modules/styles/mainstream-v4.css?v=2')&&index.includes('/modules/styles/layout-fixes-v4.css?v=1')&&index.indexOf('mainstream-v4.css')<index.indexOf('layout-fixes-v4.css'));
 check('sticky header height is allowed to grow',layout.includes('.app-header{height:auto!important;min-height:68px!important}'));
 check('header center column can shrink without covering tools',layout.includes('grid-template-columns:auto minmax(0,1fr) auto!important'));
 check('medium header becomes two rows before collision',layout.includes('@media(max-width:1180px)')&&layout.includes('grid-template-areas:"brand tools" "nav nav"!important'));
