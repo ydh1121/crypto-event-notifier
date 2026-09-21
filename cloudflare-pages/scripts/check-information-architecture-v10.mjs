@@ -17,11 +17,11 @@ check('current build marker exists',index.includes('meta name="crypto-viewer-bui
 check('architecture document declares product decision loop',doc.includes('시장 파악 → 코인 판단 → 내 자산 확인 → 모의 실행 → 전략 평가 → 결과 회고'));
 check('architecture document defines explicit scroll ownership',doc.includes('Scroll ownership is explicit')&&doc.includes('sticky bounded rail + document-flow detail'));
 
-check('primary navigation follows six user goals',['홈','시장','자산','모의투자','전략','기록'].every(label=>index.includes(`>${label}</button>`)));
+check('primary navigation follows simplified trading goals',['실전매매','가상매매','탐색','기록'].every(label=>index.includes(`>${label}</button>`))&&!index.includes('>홈</button>')&&!index.includes('>자산</button>')&&!index.includes('>전략</button>'));
 check('system is account-only, not primary navigation',!index.includes('data-route="system"')&&main.includes("userMenuBtn')?.addEventListener('click',()=>router.go('system'))"));
-check('strategy is not parented under paper',!router.includes("strategy:'paper'"));
-check('market secondary group remains coherent',main.includes("['research','코인']")&&main.includes("['dashboard-detail','시장현황']")&&main.includes("['sectors','테마']"));
-check('paper and strategy secondary fusion is removed',!main.includes("paper:[['paper','모의투자']")&&!main.includes("strategy:[['paper','모의투자']"));
+check('strategy is secondary under virtual trading',router.includes("strategy:'paper'"));
+check('market secondary group remains coherent',main.includes("['research','코인 탐색']")&&main.includes("['dashboard-detail','시장현황']")&&main.includes("['sectors','테마']"));
+check('paper and strategy share one virtual-trading journey',main.includes("paper:[['paper','가상매매'],['strategy','전략 비교']]")&&main.includes("strategy:[['paper','가상매매'],['strategy','전략 비교']]"));
 
 check('shell exposes one content width token',shell.includes('--content-max:1540px')&&shell.includes('width:min(var(--content-max),100%)'));
 check('header and main share content padding token',shell.includes('--content-pad:28px')&&shell.includes('padding:0 max(var(--content-pad),env(safe-area-inset-right)) 0 max(var(--content-pad),env(safe-area-inset-left))')&&shell.includes('padding:22px max(var(--content-pad),env(safe-area-inset-right)) calc(48px + env(safe-area-inset-bottom)) max(var(--content-pad),env(safe-area-inset-left))'));
