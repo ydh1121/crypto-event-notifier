@@ -74,6 +74,7 @@ Allowed:
 - preserve zoom; never disable user scaling
 - honor `prefers-reduced-motion`
 - preserve selected object, filter, sort, scroll, and focus during live polling/reader-mode transitions
+- sticky shell must reserve browser scroll/focus visibility via `scroll-padding-top` derived from `--shell-header-offset`; focused/anchored content must not land underneath the header stack
 
 ## 7. Stable exemplar preservation
 
