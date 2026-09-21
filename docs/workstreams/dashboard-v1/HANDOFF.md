@@ -388,3 +388,23 @@ Preview URLs:
 - alias: `https://qa-v18-ui-foundation.crypto-paper-viewer-ydh1121-cf36.pages.dev`
 
 Production was not deployed. Visual QA must use this preview only and must avoid holdings/runtime write actions. Start with 1440px dark on Home / Coin / Assets / Paper / Strategy / Records, then 390px dark on Coin / Assets / Paper, followed by light mode, keyboard/focus, simple/detail, selection/search/sort, and live-polling continuity.
+
+
+### WO-002 partial desktop visual-QA handoff — 2026-09-21
+
+User requested a pause after supplying the desktop screenshot sweep. Treat this as a durable partial-QA checkpoint, not acceptance.
+
+Observed preserve candidates:
+- Assets V17 hierarchy remains the clearest operational page.
+- Strategy master/detail selection rail and internal tabs remain intact.
+- Records keeps the useful user-vs-system audience split.
+- Research/market selection rails and scoped detail surfaces remain functional in the screenshots.
+
+Observed repair candidates for later bounded waves:
+1. Market overview/dashboard still has card-soup pressure and competing visual prominence.
+2. Theme/Sectors has excessive simultaneous density (ranking rail + coin table + evidence panel) and small scanning text.
+3. PAPER/Strategy tabs show large empty detail areas when content is sparse, causing inconsistent vertical rhythm.
+4. Sticky global/local header stack needs explicit scroll/focus visibility QA; long-page screenshots show content tight to the sticky boundary.
+5. System is operationally useful but visually flat: many equal-weight sections/status rows with weak prioritization.
+
+No source/runtime/Production mutation is authorized from these findings. Continue visual QA only when the user resumes.
