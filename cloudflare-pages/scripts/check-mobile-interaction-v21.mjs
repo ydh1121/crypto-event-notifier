@@ -32,7 +32,7 @@ check('shell owns all four safe-area edges',
   shell.includes('min-height:100dvh'));
 
 check('compact global nav is 360-safe and touch-sized',
-  shell.includes('grid-template-columns:repeat(3,minmax(0,1fr))')&&
+  shell.includes('grid-template-columns:repeat(4,minmax(0,1fr))')&&
   shell.includes('min-height:var(--control-touch-h)')&&
   shell.includes('text-overflow:ellipsis'));
 
