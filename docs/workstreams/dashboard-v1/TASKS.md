@@ -225,3 +225,21 @@ Finish this workstream when mobile/dashboard UX is approved, adaptive per-coin P
 - [x] Wrangler explicitly used preview branch `qa-v18-ui-foundation`; Production branch was not deployed.
 - [ ] Visual QA pending: desktop 1440 dark first, then representative phone 390 dark, then light/keyboard/focus/reader-mode/search/sort/polling continuity.
 - [ ] No write-action testing against holdings/PAPER/runtime mutation endpoints during visual QA.
+
+
+### WO-002 partial desktop visual-QA evidence — 2026-09-21
+
+User supplied a broad 1440px-class dark-mode screenshot sweep from the V18 preview covering Home, Coin/Research, Market overview, Theme/Sectors, Assets, PAPER, Strategy/Method comparison, Records, and System surfaces.
+
+Partial findings only — NOT final visual acceptance:
+- [x] No obvious global horizontal overflow or catastrophic shell collapse is visible in the supplied desktop screenshots.
+- [x] Global header/nav, local market nav, major master/detail rails, tables and status colors render consistently enough to continue QA.
+- [x] Assets V17 remains the strongest stable exemplar: hierarchy from portfolio summary → selected holding → PnL/facts → holdings editor → planning is comparatively clear.
+- [x] Strategy master/detail and Records audience split remain structurally intact.
+- [ ] REPAIR candidate: Market overview/dashboard remains card-dense with several blocks competing at similar visual weight.
+- [ ] REPAIR candidate: Theme/Sectors is information-dense; left ranking + central table + project evidence creates small text and weak scan hierarchy at desktop scale.
+- [ ] REPAIR candidate: PAPER/Strategy detail views have large unused vertical areas when selected content is short, producing inconsistent density between tabs.
+- [ ] REPAIR candidate: sticky global/local headers occupy substantial vertical space; during long-page scroll several screenshots show content beginning directly beneath/behind the sticky stack. Verify scroll-margin/anchor/focus visibility before acceptance.
+- [ ] REPAIR candidate: System page is operationally complete but visually reads as a long stack of equal-weight cards/rows; status/priority grouping needs later component migration, not a WO-002 foundation rewrite.
+- [ ] Visual QA is intentionally paused by user request. Phone/light/keyboard/focus/polling checks remain pending.
+- [ ] Production remains prohibited.
