@@ -14,8 +14,10 @@ const fail=[];
 const check=(name,value)=>{if(!value)fail.push(name)};
 
 check('V21 mobile asset cache lineage is active',
+  index.includes('/modules/styles/tokens.css?v=5')&&
   index.includes('/modules/styles/shell.css?v=7')&&
-  index.includes('/modules/styles/interaction-layout-v4.css?v=9'));
+  index.includes('/modules/styles/theme-dark-v4.css?v=2')&&
+  index.includes('/modules/styles/interaction-layout-v4.css?v=10'));
 
 check('viewport preserves native zoom and safe-area capability',
   index.includes('width=device-width,initial-scale=1,viewport-fit=cover')&&
@@ -35,12 +37,16 @@ check('compact global nav is 360-safe and touch-sized',
   shell.includes('text-overflow:ellipsis'));
 
 check('compact high-frequency controls use canonical touch height',
-  interaction.includes('.main-nav button,.segmented button,.reader-mode-control button,.chip-row button,.theme-toggle{min-height:var(--control-touch-h)!important}')&&
-  interaction.includes('.auth-theme-toggle{top:max(10px,env(safe-area-inset-top))!important;right:max(10px,env(safe-area-inset-right))!important;min-height:var(--control-touch-h)!important}'));
+  tokens.includes('@media(max-width:620px){:root{--control-h:var(--control-touch-h)}}')&&
+  shell.includes('min-height:var(--control-touch-h)'));
 
-check('compact journey rail respects notch side insets',
-  interaction.includes('padding-left:max(var(--content-pad-mobile,12px),env(safe-area-inset-left))!important')&&
-  interaction.includes('padding-right:max(var(--content-pad-mobile,12px),env(safe-area-inset-right))!important'));
+check('compact theme controls use owning stylesheet and safe-area geometry',
+  index.includes('/modules/styles/theme-dark-v4.css?v=2')&&
+  read('public/modules/styles/theme-dark-v4.css').includes('@media(max-width:900px){.theme-toggle{min-height:var(--control-touch-h)')&&
+  read('public/modules/styles/theme-dark-v4.css').includes('.auth-theme-toggle{top:max(10px,env(safe-area-inset-top));right:max(10px,env(safe-area-inset-right));min-height:var(--control-touch-h)}'));
+
+check('journey rail respects notch side insets without adding override debt',
+  interaction.includes('.journey-nav{justify-content:center!important;margin:0!important;padding:0 max(var(--content-pad,28px),env(safe-area-inset-right)) 0 max(var(--content-pad,28px),env(safe-area-inset-left))!important}'));
 
 check('iOS focus zoom prevention remains capability based',
   tokens.includes('@media(pointer:coarse){input,textarea,select{font-size:16px}}')&&
