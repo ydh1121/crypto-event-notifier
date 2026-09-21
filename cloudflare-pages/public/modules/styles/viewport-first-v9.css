@@ -49,7 +49,7 @@ html{scroll-padding-top:calc(var(--shell-header-offset) + 16px)}
   .main-nav{
     grid-area:nav!important;
     display:grid!important;
-    grid-template-columns:repeat(6,minmax(0,1fr))!important;
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
     width:100%!important;
     gap:0!important;
     border-top:1px solid var(--line)!important;
@@ -120,8 +120,8 @@ html{scroll-padding-top:calc(var(--shell-header-offset) + 16px)}
     grid-template-columns:minmax(0,1fr) auto!important;
     grid-template-areas:"brand tools" "nav nav"!important;
   }
-  .main-nav{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important}
-  .main-nav button{min-height:42px!important}
+  .main-nav{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  .main-nav button{min-height:var(--control-touch-h)!important}
   .header-tools{width:auto!important;justify-self:end!important;flex-wrap:nowrap!important}
   .reader-mode-control{display:none!important}
   .app-main{padding-top:14px!important}
