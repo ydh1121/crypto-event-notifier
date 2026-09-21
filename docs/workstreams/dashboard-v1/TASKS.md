@@ -278,5 +278,6 @@ Scope is intentionally bounded to the desktop evidence already supplied:
 - [x] Preserved sector table, sorting, selected coin, project evidence, official links, and research jump.
 - [x] Added `check-page-hierarchy-v19.mjs` and wired it into `npm run typecheck`.
 - [x] Exact latest-head GitHub CI verification PASS at `deb3c30385cdcf86604a62a9357c490a6071b522`: B3 trader tests #2800 SUCCESS; dashboard-smoke, cloudflare-typecheck, python-test, cloudflare-pages-viewer all SUCCESS; returned Build 51~71 workflow set SUCCESS.
-- [ ] Actual local fast-forward to `deb3c30385cdcf86604a62a9357c490a6071b522` + clean/aligned readback + full `npm run typecheck` pending.
-- [ ] Preview-only V19 redeploy/readback pending. Production prohibited.
+- [x] Actual local/current readback PASS at `7e29f78a7a20009fe741b35756cf38d2cdc96fef`: branch `b3-auto-trader-phase1`, tracked/staged/untracked `0/0/0`, upstream `0/0`; full `npm run typecheck` PASS including `PAGE_HIERARCHY_V19=PASS`.
+- [x] Preview-only V19 redeploy/readback PASS: deployment `14c1a46b`, alias `qa-v18-ui-foundation`; `dashboard.css?v=4`, `sectors.css?v=3`, `main.js?v=100.0` live. Production not deployed.
+- [x] WO-003 ACCEPTED. Market + Theme page-hierarchy scope closed; remaining PAPER/Strategy sparse-detail work moves to a new bounded WO.
