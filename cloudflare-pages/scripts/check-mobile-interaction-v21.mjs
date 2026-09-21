@@ -64,7 +64,7 @@ check('continuity restores focus selection and scroll without browser jumps',
 
 check('main render path preserves bounded UI continuity',
   main.includes("import{patchPreservingUi}from'./shared/ui-continuity.js")&&
-  main.includes("scrollSelectors:['[data-preserve-scroll]','.master-list','.asset-holdings-list','#paperList','.strategy-table']"));
+  ['[data-preserve-scroll]','.master-list','.asset-holdings-list','#paperList','.strategy-table','.live-candidate-list','.live-plan-table','.live-calc-table'].every(value=>main.includes(value)));
 
 check('polling patches do not route through full render',
   live.includes("meta.type!=='snapshot-live'")&&
