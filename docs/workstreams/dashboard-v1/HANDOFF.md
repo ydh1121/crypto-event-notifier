@@ -464,3 +464,16 @@ Preview verification:
 - Production not deployed.
 
 Close WO-003 here. Do not fold PAPER/Strategy sparse-detail composition into this work order; open a new bounded WO.
+
+
+## CRYPTO-WO-20260921-004 PAPER + Strategy sparse-detail hierarchy — IMPLEMENTED / VERIFY
+
+Implementation head: `c8c13dfa4aa0b175c3d7f58bb92eb17dfb8c3515`.
+
+Changes are composition-only:
+- PAPER no longer reserves a full viewport-height workspace when the selected detail is short. The master rail is still bounded and scrollable, but the detail pane follows its actual content height.
+- Strategy no longer uses a fixed 440px detail minimum or a second vertical scroll container. Local tabs keep the same content and semantics while the visible panel determines height.
+- Sticky geometry follows `--shell-header-offset` so the master/detail arrangement remains compatible with the V18 shell contract.
+- No PAPER execution semantics, strategy semantics, data contracts, SQLite behavior, holdings writes, or real-money boundaries changed.
+
+Regression contract `SPARSE_DETAIL_V20` is wired into the Viewer typecheck. Next gate is exact-head CI, then local reproduction and Preview-only deploy. Production remains prohibited.
