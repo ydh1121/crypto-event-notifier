@@ -371,6 +371,25 @@ STATUS = ACTIVE
 - [x] Reviewed public Git references read-only: `openexch/trading-ui`, `rampstackco/swiss-style-theme`, `davaded/frontend-art-direction`, `carbon-design-system/carbon`.
 - [x] External references are pattern evidence only; no new UI dependency/library is introduced.
 - [x] Current GitHub connector does not expose authenticated starred-repository enumeration; no repo is falsely labeled as user-starred.
-- [ ] USER REVIEW REQUIRED for mapping and Low-fi hierarchy.
-- [ ] Source/UI implementation remains blocked until user accepts/corrects the planning artifacts.
+- [x] USER CONTINUATION accepted as approval to proceed from the mapping + Low-fi hierarchy.
+- [x] Planning gate released; source mutation still requires fresh actual-local parent verification.
 - [ ] Production deploy remains prohibited.
+
+
+## S. CRYPTO-WO-20260921-008 Primary shell + 실전매매 composition v1
+
+STATUS = READY / WAITING_LOCAL_PARENT_VERIFY
+
+PARENT REMOTE = current durable branch head after WO-007 acceptance docs
+
+- [x] WO-007 planning accepted; migration order fixed in `SIMPLIFIED_TRADING_MIGRATION_PLAN_V1.md`.
+- [ ] Fresh actual-local branch/head/clean/upstream verification.
+- [ ] Implement new primary `실전매매` composition without deleting old routes.
+- [ ] Primary visible navigation becomes 실전매매 / 가상매매 / 탐색 / 기록; 운영 stays utility/admin.
+- [ ] Reuse actual holdings, current quote, candidate/watch data, PAPER/strategy evidence, averaging/profit tools.
+- [ ] Never invent dominant strategy; weak/absent evidence displays insufficient state.
+- [ ] Preserve all existing PAPER/holdings/data semantics and polling continuity.
+- [ ] Add bounded route/composition contract.
+- [ ] Full typecheck/CI.
+- [ ] Preview-only QA.
+- [ ] Production prohibited.
