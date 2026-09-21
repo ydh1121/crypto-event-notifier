@@ -241,5 +241,5 @@ Partial findings only — NOT final visual acceptance:
 - [ ] REPAIR candidate: PAPER/Strategy detail views have large unused vertical areas when selected content is short, producing inconsistent density between tabs.
 - [ ] REPAIR candidate: sticky global/local headers occupy substantial vertical space; during long-page scroll several screenshots show content beginning directly beneath/behind the sticky stack. Verify scroll-margin/anchor/focus visibility before acceptance.
 - [ ] REPAIR candidate: System page is operationally complete but visually reads as a long stack of equal-weight cards/rows; status/priority grouping needs later component migration, not a WO-002 foundation rewrite.
-- [ ] Visual QA is intentionally paused by user request. Phone/light/keyboard/focus/polling checks remain pending.
+- [ ] Screenshot intake stops at the supplied desktop set for now; work continues. Phone/light/keyboard/focus/polling checks remain pending and are not interpreted as cancelled.
 - [ ] Production remains prohibited.
