@@ -431,3 +431,16 @@ Implemented:
 - A dedicated V19 regression contract protects cache lineage, dashboard prominence, two-pane Theme ownership, and project-evidence accessibility.
 
 Source implementation lineage through `ff9253e2c174a8cc5c2f6d77618568c7c5185a89`; documentation commits follow on the same branch. Next gate is exact latest-head CI, then actual local fast-forward/typecheck, then Preview-only redeploy. Production remains prohibited.
+
+
+### WO-003 exact-head remote CI gate
+
+Remote HEAD `deb3c30385cdcf86604a62a9357c490a6071b522` is unchanged and exact-head CI is green:
+- B3 trader tests #2800 = SUCCESS
+- dashboard-smoke = SUCCESS
+- cloudflare-typecheck = SUCCESS
+- python-test = SUCCESS
+- cloudflare-pages-viewer = SUCCESS
+- returned Build 51~71 workflow set = SUCCESS
+
+Next gate is actual local fast-forward to this exact HEAD, clean/aligned readback, full `npm run typecheck`, then Preview-only redeploy/readback on `qa-v18-ui-foundation`. Production remains prohibited.
