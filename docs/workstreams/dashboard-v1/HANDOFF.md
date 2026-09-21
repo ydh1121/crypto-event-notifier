@@ -444,3 +444,23 @@ Remote HEAD `deb3c30385cdcf86604a62a9357c490a6071b522` is unchanged and exact-he
 - returned Build 51~71 workflow set = SUCCESS
 
 Next gate is actual local fast-forward to this exact HEAD, clean/aligned readback, full `npm run typecheck`, then Preview-only redeploy/readback on `qa-v18-ui-foundation`. Production remains prohibited.
+
+
+### WO-003 acceptance
+
+WO-003 is ACCEPTED.
+
+Actual local/current verification:
+- `b3-auto-trader-phase1` at `7e29f78a7a20009fe741b35756cf38d2cdc96fef`;
+- tracked/staged/untracked = 0/0/0;
+- upstream = 0/0;
+- full Viewer contract PASS, including `PAGE_HIERARCHY_V19=PASS`.
+
+Preview verification:
+- deployment `14c1a46b.crypto-paper-viewer-ydh1121-cf36.pages.dev`;
+- alias `qa-v18-ui-foundation.crypto-paper-viewer-ydh1121-cf36.pages.dev`;
+- Market hierarchy asset live;
+- Theme hierarchy asset live;
+- Production not deployed.
+
+Close WO-003 here. Do not fold PAPER/Strategy sparse-detail composition into this work order; open a new bounded WO.
