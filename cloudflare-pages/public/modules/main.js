@@ -22,7 +22,7 @@ import{installDexLaunchResearchPanel}from'./pages/dex-launch-panel.js?v=45';
 import{createAssetsPage}from'./pages/assets.js?v=52';
 import{createPaperPage}from'./pages/paper.js?v=47';
 import{createStrategyPage}from'./pages/strategy.js?v=48';
-import{createSectorsPage}from'./pages/sectors-v36.js?v=46';
+import{createSectorsPage}from'./pages/sectors-v36.js?v=47';
 import{createRecordsPage}from'./pages/records.js?v=48';
 import{createSystemPage}from'./pages/system.js?v=35';
 
