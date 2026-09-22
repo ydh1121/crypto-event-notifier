@@ -253,6 +253,9 @@ class IntelligenceIngestCycle:
                 "error": f"{type(exc).__name__}: {exc}"[:300],
             }
             result["event_response_failures"] = int(result["event_response_failures"]) + 1
+        else:
+            if response_capture.get("ok") is False:
+                result["event_response_failures"] = int(result["event_response_failures"]) + 1
         result["event_response_capture"] = response_capture
 
         try:

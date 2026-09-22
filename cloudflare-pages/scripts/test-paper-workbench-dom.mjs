@@ -11,10 +11,13 @@ const acc=(style,ex='bithumb')=>({experiment_id:`${ex}|${style}|v1`,style,label:
 const state={snapshot:{public:{exchanges:{bithumb:{leaderboard:[{market:'KRW-B3',symbol:'B3',price:100,signal_ts:clock/1000},{market:'KRW-DEXE',symbol:'DEXE',price:200,signal_ts:clock/1000}]},upbit:{leaderboard:[{market:'KRW-B3',symbol:'B3',price:101,signal_ts:clock/1000}]}}}},ui:{paperExchange:'bithumb',paperMarket:'KRW-B3',paperLabStyle:'aggressive'}};
 const listeners=new Set();const store={get:()=>state,setUi(p){Object.assign(state.ui,p)},subscribe(fn){listeners.add(fn);return()=>listeners.delete(fn)}};
 const requests=[];
+let addNewEvent=false;
+const eventAnchor=clock/1000-7*86400;
+const eventRows=market=>(addNewEvent?['new','recent','old']:['recent','old']).map(id=>({event_id:id,event_ts:eventAnchor+({old:0,recent:86400,new:172800})[id],title:`${id} 발표`,market,source_url:`https://example.com/${id}`,responses:{'15m':{coin:2,btc:1,eth:null,vs_btc_pp:1,vs_eth_pp:null,observations:{coin:{baseline_price:100,baseline_trade_ts:clock/1000-901,target_price:102,target_trade_ts:clock/1000}}}},history:{'15m':{samples:3,positive_samples:2,mean_pct:1.2,median_pct:1}}}));
 globalThis.fetch=async path=>{const u=new URL(path,'http://127.0.0.1:8766'),ex=u.searchParams.get('exchange'),market=u.searchParams.get('market');requests.push(u);
  const accounts=['aggressive','balanced'].map(s=>acc(s,ex));let body;
  if(u.searchParams.has('experiment')) {const account=accounts.find(a=>a.experiment_id===u.searchParams.get('experiment'));body={exchange:ex,market,journal:{account,trades:[],revision:account.revision,total:0,offset:0,limit:30,next_offset:null}};}
- else body={detail:{exchange:ex,market,data:{strategy_lab:{version:2,exchange:ex,market,experiments:accounts,price_history:[{ts:clock/1000-7200,price:98},{ts:clock/1000-3600,price:100}],events:[]}}}};
+ else body={detail:{exchange:ex,market,data:{strategy_lab:{version:2,exchange:ex,market,experiments:accounts,price_history:[{ts:clock/1000-7200,price:98},{ts:clock/1000-3600,price:100}],events:eventRows(market)}}}};
  return {ok:true,json:async()=>structuredClone(body)};
 };
 const page=createPaperWorkbench({store});const root=document.getElementById('root');page.mount(root);page.render();
@@ -43,6 +46,19 @@ test('ticker identifiers remain intact and existing accounts remain reachable',a
  click('[data-exchange="bithumb"]');await flush();click('[data-coin="KRW-DEXE"]');await flush();assert.ok(shadow().getElementById('coin-heading').textContent.includes('DEXE'));
  click('[data-overview="summary"]');assert.ok(root.querySelector('[data-return-workbench]'));assert.ok(root.querySelector('[data-paper-tab="coins"]'));
  root.querySelector('[data-return-workbench]').click();await flush();assert.ok(shadow().getElementById('coin-heading').textContent.includes('DEXE'));
+});
+test('event selection joins reaction, historical sample and evidence without polling reset',async()=>{
+ click('[data-section="events"]');let select=shadow().getElementById('event-picker');
+ const oldKey=select.options[1].value;select.value=oldKey;select.dispatchEvent(new window.Event('change',{bubbles:true}));
+ assert.equal(shadow().querySelector('.event-detail h3').textContent,'old 발표');
+ const details=shadow().querySelector('[data-continuity-key^="event-history"]');details.open=true;
+ assert.ok(details.textContent.includes('2/3회'));assert.ok(shadow().querySelector('.reaction-table').textContent.includes('—'));
+ addNewEvent=true;clock+=21000;revision++;for(const fn of listeners)fn(state,{type:'snapshot-live'});await flush();
+ assert.equal(shadow().getElementById('event-picker').value,oldKey);
+ assert.equal(shadow().getElementById('event-picker').options.length,3);
+ assert.equal(shadow().querySelector('[data-continuity-key^="event-history"]').open,true);
+ assert.equal(shadow().querySelector('.event-meta a').href,'https://example.com/old');
+ click('[data-section="strategy"]');await flush();
 });
 test('theme changes reach the isolated coin view; standalone review has no unsupported aggregate routes',async()=>{
  const {applyTheme}=await import('../public/modules/shared/theme.js');

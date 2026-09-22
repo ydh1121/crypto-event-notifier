@@ -130,8 +130,14 @@ def main():
     sample=read_detail(args.db,'bithumb','KRW-B3')
     exp=next((e for e in sample['data']['strategy_lab']['experiments'] if e['style']=='aggressive'),None)
     if args.report:
+        events=sample['data']['strategy_lab'].get('events',[])
+        event_market='KRW-B3'
+        if not events:
+            events=read_detail(args.db,'bithumb','KRW-BTC')['data']['strategy_lab'].get('events',[])
+            event_market='KRW-BTC'
         report={'db_path':str(args.db.resolve()),'db_size':args.db.stat().st_size,'paper_only':True,
                 'mode':'read_only','scope':'bithumb|KRW-B3|aggressive','account':exp,
+                'event_review':{'exchange':'bithumb','market':event_market,'events':events[:1]},
                 'limitations':['Stored drawdown is not fill-only replay.','No runner was started.','No remote publication.']}
         args.report.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
     server=ThreadingHTTPServer(('127.0.0.1',args.port),handler(args.db,fixture=args.fixture))

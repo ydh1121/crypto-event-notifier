@@ -6,12 +6,7 @@ import sqlite3
 import time
 from typing import Any, Iterable
 
-HORIZONS: tuple[tuple[str, int], ...] = (
-    ("15m", 15 * 60),
-    ("1h", 60 * 60),
-    ("4h", 4 * 60 * 60),
-    ("1d", 24 * 60 * 60),
-)
+from .event_response_contract import HORIZONS, PROVIDER_ID, observation
 
 DEFAULT_BENCHMARKS: tuple[tuple[str, str], ...] = (
     ("bithumb", "KRW-BTC"),
@@ -34,7 +29,6 @@ OFFICIAL_EVENT_SOURCES = (
 # carry an actual source timestamp.
 EXCLUDED_EVENT_TYPES = {"FOMC_MEETING"}
 
-PROVIDER_ID = "local_public_exchange_trade_stream"
 DATA_RIGHTS = "public_exchange_market_data_internal_research"
 OBSERVATION_TOLERANCE_SECONDS = 120.0
 EVENT_LOOKBACK_SECONDS = 3 * 24 * 60 * 60
@@ -67,7 +61,8 @@ class IntelligenceEventResponseCollector:
         self.conn = conn
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA busy_timeout=10000")
-        source = tuple(benchmarks or DEFAULT_BENCHMARKS)
+        self.include_observed_markets = benchmarks is None
+        source = tuple(DEFAULT_BENCHMARKS if benchmarks is None else benchmarks)
         cleaned: list[tuple[str, str]] = []
         for exchange, market in source:
             item = (str(exchange or "").strip().lower(), str(market or "").strip().upper())
@@ -85,6 +80,54 @@ class IntelligenceEventResponseCollector:
         )
         self.max_events = max(1, min(500, int(max_events)))
         self._ensure_schema()
+
+    def _markets(self) -> tuple[tuple[str, str], ...]:
+        """Default coverage follows locally observed KRW markets, with majors retained.
+
+        Explicit benchmark lists remain exact (e.g. controlled research runs).
+        The small REST and WebSocket registries avoid scanning millions of trades.
+        Older DBs without registry rows can still discover their stored markets.
+        """
+        if not self.include_observed_markets:
+            return self.benchmarks
+        rows = []
+        for table in ("research_market_flow_cursor_mx", "research_market_flow_stream_session_mx"):
+            if self._table_exists(table):
+                rows.extend(self.conn.execute(f"SELECT exchange,market FROM {table}").fetchall())
+        if not rows:
+            rows = self.conn.execute("SELECT DISTINCT exchange,market FROM research_market_trade_flow_mx").fetchall()
+        pairs = set(self.benchmarks)
+        for row in rows:
+            exchange, market = str(row[0]).strip().lower(), str(row[1]).strip().upper()
+            if exchange in {"bithumb", "upbit"} and market.startswith("KRW-") and len(market) > 4:
+                pairs.add((exchange, market))
+        return tuple(sorted(pairs))
+
+    def _saved_baseline(self, rows: list[sqlite3.Row], event_ts: float) -> dict[str, Any] | None:
+        """Keep the same observed anchor after the raw stream has been pruned."""
+        if any(float(row["event_ts"]) != event_ts or observation(row) is None for row in rows):
+            return {"conflict": True}
+        anchors = []
+        for row in rows:
+            stamp, price = float(row["baseline_trade_ts"]), float(row["baseline_price"])
+            if float(row["event_ts"]) != event_ts or not math.isfinite(price) or price <= 0:
+                continue
+            if not 0 <= event_ts - stamp <= self.observation_tolerance_seconds:
+                continue
+            anchors.append((stamp, price, row))
+        if not anchors:
+            return None
+        stamp, price, source = anchors[0]
+        if any(other_ts != stamp or not math.isclose(other_price, price, rel_tol=1e-12)
+               for other_ts, other_price, _ in anchors):
+            return {"conflict": True}
+        try:
+            attrs = json.loads(source["attributes_json"])
+        except (ValueError, TypeError):
+            attrs = {}
+        return {"trade_ts": stamp, "trade_price": price,
+                "sequential_id": attrs.get("baseline_sequential_id", "") if isinstance(attrs, dict) else "",
+                "from_saved_response": True}
 
     def _ensure_schema(self) -> None:
         self.conn.executescript(
@@ -142,14 +185,6 @@ class IntelligenceEventResponseCollector:
             (*params, self.max_events),
         ).fetchall()
 
-    def _existing(self, event_id: str, exchange: str, market: str, horizon_label: str) -> bool:
-        row = self.conn.execute(
-            """SELECT 1 FROM research_intelligence_event_responses
-               WHERE event_id=? AND exchange=? AND market=? AND horizon_label=? AND provider_id=?""",
-            (event_id, exchange, market, horizon_label, PROVIDER_ID),
-        ).fetchone()
-        return row is not None
-
     def _baseline_trade(self, exchange: str, market: str, event_ts: float) -> sqlite3.Row | None:
         return self.conn.execute(
             """SELECT sequential_id,trade_ts,trade_price
@@ -167,7 +202,7 @@ class IntelligenceEventResponseCollector:
             ),
         ).fetchone()
 
-    def _target_trade(self, exchange: str, market: str, target_ts: float) -> sqlite3.Row | None:
+    def _target_trade(self, exchange: str, market: str, target_ts: float, now: float) -> sqlite3.Row | None:
         return self.conn.execute(
             """SELECT sequential_id,trade_ts,trade_price
                FROM research_market_trade_flow_mx
@@ -180,7 +215,7 @@ class IntelligenceEventResponseCollector:
                 exchange,
                 market,
                 float(target_ts),
-                float(target_ts) + self.observation_tolerance_seconds,
+                min(float(target_ts) + self.observation_tolerance_seconds, now),
             ),
         ).fetchone()
 
@@ -205,6 +240,8 @@ class IntelligenceEventResponseCollector:
             "already_captured": 0,
             "missing_baseline": 0,
             "missing_target": 0,
+            "saved_baseline_used": 0,
+            "anchor_conflicts": 0,
         }
 
         if not self._table_exists("research_intelligence_events"):
@@ -213,6 +250,10 @@ class IntelligenceEventResponseCollector:
         if not self._table_exists("research_market_trade_flow_mx"):
             result["status"] = "waiting_for_market_flow"
             return result
+
+        markets = self._markets()
+        result["markets_considered"] = len(markets)
+        result["market_selection"] = "observed_krw_markets" if self.include_observed_markets else "explicit_benchmarks"
 
         events = self._eligible_events(current)
         result["events_considered"] = len(events)
@@ -232,23 +273,44 @@ class IntelligenceEventResponseCollector:
             if event_ts <= 0 or event_ts > current:
                 continue
 
+            existing_rows = self.conn.execute("""SELECT * FROM research_intelligence_event_responses
+                WHERE event_id=? AND provider_id=? ORDER BY captured_at,horizon_seconds""",
+                (event_id, PROVIDER_ID)).fetchall()
+            existing = {(r["exchange"], r["market"], r["horizon_label"]): r for r in existing_rows}
+            saved: dict[tuple[str, str], list[sqlite3.Row]] = {}
+            for row in existing_rows:
+                saved.setdefault((row["exchange"], row["market"]), []).append(row)
+            event_markets = sorted(set(markets).union(saved)) if self.include_observed_markets else markets
+            baselines: dict[tuple[str, str], Any] = {}
+
             for horizon_label, horizon_seconds in HORIZONS:
                 target_ts = event_ts + float(horizon_seconds)
                 if target_ts > current:
-                    result["future_observations"] += len(self.benchmarks)
+                    result["future_observations"] += len(event_markets)
                     continue
 
-                for exchange, market in self.benchmarks:
-                    if self._existing(event_id, exchange, market, horizon_label):
+                for exchange, market in event_markets:
+                    previous = existing.get((exchange, market, horizon_label))
+                    if previous is not None:
+                        if float(previous["event_ts"]) != event_ts:
+                            result["anchor_conflicts"] += 1
                         result["already_captured"] += 1
                         continue
                     result["due_observations"] += 1
 
-                    baseline = self._baseline_trade(exchange, market, event_ts)
+                    pair = (exchange, market)
+                    if pair not in baselines:
+                        baselines[pair] = self._saved_baseline(saved.get(pair, []), event_ts)
+                        if baselines[pair] is None:
+                            baselines[pair] = self._baseline_trade(exchange, market, event_ts)
+                    baseline = baselines[pair]
                     if baseline is None:
                         result["missing_baseline"] += 1
                         continue
-                    target = self._target_trade(exchange, market, target_ts)
+                    if isinstance(baseline, dict) and baseline.get("conflict"):
+                        result["anchor_conflicts"] += 1
+                        continue
+                    target = self._target_trade(exchange, market, target_ts, current)
                     if target is None:
                         result["missing_target"] += 1
                         continue
@@ -284,6 +346,7 @@ class IntelligenceEventResponseCollector:
                         "score_authority": False,
                         "point_in_time_backfill_used": False,
                         "missing_values_coerced_to_zero": False,
+                        "baseline_reused_from_response": isinstance(baseline, dict) and bool(baseline.get("from_saved_response")),
                     }
                     cursor = self.conn.execute(
                         """INSERT OR IGNORE INTO research_intelligence_event_responses(
@@ -317,11 +380,14 @@ class IntelligenceEventResponseCollector:
                     )
                     if int(cursor.rowcount or 0) > 0:
                         result["samples_inserted"] += 1
+                        if attrs["baseline_reused_from_response"]:
+                            result["saved_baseline_used"] += 1
                     else:
                         result["already_captured"] += 1
 
         self.conn.commit()
-        result["status"] = "ok"
+        result["ok"] = not bool(result["anchor_conflicts"])
+        result["status"] = "anchor_conflict" if result["anchor_conflicts"] else "ok"
         return result
 
     def recent(self, *, limit: int = 100) -> list[dict[str, Any]]:

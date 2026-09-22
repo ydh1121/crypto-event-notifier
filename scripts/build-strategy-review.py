@@ -15,6 +15,7 @@ PYTHON_FILES = (
     '__init__.py', 'paper_constants.py', 'strategy_journal_review.py',
     'strategy_lab_market.py', 'strategy_lab_context.py', 'strategy_lab_journal.py',
     'strategy_lab_plan.py', 'strategy_lab_rules.py',
+    'event_reaction_view.py', 'event_response_contract.py',
 )
 LAUNCHER = r'''@echo off
 setlocal
@@ -56,7 +57,8 @@ Python 3.10 이상을 사용합니다. 기존 프로젝트의 Python 또는 PC�
 확인할 흐름
 코인 선택 → 전략 탭 → 독립 계좌 → 가격·체결 → 전체 체결 원장 → 현재 계획 → 계획으로 계산
 BTC·ETH 탭은 동일 시각의 저장된 종가를 비교합니다.
-이벤트 탭은 해당 코인에 실제 저장된 반응만 표시합니다.
+이벤트 탭에서 발표를 선택하면 코인·BTC·ETH 반응을 같은 기간으로 비교합니다.
+과거 같은 이벤트의 반응과 실제 계산 가격·시각은 펼쳐서 확인합니다.
 오래된 가격·계좌는 갱신 지연으로 표시합니다. 빈 기록을 0%로 바꾸지 않습니다.
 
 계획으로 계산은 해당 가상계좌의 수량·평단·전략 조건을 불러옵니다.
@@ -66,6 +68,7 @@ BTC·ETH 탭은 동일 시각의 저장된 종가를 비교합니다.
 실제 DB는 읽기 전용으로 열립니다. DB·WAL·SHM 초기화나 교체를 하지 않습니다.
 이 폴더에 CRYPTO_B3_REVIEW_RESULT.json이 저장됩니다.
 이 파일에는 B3 공격적 전략의 실제 가상계좌·체결 원장과 대조 결과가 들어 있습니다.
+이벤트 검토 표본도 포함됩니다. B3에 반응이 없으면 BTC 표본을 별도로 명시합니다.
 파일은 자동 업로드되지 않습니다. 현재 사이트에도 배포되지 않습니다.
 
 이 실행본의 범위는 코인별 가상매매 검토입니다.

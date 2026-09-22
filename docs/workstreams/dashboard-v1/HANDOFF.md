@@ -33,6 +33,18 @@ This block supersedes older visual-acceptance and BLOCKED_LOCAL_EVIDENCE checkpo
 - Remaining data gaps: stopped/stale collection diagnosis; altcoin event reactions / 1d horizons / historical same-type samples; real-holdings workflow redesign and small-live comparison. The rejected live-trading page is not declared redesigned or accepted.
 - Transport limit: a single coin whose complete chunks exceed its per-run write budget fails explicitly; no silent truncation. Future chunk retention and very large journals need a separate bounded storage plan.
 
+### Event reaction continuation — source complete, PC verification pending
+
+- Parent for this unit: `a8c3545`. No new Windows review result was supplied or found; the actual-runtime evidence above has not advanced. This unit changes source, not the currently running PC or Production.
+- Default event-response targets now include KRW markets from both REST and WebSocket registries; older DBs can discover observed raw markets. Explicit benchmark lists remain exact. No new source feed, network request, score or order path is added.
+- A validated previously captured reaction supplies the same baseline for later horizons after raw-trade pruning. Conflicting/revised event clocks or corrupt saved samples fail closed; existing rows are not rewritten. Future ticks cannot satisfy a present target. No schema change or canonical DB mutation is required for this source change.
+- Event projection groups by captured event clock and joins the same exchange, provider, source and horizon. It exposes baseline/target prices and exact timestamps for the coin, BTC and ETH, plus relative percentage-point movement. Invalid observations stay nonnumeric and are flagged.
+- Historical samples use the same coin/exchange/source/event type/provider over the preceding year and only results captured before the selected event. Future events and late backfills cannot inflate that historical comparison. Counts, mean, median and positive counts remain separate from any recommendation probability.
+- The event tab now selects one event and connects reaction numbers, original publication link, historical samples and actual price/time evidence. Selection and disclosures survive polling, including arrival of a newer event.
+- Verification: 21 Python collection/journal/context tests + 13 ingest/check/downstream-sensitivity tests passed; latest changed collector tests 6/6 passed. JS/API/DOM 13/13 passed; all existing Viewer type/static gates and changed Python compilation passed. Extracted stdlib archive returned the same stored event prices/returns through HTTP and the local report, served every asset, and left the fixture DB hash unchanged.
+- The existing review archive now also emits one explicitly scoped event sample. It uses B3 if present, otherwise labels a BTC sample separately; no BTC observation becomes B3 evidence.
+- Limits remain: first capture still needs a real baseline and target inside existing raw retention; this does not reconstruct never-recorded prices or repair a stopped process. Unsupported event feeds, actual PC application, live accumulation and visual acceptance remain pending. New schema/pinned-price storage would require a separate additive change with actual DB backup/readback first.
+
 ### Exact next action
 
 1. Run the provided `CRYPTO_STRATEGY_REVIEW.zip` outside the actual checkout via `RUN_REVIEW.cmd`. It opens the existing canonical DB and emits private `CRYPTO_B3_REVIEW_RESULT.json` locally; do not commit or publicly upload this report.

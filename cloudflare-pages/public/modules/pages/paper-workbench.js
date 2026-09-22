@@ -4,12 +4,13 @@ import {getStrategyJournal} from '../services/strategy-journal.js';
 import {accountModel, importPlan} from '../shared/strategy-workbench-model.js';
 import {esc} from '../shared/format.js';
 import {patchPreservingUi} from '../shared/ui-continuity.js';
-import {accountHtml,planHtml,journalHtml,calculatorHtml,calculationHtml,priceChart,relativeHtml,freshnessHtml,won,number,time,percent,sourceHref} from '../shared/strategy-workbench-view.js';
+import {accountHtml,planHtml,journalHtml,calculatorHtml,calculationHtml,priceChart,relativeHtml,freshnessHtml,won,percent} from '../shared/strategy-workbench-view.js';
+import {eventsHtml,eventKey} from '../shared/event-workbench-view.js';
 
 /** One coin stays selected while independent strategy accounts change beneath it. */
 export function createPaperWorkbench({store, allowOverview=true}) {
   let root,view,legacy,unsub,detail=null,journal=null,journalError='',detailError='',loading=false,requestId=0,journalId=0;
-  let selected='',currentRevision='',search='',section='strategy',range='7d',calculatorOpen=false;
+  let selected='',currentRevision='',selectedEvent='',search='',section='strategy',range='7d',calculatorOpen=false;
   const drafts=new Map();
   const ui=()=>store.get().ui;
   const exchange=()=>ui().paperExchange==='upbit'?'upbit':'bithumb';
@@ -36,7 +37,7 @@ export function createPaperWorkbench({store, allowOverview=true}) {
     root.innerHTML='<crypto-paper-workbench data-raw-text></crypto-paper-workbench>';
     view=root.firstElementChild.attachShadow({mode:'open'});
     syncTheme();
-    view.innerHTML=`<link rel="stylesheet" href="/modules/styles/strategy-workbench.css?v=1">
+    view.innerHTML=`<link rel="stylesheet" href="/modules/styles/strategy-workbench.css?v=2">
       <main><header class="workbench-header"><h1>가상매매</h1>${allowOverview?'<nav aria-label="전체 가상매매"><button data-overview="summary">전체 계좌</button><button data-overview="compare">거래소 비교</button></nav>':''}</header>
       <div class="workspace"><aside aria-label="코인 선택"><div class="exchange-picker" role="group" aria-label="거래소"><button data-exchange="bithumb" aria-pressed="${exchange()==='bithumb'}">빗썸</button><button data-exchange="upbit" aria-pressed="${exchange()==='upbit'}">업비트</button></div><label class="search-label">코인 검색<input id="coin-search" type="search" placeholder="이름 또는 티커" value="${esc(search)}"></label><div id="coin-list" class="coin-list" data-preserve-scroll></div><label class="mobile-picker">코인 선택<select id="mobile-coin"></select></label></aside>
       <div class="coin-detail"><header id="coin-heading" class="coin-heading"></header><nav class="section-tabs" aria-label="코인 분석"><button data-section="strategy" aria-current="page">전략</button><button data-section="relative">BTC·ETH</button><button data-section="events">이벤트</button></nav><div id="coin-content"></div></div></div></main>`;
@@ -119,8 +120,8 @@ export function createPaperWorkbench({store, allowOverview=true}) {
   function calculate() { const draft=drafts.get(draftKey());if(draft)set('calculation-result',calculationHtml(draft,{exchange:exchange(),market:market()})); }
   function renderEvents() {
     const events=detail?.data?.strategy_lab?.events;
-    if(!events) {set('coin-content','<p class="placeholder">이 코인의 이벤트 반응 기록이 아직 전송되지 않았습니다.</p>');return;}
-    set('coin-content',`<div class="section-heading"><h2>이벤트 반응</h2><span>저장된 반응 ${events.length}개</span></div>${events.length?events.map(e=>`<article class="event"><header><h3>${esc(e.title)}</h3><time>${time(e.event_ts)}</time></header><a href="${sourceHref(e.source_url)}" rel="noopener noreferrer" target="_blank">발표 원문</a><div class="table-scroll"><table><thead><tr><th>경과</th><th>코인</th><th>BTC</th><th>ETH</th></tr></thead><tbody>${['15m','1h','4h','1d'].map(h=>`<tr><td>${h}</td><td>${percent(e.responses?.[h]?.coin)}</td><td>${percent(e.responses?.[h]?.btc)}</td><td>${percent(e.responses?.[h]?.eth)}</td></tr>`).join('')}</tbody></table></div></article>`).join(''):'<p class="placeholder">저장된 코인별 이벤트 반응이 없습니다.</p>'}`);
+    if(Array.isArray(events)&&!events.some(e=>eventKey(e)===selectedEvent))selectedEvent=events[0]?eventKey(events[0]):'';
+    patchPreservingUi(view,()=>set('coin-content',eventsHtml(events,selectedEvent)));
   }
   function openOverview(tab) {
     if(!allowOverview)return;
@@ -133,7 +134,7 @@ export function createPaperWorkbench({store, allowOverview=true}) {
   }
   function chooseCoin(value) {
     requestId++;journalId++;store.setUi({paperMarket:value},{scope:'paper-workbench'});
-    detail=null;journal=null;currentRevision='';calculatorOpen=false;renderCoins();renderHeading();void loadDetail();
+    detail=null;journal=null;currentRevision='';selectedEvent='';calculatorOpen=false;renderCoins();renderHeading();void loadDetail();
   }
   function click(event) {
     const b=event.target.closest('button');if(!b||b.disabled)return;
@@ -169,7 +170,10 @@ export function createPaperWorkbench({store, allowOverview=true}) {
     else return;
     calculate();
   }
-  function change(event) {if(event.target.id==='mobile-coin')chooseCoin(event.target.value);}
+  function change(event) {
+    if(event.target.id==='mobile-coin')chooseCoin(event.target.value);
+    if(event.target.id==='event-picker'){selectedEvent=event.target.value;renderEvents();}
+  }
   return {mount(node){root=node;document.addEventListener('viewer-theme-change',syncTheme);unsub=store.subscribe((_,meta)=>{if(['snapshot','snapshot-live'].includes(meta.type)&&!legacy) {pickMarket();renderHeading();void loadDetail();}});},render,
     destroy(){requestId++;journalId++;document.removeEventListener('viewer-theme-change',syncTheme);unsub?.();legacy?.destroy();root=null;view=null;}};
 }

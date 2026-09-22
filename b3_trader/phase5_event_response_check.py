@@ -42,6 +42,10 @@ def _runtime_capture(path: Path = STATUS_PATH) -> dict[str, Any]:
         "already_captured",
         "missing_baseline",
         "missing_target",
+        "saved_baseline_used",
+        "anchor_conflicts",
+        "markets_considered",
+        "market_selection",
     }
     return {key: capture[key] for key in allowed if key in capture}
 
