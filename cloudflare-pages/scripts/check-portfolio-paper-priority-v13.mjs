@@ -4,13 +4,14 @@ const index=read('public/index.html');
 const main=read('public/modules/main.js');
 const assets=read('public/modules/pages/assets.js');
 const paper=read('public/modules/pages/paper.js');
+const paperWorkbench=read('public/modules/pages/paper-workbench.js');
 const interaction=read('public/modules/styles/interaction-layout-v4.css');
 const fail=[];
 const check=(name,value)=>{if(!value)fail.push(name)};
 
 check('current build marker exists',/meta name="crypto-viewer-build" content="[^"]+"/.test(index));
 check('asset module remains cache-versioned',/\.\/pages\/assets\.js\?v=[^'\"]+/.test(main));
-check('paper module remains cache-versioned',/\.\/pages\/paper\.js\?v=[^'\"]+/.test(main));
+check('paper module remains cache-versioned',/\.\/pages\/paper-workbench\.js\?v=[^'\"]+/.test(main)&&/\.\/paper\.js\?v=[^'\"]+/.test(paperWorkbench));
 check('canonical interaction layer remains cache-versioned',/\/modules\/styles\/interaction-layout-v4\.css\?v=[^'\"]+/.test(index));
 
 const workspacePos=assets.indexOf('<section class="asset-workspace">');

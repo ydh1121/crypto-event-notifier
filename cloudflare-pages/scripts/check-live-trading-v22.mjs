@@ -2,6 +2,7 @@ import fs from'node:fs';
 const read=path=>fs.readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
 const index=read('public/index.html');
 const main=read('public/modules/main.js');
+const paperWorkbench=read('public/modules/pages/paper-workbench.js');
 const router=read('public/modules/core/router.js');
 const store=read('public/modules/core/store.js');
 const live=read('public/modules/pages/live-trading.js');
@@ -20,7 +21,7 @@ check('primary nav is simplified to four user destinations',
 
 check('live route is wired without deleting legacy pages',
   main.includes("createLiveTradingPage")&&main.includes("live:()=>createLiveTradingPage")&&
-  ['createHomePage','createDashboardPage','createResearchPage','createAssetsPage','createPaperPage','createStrategyPage','createSectorsPage','createRecordsPage','createSystemPage'].every(value=>main.includes(value)));
+  ['createHomePage','createDashboardPage','createResearchPage','createAssetsPage','createPaperWorkbench','createStrategyPage','createSectorsPage','createRecordsPage','createSystemPage'].every(value=>main.includes(value))&&paperWorkbench.includes('createPaperPage')&&paperWorkbench.includes('openOverview'));
 
 check('legacy capabilities stay reachable through secondary journeys',
   main.includes("live:[['live','실전매매'],['assets','자산(기존)']]")&&

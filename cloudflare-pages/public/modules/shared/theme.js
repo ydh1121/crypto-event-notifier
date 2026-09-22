@@ -38,6 +38,7 @@ export function applyTheme(theme,{persist=false}={}){
   document.documentElement.style.colorScheme=next;
   updateMeta(next);
   updateButtons(next);
+  document.dispatchEvent(new Event('viewer-theme-change'));
   if(persist){try{localStorage.setItem(STORAGE_KEY,next)}catch{}}
   return next;
 }

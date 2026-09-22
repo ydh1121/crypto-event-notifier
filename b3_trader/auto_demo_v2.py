@@ -15,7 +15,7 @@ from .bithumb_client import BithumbClient
 from .risk import estimate_buy, estimate_sell, recent_move_pct, spread_bps
 
 # Each Bithumb KRW market owns an independent 10M KRW PAPER account.
-START_KRW = 10_000_000.0
+from .paper_constants import DB_PATH, START_KRW
 SCAN_INTERVAL_SECONDS = 180.0
 BUY_COOLDOWN_SECONDS = 30 * 60.0
 MIN_ORDER_KRW = 50_000.0
@@ -31,7 +31,6 @@ BTC_FLASH_CRASH_PCT = -3.0
 BTC_FLASH_WINDOW_CANDLES = 3
 STATUS_PATH = Path("dashboard/runtime-demo.json")
 DETAIL_DIR = Path("dashboard/demo-runtime")
-DB_PATH = Path("b3_trader/data/auto_demo.sqlite3")
 
 
 def _num(value: Any, default: float = 0.0) -> float:

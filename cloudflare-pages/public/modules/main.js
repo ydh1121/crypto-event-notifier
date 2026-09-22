@@ -21,7 +21,7 @@ import{createResearchPage}from'./pages/research.js?v=43.1';
 import{installDexLaunchResearchPanel}from'./pages/dex-launch-panel.js?v=45';
 import{createAssetsPage}from'./pages/assets.js?v=52';
 import{createLiveTradingPage}from'./pages/live-trading.js?v=1';
-import{createPaperPage}from'./pages/paper.js?v=47';
+import{createPaperWorkbench}from'./pages/paper-workbench.js?v=1';
 import{createStrategyPage}from'./pages/strategy.js?v=48';
 import{createSectorsPage}from'./pages/sectors-v36.js?v=47';
 import{createRecordsPage}from'./pages/records.js?v=48';
@@ -63,7 +63,7 @@ const pages={
   'dashboard-detail':()=>createDashboardPage({store,navigate:name=>router.go(name)}),
   research:()=>createResearchPage({store}),
   assets:()=>createAssetsPage({store}),
-  paper:()=>createPaperPage({store}),
+  paper:()=>createPaperWorkbench({store}),
   strategy:()=>createStrategyPage({store}),
   sectors:()=>createSectorsPage({store,navigate:name=>router.go(name)}),
   records:()=>createRecordsPage({store}),

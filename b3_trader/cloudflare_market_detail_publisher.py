@@ -195,7 +195,7 @@ def _split_batches(details: list[dict[str, Any]]) -> list[tuple[list[dict[str, A
             raise RuntimeError(f"single market detail is too large: {key} {len(single_body)} bytes")
         candidate = [*current, detail]
         candidate_body = _encode_batch(candidate)
-        if current and len(candidate_body) > MAX_BODY_BYTES:
+        if current and (len(candidate_body) > MAX_BODY_BYTES or len(candidate) > 40):
             batches.append((current, current_body))
             current = [detail]
             current_body = single_body
@@ -253,6 +253,9 @@ class CloudflareMarketDetailPublisher:
         next_cursor = (cursor + rotating_count) % len(markets)
         return (priority + rotating)[:max_batch], next_cursor
 
+    def _detail_items(self, item: dict[str, Any]) -> list[dict[str, Any]]:
+        return [item]
+
     def publish_once(self) -> dict[str, Any]:
         url, token = self._endpoint()
         if not url or not token:
@@ -262,6 +265,7 @@ class CloudflareMarketDetailPublisher:
         old_cursor = int(state.get("cursor") or 0)
         cursors = state.get("cursors") if isinstance(state.get("cursors"), dict) else {"bithumb": old_cursor}
         next_cursors = dict(cursors)
+        pending_markets = dict(state.get("pending_markets") or {})
         details: list[dict[str, Any]] = []
         picked_by_exchange: dict[str, int] = {}
 
@@ -279,25 +283,33 @@ class CloudflareMarketDetailPublisher:
                 rotating_count=int(config["rotating"]),
                 max_batch=int(config["max_batch"]),
             )
+            if pending_markets.get(exchange):
+                markets = pending_markets[exchange]
+                next_cursor = int(cursors.get(exchange) or 0)
             next_cursors[exchange] = next_cursor
+            pending_markets[exchange] = []
             added = 0
-            for market in markets:
+            row_budget = int(config["max_batch"])
+            used_rows = 0
+            for market_index, market in enumerate(markets):
                 source = _read_json(Path(config["details"]) / f"{market.replace('/', '_')}.json")
                 if not source:
                     continue
                 compact = _compact_detail(source)
                 summary = compact.get("summary") if isinstance(compact.get("summary"), dict) else {}
                 source_ts = _num(summary.get("signal_ts")) or _num((compact.get("signal") or {}).get("ts"))
-                details.append(
-                    {
-                        "key": f"{exchange}|{market}|{strategy}",
-                        "exchange": exchange,
-                        "market": market,
-                        "strategy": strategy,
-                        "source_ts": source_ts,
-                        "detail": compact,
-                    }
-                )
+                items = self._detail_items({
+                    "key": f"{exchange}|{market}|{strategy}", "exchange": exchange,
+                    "market": market, "strategy": strategy, "source_ts": source_ts, "detail": compact,
+                })
+                if len(items) > row_budget:
+                    raise RuntimeError(f"complete journal exceeds per-run row budget: {exchange}|{market}")
+                if used_rows + len(items) > row_budget:
+                    # Retry this rotation on the next run; never publish a partial manifest.
+                    pending_markets[exchange] = markets[market_index:]
+                    break
+                details.extend(items)
+                used_rows += len(items)
                 added += 1
             picked_by_exchange[exchange] = added
 
@@ -344,6 +356,7 @@ class CloudflareMarketDetailPublisher:
             {
                 "version": 3,
                 "cursors": next_cursors,
+                "pending_markets": pending_markets,
                 "published_at": now,
                 "published_keys": [row["key"] for row in details],
                 "published": len(details),

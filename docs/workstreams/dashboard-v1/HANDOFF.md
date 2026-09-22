@@ -2,42 +2,43 @@
 
 ## Successor CURRENT — CRYPTO-WO-20260921-RECOVERY-001
 
-**Status: BLOCKED_LOCAL_EVIDENCE. V22 / WO-008 was rejected by the user.**
-This block supersedes earlier visual-acceptance/next-page checkpoints below.
+**Status: IMPLEMENTED_REVIEW_PENDING. V22 / WO-008 remains rejected.**
+This block supersedes older visual-acceptance and BLOCKED_LOCAL_EVIDENCE checkpoints below.
 
-- Authority: the user's full project successor directive; existing functions/data must be preserved. Complete coin × strategy workflows from the actual journal before further UI work.
-- Source baseline actually read: `b3-auto-trader-phase1@56b9361f352eedce2e543b3baca36952b2397d76`. PR #1 was open, draft, unmerged.
-- Current Windows HEAD, worktree, canonical DB size/count/freshness and running processes: **UNKNOWN**. This session runs in a Linux workspace without the user's Windows checkout or a remote PC execution tool. Do not promote this workspace or the remote branch into local authority.
-- Canonical DB remains `b3_trader/data/auto_demo.sqlite3`. No replacement DB was created. No application source, runtime, holdings, strategy/PAPER semantics, migration, deployment or order change was performed.
-- This isolated recovery branch changes only TASKS/HANDOFF. Do not switch the running PC to it or merge it automatically.
+### Authority and actual evidence
 
-### Findings established from existing source
+- Actual Windows evidence: user-supplied `CRYPTO_LOCAL_CURRENT_20260921T233738Z(1).json`, observed 2026-09-21 23:37:38–23:41:55 UTC. Clean local `b3-auto-trader-phase1@ba3c59a50962ae1a5bdc41053a75f9e6bf9e1ec7`; execution-source hashes align with remote `56b9361f352eedce2e543b3baca36952b2397d76` (later documentation changes).
+- Canonical `b3_trader/data/auto_demo.sqlite3`: 3,081,179,136 bytes; WAL present. Latest relevant activity around 06:23 UTC, about 17 hours old at observation. T0/T1 did not grow; relevant process discovery returned no items. Historical healthy badges are not current liveness proof. Cause and present runtime still need actual-PC investigation.
+- Actual counts: PAPER accounts 775 / fills 23,134; Strategy Lab accounts 4,650 / trades 7,007; market memory 347,777; OHLCV 1,639,206; trade flow 2,863,417; intelligence events 70 / responses 10. Responses cover one event and BTC/ETH only, with no 1d or altcoin samples.
+- Bithumb/B3/aggressive: 5 fills, 2 closed trades, 1 win. Full diagnostic replay matches cash 9,003,349.466550918, quantity 1,242,359.8884979396, average 0.7942143087, realized -9,950.53344908182; no replay differences. Global aggressive 1,039 closed trades is a separate scope. Stored maximum drawdown is not reproducible from fills alone.
+- `manual_holdings` is absent in this DB; source owns holdings through `Settings.journal_db` (default `b3_trader/data/crypto_trader.sqlite3`). That other actual DB has not been inventoried. Do not invent holdings loss or initialize new tables.
+- Implementation checkout: isolated `agent/crypto-product-data-recovery-20260921`, based on recovery checkpoint `368d4d9`. It is not the user's Windows runtime. No canonical DB write, runtime restart, Production deployment, real order, automatic merge or holdings mutation occurred.
 
-1. `strategy_lab_snapshot.py` publishes experiment/metrics/coin-matrix/equity aggregates, but no complete trade ledger.
-2. `strategy_lab_market.py` reads at most 80 trades **across all experiments for a coin**, then discards all but the latest trade for each experiment. Its output also omits account volume. This is not a complete per-strategy journal contract.
-3. The Viewer trade selector reads summary-level `strategy_trades/trades/fills`; a source-backed complete account/ledger path is still unconnected.
-4. Strategy Lab buy `krw` is the fee-inclusive cash debit; sell `krw` is net proceeds. Reconciliation must not charge fees twice. Global strategy metrics must stay separate from coin-specific metrics.
-5. Trade fills alone do not establish maximum drawdown; intermediate marking history must also be checked.
+### Implemented vertical slice
 
-### Prepared local evidence collection
+- Read-only consistent coin/exchange account projection now includes quantity, full precision, complete per-experiment ledger, fee-aware replay, scoped wins/return and revision identity. Removed the old shared 80-fill truncation/latest-only gap.
+- Existing execution predicates and sizing are shared with the plan projection, preserving strategy/PAPER behavior. Plan exposes next entry, weight, conditional later rounds, actual full-position take-profit and stop rules; no invented partial-sale strategy.
+- Existing D1 detail transport can store complete immutable ledger chunks. Authenticated API paginates by experiment and revision; changed revisions return 409 instead of mixing account and old fills. Pending rotations retain their place under existing write budgets.
+- Paper route now keeps coin fixed across strategy tabs, account, price/fill chart, complete ledger and fee-inclusive split calculator. BTC/ETH comparisons use aligned stored 1h closes; events show only actual selected-coin responses. Missing observations stay missing. Old aggregate/basic-strategy pages remain reachable in the full Viewer.
+- New view has one owned Shadow DOM stylesheet; preserves draft, focus and disclosure state during polling and follows the existing theme. Cross-exchange holding fallback and ticker localization corruption are corrected. No global strategy sample is presented as coin validation.
+- Standalone stdlib review server opens the same projection/UI against the existing PC DB in read-only mode. Bind is loopback only; mutation routes, foreign origins and nonlocal hosts are rejected. `scripts/build-strategy-review.py` packages it with `RUN_REVIEW.cmd`; no DB, secrets, seeded data, Python dependencies or installer are included.
 
-Standalone deliverable: `CRYPTO_READ_ONLY.zip`, SHA-256 `23483470926a53d45b2d8a604c05bb4cf57fd313d0c4e8394c13fc1c6770d9ea`.
-It is distributed privately with this task, outside the Git checkout, so creating diagnostics does not precede the required application-source gate.
+### Verification and limits
 
-It uses Python stdlib, SQLite `mode=ro` + `query_only` + a write-denying authorizer; no app-module imports, DB initialization, Git pull, restart, upload or order operations.
-It collects 20-table aggregates/schema/time ranges, BTC/ETH/OHLCV/event coverage, safe process/component metadata, two observations 45 seconds apart, and Bithumb/B3/aggressive account ↔ full ledger reconciliation with global metrics in a separate scope.
-If B3 has no trades, a populated account is checked separately and is never substituted as B3 evidence.
-
-Focused verification: **7 tests passed** on temporary fixtures: missing DB not created; SQL/pragma/attach writes denied and fixture file unchanged; WAL-visible committed data plus transaction consistency; fee-inclusive replay; incomplete ledger detection; absent-table UNKNOWN semantics; actual Strategy Lab schema with exchange/coin isolation and mismatch detection.
-Windows process discovery and the user's canonical DB execution remain unverified. These fixture results are not product acceptance.
+- New Python projection/journal/context/HTTP tests: 8 passed; existing affected Strategy Lab/custom/candidate/write-budget tests: 10 passed.
+- Pre/post execution differential: 5,000 randomized cases matched fills, balances and learning (excluding wallclock metadata). Shared-rule extraction does not authorize strategy changes.
+- JavaScript API/model/DOM tests: 12 passed, covering complete pagination, revision/chunk integrity, fee/quantity conservation, exchange/quote isolation, polling continuity, theme, identifier fidelity and preservation of original account pages.
+- TypeScript and all existing Viewer static gates passed; changed Python modules compile. Extracted archive runs with Python `-S`, serves every packaged asset and reconciles a fixture account with unchanged DB hash. Static gates and DOM tests are not visual acceptance.
+- Browser local navigation was blocked by this session's browser policy. Desktop/mobile visual acceptance and actual Windows DB → new Viewer numeric comparison remain pending. No screenshots or visual PASS are claimed.
+- Remaining data gaps: stopped/stale collection diagnosis; altcoin event reactions / 1d horizons / historical same-type samples; real-holdings workflow redesign and small-live comparison. The rejected live-trading page is not declared redesigned or accepted.
+- Transport limit: a single coin whose complete chunks exceed its per-run write budget fails explicitly; no silent truncation. Future chunk retention and very large journals need a separate bounded storage plan.
 
 ### Exact next action
 
-Have the prepared `RUN_READ_ONLY.cmd` executed on the user's existing Windows PC outside the repository and receive `CRYPTO_LOCAL_CURRENT_*.json`.
-Then compare actual local source hashes/HEAD against the remote baseline, inspect counts/freshness/runtime, and select the first vertical slice from actual evidence. Do not ask for another product-design plan.
-If the ledger is valid, connect bounded per-coin/per-experiment account + complete paginated ledger + scoped performance through producer/API/service to the coin strategy view, preserving existing execution rules and actual holdings. Validate DB ↔ Viewer numbers before acceptance.
-If actual corruption or stopped collection is found, prioritize that cause; do not restart processes or change semantics without the relevant authority.
-Production deploy, live order activation, destructive DB changes and automatic merge remain outside this task's authority.
+1. Run the provided `CRYPTO_STRATEGY_REVIEW.zip` outside the actual checkout via `RUN_REVIEW.cmd`. It opens the existing canonical DB and emits private `CRYPTO_B3_REVIEW_RESULT.json` locally; do not commit or publicly upload this report.
+2. Compare the real B3 account, all fills, current rules and calculation result in the new screen; complete desktop/mobile visual review. The archive is a review build, not a site deployment or production acceptance.
+3. Investigate current Windows collector/supervisor exit evidence without treating persisted badges as liveness or restarting blindly. Restore accumulation only from actual process/log evidence and existing operating rules.
+4. After actual review, carry this source through the existing Preview workflow. Primary branch, PR #1 and Production stay unmerged/unchanged unless separately authorized.
 
 
 ## Current phase

@@ -57,10 +57,12 @@ export function captureUiContinuity(root,{scrollSelectors=[DEFAULT_SCROLL_SELECT
       scroll.push({selector,index,top:element.scrollTop,left:element.scrollLeft});
     });
   }
-  const active=preserveFocus&&root?.contains?.(document.activeElement)?document.activeElement:null;
+  const focused=root?.activeElement||document.activeElement;
+  const active=preserveFocus&&root?.contains?.(focused)?focused:null;
   return{
     window:preserveWindow?{x:window.scrollX,y:window.scrollY}:null,
     scroll,
+    disclosures:[...(root?.querySelectorAll?.("details[data-continuity-key]")||[])].filter(n=>n.open).map(n=>n.getAttribute("data-continuity-key")),
     focus:active?{selector:focusIdentity(active),selection:captureSelection(active)}:null,
   };
 }
@@ -74,6 +76,7 @@ function restoreSelection(element,selection){
 export function restoreUiContinuity(root,snapshot,{repeatOnFrame=true}={}){
   if(!snapshot)return;
   const apply=()=>{
+    for(const key of snapshot.disclosures||[]){const node=root?.querySelector?.(`[data-continuity-key="${CSS.escape(key)}"]`);if(node)node.open=true;}
     for(const item of snapshot.scroll||[]){
       const elements=root?.querySelectorAll?.(item.selector)||[];
       const element=elements[item.index];

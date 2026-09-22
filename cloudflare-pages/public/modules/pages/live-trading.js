@@ -1,3 +1,4 @@
+import{exactHolding}from'../shared/strategy-workbench-model.js';
 import{rowsFor,holdings,allCandidateRows,strategyCoinRows,strategyRows,strategyLab,findMarket}from'../shared/selectors.js';
 import{pageHead,loading,empty}from'../shared/components.js';
 import{n,money,pct,price,tone,esc,decisionLabel}from'../shared/format.js';
@@ -13,12 +14,9 @@ function symbolOf(row,market=''){return String(row?.symbol||market||'').replace(
 function marketKey(exchange,market){return `${exchange}|${market}`}
 function marketChange(row){const value=Number(row?.change_24h_pct);return Number.isFinite(value)?value:null}
 function validationLabel(exp,coinRow,criteria){
-  const c=exp?.candidate||{};
-  if(exp?.status==='paused'||c.status==='paused')return['일시정지','paused'];
-  if(c.status==='candidate')return['전략 후보 통과','candidate'];
-  if(c.status==='rejected')return['전략 기준 미충족','rejected'];
-  const min=Math.max(1,n(criteria?.min_closed_trades)||30);
-  return[`검증 ${n(c.closed_trades||exp?.closed_trades)}/${min}`,'warming'];
+  if(exp?.status==='paused')return['일시정지','paused'];
+  const count=coinRow?.closed_trades;
+  return count===null||count===undefined?['코인별 성과 미수신','warming']:[`이 코인 완료 ${n(count)}회`,'warming'];
 }
 
 export function createLiveTradingPage({store,navigate}){
@@ -30,9 +28,7 @@ export function createLiveTradingPage({store,navigate}){
   function exchangeRows(ex=exchange()){return rowsFor(store.get(),ex)}
   function holdingFor(ex,market){
     const list=holdings(store.get());
-    return list.find(row=>String(row.market||'')===market&&String(row.exchange||'').toLowerCase()===ex)
-      ||list.find(row=>String(row.market||'')===market)
-      ||null;
+    return exactHolding(list,ex,market);
   }
   function rankedCandidates(ex=exchange()){
     return allCandidateRows(store.get())

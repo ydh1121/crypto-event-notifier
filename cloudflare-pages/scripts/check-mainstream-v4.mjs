@@ -2,6 +2,7 @@ import fs from'node:fs';
 const read=path=>fs.readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
 const index=read('public/index.html');
 const main=read('public/modules/main.js');
+const paperWorkbench=read('public/modules/pages/paper-workbench.js');
 const router=read('public/modules/core/router.js');
 const home=read('public/modules/pages/v4/home.js');
 const words=read('public/modules/shared/mainstream-ui.js');
@@ -20,7 +21,7 @@ check('system is removed from primary navigation',!index.includes('data-route="s
 check('market secondary navigation is familiar',main.includes("['research','코인 탐색']")&&main.includes("['dashboard-detail','시장현황']")&&main.includes("['sectors','테마']"));
 check('paper is primary and strategy remains reachable as secondary',index.includes('data-route="paper"')&&!index.includes('data-route="strategy">전략</button>')&&router.includes("strategy:'paper'")&&main.includes("['strategy','전략 비교']"));
 check('market and theme routes stay under market navigation',router.includes("'dashboard-detail':'research'")&&router.includes("sectors:'research'"));
-check('all legacy functional pages remain wired',main.includes('createResearchPage')&&main.includes('createAssetsPage')&&main.includes('createPaperPage')&&main.includes('createStrategyPage')&&main.includes('createSectorsPage')&&main.includes('createRecordsPage')&&main.includes('createSystemPage'));
+check('all legacy functional pages remain wired',main.includes('createResearchPage')&&main.includes('createAssetsPage')&&(main.includes('createPaperWorkbench')&&paperWorkbench.includes('createPaperPage')&&paperWorkbench.includes('openOverview'))&&main.includes('createStrategyPage')&&main.includes('createSectorsPage')&&main.includes('createRecordsPage')&&main.includes('createSystemPage'));
 check('existing interaction helpers remain installed',main.includes('installSectorImeGuard')&&main.includes('installTableSortEnhancer')&&main.includes('installAmountInputUx')&&main.includes('installDexLaunchResearchPanel')&&main.includes('installViewportHandoff'));
 check('observer based same page continuity is not installed',!main.includes('installSamePageInteractionContinuity'));
 check('new home is portfolio and transaction oriented',home.includes("sectionHead('시장현황'")&&home.includes("sectionHead('코인'")&&home.includes("sectionHead('내 자산'")&&home.includes("sectionHead('최근 거래'"));

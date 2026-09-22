@@ -42,9 +42,15 @@ const REPLACEMENTS=[
   ['Launch','상장 전'],
 ];
 
-function replaceText(value){
+export function replaceText(value){
   let out=String(value??'');
-  for(const[from,to]of REPLACEMENTS)out=out.split(from).join(to);
+  for(const[from,to]of REPLACEMENTS){
+    // Latin words in copy must not replace substrings of tickers or identifiers.
+    if(/^[A-Za-z ]+$/.test(from)){
+      const escaped=from.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      out=out.replace(new RegExp(`(?<![A-Za-z0-9_-])${escaped}(?![A-Za-z0-9_-])`,'g'),to);
+    }else out=out.split(from).join(to);
+  }
   return out;
 }
 function rawElement(element){return !element||element.closest?.('[data-raw-text]')}

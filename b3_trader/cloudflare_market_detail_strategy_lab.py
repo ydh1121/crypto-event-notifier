@@ -7,6 +7,7 @@ from typing import Any
 from . import cloudflare_market_detail_publisher as base
 from .market_detail_feature_projection import apply_market_feature_projection
 from .strategy_lab_market import read_strategy_lab_market
+from .strategy_lab_transport import detail_items
 
 _PATCH_LOCK = threading.RLock()
 _BASE_COMPACT_DETAIL = base._compact_detail
@@ -37,7 +38,7 @@ def _compact_detail_with_strategy_lab(source: dict[str, Any]) -> dict[str, Any]:
     exchange = str(summary.get("exchange") or signal.get("exchange") or "").lower()
     market = str(summary.get("market") or signal.get("market") or "").upper()
     result["strategy_lab"] = read_strategy_lab_market(exchange, market)
-    result["version"] = max(4, int(result.get("version") or 0))
+    result["version"] = max(5, int(result.get("version") or 0))
     return result
 
 
@@ -48,6 +49,9 @@ class CloudflareMarketDetailPublisher(base.CloudflareMarketDetailPublisher):
     The 24/7 supervisor additionally applies a D1 write budget here so Viewer
     detail refreshes cannot overwhelm the Free-tier row-write allowance.
     """
+
+    def _detail_items(self, item: dict[str, Any]) -> list[dict[str, Any]]:
+        return detail_items(item)
 
     def publish_once(self) -> dict[str, Any]:
         with _PATCH_LOCK:
@@ -60,7 +64,7 @@ class CloudflareMarketDetailPublisher(base.CloudflareMarketDetailPublisher):
                 if isinstance(result, dict):
                     result["strategy_lab_detail"] = True
                     result["market_feature_detail"] = True
-                    result["detail_payload_version"] = 4
+                    result["detail_payload_version"] = 5
                     result["d1_write_budget"] = {
                         "max_details_per_run": sum(
                             int(config.get("max_batch") or 0) for config in base.SOURCE_CONFIGS
