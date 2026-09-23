@@ -56,6 +56,21 @@ def test_backup_never_creates_missing_source_or_overwrites_destination(tmp_path)
     assert (destination/'auto_demo.sqlite3').read_bytes() == b'keep me'
 
 
+def test_event_backup_checks_existing_rows_and_does_not_create_absent_archive(tmp_path):
+    path = tmp_path/'events.sqlite3'; source = make_db(path)
+    for table in recovery.EVENT_BACKUP_TABLES[:2]:
+        source.execute(f'CREATE TABLE {table}(id INTEGER PRIMARY KEY)')
+        source.execute(f'INSERT INTO {table} VALUES(1)')
+    source.commit()
+    result = recovery.backup_database(path,tmp_path/'backup')
+    assert result['event_counts'] == {t: 1 for t in recovery.EVENT_BACKUP_TABLES[:2]}
+    assert source.execute("SELECT name FROM sqlite_master WHERE name=?",
+                          (recovery.EVENT_BACKUP_TABLES[2],)).fetchone() is None
+    with sqlite3.connect(result['path']) as copied:
+        assert copied.execute('SELECT id FROM research_intelligence_event_responses').fetchall() == [(1,)]
+    source.close()
+
+
 def test_low_disk_space_leaves_existing_db_intact(tmp_path, monkeypatch):
     path = tmp_path/'original.sqlite3'; db = make_db(path); db.close()
     before = path.read_bytes()

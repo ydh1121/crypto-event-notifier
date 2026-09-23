@@ -6,7 +6,11 @@ import sqlite3
 import time
 from typing import Any, Iterable
 
-from .event_response_contract import HORIZONS, PROVIDER_ID, observation
+from .event_response_contract import (
+    HORIZONS, PROVIDER_ID, observation, OFFICIAL_EVENT_SOURCES,
+    EXCLUDED_EVENT_TYPES, OBSERVATION_TOLERANCE_SECONDS, EVENT_LOOKBACK_SECONDS, MAX_EVENTS,
+)
+from .event_price_archive import capture_market, eligible_events, read_price, ensure_schema as ensure_price_schema
 
 DEFAULT_BENCHMARKS: tuple[tuple[str, str], ...] = (
     ("bithumb", "KRW-BTC"),
@@ -15,24 +19,7 @@ DEFAULT_BENCHMARKS: tuple[tuple[str, str], ...] = (
     ("upbit", "KRW-ETH"),
 )
 
-OFFICIAL_EVENT_SOURCES = (
-    "us_bls_release_calendar",
-    "us_bea_release_schedule",
-    "us_fed_fomc_calendar",
-    "us_sec_press_releases",
-    "us_cftc_press_releases",
-)
-
-# The FOMC meeting calendar intentionally preserves date-only meeting evidence.
-# A date without the statement/release clock must never be turned into a price
-# reaction anchor. Statement/minutes/projections rows remain eligible when they
-# carry an actual source timestamp.
-EXCLUDED_EVENT_TYPES = {"FOMC_MEETING"}
-
 DATA_RIGHTS = "public_exchange_market_data_internal_research"
-OBSERVATION_TOLERANCE_SECONDS = 120.0
-EVENT_LOOKBACK_SECONDS = 3 * 24 * 60 * 60
-MAX_EVENTS = 80
 SCHEMA_VERSION = 1
 
 
@@ -163,6 +150,7 @@ class IntelligenceEventResponseCollector:
                 ON research_intelligence_event_responses(exchange,market,horizon_seconds,captured_at DESC);
             """
         )
+        ensure_price_schema(self.conn)
         self.conn.commit()
 
     def _table_exists(self, name: str) -> bool:
@@ -173,17 +161,7 @@ class IntelligenceEventResponseCollector:
         return row is not None
 
     def _eligible_events(self, now: float) -> list[sqlite3.Row]:
-        placeholders = ",".join("?" for _ in OFFICIAL_EVENT_SOURCES)
-        params: list[Any] = [*OFFICIAL_EVENT_SOURCES, now - self.event_lookback_seconds, now]
-        return self.conn.execute(
-            f"""SELECT event_id,event_type,source_id,title,source_ts
-                FROM research_intelligence_events
-                WHERE source_id IN ({placeholders})
-                  AND source_ts>=? AND source_ts<=?
-                ORDER BY source_ts DESC,event_id
-                LIMIT ?""",
-            (*params, self.max_events),
-        ).fetchall()
+        return eligible_events(self.conn, now, lookback=self.event_lookback_seconds, limit=self.max_events)
 
     def _baseline_trade(self, exchange: str, market: str, event_ts: float) -> sqlite3.Row | None:
         return self.conn.execute(
@@ -242,6 +220,9 @@ class IntelligenceEventResponseCollector:
             "missing_target": 0,
             "saved_baseline_used": 0,
             "anchor_conflicts": 0,
+            "prices_archived": 0,
+            "archived_baseline_used": 0,
+            "archived_target_used": 0,
         }
 
         if not self._table_exists("research_intelligence_events"):
@@ -260,6 +241,11 @@ class IntelligenceEventResponseCollector:
         if not events:
             result["status"] = "idle"
             return result
+
+        # Capture even before the first 15m horizon is due. Market-flow pruning
+        # uses this same repository to preserve known event prices beforehand.
+        for exchange, market in markets:
+            result["prices_archived"] += capture_market(self.conn, exchange, market, current, events=events)
 
         for event in events:
             event_type = str(event["event_type"] or "").strip().upper()
@@ -302,6 +288,9 @@ class IntelligenceEventResponseCollector:
                     if pair not in baselines:
                         baselines[pair] = self._saved_baseline(saved.get(pair, []), event_ts)
                         if baselines[pair] is None:
+                            baselines[pair] = read_price(self.conn, event, exchange, market, 'baseline', current,
+                                                        self.observation_tolerance_seconds)
+                        if baselines[pair] is None:
                             baselines[pair] = self._baseline_trade(exchange, market, event_ts)
                     baseline = baselines[pair]
                     if baseline is None:
@@ -310,7 +299,10 @@ class IntelligenceEventResponseCollector:
                     if isinstance(baseline, dict) and baseline.get("conflict"):
                         result["anchor_conflicts"] += 1
                         continue
-                    target = self._target_trade(exchange, market, target_ts, current)
+                    target = read_price(self.conn, event, exchange, market, horizon_label, current,
+                                        self.observation_tolerance_seconds)
+                    if target is None:
+                        target = self._target_trade(exchange, market, target_ts, current)
                     if target is None:
                         result["missing_target"] += 1
                         continue
@@ -347,6 +339,8 @@ class IntelligenceEventResponseCollector:
                         "point_in_time_backfill_used": False,
                         "missing_values_coerced_to_zero": False,
                         "baseline_reused_from_response": isinstance(baseline, dict) and bool(baseline.get("from_saved_response")),
+                        "baseline_from_event_archive": isinstance(baseline, dict) and bool(baseline.get("from_event_archive")),
+                        "target_from_event_archive": isinstance(target, dict) and bool(target.get("from_event_archive")),
                     }
                     cursor = self.conn.execute(
                         """INSERT OR IGNORE INTO research_intelligence_event_responses(
@@ -382,6 +376,10 @@ class IntelligenceEventResponseCollector:
                         result["samples_inserted"] += 1
                         if attrs["baseline_reused_from_response"]:
                             result["saved_baseline_used"] += 1
+                        if attrs["baseline_from_event_archive"]:
+                            result["archived_baseline_used"] += 1
+                        if attrs["target_from_event_archive"]:
+                            result["archived_target_used"] += 1
                     else:
                         result["already_captured"] += 1
 

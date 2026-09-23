@@ -32,6 +32,10 @@ BACKUP_TABLES = (
     "research_accounts_mx", "research_fills_mx", "research_feedback_mx",
     "strategy_lab_accounts", "strategy_lab_trades", "strategy_lab_metrics",
 )
+EVENT_BACKUP_TABLES = (
+    "research_intelligence_events", "research_intelligence_event_responses",
+    "research_intelligence_event_prices",
+)
 
 
 class RecoveryBlocked(RuntimeError):
@@ -110,7 +114,9 @@ def backup_database(source, folder):
         required = conn.execute("PRAGMA page_count").fetchone()[0] * conn.execute("PRAGMA page_size").fetchone()[0]
         if shutil.disk_usage(folder).free < required + 512 * 1024 * 1024:
             raise RecoveryBlocked("insufficient_backup_space")
-        counts = {t: conn.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0] for t in BACKUP_TABLES}
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        count_tables = (*BACKUP_TABLES, *(t for t in EVENT_BACKUP_TABLES if t in tables))
+        counts = {t: conn.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0] for t in count_tables}
         deadline = time.monotonic() + 1800
         progress_band = [-1]
 
@@ -128,11 +134,13 @@ def backup_database(source, folder):
         with closing(sqlite3.connect(destination.as_uri() + "?mode=ro", uri=True)) as verify:
             verify.execute("PRAGMA query_only=ON")
             integrity = verify.execute("PRAGMA quick_check").fetchall()
-            copied = {t: verify.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0] for t in BACKUP_TABLES}
+            copied = {t: verify.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0] for t in count_tables}
         if integrity != [("ok",)] or counts != copied:
             raise RecoveryBlocked("backup_readback_failed")
         receipt = {"path": str(destination), "bytes": destination.stat().st_size,
-                   "quick_check": "ok", "ledger_counts": counts, "completed_at": time.time()}
+                   "quick_check": "ok", "ledger_counts": {t: counts[t] for t in BACKUP_TABLES},
+                   "event_counts": {t: counts[t] for t in EVENT_BACKUP_TABLES if t in counts},
+                   "completed_at": time.time()}
         write_report(folder / "backup-receipt.json", receipt)
         return receipt
     finally:

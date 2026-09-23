@@ -7,6 +7,15 @@ from typing import Any
 
 HORIZONS = (("15m", 900), ("1h", 3600), ("4h", 14400), ("1d", 86400))
 PROVIDER_ID = "local_public_exchange_trade_stream"
+OFFICIAL_EVENT_SOURCES = (
+    "us_bls_release_calendar", "us_bea_release_schedule", "us_fed_fomc_calendar",
+    "us_sec_press_releases", "us_cftc_press_releases",
+)
+# Date-only meetings have no defensible reaction clock.
+EXCLUDED_EVENT_TYPES = {"FOMC_MEETING"}
+OBSERVATION_TOLERANCE_SECONDS = 120.0
+EVENT_LOOKBACK_SECONDS = 3 * 86400
+MAX_EVENTS = 80
 
 
 def observation(row: sqlite3.Row | None) -> dict[str, Any] | None:

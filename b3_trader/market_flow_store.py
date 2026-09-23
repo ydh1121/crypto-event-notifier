@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .auto_demo_v2 import DB_PATH
+from .event_price_archive import capture_market, ensure_schema as ensure_event_price_schema
 
 SCHEMA_VERSION = 1
 DEFAULT_TRADE_RETENTION = 20000
@@ -127,6 +128,7 @@ class MarketFlowStore:
             ON research_market_flow_feature_mx(exchange,market,feature_ts DESC);
             """
         )
+        ensure_event_price_schema(self.conn)
         self.conn.commit()
 
     def cursor(self, exchange: str, market: str) -> dict[str, Any]:
@@ -205,19 +207,19 @@ class MarketFlowStore:
         return max(0, self.conn.total_changes - before)
 
     def prune_trades(self, exchange: str, market: str) -> int:
-        before = self.conn.total_changes
-        self.conn.execute(
-            """DELETE FROM research_market_trade_flow_mx
-               WHERE rowid IN (
-                   SELECT rowid FROM research_market_trade_flow_mx
-                   WHERE exchange=? AND market=?
-                   ORDER BY trade_ts DESC,sequential_id DESC
-                   LIMIT -1 OFFSET ?
-               )""",
-            (str(exchange), str(market), self.trade_retention),
-        )
-        self.conn.commit()
-        return max(0, self.conn.total_changes - before)
+        with self.conn:
+            capture_market(self.conn, str(exchange), str(market), time.time())
+            cursor = self.conn.execute(
+                """DELETE FROM research_market_trade_flow_mx
+                   WHERE rowid IN (
+                       SELECT rowid FROM research_market_trade_flow_mx
+                       WHERE exchange=? AND market=?
+                       ORDER BY trade_ts DESC,sequential_id DESC
+                       LIMIT -1 OFFSET ?
+                   )""",
+                (str(exchange), str(market), self.trade_retention),
+            )
+        return max(0, cursor.rowcount)
 
     def trade_stats(self, exchange: str, market: str, *, start_ts: float, end_ts: float) -> dict[str, Any]:
         row = self.conn.execute(

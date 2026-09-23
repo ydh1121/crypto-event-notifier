@@ -29,6 +29,7 @@ ACTIVITY = {
     "ohlcv": ("research_market_ohlcv_mx", "received_at"),
     "events": ("research_intelligence_events", "received_at"),
     "event_responses": ("research_intelligence_event_responses", "captured_at"),
+    "event_prices": ("research_intelligence_event_prices", "archived_at"),
 }
 ERROR_PATTERNS = {
     "missing_module": r"ModuleNotFoundError|No module named",
@@ -187,7 +188,8 @@ def _result_evidence(result, *, include_response=True):
                 "candles_written", "markets_processed", "markets_considered", "rows_written", "source_failures",
                 "event_response_failures", "events_considered", "events_excluded_imprecise",
                 "due_observations", "future_observations", "samples_inserted", "already_captured",
-                "missing_baseline", "missing_target", "saved_baseline_used", "anchor_conflicts"):
+                "missing_baseline", "missing_target", "saved_baseline_used", "anchor_conflicts",
+                "prices_archived", "archived_baseline_used", "archived_target_used"):
         value = result.get(key)
         if type(value) in (int, float) and math.isfinite(value) and value >= 0:
             evidence[key] = value
