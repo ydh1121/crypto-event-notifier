@@ -21,6 +21,9 @@ PYTHON_FILES = (
 LAUNCHER = r'''@echo off
 setlocal
 cd /d "%~dp0"
+title CRYPTO @MODE@ @BUILD@
+echo CRYPTO @MODE@ @BUILD@
+echo Keep the collection window open. This is a separate read-only check.
 set "CRYPTO_REVIEW_REPO=C:\Users\Administrator\Desktop\crypto-event-notifier-live"
 set "CRYPTO_REVIEW_DB=%CRYPTO_REVIEW_REPO%\b3_trader\data\auto_demo.sqlite3"
 if not "%~1"=="" set "CRYPTO_REVIEW_DB=%~1"
@@ -31,24 +34,37 @@ if not exist "%CRYPTO_REVIEW_DB%" (
   exit /b 1
 )
 if exist "%CRYPTO_REVIEW_REPO%\.venv\Scripts\python.exe" (
-  "%CRYPTO_REVIEW_REPO%\.venv\Scripts\python.exe" -B -S -m b3_trader.strategy_journal_review --db "%CRYPTO_REVIEW_DB%" --report "%~dp0CRYPTO_B3_REVIEW_RESULT.json" --open-browser
+  "%CRYPTO_REVIEW_REPO%\.venv\Scripts\python.exe" -B -S -m b3_trader.strategy_journal_review --db "%CRYPTO_REVIEW_DB%" --report "%~dp0@REPORT@" @EXTRA@
 ) else (
   where py >nul 2>nul
   if not errorlevel 1 (
-    py -3 -B -S -m b3_trader.strategy_journal_review --db "%CRYPTO_REVIEW_DB%" --report "%~dp0CRYPTO_B3_REVIEW_RESULT.json" --open-browser
+    py -3 -B -S -m b3_trader.strategy_journal_review --db "%CRYPTO_REVIEW_DB%" --report "%~dp0@REPORT@" @EXTRA@
   ) else (
-    python -B -S -m b3_trader.strategy_journal_review --db "%CRYPTO_REVIEW_DB%" --report "%~dp0CRYPTO_B3_REVIEW_RESULT.json" --open-browser
+    python -B -S -m b3_trader.strategy_journal_review --db "%CRYPTO_REVIEW_DB%" --report "%~dp0@REPORT@" @EXTRA@
   )
 )
-echo Review viewer stopped. Existing collectors and trading programs were not restarted.
-pause
+set "CRYPTO_REVIEW_EXIT=%errorlevel%"
+if not "%CRYPTO_REVIEW_EXIT%"=="0" (
+  echo Check did not complete. The collection window is separate.
+  pause
+)
+exit /b %CRYPTO_REVIEW_EXIT%
 '''
 README = '''코인별 가상매매 검토 화면
 
-1. 압축을 풀고 RUN_REVIEW.cmd를 두 번 클릭합니다.
-2. 브라우저가 열리면 빗썸 / B3 / 공격적 전략이 먼저 표시됩니다.
-3. 창을 30초 이상 열어 두면 프로세스와 DB 갱신 시각을 한 번 더 비교합니다.
-4. 창을 닫으면 이 조회 화면만 종료됩니다.
+이번 실행본: @BUILD@
+압축을 풀면 버전이 붙은 새 폴더가 나옵니다. 이전 폴더에 덮어쓰지 마세요.
+
+수집 상태 점검: RUN_CHECK.cmd
+수집 창을 열어 둔 채 RUN_CHECK.cmd를 두 번 클릭합니다.
+약 30초 뒤 점검 창이 자동으로 닫히고, 같은 폴더에 CRYPTO_CHECK_RESULT.json이 저장됩니다.
+기존 조회 화면이 열려 있어도 점검할 수 있습니다. 점검은 브라우저나 서버를 열지 않습니다.
+수집 창은 계속 열어 둡니다. 수집 창을 닫으면 자동 누적이 중단됩니다.
+
+코인별 화면 보기: RUN_REVIEW.cmd
+브라우저가 열리면 빗썸 / B3 / 공격적 전략이 먼저 표시됩니다.
+창을 30초 이상 열어 두면 CRYPTO_B3_REVIEW_RESULT.json에 전후 점검 결과도 저장됩니다.
+조회 창을 닫으면 이 조회 화면만 종료됩니다.
 
 Python 3.10 이상을 사용합니다. 기존 프로젝트의 Python 또는 PC의 Python을 자동으로 찾습니다.
 별도 설치, Git 변경, 기존 수집기 재시작 없이 실행됩니다.
@@ -70,6 +86,10 @@ BTC·ETH 탭은 동일 시각의 저장된 종가를 비교합니다.
 실제 DB는 읽기 전용으로 열립니다. DB·WAL·SHM 초기화나 교체를 하지 않습니다.
 이 폴더에 CRYPTO_B3_REVIEW_RESULT.json이 저장됩니다.
 이 파일에는 B3 공격적 전략의 실제 가상계좌·체결 원장과 대조 결과가 들어 있습니다.
+두 결과 파일에는 점검본 버전, 시작·종료 시각, 계좌 조회 시각이 기록됩니다.
+점검본 버전과 PC 수집 프로그램의 버전은 별개입니다.
+30초 전에 Ctrl+C로 점검을 종료하면 완료 대신 중단으로 기록합니다.
+창을 강제로 닫거나 PC를 종료한 경우, 미완료 기록이 남을 수 있습니다.
 이벤트 검토 표본도 포함됩니다. B3에 반응이 없으면 BTC 표본을 별도로 명시합니다.
 실행 중인 프로세스, 저장된 종료 코드, 최근 오류 종류, DB 갱신 시각의 전후 비교도 포함됩니다.
 프로세스 조회 실패는 미확인으로 남깁니다. 기록 변화가 없다는 이유만으로 수집 실패라고 판정하지 않습니다.
@@ -86,6 +106,9 @@ BTC·ETH 탭은 동일 시각의 저장된 종가를 비교합니다.
 
 
 def build(destination: Path) -> dict:
+    if subprocess.check_output(['git','status','--porcelain','--untracked-files=no'], cwd=ROOT, text=True).strip():
+        raise ValueError('Commit tracked changes before building a versioned review package.')
+    head = subprocess.check_output(['git','rev-parse','HEAD'], cwd=ROOT, text=True).strip()
     files = {Path('b3_trader') / name: (ROOT/'b3_trader'/name).read_bytes() for name in PYTHON_FILES}
     pending = [PUBLIC/'modules/pages/paper-workbench.js']
     seen = set()
@@ -104,16 +127,19 @@ def build(destination: Path) -> dict:
             pending.append(path.parent/reference.split('?', 1)[0])
     css = Path('cloudflare-pages/public/modules/styles/strategy-workbench.css')
     files[css] = (ROOT/css).read_bytes()
-    files[Path('RUN_REVIEW.cmd')] = LAUNCHER.replace('\n', '\r\n').encode('ascii')
-    files[Path('README.txt')] = README.encode('utf-8-sig')
-    head = subprocess.check_output(['git','rev-parse','HEAD'], cwd=ROOT, text=True).strip()
+    for name, mode, report, extra in (
+            ('RUN_REVIEW.cmd', 'VIEWER', 'CRYPTO_B3_REVIEW_RESULT.json', '--open-browser'),
+            ('RUN_CHECK.cmd', 'CHECK', 'CRYPTO_CHECK_RESULT.json', '--report-only')):
+        launcher = LAUNCHER.replace('@BUILD@', head[:12]).replace('@MODE@', mode).replace('@REPORT@', report).replace('@EXTRA@', extra)
+        files[Path(name)] = launcher.replace('\n', '\r\n').encode('ascii')
+    files[Path('README.txt')] = README.replace('@BUILD@', head[:12]).encode('utf-8-sig')
     manifest = {'source_commit': head, 'mode': 'read_only', 'files': {
-        str(path): hashlib.sha256(body).hexdigest() for path, body in sorted(files.items())}}
+        path.as_posix(): hashlib.sha256(body).hexdigest() for path, body in sorted(files.items())}}
     files[Path('SOURCE_MANIFEST.json')] = json.dumps(manifest, indent=2).encode()
     destination.parent.mkdir(parents=True, exist_ok=True)
     with ZipFile(destination, 'w', ZIP_DEFLATED) as archive:
         for path, body in sorted(files.items()):
-            archive.writestr('CRYPTO_STRATEGY_REVIEW/'+path.as_posix(), body)
+            archive.writestr('CRYPTO_STRATEGY_REVIEW_'+head[:12]+'/'+path.as_posix(), body)
     return {'file': str(destination.resolve()), 'bytes': destination.stat().st_size,
             'files': len(files), 'sha256': hashlib.sha256(destination.read_bytes()).hexdigest(),
             'source_commit': head}

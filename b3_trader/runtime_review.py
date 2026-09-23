@@ -184,13 +184,15 @@ def _result_evidence(result, *, include_response=True):
         if isinstance(result.get(key), bool):
             evidence[key] = result[key]
     for key in ("source_rows", "trades", "inserted", "received", "sources_ok", "sources_failed",
-                "candles_written", "markets_processed", "rows_written", "source_failures",
+                "candles_written", "markets_processed", "markets_considered", "rows_written", "source_failures",
                 "event_response_failures", "events_considered", "events_excluded_imprecise",
                 "due_observations", "future_observations", "samples_inserted", "already_captured",
                 "missing_baseline", "missing_target", "saved_baseline_used", "anchor_conflicts"):
         value = result.get(key)
         if type(value) in (int, float) and math.isfinite(value) and value >= 0:
             evidence[key] = value
+    if result.get("market_selection") in ("observed_krw_markets", "explicit_benchmarks"):
+        evidence["market_selection"] = result["market_selection"]
     if include_response and isinstance(result.get("event_response_capture"), dict):
         evidence["event_response_capture"] = _result_evidence(result["event_response_capture"], include_response=False)
     return evidence

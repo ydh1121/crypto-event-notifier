@@ -6,11 +6,14 @@ outside this PC, or accepts mutation routes. Bind address is fixed to loopback.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
+import re
 import sqlite3
 import tempfile
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -20,6 +23,7 @@ from .runtime_review import compare_activity, read_runtime
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / "cloudflare-pages/public"
+REPORT_SCHEMA = 2
 INDEX = """<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>코인별 전략 · 로컬 검토</title><style>body{margin:0;padding:24px;font-family:system-ui;background:#fff;color:#202124}.review-label{font-size:13px;color:#775113;margin:0 auto 16px;max-width:1600px}#pageRoot{max-width:1600px;margin:auto}@media(max-width:760px){body{padding:16px}}</style>
 <p class="review-label">로컬 DB 조회 전용 · 주문·수집 프로그램과 별도 실행</p><div id="pageRoot"></div><script type="module" src="/review.js"></script></html>"""
@@ -136,17 +140,52 @@ def write_report(path: Path, report: dict):
         temp.unlink(missing_ok=True)
 
 
-def finish_runtime_observation(db, path, report, seconds, stop_event):
-    if stop_event.wait(seconds):
-        return
+def review_build(root: Path = ROOT) -> dict:
+    """Identify this extracted review package, never the separate PC checkout."""
+    result = {'report_schema': REPORT_SCHEMA, 'source_commit': None,
+              'integrity': 'unavailable'}
     try:
-        after = read_runtime(db)
-        report['runtime_review'].update(status='complete', after=after,
-            changes=compare_activity(report['runtime_review']['before'], after))
+        raw = (root / 'SOURCE_MANIFEST.json').read_bytes()
+        result['manifest_sha256'] = hashlib.sha256(raw).hexdigest()
+        manifest = json.loads(raw)
+        files = manifest.get('files')
+        commit = manifest.get('source_commit')
+        if (not isinstance(commit, str) or not re.fullmatch(r'[0-9a-f]{40}', commit)
+                or manifest.get('mode') != 'read_only' or not isinstance(files, dict)
+                or 'b3_trader/strategy_journal_review.py' not in files
+                or 'b3_trader/runtime_review.py' not in files):
+            raise ValueError('Invalid review manifest')
+        for name, expected in files.items():
+            target = (root / name).resolve()
+            if root.resolve() not in target.parents or target.is_symlink():
+                raise ValueError('Nonlocal manifest entry')
+            if not isinstance(expected, str) or hashlib.sha256(target.read_bytes()).hexdigest() != expected:
+                raise ValueError('Review files differ from manifest')
+        result.update(source_commit=commit, integrity='verified')
+    except FileNotFoundError:
+        result['integrity'] = 'mismatch' if 'manifest_sha256' in result else 'unavailable'
+    except (OSError, ValueError, TypeError, AttributeError):
+        result['integrity'] = 'mismatch'
+    return result
+
+
+def finish_runtime_observation(db, path, report, seconds, stop_event):
+    try:
+        if stop_event.wait(seconds):
+            if 'runtime_review' not in report:
+                return
+            report['runtime_review'].update(status='interrupted')
+        else:
+            after = read_runtime(db)
+            report['runtime_review'].update(status='complete', after=after,
+                changes=compare_activity(report['runtime_review']['before'], after))
+    except KeyboardInterrupt:
+        report['runtime_review'].update(status='interrupted')
     except (OSError, sqlite3.Error, ValueError) as exc:
         report['runtime_review'].update(status='read_failed', error_type=type(exc).__name__)
+    report['review_finished_at'] = time.time()
     write_report(path, report)
-    print('Runtime observation saved to the local review result.', flush=True)
+    print(f'Review {report["runtime_review"]["status"]}: {path.resolve()}', flush=True)
 
 
 def main():
@@ -154,16 +193,41 @@ def main():
     parser.add_argument('--db',type=Path,required=True)
     parser.add_argument('--port',type=int,default=8766)
     parser.add_argument('--report',type=Path)
+    parser.add_argument('--report-only',action='store_true',help='Save both observations and exit without a browser or server')
     parser.add_argument('--fixture',action='store_true',help='Label synthetic test data explicitly')
     parser.add_argument('--open-browser',action='store_true')
     parser.add_argument('--observe-seconds',type=float,default=30)
     args=parser.parse_args()
     if not math.isfinite(args.observe_seconds) or not 0 <= args.observe_seconds <= 300:
         parser.error('Observation interval must be between 0 and 300 seconds.')
+    if args.report_only and not args.report:
+        parser.error('--report-only requires --report.')
     if not args.db.is_file():parser.error('Existing canonical database is required; no database will be created.')
     if args.report and args.report.resolve() in {args.db.resolve(), Path(str(args.db.resolve())+'-wal'), Path(str(args.db.resolve())+'-shm')}:
         parser.error('The report must be separate from the database and its WAL/SHM files.')
+    build = review_build()
+    print(f'Review schema {REPORT_SCHEMA} / package {build["source_commit"] or "unversioned"} / {build["integrity"]}',flush=True)
+    if build['integrity'] == 'mismatch':
+        parser.error('Review package files do not match. Extract the complete ZIP into its own new folder.')
+    # Bind before generating output, so an old viewer occupying this port cannot
+    # leave a new report that appears to belong to the old browser window.
+    server = None
+    if not args.report_only:
+        try:
+            server=ThreadingHTTPServer(('127.0.0.1',args.port),handler(args.db,fixture=args.fixture))
+        except OSError:
+            parser.error('Review port is in use. Use RUN_CHECK.cmd to check without opening a viewer.')
+    try:
+        return run_review(args, build, server)
+    finally:
+        if server:
+            server.server_close()
+
+
+def run_review(args, build, server):
+    started_at = time.time()
     sample=read_detail(args.db,'bithumb','KRW-B3')
+    account_observed_at = time.time()
     exp=next((e for e in sample['data']['strategy_lab']['experiments'] if e['style']=='aggressive'),None)
     observation_stop = threading.Event()
     if args.report:
@@ -172,27 +236,34 @@ def main():
         if not events:
             events=read_detail(args.db,'bithumb','KRW-BTC')['data']['strategy_lab'].get('events',[])
             event_market='KRW-BTC'
-        report={'db_path':str(args.db.resolve()),'db_size':args.db.stat().st_size,'paper_only':True,
+        report={'review_build':build,'review_started_at':started_at,'account_observed_at':account_observed_at,
+                'db_path':str(args.db.resolve()),'db_size':args.db.stat().st_size,'paper_only':True,
                 'mode':'read_only','scope':'bithumb|KRW-B3|aggressive','account':exp,
                 'event_review':{'exchange':'bithumb','market':event_market,'events':events[:1]},
                 'runtime_review':{'status':'waiting_for_second_observation','before':read_runtime(args.db)},
                 'limitations':['Stored drawdown is not fill-only replay.','No runner was started.','No remote publication.']}
         write_report(args.report, report)
-    server=ThreadingHTTPServer(('127.0.0.1',args.port),handler(args.db,fixture=args.fixture))
+        print(f'Checking for {args.observe_seconds:g} seconds. Keep the collection window open; this check ends separately.',flush=True)
+    if args.report_only:
+        finish_runtime_observation(args.db,args.report,report,args.observe_seconds,observation_stop)
+        return 0 if report['runtime_review']['status'] == 'complete' else 1
     print(f'READ ONLY: http://127.0.0.1:{server.server_port}/',flush=True)
     print(f'B3 aggressive journal match: {exp.get("reconciliation",{}).get("matches") if exp else "account unavailable"}',flush=True)
     if args.open_browser:
         import webbrowser
         webbrowser.open(f'http://127.0.0.1:{server.server_port}/')
+    observation = None
     if args.report:
-        threading.Thread(target=finish_runtime_observation,
-            args=(args.db,args.report,report,args.observe_seconds,observation_stop),daemon=True).start()
-        print(f'Observing process and database activity for {args.observe_seconds:g} seconds; no runner is started.',flush=True)
+        observation=threading.Thread(target=finish_runtime_observation,
+            args=(args.db,args.report,report,args.observe_seconds,observation_stop),daemon=True)
+        observation.start()
     try:server.serve_forever()
     except KeyboardInterrupt:pass
     finally:
         observation_stop.set()
-        server.server_close()
+        if observation:
+            observation.join()
+    return 0
 
 
-if __name__=='__main__':main()
+if __name__=='__main__':raise SystemExit(main())

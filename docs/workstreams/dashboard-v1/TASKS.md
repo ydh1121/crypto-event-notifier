@@ -2,10 +2,20 @@
 
 ## Successor CURRENT — CRYPTO-WO-20260921-RECOVERY-001
 
-**Status: PARTIAL_ACCUMULATION_OBSERVED. OHLCV, reactions and scoped B3 freshness still require evidence. V22 / WO-008 remains rejected.**
+**Status: B3_LEDGER_AND_OHLCV_ADVANCEMENT_OBSERVED. Event-reaction accumulation still needs actual evidence. V22 / WO-008 remains rejected.**
 This block supersedes older visual-acceptance and BLOCKED_LOCAL_EVIDENCE checkpoints below.
 
-### Latest actual recovery evidence — 2026-09-23 10:50 UTC
+### Latest actual continuation evidence — 2026-09-23 11:12 UTC
+
+- User supplied `CRYPTO_B3_REVIEW_RESULT(2).json`, 36,463 bytes, SHA256 `66db5b61a81ff415b491558fba281251c4b4192110b6089408b6587ebb3ce0c1`, and reported closing the collection session once. Attachment read locally only. At 11:12:04–11:12:36 UTC (20:12 KST), native process discovery found forward, market-flow, research and PAPER roles. Their current generation began around 11:12:02 UTC; this file does not prove shutdown cleanup or automatic restart, nor current liveness after the observation.
+- Bithumb/B3/aggressive retains the exact previous five fill rows and adds one PAPER sell with ledger time 10:50:11 UTC (19:50 KST), source memory 3559614, price 1.083458, realized +358,806.34216817166 KRW. Six-fill replay matches the account: cash 10,348,855.80871909, quantity/average zero, cumulative realized +348,855.8087190897, three closes/two wins. Account/source clocks advanced to 11:08:24/11:08:11 UTC. This verifies scoped ledger continuity, not broad strategy superiority or real-money performance; drawdown is still not fill-only replay.
+- OHLCV latest receipt advanced between reports to 11:00:41 UTC (20:00 KST). PAPER and memory advanced across this 32-second observation. Trade-flow T1 was current but T0 timed out, so its paired change is unknown. Reaction latest capture remains the old September 11 value; no B3 reaction is established by the explicitly separate BTC fallback sample.
+- This attachment has the earlier reviewer schema: no source version, collector result, account/metrics separation or event receipt-clock metadata. Its events=0 and historical crash categories cannot establish a current ingest failure or crash. Exact reviewer revision cannot be recovered from this file. The PC's last verified source remains c5ffd52 on the previously recorded local recovery branch; this report contains no new Git observation.
+- The updated read-only package adds `RUN_CHECK.cmd`: collect two observations, save `CRYPTO_CHECK_RESULT.json`, then exit without a server/browser. The extraction folder and launcher show the source revision. Results record schema 2, verified package file hashes/source identity and observation times; mixed files fail before DB review. This package identity is never labelled as the separate PC runner revision. Ctrl+C records an interrupted observation; abrupt process termination can still leave incomplete evidence.
+- Existing `RUN_REVIEW.cmd` remains available for the coin workspace; an occupied port no longer overwrites a prior result before failing. Saved event response output now preserves the observed-market count/selection as well as missing baseline/target counters. Neither reviewer starts, stops or changes collectors, Git, the canonical DB or credentials.
+- Verification: 26 affected session/runtime/journal tests and changed-module compilation passed. Real six-fill comparison and the unchanged five-fill prefix were checked against the two uploaded reports. Extracted archive verification follows the committed build. Native Windows launcher execution of this revision, event reaction growth, long-run coverage and UI visual acceptance remain pending.
+
+### Earlier recovery evidence — 2026-09-23 10:50 UTC
 
 - User supplied `CRYPTO_RECOVERY_RESULT.json`, 30,852 bytes, SHA256 `56a450646bd34c27498475c9b3e827aabedc1eefe495fbdaa9ddea970a98b216`; read locally only. Windows activated `c5ffd52423a4a8bcfbb109fce5829f401322087f` on `recovery/paper-20260923-194932-741dec34` from actual `ba3c59a` / primary branch. The 3,081,179,136-byte pre-start SQLite backup passed quick_check and six account/ledger count comparisons.
 - Native observation 10:49:58–10:50:59 UTC: PAPER accounts, market memory, all four BTC/ETH trade streams, Strategy Lab aggregate metrics and event receipt clocks advanced. Four collector owners started once, no reported fresh error categories. App/holdings/publish/deploy stayed excluded. This proves partial persisted activity, not complete coverage or long-term liveness.
@@ -40,7 +50,7 @@ This block supersedes older visual-acceptance and BLOCKED_LOCAL_EVIDENCE checkpo
 - JavaScript API/model/DOM tests: 12 passed, covering complete pagination, revision/chunk integrity, fee/quantity conservation, exchange/quote isolation, polling continuity, theme, identifier fidelity and preservation of original account pages.
 - TypeScript and all existing Viewer static gates passed; changed Python modules compile. Extracted archive runs with Python `-S`, serves every packaged asset and reconciles a fixture account with unchanged DB hash. Static gates and DOM tests are not visual acceptance.
 - Browser local navigation was blocked by this session's browser policy. Desktop/mobile visual acceptance remains pending; the September 23 actual-PC report below verifies the new account/ledger projection. No screenshots or visual PASS are claimed.
-- Remaining data gaps: stopped/stale collection diagnosis; altcoin event reactions / 1d horizons / historical same-type samples; real-holdings workflow redesign and small-live comparison. The rejected live-trading page is not declared redesigned or accepted.
+- Remaining data gaps: sustained collection coverage and event-reaction diagnosis; altcoin event reactions / 1d horizons / historical same-type samples; real-holdings workflow redesign and small-live comparison. The rejected live-trading page is not declared redesigned or accepted.
 - Transport limit: a single coin whose complete chunks exceed its per-run write budget fails explicitly; no silent truncation. Future chunk retention and very large journals need a separate bounded storage plan.
 
 ### Event reaction continuation — source complete, PC verification pending
