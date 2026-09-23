@@ -7,12 +7,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sqlite3
+import tempfile
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from .strategy_lab_market import read_strategy_lab_market
+from .runtime_review import compare_activity, read_runtime
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / "cloudflare-pages/public"
@@ -116,6 +120,35 @@ def handler(path: Path, *, fixture: bool = False):
     return ReviewHandler
 
 
+def write_report(path: Path, report: dict):
+    with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', prefix='.crypto-review-',
+                                     dir=path.parent, delete=False) as stream:
+        temp = Path(stream.name)
+        try:
+            json.dump(report, stream, ensure_ascii=False, indent=2, allow_nan=False)
+        except BaseException:
+            stream.close()
+            temp.unlink(missing_ok=True)
+            raise
+    try:
+        temp.replace(path)
+    finally:
+        temp.unlink(missing_ok=True)
+
+
+def finish_runtime_observation(db, path, report, seconds, stop_event):
+    if stop_event.wait(seconds):
+        return
+    try:
+        after = read_runtime(db)
+        report['runtime_review'].update(status='complete', after=after,
+            changes=compare_activity(report['runtime_review']['before'], after))
+    except (OSError, sqlite3.Error, ValueError) as exc:
+        report['runtime_review'].update(status='read_failed', error_type=type(exc).__name__)
+    write_report(path, report)
+    print('Runtime observation saved to the local review result.', flush=True)
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--db',type=Path,required=True)
@@ -123,12 +156,16 @@ def main():
     parser.add_argument('--report',type=Path)
     parser.add_argument('--fixture',action='store_true',help='Label synthetic test data explicitly')
     parser.add_argument('--open-browser',action='store_true')
+    parser.add_argument('--observe-seconds',type=float,default=30)
     args=parser.parse_args()
+    if not math.isfinite(args.observe_seconds) or not 0 <= args.observe_seconds <= 300:
+        parser.error('Observation interval must be between 0 and 300 seconds.')
     if not args.db.is_file():parser.error('Existing canonical database is required; no database will be created.')
     if args.report and args.report.resolve() in {args.db.resolve(), Path(str(args.db.resolve())+'-wal'), Path(str(args.db.resolve())+'-shm')}:
         parser.error('The report must be separate from the database and its WAL/SHM files.')
     sample=read_detail(args.db,'bithumb','KRW-B3')
     exp=next((e for e in sample['data']['strategy_lab']['experiments'] if e['style']=='aggressive'),None)
+    observation_stop = threading.Event()
     if args.report:
         events=sample['data']['strategy_lab'].get('events',[])
         event_market='KRW-B3'
@@ -138,17 +175,24 @@ def main():
         report={'db_path':str(args.db.resolve()),'db_size':args.db.stat().st_size,'paper_only':True,
                 'mode':'read_only','scope':'bithumb|KRW-B3|aggressive','account':exp,
                 'event_review':{'exchange':'bithumb','market':event_market,'events':events[:1]},
+                'runtime_review':{'status':'waiting_for_second_observation','before':read_runtime(args.db)},
                 'limitations':['Stored drawdown is not fill-only replay.','No runner was started.','No remote publication.']}
-        args.report.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+        write_report(args.report, report)
     server=ThreadingHTTPServer(('127.0.0.1',args.port),handler(args.db,fixture=args.fixture))
     print(f'READ ONLY: http://127.0.0.1:{server.server_port}/',flush=True)
     print(f'B3 aggressive journal match: {exp.get("reconciliation",{}).get("matches") if exp else "account unavailable"}',flush=True)
     if args.open_browser:
         import webbrowser
         webbrowser.open(f'http://127.0.0.1:{server.server_port}/')
+    if args.report:
+        threading.Thread(target=finish_runtime_observation,
+            args=(args.db,args.report,report,args.observe_seconds,observation_stop),daemon=True).start()
+        print(f'Observing process and database activity for {args.observe_seconds:g} seconds; no runner is started.',flush=True)
     try:server.serve_forever()
     except KeyboardInterrupt:pass
-    finally:server.server_close()
+    finally:
+        observation_stop.set()
+        server.server_close()
 
 
 if __name__=='__main__':main()

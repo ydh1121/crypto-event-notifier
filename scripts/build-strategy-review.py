@@ -16,6 +16,7 @@ PYTHON_FILES = (
     'strategy_lab_market.py', 'strategy_lab_context.py', 'strategy_lab_journal.py',
     'strategy_lab_plan.py', 'strategy_lab_rules.py',
     'event_reaction_view.py', 'event_response_contract.py',
+    'runtime_review.py', 'runtime_process_contract.py',
 )
 LAUNCHER = r'''@echo off
 setlocal
@@ -46,7 +47,8 @@ README = '''코인별 가상매매 검토 화면
 
 1. 압축을 풀고 RUN_REVIEW.cmd를 두 번 클릭합니다.
 2. 브라우저가 열리면 빗썸 / B3 / 공격적 전략이 먼저 표시됩니다.
-3. 창을 닫으면 이 조회 화면만 종료됩니다.
+3. 창을 30초 이상 열어 두면 프로세스와 DB 갱신 시각을 한 번 더 비교합니다.
+4. 창을 닫으면 이 조회 화면만 종료됩니다.
 
 Python 3.10 이상을 사용합니다. 기존 프로젝트의 Python 또는 PC의 Python을 자동으로 찾습니다.
 별도 설치, Git 변경, 기존 수집기 재시작 없이 실행됩니다.
@@ -69,6 +71,9 @@ BTC·ETH 탭은 동일 시각의 저장된 종가를 비교합니다.
 이 폴더에 CRYPTO_B3_REVIEW_RESULT.json이 저장됩니다.
 이 파일에는 B3 공격적 전략의 실제 가상계좌·체결 원장과 대조 결과가 들어 있습니다.
 이벤트 검토 표본도 포함됩니다. B3에 반응이 없으면 BTC 표본을 별도로 명시합니다.
+실행 중인 프로세스, 저장된 종료 코드, 최근 오류 종류, DB 갱신 시각의 전후 비교도 포함됩니다.
+프로세스 조회 실패는 미확인으로 남깁니다. 기록 변화가 없다는 이유만으로 수집 실패라고 판정하지 않습니다.
+원본 명령행·로그 본문·환경변수·인증정보는 결과 파일에 담지 않습니다.
 파일은 자동 업로드되지 않습니다. 현재 사이트에도 배포되지 않습니다.
 
 이 실행본의 범위는 코인별 가상매매 검토입니다.

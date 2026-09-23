@@ -18,6 +18,8 @@ def main() -> None:
     supervisor = _text("b3_trader/research_supervisor.py")
     notice_collector = _text("b3_trader/market_notice_collector.py")
     launcher = _text("scripts/run-local.ps1")
+    process_contract = _text("b3_trader/runtime_process_contract.py")
+    process_host = _text("b3_trader/local_process_host.py")
     cleanup = _text("scripts/cleanup-stale-runtime-supervisors.ps1")
     verifier = _text("scripts/verify-dex-forward-pipeline-scheduler-build69.py")
     tree = ast.parse(scheduler)
@@ -45,7 +47,8 @@ def main() -> None:
         ),
         "build69_scheduler_server_off_means_no_work": (
             "scheduler.run()" in scheduler
-            and "b3_trader.forward_pipeline_scheduler" in launcher
+            and "b3_trader.forward_pipeline_scheduler" in process_contract
+            and "self._stop_children()" in process_host
             and "ForwardPipelineScheduler(" not in supervisor
         ),
         "build69_scheduler_generic_supervisors_disabled": (
@@ -86,9 +89,10 @@ def main() -> None:
             {"place_order", "create_order", "submit_order"} & calls
         ),
         "build69_scheduler_launcher_lifecycle": (
-            "function Start-ForwardPipelineScheduler" in launcher
-            and "$forwardScheduler = Start-ForwardPipelineScheduler" in launcher
-            and "Stop-Process -Id $forwardScheduler.Id" in launcher
+            "& $python -m b3_trader.local_process_host" in launcher
+            and '"b3_trader.forward_pipeline_scheduler"' in process_contract
+            and "self._stop_children()" in process_host
+            and "$code -eq 75" in launcher
             and "b3_trader.forward_pipeline_scheduler" in cleanup
         ),
         "build69_scheduler_status_heartbeat": (

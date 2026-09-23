@@ -193,108 +193,24 @@ if (-not (Test-Path ".env")) {
   Write-Host ".env created. PAPER mode needs no Bithumb API key."
 }
 
-function Start-ResearchSupervisor {
-  param([string]$PythonPath)
-  $statusPath = Join-Path $repo "b3_trader\data\research-platform\status.json"
-  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $statusPath) | Out-Null
-  $process = Start-Process -FilePath $PythonPath -ArgumentList @("-m", "b3_trader.research_supervisor") -PassThru -WindowStyle Hidden
-  Write-Host "Research supervisor: ON (warehouse export + external repo version watch, PAPER-only)" -ForegroundColor Green
-  return $process
-}
-
-function Start-PaperRuntimeSupervisor {
-  param([string]$PythonPath)
-  $statusPath = Join-Path $repo "b3_trader\data\paper-runtime-supervisor.json"
-  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $statusPath) | Out-Null
-  $process = Start-Process -FilePath $PythonPath -ArgumentList @("-m", "b3_trader.paper_runtime_supervisor") -PassThru -WindowStyle Hidden
-  Write-Host "Bithumb PAPER supervisor: ON (restart-safe, PAPER-only)" -ForegroundColor Green
-  return $process
-}
-
-function Start-ForwardPipelineScheduler {
-  param([string]$PythonPath)
-  $statusPath = Join-Path $repo "b3_trader\data\research-platform\dex-forward-pipeline-scheduler-build69.json"
-  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $statusPath) | Out-Null
-  $process = Start-Process -FilePath $PythonPath -ArgumentList @("-m", "b3_trader.forward_pipeline_scheduler") -PassThru -WindowStyle Hidden
-  Write-Host "Build69 forward scheduler: ON (15m, max 1 case/run, PAPER/shadow-only)" -ForegroundColor Green
-  return $process
-}
-
-function Start-MarketFlowStream {
-  param([string]$PythonPath)
-  $statusPath = Join-Path $repo "b3_trader\data\research-platform\market-flow-stream.json"
-  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $statusPath) | Out-Null
-  $process = Start-Process -FilePath $PythonPath -ArgumentList @("-m", "b3_trader.market_flow_stream") -PassThru -WindowStyle Hidden
-  Write-Host "Market Flow WebSocket: ON (Bithumb/Upbit BTC+ETH, PAPER-only, score/order unwired)" -ForegroundColor Green
-  return $process
-}
-
-function Start-HoldingMutationConsumer {
-  param([string]$PythonPath)
-  $process = Start-Process -FilePath $PythonPath -ArgumentList @("-m", "b3_trader.holding_mutation_consumer", "--interval", "5") -PassThru -WindowStyle Hidden
-  Write-Host "Holding mutation consumer: ON (owner queue -> canonical SQLite, idempotent)" -ForegroundColor Green
-  return $process
-}
-
-$researchSupervisor = $null
-$paperSupervisor = $null
-$forwardScheduler = $null
-$marketFlowStream = $null
-$holdingMutationConsumer = $null
-try {
-  $forwardScheduler = Start-ForwardPipelineScheduler -PythonPath $python
-  $marketFlowStream = Start-MarketFlowStream -PythonPath $python
-  $researchSupervisor = Start-ResearchSupervisor -PythonPath $python
-  $paperSupervisor = Start-PaperRuntimeSupervisor -PythonPath $python
-  $holdingMutationConsumer = Start-HoldingMutationConsumer -PythonPath $python
-  Write-Host "Starting Crypto Auto Trader..."
-  Write-Host "Dashboard will be available at http://127.0.0.1:8765"
-  while ($true) {
-    & $python -m b3_trader.local_app
+# Own all existing child processes through one monitored server session. A child
+# exit is recorded and observation/PAPER sidecars are retried while the app runs.
+# Holding mutations retain their existing start/stop policy without new retries.
+while ($true) {
+  $previousPreference = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = "Continue"
+    & $python -m b3_trader.local_process_host
     $code = $LASTEXITCODE
-    if ($code -eq 0) { break }
-    if ($code -eq 75) {
-      Write-Host "GitHub runtime update applied. Restarting trader and PAPER/research/forward/flow/holding supervisors automatically..."
-      if ($holdingMutationConsumer -and -not $holdingMutationConsumer.HasExited) {
-        Stop-Process -Id $holdingMutationConsumer.Id -Force -ErrorAction SilentlyContinue
-      }
-      if ($marketFlowStream -and -not $marketFlowStream.HasExited) {
-        Stop-Process -Id $marketFlowStream.Id -Force -ErrorAction SilentlyContinue
-      }
-      if ($forwardScheduler -and -not $forwardScheduler.HasExited) {
-        Stop-Process -Id $forwardScheduler.Id -Force -ErrorAction SilentlyContinue
-      }
-      if ($researchSupervisor -and -not $researchSupervisor.HasExited) {
-        Stop-Process -Id $researchSupervisor.Id -Force -ErrorAction SilentlyContinue
-      }
-      if ($paperSupervisor -and -not $paperSupervisor.HasExited) {
-        Stop-Process -Id $paperSupervisor.Id -Force -ErrorAction SilentlyContinue
-      }
-      Start-Sleep -Seconds 2
-      $forwardScheduler = Start-ForwardPipelineScheduler -PythonPath $python
-      $marketFlowStream = Start-MarketFlowStream -PythonPath $python
-      $researchSupervisor = Start-ResearchSupervisor -PythonPath $python
-      $paperSupervisor = Start-PaperRuntimeSupervisor -PythonPath $python
-      $holdingMutationConsumer = Start-HoldingMutationConsumer -PythonPath $python
-      continue
-    }
-    Write-Host "Trader stopped with exit code $code. Restarting in 5 seconds..."
-    Start-Sleep -Seconds 5
+  } finally {
+    $ErrorActionPreference = $previousPreference
   }
-} finally {
-  if ($holdingMutationConsumer -and -not $holdingMutationConsumer.HasExited) {
-    Stop-Process -Id $holdingMutationConsumer.Id -Force -ErrorAction SilentlyContinue
+  if ($code -eq 0 -or $code -eq 2) { break }
+  if ($code -eq 75) {
+    Write-Host "GitHub runtime update applied. Reloading the server process host..."
+    Start-Sleep -Seconds 2
+    continue
   }
-  if ($marketFlowStream -and -not $marketFlowStream.HasExited) {
-    Stop-Process -Id $marketFlowStream.Id -Force -ErrorAction SilentlyContinue
-  }
-  if ($forwardScheduler -and -not $forwardScheduler.HasExited) {
-    Stop-Process -Id $forwardScheduler.Id -Force -ErrorAction SilentlyContinue
-  }
-  if ($researchSupervisor -and -not $researchSupervisor.HasExited) {
-    Stop-Process -Id $researchSupervisor.Id -Force -ErrorAction SilentlyContinue
-  }
-  if ($paperSupervisor -and -not $paperSupervisor.HasExited) {
-    Stop-Process -Id $paperSupervisor.Id -Force -ErrorAction SilentlyContinue
-  }
+  Write-Host "Server process host stopped with exit code $code. Retrying in 5 seconds..."
+  Start-Sleep -Seconds 5
 }
