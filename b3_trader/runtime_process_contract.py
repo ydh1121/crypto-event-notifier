@@ -13,3 +13,17 @@ APP_MODULE = "b3_trader.local_app"
 HOST_STATUS = "b3_trader/data/local-process-host.json"
 HOST_LOCK = "b3_trader/data/local-process-host.lock"
 HOST_LOGS = "b3_trader/data/local-process-logs"
+
+# A user-started recovery session never opens the app, consumes real holdings
+# mutations, or publishes local data to Cloudflare. Saved controls still apply.
+RECOVERY_ROLES = frozenset({"forward", "market_flow", "research", "paper"})
+RECOVERY_COMPONENTS = frozenset({
+    "warehouse-export", "market-notice-watch", "market-ohlcv-history",
+    "phase5-intelligence-ingest", "upbit-paper-research", "strategy-lab-shadow",
+})
+RECOVERY_ENV = {
+    "LIVE_TRADING_ENABLED": "false", "TELEGRAM_ENABLED": "false",
+    "AUTO_GIT_SYNC": "false", "AUTO_GIT_PUSH_CONTROL": "false",
+    "AUTO_DEMO_EMBEDDED_WORKER": "false",
+    "DEX_FORWARD_PIPELINE_DEDICATED_MODE": "true",
+}

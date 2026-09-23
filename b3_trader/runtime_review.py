@@ -24,9 +24,9 @@ ACTIVITY = {
     "paper": ("research_accounts_mx", "updated_ts"),
     "market_memory": ("research_market_memory_mx", "ts"),
     "strategy_lab": ("strategy_lab_metrics", "updated_ts"),
-    "trade_flow": ("research_market_trade_flow_mx", "received_at"),
+    "trade_flow": ("research_market_trade_flow_mx", "trade_ts"),
     "ohlcv": ("research_market_ohlcv_mx", "received_at"),
-    "events": ("research_intelligence_events", "observed_at"),
+    "events": ("research_intelligence_events", "received_at"),
     "event_responses": ("research_intelligence_event_responses", "captured_at"),
 }
 ERROR_PATTERNS = {
@@ -47,6 +47,8 @@ def _processes(root):
         return {"status": "unsupported_host", "items": []}
     roles = {module: role for role, module, _, _ in SIDECARS}
     roles.update({APP_MODULE: "app", "b3_trader.local_process_host": "host"})
+    roles.update({"b3_trader.paper_recovery": "recovery", "b3_trader.auto_demo": "legacy_paper",
+                  "b3_trader.auto_demo_v2": "legacy_paper", "b3_trader.multi_exchange_demo": "legacy_paper"})
     # Command lines are inspected inside PowerShell, never returned or saved.
     script = r'''
 $ErrorActionPreference = 'Stop'
@@ -54,7 +56,9 @@ $ErrorActionPreference = 'Stop'
 $roles = ConvertFrom-Json $env:CRYPTO_REVIEW_PROCESS_ROLES
 $root = $env:CRYPTO_REVIEW_RUNTIME_ROOT.TrimEnd('\') + '\'
 $items = @()
+$unreadable = $false
 foreach ($p in @(Get-CimInstance Win32_Process -Filter "Name='python.exe' OR Name='pythonw.exe'")) {
+  if (-not $p.CommandLine) { $unreadable = $true }
   foreach ($entry in $roles.PSObject.Properties) {
     if ($p.CommandLine -match ('(?<![\w.])' + [regex]::Escape($entry.Name) + '(?![\w.])')) {
       $scope = 'unresolved_checkout'
@@ -64,7 +68,8 @@ foreach ($p in @(Get-CimInstance Win32_Process -Filter "Name='python.exe' OR Nam
     }
   }
 }
-@{status='read'; items=$items} | ConvertTo-Json -Depth 5 -Compress
+$status = if ($unreadable) { 'partial_read' } else { 'read' }
+@{status=$status; items=$items} | ConvertTo-Json -Depth 5 -Compress
 '''
     env = dict(os.environ, CRYPTO_REVIEW_RUNTIME_ROOT=str(root),
                CRYPTO_REVIEW_PROCESS_ROLES=json.dumps(roles))
@@ -116,9 +121,10 @@ def _log_kinds(path):
 
 def _status(root, role, processes):
     meta, value = _json_file(root / STATUS_FILES[role])
-    saved = {k: value[k] for k in ("pid", "started_at", "updated_at", "running", "stop_reason") if k in value}
-    matches = [p for p in processes.get("items", []) if p.get("role") == role and p.get("scope") == "checkout"]
-    uncertain = any(p.get("role") == role and p.get("scope") != "checkout" for p in processes.get("items", []))
+    saved = {k: value[k] for k in ("pid", "started_at", "updated_at", "running", "stop_reason", "profile") if k in value}
+    identities = {"host", "recovery"} if role == "host" else {role}
+    matches = [p for p in processes.get("items", []) if p.get("role") in identities and p.get("scope") == "checkout"]
+    uncertain = any(p.get("role") in identities and p.get("scope") != "checkout" for p in processes.get("items", []))
     observation = "present" if matches else "unknown" if uncertain or processes.get("status") != "read" else "absent"
     owner_match = any(p.get("pid") == saved.get("pid") and
                       isinstance(saved.get("started_at"), (int, float)) and
@@ -153,15 +159,33 @@ def read_activity(db):
             deadline = time.monotonic() + 1
             conn.set_progress_handler(lambda: int(time.monotonic() > deadline), 10_000)
             try:
-                row = conn.execute(f'SELECT MAX({clock}) FROM "{table}"').fetchone()
-                latest = row[0] if row else None
-                result[name] = {"status": "read", "latest": latest if isinstance(latest, (int, float)) and math.isfinite(latest) else None}
+                scope = "all_rows"
+                if name == "trade_flow":
+                    # Use the existing (exchange,market,trade_ts DESC) index.
+                    # This measures only the four benchmark streams, not all coins.
+                    scope = "bithumb,upbit / KRW-BTC,KRW-ETH"
+                    streams = {}
+                    for exchange in ("bithumb", "upbit"):
+                        for market in ("KRW-BTC", "KRW-ETH"):
+                            row = conn.execute(f'SELECT trade_ts FROM "{table}" WHERE exchange=? AND market=? ORDER BY trade_ts DESC LIMIT 1', (exchange, market)).fetchone()
+                            streams[f"{exchange}|{market}"] = _positive_clock(row[0] if row else None)
+                    latest = max((v for v in streams.values() if v is not None), default=None)
+                else:
+                    row = conn.execute(f'SELECT MAX({clock}) FROM "{table}"').fetchone()
+                    latest = _positive_clock(row[0] if row else None)
+                result[name] = {"status": "read", "latest": latest, "clock": clock, "scope": scope}
+                if name == "trade_flow":
+                    result[name]["streams"] = streams
             except sqlite3.OperationalError as exc:
                 kind = "query_timeout" if str(exc) == "interrupted" else "unavailable"
                 result[name] = {"status": kind, "latest": None}
     finally:
         conn.close()
     return result
+
+
+def _positive_clock(value):
+    return value if isinstance(value, (int, float)) and math.isfinite(value) and value > 0 else None
 
 
 def read_runtime(db: Path):

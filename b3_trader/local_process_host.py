@@ -5,6 +5,7 @@ process is only a process observation, never proof of successful collection.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 from logging.handlers import RotatingFileHandler
@@ -17,17 +18,26 @@ import threading
 import time
 
 from .research_work_lock import ResearchWorkLock
-from .runtime_process_contract import APP_MODULE, HOST_LOCK, HOST_LOGS, HOST_STATUS, SIDECARS
+from .runtime_process_contract import (
+    APP_MODULE, HOST_LOCK, HOST_LOGS, HOST_STATUS, SIDECARS, RECOVERY_ROLES, RECOVERY_ENV,
+)
 
 
 class LocalProcessHost:
-    def __init__(self, root: Path, *, commands=None, retry_seconds=5.0, tick_seconds=1.0):
+    def __init__(self, root: Path, *, commands=None, retry_seconds=5.0, tick_seconds=1.0, recovery=False):
         self.root = root.resolve()
+        self.recovery = recovery
         self.commands = commands if commands is not None else {
             **{role: [sys.executable, "-u", "-m", module, *args]
                for role, module, args, _ in SIDECARS},
             "app": [sys.executable, "-u", "-m", APP_MODULE],
         }
+        if recovery:
+            if commands is not None:
+                raise ValueError("Recovery commands must use the fixed collection allowlist")
+            self.commands = {role: command for role, command in self.commands.items() if role in RECOVERY_ROLES}
+            self.commands["research"] = [*self.commands["research"], "--recovery"]
+        self.child_env = {**os.environ, **RECOVERY_ENV} if recovery else None
         self.retry_roles = {role for role, _, _, retry in SIDECARS if retry} | {"app"}
         self.retry_seconds = retry_seconds
         self.tick_seconds = tick_seconds
@@ -88,7 +98,7 @@ class LocalProcessHost:
             logger = self._logger(role)
             kwargs = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
             process = subprocess.Popen(self.commands[role], cwd=self.root,
-                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **kwargs)
+                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=self.child_env, **kwargs)
             self.children[role] = process
             state.update(pid=process.pid, state="process_started", starts=state["starts"] + 1,
                          last_started_at=time.time(), spawn_error=None)
@@ -118,6 +128,7 @@ class LocalProcessHost:
         payload = {"version": 1, "pid": os.getpid(), "repo": str(self.root),
                    "started_at": self.started_at, "updated_at": time.time(),
                    "running": running, "stop_reason": self.stop_reason,
+                   "profile": "collection_recovery" if self.recovery else "normal",
                    "collection_verified": False, "children": self.states}
         path = self.root / HOST_STATUS
         try:
@@ -209,7 +220,10 @@ class LocalProcessHost:
 
 
 def main():
-    host = LocalProcessHost(Path(__file__).resolve().parents[1])
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--recovery", action="store_true")
+    args = parser.parse_args()
+    host = LocalProcessHost(Path(__file__).resolve().parents[1], recovery=args.recovery)
 
     def stop(_signum, _frame):
         host.stop_reason = "signal_stop"

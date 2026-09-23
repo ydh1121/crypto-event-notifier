@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import os
 import signal
 import threading
@@ -22,6 +23,7 @@ from .market_ohlcv_research_cycle import MarketOhlcvResearchCycle
 from .reference_components import ReferenceComponentWatcher
 from .research_control import COMPONENT_DEFINITIONS, STATUS_PATH, atomic_json, load_control
 from .research_work_lock import ResearchWorkLock
+from .runtime_process_contract import RECOVERY_COMPONENTS
 from .research_warehouse import ResearchWarehouse
 from .strategy_lab_custom import ConfiguredStrategyLabRunner
 from .upbit_paper_runner import UpbitPaperResearchRunner
@@ -80,8 +82,9 @@ class ComponentState:
 class ResearchSupervisor:
     """Non-trading sidecar for storage, research enrichment, web snapshots and Pages deployment."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, recovery: bool = False) -> None:
         load_dotenv()
+        self.recovery = recovery
         self.stop_event = threading.Event()
         self.started_at = time.time()
         self.forward_pipeline_dedicated_mode = str(
@@ -89,10 +92,6 @@ class ResearchSupervisor:
         ).strip().lower() in {"1", "true", "yes", "on"}
         self.control = load_control()
         self.warehouse = ResearchWarehouse()
-        self.reference_watcher = ReferenceComponentWatcher()
-        self.cloudflare_publisher = CloudflareSnapshotPublisher()
-        self.cloudflare_market_detail_publisher = CloudflareMarketDetailPublisher()
-        self.coin_profile_research = CoinProfileResearchCycleV36()
         self.market_notice_collector = MarketNoticeCollector()
         # SQLite-owning research cycles must be created, used and closed on
         # their own component worker threads; never construct them on main.
@@ -100,25 +99,32 @@ class ResearchSupervisor:
         self.listing_history_research: ListingHistoryResearchCycle | None = None
         self.dex_launch_research: DexLaunchResearchCycle | None = None
         self.intelligence_ingest: IntelligenceIngestCycle | None = None
-        self.cloudflare_deployer = CloudflarePagesDeployer()
         self.upbit_paper_runner = UpbitPaperResearchRunner()
         self.strategy_lab_runner = ConfiguredStrategyLabRunner()
         self.states: dict[str, ComponentState] = {}
         self.runners: dict[str, Callable[[], dict[str, Any]]] = {
             "warehouse-export": self.warehouse.export_once,
-            "reference-version-watch": self.reference_watcher.check_once,
-            "cloudflare-snapshot-publish": self.cloudflare_publisher.publish_once,
-            "cloudflare-market-detail-publish": self.cloudflare_market_detail_publisher.publish_once,
-            "coin-profile-enrichment": self.coin_profile_research.run_once,
             "market-notice-watch": self.market_notice_collector.run_once,
             "market-ohlcv-history": self._run_market_ohlcv_once,
-            "listing-history-research": self._run_listing_history_once,
-            "dex-launch-research": self._run_dex_launch_once,
             "phase5-intelligence-ingest": self._run_intelligence_ingest_once,
             "upbit-paper-research": self.upbit_paper_runner.run_once,
             "strategy-lab-shadow": self.strategy_lab_runner.run_once,
-            "cloudflare-pages-deploy": self.cloudflare_deployer.deploy_once,
         }
+        if not recovery:
+            self.reference_watcher = ReferenceComponentWatcher()
+            self.cloudflare_publisher = CloudflareSnapshotPublisher()
+            self.cloudflare_market_detail_publisher = CloudflareMarketDetailPublisher()
+            self.coin_profile_research = CoinProfileResearchCycleV36()
+            self.cloudflare_deployer = CloudflarePagesDeployer()
+            self.runners.update({
+                "reference-version-watch": self.reference_watcher.check_once,
+                "cloudflare-snapshot-publish": self.cloudflare_publisher.publish_once,
+                "cloudflare-market-detail-publish": self.cloudflare_market_detail_publisher.publish_once,
+                "coin-profile-enrichment": self.coin_profile_research.run_once,
+                "listing-history-research": self._run_listing_history_once,
+                "dex-launch-research": self._run_dex_launch_once,
+                "cloudflare-pages-deploy": self.cloudflare_deployer.deploy_once,
+            })
         self.threads: dict[str, threading.Thread] = {}
         self.wake_events: dict[str, threading.Event] = {}
         self.force_run: dict[str, bool] = {}
@@ -178,6 +184,13 @@ class ResearchSupervisor:
             and name in FORWARD_PIPELINE_BLOCKED_COMPONENTS
         )
 
+    def _component_blocked_by_recovery(self, name: str) -> bool:
+        return bool(getattr(self, "recovery", False) and name not in RECOVERY_COMPONENTS)
+
+    @staticmethod
+    def _recovery_blocked_result(name: str) -> dict[str, Any]:
+        return {"ok": True, "status": "disabled_by_collection_recovery", "component": name}
+
     @staticmethod
     def _forward_mode_blocked_result(name: str) -> dict[str, Any]:
         return {
@@ -228,6 +241,9 @@ class ResearchSupervisor:
             blocked = self._component_blocked_by_forward_mode(name)
             if blocked:
                 enabled = False
+            recovery_blocked = self._component_blocked_by_recovery(name)
+            if recovery_blocked:
+                enabled = False
             minimum = float(definition["min_interval_seconds"])
             interval = max(minimum, float(cfg.get("interval_seconds") or definition["default_interval_seconds"]))
             self.states[name] = ComponentState(
@@ -235,12 +251,13 @@ class ResearchSupervisor:
                 enabled=enabled,
                 interval_seconds=interval,
                 status="starting" if enabled else "stopped",
-                last_result=(self._forward_mode_blocked_result(name) if blocked else {}),
+                last_result=(self._recovery_blocked_result(name) if recovery_blocked else self._forward_mode_blocked_result(name) if blocked else {}),
             )
             self.wake_events[name] = threading.Event()
             self.force_run[name] = False
             self.last_run_nonce[name] = int(cfg.get("run_nonce") or 0)
-            self.threads[name] = threading.Thread(target=self._component_loop, args=(name, self.runners[name]), name=f"research-{name}", daemon=True)
+            if name in self.runners:
+                self.threads[name] = threading.Thread(target=self._component_loop, args=(name, self.runners[name]), name=f"research-{name}", daemon=True)
 
     def _write_status(self) -> None:
         with self._lock:
@@ -309,6 +326,9 @@ class ResearchSupervisor:
                 if self._component_blocked_by_forward_mode(name):
                     state.enabled = False
                     state.last_result = self._forward_mode_blocked_result(name)
+                if self._component_blocked_by_recovery(name):
+                    state.enabled = False
+                    state.last_result = self._recovery_blocked_result(name)
                 state.interval_seconds = max(minimum, float(cfg.get("interval_seconds") or definition["default_interval_seconds"]))
                 nonce = int(cfg.get("run_nonce") or 0)
                 if nonce != self.last_run_nonce.get(name, 0):
@@ -392,6 +412,9 @@ class ResearchSupervisor:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--recovery", action="store_true")
+    args = parser.parse_args()
     stop_requested = threading.Event()
     holder: dict[str, ResearchSupervisor | None] = {"supervisor": None}
 
@@ -409,7 +432,7 @@ def main() -> None:
     while not stop_requested.is_set():
         supervisor: ResearchSupervisor | None = None
         try:
-            supervisor = ResearchSupervisor()
+            supervisor = ResearchSupervisor(recovery=args.recovery)
             holder["supervisor"] = supervisor
             supervisor.run()
             if stop_requested.is_set():

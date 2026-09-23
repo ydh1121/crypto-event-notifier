@@ -898,8 +898,8 @@ class AutoPaperDemo:
 
     def run(self, stop_event: threading.Event | None = None) -> None:
         stop_event = stop_event or threading.Event()
-        self._write_status(scanned=0, total=0)
         try:
+            self._write_status(scanned=0, total=0)
             while not stop_event.is_set():
                 started = time.time()
                 try:

@@ -89,3 +89,35 @@ def test_damaged_status_and_startup_error_logs_do_not_break_read_only_review(tmp
     assert result['saved_statuses']['host']['status'] == 'unreadable'
     assert result['process_logs']['paper']['recent_error_kinds'] == ['missing_module']
     assert 'private-value' not in json.dumps(result)
+
+
+def test_actual_receipt_time_and_indexed_benchmark_scope(tmp_path):
+    db = database(tmp_path)
+    with sqlite3.connect(db) as conn:
+        conn.execute('CREATE TABLE research_intelligence_events(observed_at REAL, received_at REAL)')
+        conn.execute('INSERT INTO research_intelligence_events VALUES(0,300)')
+        conn.execute('CREATE TABLE research_market_trade_flow_mx(exchange TEXT, market TEXT, trade_ts REAL, received_at REAL)')
+        conn.execute('CREATE INDEX trade_time ON research_market_trade_flow_mx(exchange,market,trade_ts DESC)')
+        conn.executemany('INSERT INTO research_market_trade_flow_mx VALUES(?,?,?,?)', [
+            ('bithumb','KRW-BTC',100,200), ('upbit','KRW-ETH',120,220),
+            ('bithumb','KRW-B3',1000,1100), ('bithumb','KRW-BTC',90,2000)])
+    result = review.read_activity(db)
+    assert result['events']['latest'] == 300 and result['events']['clock'] == 'received_at'
+    flow = result['trade_flow']
+    assert flow['latest'] == 120 and flow['clock'] == 'trade_ts'
+    assert flow['streams']['upbit|KRW-BTC'] is None
+    assert flow['streams']['bithumb|KRW-BTC'] == 100
+    assert flow['scope'] != 'all_rows'
+    with sqlite3.connect(db) as conn:
+        conn.execute('UPDATE research_intelligence_events SET received_at=0')
+    assert review.read_activity(db)['events']['latest'] is None
+
+
+def test_recovery_helper_is_observed_as_host_owner(tmp_path, monkeypatch):
+    db = database(tmp_path)
+    (tmp_path/review.STATUS_FILES['host']).write_text(json.dumps({'pid':111,'started_at':100,'profile':'collection_recovery'}))
+    monkeypatch.setattr(review, '_processes', lambda _: {'status':'read','items':[
+        {'role':'recovery','pid':111,'scope':'checkout','created_at':100}]})
+    owner = review.read_runtime(db)['saved_statuses']['host']
+    assert owner['saved_owner_matches'] is True
+    assert owner['saved']['profile'] == 'collection_recovery'
