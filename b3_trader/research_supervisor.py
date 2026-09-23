@@ -61,6 +61,9 @@ class ComponentState:
     last_error_at: float = 0.0
     last_error: str = ""
     runs: int = 0
+    deferred_runs: int = 0
+    consecutive_deferrals: int = 0
+    next_due_at: float = 0.0
     last_result: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -75,6 +78,9 @@ class ComponentState:
             "last_error_at": self.last_error_at,
             "last_error": self.last_error,
             "runs": self.runs,
+            "deferred_runs": self.deferred_runs,
+            "consecutive_deferrals": self.consecutive_deferrals,
+            "next_due_at": self.next_due_at,
             "last_result": self.last_result,
         }
 
@@ -360,23 +366,41 @@ class ResearchSupervisor:
                 self.force_run[name] = False
                 state.status = "running"
                 state.last_started_at = time.time()
+                retry_delay = state.interval_seconds
                 self._safe_write_status()
                 try:
                     result = runner()
                     state.last_result = result if isinstance(result, dict) else {"result": str(result)}
-                    state.last_success_at = time.time()
-                    state.last_error = ""
-                    state.status = "healthy"
-                    _log(f"{name}: healthy")
+                    if state.last_result.get("status") == "deferred_forward_research_work_lock_busy":
+                        # Nothing was collected. Retrying this lock probe must
+                        # not postpone OHLCV by another full five-minute cycle.
+                        state.status = "deferred"
+                        state.deferred_runs += 1
+                        state.consecutive_deferrals += 1
+                        retry_delay = min(state.interval_seconds, 5.0 * 2 ** min(state.consecutive_deferrals - 1, 2))
+                        state.last_error = ""
+                    elif state.last_result.get("ok") is False:
+                        state.status = "degraded"
+                        state.last_error = "Component returned ok=false"
+                        state.last_error_at = time.time()
+                        state.consecutive_deferrals = 0
+                    else:
+                        state.last_success_at = time.time()
+                        state.last_error = ""
+                        state.status = "healthy"
+                        state.consecutive_deferrals = 0
+                    _log(f"{name}: {state.status}")
                 except Exception as exc:
                     state.last_error_at = time.time()
                     state.last_error = f"{type(exc).__name__}: {exc}"
                     state.status = "degraded"
+                    state.consecutive_deferrals = 0
                     _log(f"{name}: degraded: {state.last_error}")
                 finally:
                     state.runs += 1
                     state.last_finished_at = time.time()
-                    next_due = state.last_finished_at + state.interval_seconds
+                    next_due = state.last_finished_at + retry_delay
+                    state.next_due_at = next_due
                     if not state.enabled:
                         state.status = "stopped"
                     self._safe_write_status()

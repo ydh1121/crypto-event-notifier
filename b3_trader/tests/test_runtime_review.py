@@ -121,3 +121,49 @@ def test_recovery_helper_is_observed_as_host_owner(tmp_path, monkeypatch):
     owner = review.read_runtime(db)['saved_statuses']['host']
     assert owner['saved_owner_matches'] is True
     assert owner['saved']['profile'] == 'collection_recovery'
+
+
+def test_windows_venv_lineage_and_long_backup_before_host_start(tmp_path, monkeypatch):
+    db=database(tmp_path)
+    processes=review.resolve_process_scopes([
+        {'role':'recovery','pid':11,'parent_pid':1,'scope':'checkout','created_at':100},
+        {'role':'recovery','pid':12,'parent_pid':11,'scope':'unresolved_checkout','created_at':100},
+        {'role':'paper','pid':13,'parent_pid':11,'scope':'unresolved_checkout','created_at':100},
+        {'role':'recovery','pid':14,'parent_pid':11,'scope':'unresolved_checkout','created_at':200},
+    ])
+    assert processes[1]['scope']=='checkout_child'
+    assert processes[2]['scope']==processes[3]['scope']=='unresolved_checkout'
+    (tmp_path/review.STATUS_FILES['host']).write_text(json.dumps({'pid':12,'started_at':160}))
+    monkeypatch.setattr(review,'_processes',lambda _: {'status':'read','items':processes})
+    assert review.read_runtime(db)['saved_statuses']['host']['saved_owner_matches'] is True
+
+
+def test_deferred_result_is_exported_without_raw_error_or_secret(tmp_path, monkeypatch):
+    db=database(tmp_path)
+    status=tmp_path/review.STATUS_FILES['research']; status.parent.mkdir(parents=True)
+    status.write_text(json.dumps({'components':[{'name':'market-ohlcv-history','status':'healthy',
+        'last_result':{'status':'deferred_forward_research_work_lock_busy','network_fetches':False,
+                       'error':'token=private-secret','rows_written':0,'url':'private-secret',
+                       'event_response_capture':{'status':'complete','missing_baseline':2,
+                           'future_observations':10,'samples_inserted':0,'error':'private-secret'}}}]}))
+    monkeypatch.setattr(review,'_processes',lambda _: {'status':'read','items':[]})
+    result=review.read_runtime(db)
+    component=result['saved_statuses']['research']['components'][0]
+    assert component['last_result']=={'status':'deferred_forward_research_work_lock_busy','network_fetches':False,'rows_written':0,
+        'event_response_capture':{'status':'complete','missing_baseline':2,'future_observations':10,'samples_inserted':0}}
+    assert 'private-secret' not in json.dumps(result)
+
+
+def test_strategy_aggregate_refresh_is_separate_from_account_activity(tmp_path):
+    db=database(tmp_path)
+    with sqlite3.connect(db) as conn:
+        conn.execute('CREATE TABLE strategy_lab_accounts(updated_ts REAL)')
+        conn.execute('CREATE TABLE strategy_lab_metrics(updated_ts REAL)')
+        conn.execute('INSERT INTO strategy_lab_accounts VALUES(100)')
+        conn.execute('INSERT INTO strategy_lab_metrics VALUES(100)')
+    before={'activity':review.read_activity(db)}
+    with sqlite3.connect(db) as conn: conn.execute('UPDATE strategy_lab_metrics SET updated_ts=200')
+    after={'activity':review.read_activity(db)}
+    changes=review.compare_activity(before,after)
+    assert changes['strategy_lab']['observation']=='unchanged'
+    assert changes['strategy_lab_metrics']['observation']=='advanced'

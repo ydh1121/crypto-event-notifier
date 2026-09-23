@@ -2,10 +2,20 @@
 
 ## Successor CURRENT — CRYPTO-WO-20260921-RECOVERY-001
 
-**Status: ACCOUNT_VERIFIED_RECOVERY_READY. Actual PC collection restart pending. V22 / WO-008 remains rejected.**
+**Status: PARTIAL_ACCUMULATION_OBSERVED. OHLCV, reactions and scoped B3 freshness still require evidence. V22 / WO-008 remains rejected.**
 This block supersedes older visual-acceptance and BLOCKED_LOCAL_EVIDENCE checkpoints below.
 
-### Authority and actual evidence
+### Latest actual recovery evidence — 2026-09-23 10:50 UTC
+
+- User supplied `CRYPTO_RECOVERY_RESULT.json`, 30,852 bytes, SHA256 `56a450646bd34c27498475c9b3e827aabedc1eefe495fbdaa9ddea970a98b216`; read locally only. Windows activated `c5ffd52423a4a8bcfbb109fce5829f401322087f` on `recovery/paper-20260923-194932-741dec34` from actual `ba3c59a` / primary branch. The 3,081,179,136-byte pre-start SQLite backup passed quick_check and six account/ledger count comparisons.
+- Native observation 10:49:58–10:50:59 UTC: PAPER accounts, market memory, all four BTC/ETH trade streams, Strategy Lab aggregate metrics and event receipt clocks advanced. Four collector owners started once, no reported fresh error categories. App/holdings/publish/deploy stayed excluded. This proves partial persisted activity, not complete coverage or long-term liveness.
+- OHLCV and event-reaction clocks did not advance during this first minute. The B3 aggressive account/source timestamps also remained old, although all five fills still reconcile (two closes, one win). Aggregate metric refresh can occur without consuming any new source rows; it must not imply this coin account is current.
+- The report exposes Windows venv launchers plus their same-role interpreter children. Earlier scope logic did not recognize the latter, and the backup delay exceeded the old 30-second host start tolerance. The corrected direct-parent/time/PID checks resolve all five saved owner identities against this uploaded observation. This is report re-evaluation, not a new live PC probe. Native shutdown remains untested.
+- Source-confirmed collection defect: research lock deferral was labelled healthy and delayed the next probe for a full normal interval. It now preserves the last-success clock, reports deferred and retries lock probes after 5/10/20 seconds (20-second cap). Normal successful collection intervals and lock ownership remain unchanged. Explicit ok=false is degraded, not healthy. Actual OHLCV's saved result is needed before claiming the lock caused this particular missing update.
+- Read-only evidence now includes allowlisted collector outcome/counters, event missing-baseline/target and future/due counts; no raw logs, command lines, errors or credentials. Strategy Lab account activity and aggregate metric refresh are separate series. Unknown remains unknown. The revised review archive can inspect the currently running PC without restarting collectors.
+- Verification: 34 affected Python tests passed, Build 69 contract and changed-module compilation passed. Actual uploaded lineage re-evaluation matches all owner PIDs. No running PC process or database was modified by this agent; the retry fix is source-only until a later controlled code update. The existing collection recovery ZIP remains pinned to c5ffd52.
+
+### Earlier inventory and implementation history
 
 - Latest actual Windows evidence: `CRYPTO_B3_REVIEW_RESULT(1).json`, observed 2026-09-23 04:28:50–04:29:23 UTC: actual account/ledger projection matches, native process discovery succeeds with no matching runners. The new report does not contain Git HEAD. Last actual Git observation remains the September 21 clean `b3-auto-trader-phase1@ba3c59a50962ae1a5bdc41053a75f9e6bf9e1ec7`; recovery must recheck it. Remote primary remains `56b9361f352eedce2e543b3baca36952b2397d76`.
 - Canonical `b3_trader/data/auto_demo.sqlite3`: 3,081,179,136 bytes. Latest PAPER/memory activity remains September 21 around 06:23 UTC, about 46.1 hours old at the latest observation. T0/T1 did not advance. Historical healthy badges do not prove liveness; shutdown cause is unestablished. Latest input has no new WAL inventory.
@@ -69,10 +79,10 @@ This block supersedes older visual-acceptance and BLOCKED_LOCAL_EVIDENCE checkpo
 
 ### Exact next action
 
-1. Run the separate recovery package on the existing Windows PC using `RUN_RECOVERY.cmd`, extracted outside the checkout. It starts collection only after its backup/source/process checks pass. Keep the session open and inspect the private result after at least one minute; slower/new event horizons require subsequent observations.
-2. Confirm actual process ownership and advancing raw/PAPER/OHLCV/lab clocks; investigate fresh errors if any. Do not treat persisted healthy badges or successful fixture tests as actual recovery. Never kill discovered processes, change strategy semantics or apply a destructive repair automatically.
-3. Continue the actual event → coin/BTC/ETH → horizons verification when real new samples exist, and finish desktop/mobile visual review of the already implemented coin workspace. Preserve missing values.
-4. Then continue the real-holdings planning flow and authorized Preview review. Production, primary merge, real orders and holdings mutations remain out of scope.
+1. Keep the currently running recovery session open. Run the updated read-only `RUN_REVIEW.cmd` outside the checkout for at least 30 seconds and inspect `CRYPTO_B3_REVIEW_RESULT.json`. This reads actual saved outcomes and current per-account activity without changing source, DB or processes.
+2. Distinguish actual OHLCV lock deferral/error/no-markets from normal cadence, and event future horizons from missing baseline/target. Check that B3 itself receives and consumes new memory; do not accept only global metric freshness. Longer-run collector growth and Windows cleanup remain unverified.
+3. Apply the tested collector retry source later with a verified stopped-process/backup transition if evidence requires it; never blindly restart the now-active PC. Continue real event/coin/BTC/ETH verification and existing coin workspace visual review, then real-holdings planning.
+4. No Production deployment, primary merge, real order, strategy/PAPER rule change, holdings mutation or destructive DB operation.
 
 
 ## Current phase
