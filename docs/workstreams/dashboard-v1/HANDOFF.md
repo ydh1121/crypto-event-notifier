@@ -2,10 +2,21 @@
 
 ## Successor CURRENT — CRYPTO-WO-20260921-RECOVERY-001
 
-**Status: EVENT_PRICE_PRESERVATION_APPLIED. Actual PC runs 4af291d and preserved-price writes are observed. Read-only coin/event Viewer now includes partial stored prices; actual screen acceptance remains pending. V22 remains rejected.**
+**Status: EVENT_ARCHIVE_CONSUMPTION_OBSERVED / HOLDINGS_PLAN_REVIEW_READY. Actual PC event Viewer d60449c is observed; one collector response used preserved prices. New read-only actual-holdings planning slice is implemented; actual holdings DB and new-screen acceptance remain pending. V22 remains rejected.**
 This block supersedes older visual-acceptance and BLOCKED_LOCAL_EVIDENCE checkpoints below.
 
-### Latest actual application and event-view continuation — 2026-09-24
+### Latest actual event evidence and holdings planning — 2026-09-24
+
+- Read local attachments `CRYPTO_B3_REVIEW_RESULT(3).json` (53,295 bytes, SHA256 `7f82fb435b0407c64aa2c3925ac7c9168666e7280fb6a5bd141dbc1986253255`) and `195368af-dce6-4df5-a3f0-6d91addc05f9.png`. Report confirms Viewer d60449c / verified manifest. Observation: 17:20:42–17:21:18 KST. PAPER DB remains 3,081,179,136 bytes. No new PC Git observation; collector source remains last verified 4af291d.
+- PAPER, memory, lab account/metrics and all four sampled BTC/ETH streams advanced. Latest OHLCV receipt 17:15:57 KST; last cycle wrote 4,054 rows for 16 markets. Last intelligence cycle 17:10:04 KST inserted one response using one archived baseline and one archived target (source/response failures 0). This establishes actual archive consumption; the report does not identify that new response's coin/horizon. No inference of all-market coverage.
+- Host/research/PAPER/flow/forward owners match. Research/PAPER started once; forward started twice and flow four times, with earlier code-1 exits and subsequent owned restarts. All were running during this observation. Permission-denied/crash categories lack log bodies and do not establish their root cause. Do not claim uninterrupted uptime or a currently dead collector. No restart is needed for the new Viewer.
+- Screenshot and JSON agree on the September 24 01:00 KST SEC event: B3 baseline missing, preserved 15m target 1.03 at 01:16:07 and 1h target 1.032 at 02:00:39. BTC/ETH have stored 15m/1h/4h returns; 1d was not yet due. B3 relative returns and zero-sample history correctly remain missing. The precise reason that B3 baseline was not captured is not established. The screen is observed, not a user-approved final design.
+- B3/aggressive still reconciles six fills / three closes / two wins / zero position; PAPER cash 10,348,855.81 and realized +348,855.81 KRW. Account/source clocks 17:18:42 / 17:17:54 KST. Do not call three completed trades validated superiority.
+- Added `holdings_review.py`: opens the existing separate manual journal with SQLite mode=ro/query_only, reuses canonical holding-market identity helpers, never instantiates a writing store. Resolves explicit path, B3_JOURNAL_DB environment/project setting, or canonical crypto_trader.sqlite3 default; ambiguous configuration is not a fallback to PAPER. Missing DB/schema/read failure remains distinct from an empty portfolio; zero closeout rows remain stored. Prices require exact exchange/API market/quote. Unknown/stale prices and incomplete totals stay explicit.
+- New local `실전 계획` tab connects real holdings → scoped strategy comparisons → exact strategy ledger → fee-aware split planning. Reuses existing tradingCost/calculatePlan. Imports reference entry prices and relative budget allocation into the user's total budget; never imports PAPER balance/quantity/average. TP uses the user's calculated average and the chosen strategy's TP percentage. Existing average is retained; new fees apply only to planned trades. Drafts are per holding/strategy and survive polling/navigation while open; fresh holding updates require explicit start-value reload. Full 100% sale now consumes exact remaining quantity rather than leaving floating-point dust. No strategy/PAPER rule change.
+- Verification: 22 affected Python tests + 22 distinct JS/API/DOM tests passed; TypeScript, Python compile, diff whitespace and existing V18/V16 foundation checks passed. Tests cover separate journals, identity/quote isolation, missing/zero/stale data, read-only HTTP, report-file protection, budget/fee conservation, split-sell limits, exact ledger navigation and polling continuity. Fixtures only for the new holdings flow. The supplied report contains no actual manual-holdings rows; no real holdings balance or new-screen visual acceptance is claimed. Prior localhost browser policy limitation was not bypassed.
+
+### Earlier actual application and event-view continuation — 2026-09-24
 
 - Attachment `CRYPTO_RECOVERY_RESULT(2).json`: 42,165 bytes, SHA256 `76e61f0408e2c815ef518dede2c44c7306ddd0cf75ee678e6d93f1eb54a18b80`, read locally only. Actual PC moved from `c5ffd52` to `4af291dd9b0a3266959cfc1b15ee0309f07daa8f` on `recovery/paper-20260924-110445-3a82105c`.
 - Verified pre-activation backup `20260924-110445-3a82105c/auto_demo.sqlite3`: 3,081,179,136 bytes, integrity OK; research accounts 775 / fills 24,508 / feedback 11,832; lab accounts 4,650 / trades 7,471 / metrics 12; intelligence events 73 / stored horizon responses 176. These are backup-time counts; no event-price table existed then.
@@ -126,10 +137,10 @@ This block supersedes older visual-acceptance and BLOCKED_LOCAL_EVIDENCE checkpo
 
 ### Exact next action
 
-1. Keep the verified `4af291d` collection session open. Do not rerun recovery or switch its checkout merely to view the new event screen.
-2. Open the new version-labelled strategy review package outside the checkout and run `RUN_REVIEW.cmd`. If an older review window owns port 8766, close only that review session first. The new Viewer reads the existing DB and displays coin/strategy account, ledger, BTC/ETH and event prices without changing the DB or Git.
-3. Inspect actual selected-coin event evidence and visual behavior from this Viewer/result. Verify eventual preserved-price use when a suitable event/horizon exists; do not fill prior outages or infer all-market completeness from global counters. Then continue real-holdings planning using its separate canonical journal and existing fee logic.
-4. No Production deployment, primary merge, real order, strategy/PAPER rule change, holdings mutation or destructive DB operation. V22 remains rejected.
+1. Keep the verified 4af291d collection session open. Do not rerun recovery or switch its checkout for this read-only Viewer.
+2. Run the newly version-labelled strategy review package outside the checkout. Close only the old review session if it owns port 8766; open the new folder's RUN_REVIEW.cmd and choose 실전 계획.
+3. Inspect the actual separate manual-holdings connection, exact exchange/coin amounts, strategy-ledger navigation and fee-aware split calculations from the new screen/report. Missing journal/configuration is not evidence that holdings were deleted. Keep prior event gaps missing; actual archive use is now observed globally but B3 baseline remains unavailable for the supplied event.
+4. Next: resolve concrete real-holdings evidence/UI issues, then manual small-trade comparison and broader main-Viewer integration. No Production deployment, primary merge, live order, strategy/PAPER change, holdings mutation or destructive DB operation. V22 remains rejected.
 
 
 ## Current phase

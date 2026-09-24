@@ -54,7 +54,9 @@ export function calculatePlan(draft, {exchange='bithumb',market='KRW-B3'}={}) {
     if(price===null||price<=0||weight===null||weight<=0||weight>100) { errors.push(`${i+1}차 익절가와 비중을 확인하세요.`);continue; }
     totalWeight+=weight;
     if(totalWeight>100+1e-9) { errors.push('익절 비중의 합계는 100% 이하여야 합니다.');break; }
-    const sold=afterBuyQuantity*weight/100, gross=sold*price*(1-slip);
+    // An explicitly complete sale consumes the exact remaining quantity;
+    // multiplying by 100 / 100 can otherwise leave floating-point dust.
+    const sold=totalWeight===100?quantity:Math.min(quantity,afterBuyQuantity*weight/100), gross=sold*price*(1-slip);
     const charge=tradingCost({sellGross:gross,exchange,market,rate:fee});
     const pnl=charge.sell_net-sold*afterBuyAverage;
     quantity-=sold;cost-=sold*afterBuyAverage;fees+=charge.sell_fee;realized+=pnl;net+=charge.sell_net;

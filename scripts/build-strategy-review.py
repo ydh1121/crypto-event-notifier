@@ -16,7 +16,7 @@ PYTHON_FILES = (
     'strategy_lab_market.py', 'strategy_lab_context.py', 'strategy_lab_journal.py',
     'strategy_lab_plan.py', 'strategy_lab_rules.py',
     'event_reaction_view.py', 'event_response_contract.py', 'event_price_archive.py',
-    'runtime_review.py', 'runtime_process_contract.py',
+    'runtime_review.py', 'runtime_process_contract.py', 'holdings_review.py', 'user_tools.py',
 )
 LAUNCHER = r'''@echo off
 setlocal
@@ -50,7 +50,7 @@ if not "%CRYPTO_REVIEW_EXIT%"=="0" (
 )
 exit /b %CRYPTO_REVIEW_EXIT%
 '''
-README = '''코인별 가상매매 검토 화면
+README = '''가상매매 · 실전 계획 검토 화면
 
 이번 실행본: @BUILD@
 압축을 풀면 버전이 붙은 새 폴더가 나옵니다. 이전 폴더에 덮어쓰지 마세요.
@@ -101,7 +101,22 @@ BTC·ETH 탭은 동일 시각의 저장된 종가를 비교합니다.
 원본 명령행·로그 본문·환경변수·인증정보는 결과 파일에 담지 않습니다.
 파일은 자동 업로드되지 않습니다. 현재 사이트에도 배포되지 않습니다.
 
-이 실행본의 범위는 코인별 가상매매 검토입니다.
+실전 계획 탭
+기존 보유자산 DB(기본 crypto_trader.sqlite3)를 별도로 읽습니다.
+프로젝트의 B3_JOURNAL_DB 설정이 있으면 해당 경로를 사용합니다.
+보유 코인을 고르면 같은 거래소·원화 마켓의 전략별 성과와 원장을 연결합니다.
+가상매매 수량·평단·1천만 원 예산을 실제 보유분에 넣지 않습니다.
+분할 매수 총예산을 입력하고 전략 가격을 불러오면 내 수량·평단으로 계산합니다.
+익절은 내 예상 평단에 전략의 익절 비율을 적용한 계산값입니다.
+매수·익절 회차는 직접 조정할 수 있습니다. 합계 비중이 100%를 넘으면 계산을 막습니다.
+기존 평단은 저장값을 사용하며 수수료는 새 매수·익절에만 적용합니다.
+수수료 입력값은 기존 계산기의 가정입니다. 실제 적용 수수료에 맞게 변경하세요.
+원화 외 마켓·미지정 거래소·미확보 가격을 다른 거래소나 원화 가격으로 채우지 않습니다.
+수량 0인 매도 완료 기록은 DB에 그대로 남습니다. 보유정보 수정이나 주문은 하지 않습니다.
+계산 입력은 조회 창이 열린 동안 유지되며, 페이지 새로고침·창 종료 시 저장되지 않습니다.
+결과 파일의 holdings_review는 연결 상태와 건수만 담고 보유자산별 금액은 담지 않습니다.
+보유 DB를 찾지 못하면 기존 설정을 확인하며 새 DB를 만들지 않습니다.
+명시적 경로가 필요하면 Python 실행 인자 --holdings-db "기존 보유 DB 경로"를 사용할 수 있습니다.
 실제 PC의 현재 누적과 화면 확인은 생성된 결과 및 실제 화면을 기준으로 판단합니다.
 최대 하락폭은 저장된 계좌 수치이며 체결 원장만으로 재현했다고 표시하지 않습니다.
 '''
@@ -112,7 +127,7 @@ def build(destination: Path) -> dict:
         raise ValueError('Commit tracked changes before building a versioned review package.')
     head = subprocess.check_output(['git','rev-parse','HEAD'], cwd=ROOT, text=True).strip()
     files = {Path('b3_trader') / name: (ROOT/'b3_trader'/name).read_bytes() for name in PYTHON_FILES}
-    pending = [PUBLIC/'modules/pages/paper-workbench.js']
+    pending = [PUBLIC/'modules/pages/paper-workbench.js', PUBLIC/'modules/pages/holdings-workbench.js']
     seen = set()
     while pending:
         path = pending.pop().resolve()
@@ -127,8 +142,9 @@ def build(destination: Path) -> dict:
             if not reference.startswith('.'):
                 raise ValueError(f'Nonlocal dependency: {reference}')
             pending.append(path.parent/reference.split('?', 1)[0])
-    css = Path('cloudflare-pages/public/modules/styles/strategy-workbench.css')
-    files[css] = (ROOT/css).read_bytes()
+    for name in ('strategy-workbench.css','holdings-workbench.css'):
+        css = Path('cloudflare-pages/public/modules/styles')/name
+        files[css] = (ROOT/css).read_bytes()
     for name, mode, report, extra in (
             ('RUN_REVIEW.cmd', 'VIEWER', 'CRYPTO_B3_REVIEW_RESULT.json', '--open-browser'),
             ('RUN_CHECK.cmd', 'CHECK', 'CRYPTO_CHECK_RESULT.json', '--report-only')):

@@ -78,6 +78,13 @@ test('pending evidence remains distinct from a recorded zero and keeps full even
  assert.ok(box.querySelector('[data-continuity-key^="event-prices"]').textContent.includes('105원'));
  assert.ok(!box.querySelector('.reaction-table').textContent.includes('+5%'));
 });
+test('actual-holding ledger navigation explicitly opens its strategy even from an event tab',async()=>{
+ click('[data-section="events"]');page.openAccount('bithumb','KRW-B3','aggressive');await flush();
+ assert.equal(state.ui.paperMarket,'KRW-B3');assert.equal(state.ui.paperLabStyle,'aggressive');
+ assert.equal(shadow().querySelector('[data-section][aria-current="page"]').dataset.section,'strategy');
+ assert.equal(shadow().querySelector('[role="tab"][aria-selected="true"]').dataset.experiment,'bithumb|aggressive|v1');
+ assert.equal(requests.at(-1).searchParams.get('experiment'),'bithumb|aggressive|v1');
+});
 test('theme changes reach the isolated coin view; standalone review has no unsupported aggregate routes',async()=>{
  const {applyTheme}=await import('../public/modules/shared/theme.js');
  applyTheme('dark');assert.equal(shadow().host.dataset.theme,'dark');

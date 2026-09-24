@@ -175,5 +175,6 @@ export function createPaperWorkbench({store, allowOverview=true}) {
     if(event.target.id==='event-picker'){selectedEvent=event.target.value;renderEvents();}
   }
   return {mount(node){root=node;document.addEventListener('viewer-theme-change',syncTheme);unsub=store.subscribe((_,meta)=>{if(['snapshot','snapshot-live'].includes(meta.type)&&!legacy) {pickMarket();renderHeading();void loadDetail();}});},render,
+    openAccount(exchange,market,style){selected='';section='strategy';detail=null;journal=null;currentRevision='';selectedEvent='';calculatorOpen=false;store.setUi({paperExchange:exchange,paperMarket:market,paperLabStyle:style},{scope:'paper-workbench'});render();},
     destroy(){requestId++;journalId++;document.removeEventListener('viewer-theme-change',syncTheme);unsub?.();legacy?.destroy();root=null;view=null;}};
 }
