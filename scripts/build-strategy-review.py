@@ -138,7 +138,10 @@ def build(destination: Path) -> dict:
         seen.add(path)
         content = path.read_text(encoding='utf-8')
         files[path.relative_to(ROOT)] = content.encode('utf-8')
-        for reference in re.findall(r"(?:from\s*|import\s*)['\"]([^'\"]+)['\"]", content):
+        # Match static module declarations, not HTML class names ending in
+        # "-import" inside a template string.
+        pattern = r"(?:^|;)\s*(?:import\s*(?:[^'\";]+?\s*from\s*)?|export\s+[^'\";]+?\s*from\s*)['\"]([^'\"]+)['\"]"
+        for reference in re.findall(pattern, content, re.MULTILINE):
             if not reference.startswith('.'):
                 raise ValueError(f'Nonlocal dependency: {reference}')
             pending.append(path.parent/reference.split('?', 1)[0])
