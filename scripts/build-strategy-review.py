@@ -15,7 +15,7 @@ PYTHON_FILES = (
     '__init__.py', 'paper_constants.py', 'strategy_journal_review.py',
     'strategy_lab_market.py', 'strategy_lab_context.py', 'strategy_lab_journal.py',
     'strategy_lab_plan.py', 'strategy_lab_rules.py',
-    'event_reaction_view.py', 'event_response_contract.py',
+    'event_reaction_view.py', 'event_response_contract.py', 'event_price_archive.py',
     'runtime_review.py', 'runtime_process_contract.py',
 )
 LAUNCHER = r'''@echo off
@@ -76,6 +76,8 @@ Python 3.10 이상을 사용합니다. 기존 프로젝트의 Python 또는 PC�
 코인 선택 → 전략 탭 → 독립 계좌 → 가격·체결 → 전체 체결 원장 → 현재 계획 → 계획으로 계산
 BTC·ETH 탭은 동일 시각의 저장된 종가를 비교합니다.
 이벤트 탭에서 발표를 선택하면 코인·BTC·ETH 반응을 같은 기간으로 비교합니다.
+반응 계산 전 보존된 가격도 표시합니다. 기다리는 구간·미확보 가격·계산 대기를 구분합니다.
+반응 수익률은 실제 저장이 끝난 값만 표시하며 조회 화면에서 만들어 채우지 않습니다.
 과거 같은 이벤트의 반응과 실제 계산 가격·시각은 펼쳐서 확인합니다.
 오래된 가격·계좌는 갱신 지연으로 표시합니다. 빈 기록을 0%로 바꾸지 않습니다.
 

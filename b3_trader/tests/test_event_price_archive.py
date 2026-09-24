@@ -50,7 +50,7 @@ def test_pruning_before_first_reaction_preserves_all_horizons_and_view_values(tm
     assert result['samples_inserted'] == 12
     assert result['archived_baseline_used'] == result['archived_target_used'] == 12
     assert result['missing_baseline'] == result['missing_target'] == 0
-    view = read_event_context(conn,'bithumb','KRW-B3')[0]
+    view = read_event_context(conn,'bithumb','KRW-B3',now=187300)[0]
     for point, _ in archive.HORIZONS:
         response = view['responses'][point]
         assert response['coin'] == pytest.approx(10)

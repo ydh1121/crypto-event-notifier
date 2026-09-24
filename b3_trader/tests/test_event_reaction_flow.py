@@ -95,8 +95,13 @@ def test_revised_event_clock_does_not_rewrite_or_mix_saved_horizons(tmp_path):
     assert result['ok'] is False and result['anchor_conflicts']>0
     assert tuple(conn.execute('SELECT * FROM research_intelligence_event_responses').fetchone())==before
     assert conn.execute('SELECT COUNT(*) FROM research_intelligence_event_responses').fetchone()[0]==1
-    shown=read_event_context(conn,'bithumb','KRW-B3')[0]
+    views=read_event_context(conn,'bithumb','KRW-B3',now=404000)
+    shown=next(e for e in views if e['event_ts']==400000)
     assert shown['event_ts']==400000 and shown['source_ts']==400010 and shown['anchor_changed']
+    revised=next(e for e in views if e['event_ts']==400010)
+    assert revised['responses']['15m']['coin'] is None and revised['anchor_conflict']
+    assert revised['price_progress']['coin']['1h']['status']=='invalid_response'
+    assert revised['price_progress']['coin']['1h']['target']['price']==120
     conn.close()
 
 

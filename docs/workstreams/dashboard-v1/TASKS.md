@@ -2,10 +2,23 @@
 
 ## Successor CURRENT — CRYPTO-WO-20260921-RECOVERY-001
 
-**Status: COLLECTION_RESTART_OBSERVED_OLD_PACKAGE. September 24 recovery ran c5ffd52 again; collection progressed but 4af291d event-price preservation is still unapplied. V22 remains rejected.**
+**Status: EVENT_PRICE_PRESERVATION_APPLIED. Actual PC runs 4af291d and preserved-price writes are observed. Read-only coin/event Viewer now includes partial stored prices; actual screen acceptance remains pending. V22 remains rejected.**
 This block supersedes older visual-acceptance and BLOCKED_LOCAL_EVIDENCE checkpoints below.
 
-### Latest actual recovery evidence — 2026-09-24 01:45–01:46 UTC / 10:45–10:46 KST
+### Latest actual application and event-view continuation — 2026-09-24
+
+- Attachment `CRYPTO_RECOVERY_RESULT(2).json`: 42,165 bytes, SHA256 `76e61f0408e2c815ef518dede2c44c7306ddd0cf75ee678e6d93f1eb54a18b80`, read locally only. Actual PC moved from `c5ffd52` to `4af291dd9b0a3266959cfc1b15ee0309f07daa8f` on `recovery/paper-20260924-110445-3a82105c`.
+- Verified pre-activation backup `20260924-110445-3a82105c/auto_demo.sqlite3`: 3,081,179,136 bytes, integrity OK; research accounts 775 / fills 24,508 / feedback 11,832; lab accounts 4,650 / trades 7,471 / metrics 12; intelligence events 73 / stored horizon responses 176. These are backup-time counts; no event-price table existed then.
+- Actual observation 11:05:19–11:08:22 KST: PAPER, memory, lab account/metrics, all four exchange/BTC/ETH flow streams, OHLCV and event receipts advanced. New event-price table became readable, latest archive 11:05:21 KST; intelligence reported 1,376 preserved-price writes. This verifies initial archive accumulation, not complete reaction coverage or subsequent uninterrupted uptime.
+- OHLCV recovered after two lock deferrals: collected 16 markets / 422 writes, consecutive deferrals 0. Notices recovered after one deferral. Runtime owner checks now match for host/research/PAPER/flow/forward; each host role started once with no current exit. Historical crash-string matches in old logs are not a new failure.
+- Latest intelligence run: 775 exchange/markets, 3 events, due 8,359 / future 775 / already captured 166 / missing baseline 8,047 / missing target 312; inserted 0, source and response failures 0, archive baseline/target usage 0. These are event×market×horizon attempts. Response timestamp remains 11:01:03 KST. A three-minute observation does not establish later archive consumption; missing outage-era prices remain missing.
+- B3/aggressive still has six reconciled fills / three closes / two wins, zero holdings and PAPER realized +348,855.81 KRW. Its source/account clocks advanced. No additional B3 fill or strategy-superiority claim.
+- Implemented the next read-only slice: `event_reaction_view.py` now joins completed reactions and archived partial prices for the selected coin plus same-exchange BTC/ETH. Bounded archive candidates use at most 80 metadata IDs and exact event/clock/source/type/provider/market keys. Revised clocks remain separate; conflicts cannot borrow old anchors. Saved reactions keep their own prices. Pending points reuse strict archive validation; no reaction is calculated or written by the view.
+- Event UI displays stored prices before the first completed reaction and distinguishes waiting, missing baseline/target, calculation pending and invalid records. Saved 0% remains distinct from missing. Same-event BTC/ETH samples are visible while missing coin returns stay null. Full event identity and selections/open details/focus survive polling, including unchanged account revisions. No CSS layer or collector/PAPER rule change.
+- Verification: 33 affected Python tests + 14 JS/API/DOM tests passed; TypeScript and changed-module syntax/compilation passed. Read-only HTTP returns actual fixture archive prices, rejects mutation, preserves DB hash. Latest-20 event projection fits the existing transport budget; completed prices are not duplicated. Tests use temporary fixtures; actual PC event rows and browser visual acceptance still require the new read-only Viewer. Existing localhost-browser policy limitation remains; no bypass attempted.
+- Delivery is an updated version-labelled `CRYPTO_STRATEGY_REVIEW_<commit>.zip`. Run its `RUN_REVIEW.cmd` while retaining the verified collection session. No new recovery package or collector restart is needed for this Viewer change. Package extraction verification follows the pinned commit.
+
+### Earlier actual recovery evidence — 2026-09-24 01:45–01:46 UTC / 10:45–10:46 KST
 
 - Attachment `CRYPTO_RECOVERY_RESULT(1).json`: 32,287 bytes, SHA256 `935624e1404f2934acdc4201090d2a9a7f7fc2d24ea5e3b20078b0e0999f2699`; read locally only. Actual source receipt: original `56b9361` on the primary branch → pinned `c5ffd52423a4a8bcfbb109fce5829f401322087f` on `recovery/paper-20260924-104520-7f48fa08`. This old recovery package does not prove `4af291d` application. The intervening return to the primary branch is not explained.
 - Consistent backup `20260924-104520-7f48fa08/auto_demo.sqlite3`: 3,081,179,136 bytes, `quick_check=ok`; counts: research accounts 775, fills 24,502, feedback 11,830, Strategy Lab accounts 4,650, trades 7,466, metrics 12. Compared with the September 23 verified backup: +1,368 research fills, +652 feedback rows, +459 lab trades. This older helper has no event backup counts.
@@ -112,10 +125,10 @@ This block supersedes older visual-acceptance and BLOCKED_LOCAL_EVIDENCE checkpo
 
 ### Exact next action
 
-1. Latest September 24 report ran old `c5ffd52`. Use `CRYPTO_PAPER_RECOVERY_4af291d.zip`, extracted outside the checkout into its own new folder. If the old recovery window is active, Ctrl+C there and wait for that session to end first. Do not close arbitrary processes or change Git under live collectors. New helper checks stopped state, clean compatible Git, disk capacity and SQLite backup before source activation.
-2. Inspect the new folder's result: `source.pinned_commit` must be `4af291dd9b0a3266959cfc1b15ee0309f07daa8f`, with backup event counts, owners, event_prices activity and preserved-price usage. If startup blocks on remaining/unknown processes, use its evidence rather than force termination. Future horizons need time and an actual event; prior outages remain missing.
-3. Read-only review at 39c2740 remains available. Next product work: actual selected-coin event/benchmark evidence and visual acceptance, then real-holdings planning. Do not repeat the confirmed B3 six-fill reconciliation or create another general checker.
-4. No Production deployment, primary merge, real order, strategy/PAPER rule change, holdings mutation or destructive DB operation. Additive price preservation runs only after verified backup and source activation.
+1. Keep the verified `4af291d` collection session open. Do not rerun recovery or switch its checkout merely to view the new event screen.
+2. Open the new version-labelled strategy review package outside the checkout and run `RUN_REVIEW.cmd`. If an older review window owns port 8766, close only that review session first. The new Viewer reads the existing DB and displays coin/strategy account, ledger, BTC/ETH and event prices without changing the DB or Git.
+3. Inspect actual selected-coin event evidence and visual behavior from this Viewer/result. Verify eventual preserved-price use when a suitable event/horizon exists; do not fill prior outages or infer all-market completeness from global counters. Then continue real-holdings planning using its separate canonical journal and existing fee logic.
+4. No Production deployment, primary merge, real order, strategy/PAPER rule change, holdings mutation or destructive DB operation. V22 remains rejected.
 
 
 ## A. Continuity and permanent rules

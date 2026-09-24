@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {JSDOM} from 'jsdom';
 import {createPaperWorkbench} from '../public/modules/pages/paper-workbench.js';
+import {eventsHtml,eventKey} from '../public/modules/shared/event-workbench-view.js';
 const dom=new JSDOM('<div id="root"></div>',{url:'http://127.0.0.1:8766/',pretendToBeVisual:true});
 for(const key of ['window','document','HTMLElement','HTMLInputElement','HTMLTextAreaElement','Node','Element','Document','DocumentFragment','Event'])globalThis[key]=dom.window[key];
 globalThis.CSS={escape:value=>String(value)};globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);window.scrollTo=()=>{};
@@ -11,9 +12,9 @@ const acc=(style,ex='bithumb')=>({experiment_id:`${ex}|${style}|v1`,style,label:
 const state={snapshot:{public:{exchanges:{bithumb:{leaderboard:[{market:'KRW-B3',symbol:'B3',price:100,signal_ts:clock/1000},{market:'KRW-DEXE',symbol:'DEXE',price:200,signal_ts:clock/1000}]},upbit:{leaderboard:[{market:'KRW-B3',symbol:'B3',price:101,signal_ts:clock/1000}]}}}},ui:{paperExchange:'bithumb',paperMarket:'KRW-B3',paperLabStyle:'aggressive'}};
 const listeners=new Set();const store={get:()=>state,setUi(p){Object.assign(state.ui,p)},subscribe(fn){listeners.add(fn);return()=>listeners.delete(fn)}};
 const requests=[];
-let addNewEvent=false;
+let addNewEvent=false,archivedTarget=null;
 const eventAnchor=clock/1000-7*86400;
-const eventRows=market=>(addNewEvent?['new','recent','old']:['recent','old']).map(id=>({event_id:id,event_ts:eventAnchor+({old:0,recent:86400,new:172800})[id],title:`${id} 발표`,market,source_url:`https://example.com/${id}`,responses:{'15m':{coin:2,btc:1,eth:null,vs_btc_pp:1,vs_eth_pp:null,observations:{coin:{baseline_price:100,baseline_trade_ts:clock/1000-901,target_price:102,target_trade_ts:clock/1000}}}},history:{'15m':{samples:3,positive_samples:2,mean_pct:1.2,median_pct:1}}}));
+const eventRows=market=>(addNewEvent?['new','recent','old']:['recent','old']).map(id=>({event_id:id,event_ts:eventAnchor+({old:0,recent:86400,new:172800})[id],title:`${id} 발표`,market,source_url:`https://example.com/${id}`,responses:{'15m':{coin:2,btc:1,eth:null,vs_btc_pp:1,vs_eth_pp:null,observations:{coin:{baseline_price:100,baseline_trade_ts:clock/1000-901,target_price:102,target_trade_ts:clock/1000}}}},price_progress:{coin:{'1h':{status:archivedTarget?'awaiting_capture':'missing_target',baseline:{price:100,trade_ts:clock/1000-3601,origin:'response'},target:archivedTarget}}},history:{'15m':{samples:3,positive_samples:2,mean_pct:1.2,median_pct:1}}}));
 globalThis.fetch=async path=>{const u=new URL(path,'http://127.0.0.1:8766'),ex=u.searchParams.get('exchange'),market=u.searchParams.get('market');requests.push(u);
  const accounts=['aggressive','balanced'].map(s=>acc(s,ex));let body;
  if(u.searchParams.has('experiment')) {const account=accounts.find(a=>a.experiment_id===u.searchParams.get('experiment'));body={exchange:ex,market,journal:{account,trades:[],revision:account.revision,total:0,offset:0,limit:30,next_offset:null}};}
@@ -52,13 +53,30 @@ test('event selection joins reaction, historical sample and evidence without pol
  const oldKey=select.options[1].value;select.value=oldKey;select.dispatchEvent(new window.Event('change',{bubbles:true}));
  assert.equal(shadow().querySelector('.event-detail h3').textContent,'old 발표');
  const details=shadow().querySelector('[data-continuity-key^="event-history"]');details.open=true;
+ const prices=shadow().querySelector('[data-continuity-key^="event-prices"]');prices.open=true;shadow().getElementById('event-picker').focus();
  assert.ok(details.textContent.includes('2/3회'));assert.ok(shadow().querySelector('.reaction-table').textContent.includes('—'));
- addNewEvent=true;clock+=21000;revision++;for(const fn of listeners)fn(state,{type:'snapshot-live'});await flush();
+ addNewEvent=true;archivedTarget={price:107,trade_ts:clock/1000,origin:'archive'};clock+=21000;for(const fn of listeners)fn(state,{type:'snapshot-live'});await flush();
  assert.equal(shadow().getElementById('event-picker').value,oldKey);
  assert.equal(shadow().getElementById('event-picker').options.length,3);
  assert.equal(shadow().querySelector('[data-continuity-key^="event-history"]').open,true);
+ assert.equal(shadow().querySelector('[data-continuity-key^="event-prices"]').open,true);
+ assert.equal(shadow().activeElement,shadow().getElementById('event-picker'));
+ assert.ok(shadow().querySelector('.reaction-table').textContent.includes('계산 대기'));
+ assert.ok(shadow().querySelector('[data-continuity-key^="event-prices"]').textContent.includes('107원'));
  assert.equal(shadow().querySelector('.event-meta a').href,'https://example.com/old');
  click('[data-section="strategy"]');await flush();
+});
+test('pending evidence remains distinct from a recorded zero and keeps full event identity',()=>{
+ const e={event_id:'same|release',event_ts:100000,source_id:'source-a',event_type:'TYPE',title:'발표',market:'KRW-DEXE',responses:{'15m':{coin:null,btc:0,eth:null,vs_btc_pp:null,vs_eth_pp:null}},price_progress:{coin:{'15m':{status:'awaiting_capture',baseline:{price:100,trade_ts:99999,origin:'archive'},target:{price:105,trade_ts:100901,origin:'archive'}},'1h':{status:'before_horizon'},'4h':{status:'missing_baseline'},'1d':{status:'invalid_response'}},eth:{'15m':{status:'missing_target'}}}};
+ const other={...e,source_id:'source-b'};assert.notEqual(eventKey(e),eventKey(other));
+ const box=document.createElement('div');box.innerHTML=eventsHtml([e,other],eventKey(e));
+ assert.equal(box.querySelector('.reaction-table th:nth-child(2)').textContent,'DEXE');
+ const first=box.querySelector('.reaction-table tbody tr');
+ assert.equal(first.children[1].textContent,'계산 대기');assert.equal(first.children[2].textContent,'0%');
+ assert.equal(first.children[3].textContent,'이후 가격 미확보');assert.equal(first.children[4].textContent,'—');
+ assert.ok(box.textContent.includes('대기 중'));assert.ok(box.textContent.includes('기준가 미확보'));assert.ok(box.textContent.includes('확인 필요'));
+ assert.ok(box.querySelector('[data-continuity-key^="event-prices"]').textContent.includes('105원'));
+ assert.ok(!box.querySelector('.reaction-table').textContent.includes('+5%'));
 });
 test('theme changes reach the isolated coin view; standalone review has no unsupported aggregate routes',async()=>{
  const {applyTheme}=await import('../public/modules/shared/theme.js');
