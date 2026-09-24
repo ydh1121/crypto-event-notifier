@@ -2,10 +2,20 @@
 
 ## Successor CURRENT — CRYPTO-WO-20260921-RECOVERY-001
 
-**Status: COLLECTION_AND_REACTION_PROGRESS_OBSERVED. User now reports the server stopped; event-price preservation source is ready for backup-first application. V22 remains rejected.**
+**Status: COLLECTION_RESTART_OBSERVED_OLD_PACKAGE. September 24 recovery ran c5ffd52 again; collection progressed but 4af291d event-price preservation is still unapplied. V22 remains rejected.**
 This block supersedes older visual-acceptance and BLOCKED_LOCAL_EVIDENCE checkpoints below.
 
-### Latest actual continuation evidence — 2026-09-23 15:54 UTC / September 24 00:54 KST
+### Latest actual recovery evidence — 2026-09-24 01:45–01:46 UTC / 10:45–10:46 KST
+
+- Attachment `CRYPTO_RECOVERY_RESULT(1).json`: 32,287 bytes, SHA256 `935624e1404f2934acdc4201090d2a9a7f7fc2d24ea5e3b20078b0e0999f2699`; read locally only. Actual source receipt: original `56b9361` on the primary branch → pinned `c5ffd52423a4a8bcfbb109fce5829f401322087f` on `recovery/paper-20260924-104520-7f48fa08`. This old recovery package does not prove `4af291d` application. The intervening return to the primary branch is not explained.
+- Consistent backup `20260924-104520-7f48fa08/auto_demo.sqlite3`: 3,081,179,136 bytes, `quick_check=ok`; counts: research accounts 775, fills 24,502, feedback 11,830, Strategy Lab accounts 4,650, trades 7,466, metrics 12. Compared with the September 23 verified backup: +1,368 research fills, +652 feedback rows, +459 lab trades. This older helper has no event backup counts.
+- Observation 01:45:53.664 → 01:46:54.309 UTC: PAPER, market memory, lab account clock, all four exchange/BTC/ETH flow clocks, event receipts and reaction captures advanced. Latest event/reaction receipt: 01:45:55.433 UTC. Missing count/coin/horizon breakdown prevents claiming B3 or full reaction coverage. OHLCV receipt stayed at 01:39:24.987 UTC during this minute; old helper lacks per-cycle results, so a healthy badge does not prove a new write.
+- After-start inventory shows recovery plus forward/market_flow/research/paper launcher-child pairs; each host child started once and was running at capture. Old reviewer labels native Windows venv children unresolved and owner checks false; known lineage/creation-clock fixes are in the unapplied package. Historical log matches/pre-start stale status do not establish a new collector failure.
+- Bithumb/B3/aggressive still reconciles six fills, three closes, two wins, zero position, cash/equity 10,348,855.81 KRW and cumulative PAPER realized +348,855.81 KRW. No new B3 fill; three closes do not establish strategy superiority. Account/source clocks advanced; fill-only replay cannot reproduce drawdown.
+- Delivery renamed `CRYPTO_PAPER_RECOVERY_4af291d.zip`: unchanged verified 18-file/37,520-byte package, SHA256 `b044679eb996d88d9d71c51ba0dff5d55f6a84e7e0a7ae3f8d3660aaf204ee64`, internal folder `CRYPTO_PAPER_RECOVERY_4af291dd9b0a`. Filename, folder, launcher title and manifest identify the same source. Full manifest rechecked; no rebuild or repeated tests. Durable file identity/version preserved.
+- If the old recovery session remains active, Ctrl+C in that session and wait for termination before launching the new folder. Never kill arbitrary Python processes or switch Git under active collectors. New helper checks stopped state and backup; unresolved children block activation. Keep the new session open, then inspect its new result.
+
+### Earlier actual continuation evidence — 2026-09-23 15:54 UTC / September 24 00:54 KST
 
 - Verified schema-2 input `CRYPTO_CHECK_RESULT.json`, 47,265 bytes, SHA256 `e0adb5c74ac30f2a47c46dd8d7aa6fbc16de181b2f5cfdf856f0c8f3079b3575`; reviewer source 39c2740 with matching package hashes. Read locally only. Two observations completed 15:54:00–15:54:33 UTC. Canonical DB file remains 3,081,179,136 bytes; file size alone is not an accumulation measure.
 - Same collector PIDs/creation times as the 11:12 report were observed about 4h42m later, with one start per owned role. Host ownership now verifies. PAPER/memory and all four sampled BTC/ETH trade streams advanced across T0/T1. B3 source memory advanced to 3630772, account/source times to 15:51:42/15:51:06 UTC; all six fills still reconcile with cumulative PAPER realized +348,855.8087190897 KRW. No extra B3 trade is required for a successful scan.
@@ -102,10 +112,10 @@ This block supersedes older visual-acceptance and BLOCKED_LOCAL_EVIDENCE checkpo
 
 ### Exact next action
 
-1. User reports the server is now off. When resuming collection, use the new version-labelled `CRYPTO_PAPER_RECOVERY.zip` folder and `RUN_RECOVERY.cmd`. The helper must freshly confirm no active/unresolved collectors, clean compatible Git, disk capacity and verified SQLite backup before switching to the pinned source. Do not kill discovered processes or assume closing the web app stopped collectors.
-2. Inspect the resulting `CRYPTO_RECOVERY_RESULT.json`: actual source/backup event counts, process owners, new event_prices activity and preserved-price usage in reaction outcomes. Future horizons require time and an actual event; a minute without new reactions is not failure. Do not fabricate prices from prior outages.
-3. Read-only review remains available at 39c2740 for the existing coin workspace. Next product work is actual selected-coin event/benchmark evidence and visual acceptance, then real-holdings planning. No need to repeat the now-verified B3 six-fill reconciliation or create another general-purpose checker.
-4. No Production deployment, primary merge, real order, strategy/PAPER rule change, holdings mutation or destructive DB operation. New additive price preservation must only run on the PC after the verified backup transition.
+1. Latest September 24 report ran old `c5ffd52`. Use `CRYPTO_PAPER_RECOVERY_4af291d.zip`, extracted outside the checkout into its own new folder. If the old recovery window is active, Ctrl+C there and wait for that session to end first. Do not close arbitrary processes or change Git under live collectors. New helper checks stopped state, clean compatible Git, disk capacity and SQLite backup before source activation.
+2. Inspect the new folder's result: `source.pinned_commit` must be `4af291dd9b0a3266959cfc1b15ee0309f07daa8f`, with backup event counts, owners, event_prices activity and preserved-price usage. If startup blocks on remaining/unknown processes, use its evidence rather than force termination. Future horizons need time and an actual event; prior outages remain missing.
+3. Read-only review at 39c2740 remains available. Next product work: actual selected-coin event/benchmark evidence and visual acceptance, then real-holdings planning. Do not repeat the confirmed B3 six-fill reconciliation or create another general checker.
+4. No Production deployment, primary merge, real order, strategy/PAPER rule change, holdings mutation or destructive DB operation. Additive price preservation runs only after verified backup and source activation.
 
 
 ## Current phase
