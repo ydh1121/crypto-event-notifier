@@ -44,7 +44,8 @@ await refresh(true);setInterval(()=>refresh(),10000);
 """
 
 
-def read_state(path: Path, holdings_path: Path | None = None, quotes: HoldingQuotes | None = None) -> dict:
+def read_state(path: Path, holdings_path: Path | None = None, quotes: HoldingQuotes | None = None,
+               confirmed_exchange: str | None = None) -> dict:
     conn = sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True, timeout=10)
     conn.row_factory = sqlite3.Row
     try:
@@ -57,7 +58,7 @@ def read_state(path: Path, holdings_path: Path | None = None, quotes: HoldingQuo
             if row['exchange'] in exchanges:
                 exchanges[row['exchange']]['leaderboard'].append(row)
         extra, quote_status = quotes.snapshot() if quotes else ([], {"status": "not_requested"})
-        holdings = read_holdings(holdings_path, [dict(r) for r in rows] + extra)
+        holdings = read_holdings(holdings_path, [dict(r) for r in rows] + extra, confirmed_exchange=confirmed_exchange)
         holdings['public_quotes'] = quote_status
         return {"public": {"exchanges": exchanges}, "private_visible": False, "local_holdings": holdings}
     finally:
@@ -83,7 +84,8 @@ def review_journal(detail: dict, experiment: str, revision: str, offset: int, li
         "offset": offset, "limit": limit, "next_offset": offset+len(trades) if offset+len(trades)<journal['total'] else None}}
 
 
-def handler(path: Path, *, fixture: bool = False, holdings_path: Path | None = None, quotes=None):
+def handler(path: Path, *, fixture: bool = False, holdings_path: Path | None = None, quotes=None,
+            confirmed_exchange: str | None = None):
     quotes = quotes if quotes is not None else HoldingQuotes()
     class ReviewHandler(BaseHTTPRequestHandler):
         def log_message(self, *_): pass
@@ -108,10 +110,10 @@ def handler(path: Path, *, fixture: bool = False, holdings_path: Path | None = N
             try:
                 if url.path=='/': return self.send(200,INDEX.replace('로컬 DB 조회 전용', '테스트 데이터 · 실제 계좌 아님') if fixture else INDEX,'text/html; charset=utf-8')
                 if url.path=='/review.js': return self.send(200,SCRIPT,'text/javascript; charset=utf-8')
-                if url.path=='/api/review-state': return self.send(200,read_state(path,holdings_path,quotes))
+                if url.path=='/api/review-state': return self.send(200,read_state(path,holdings_path,quotes,confirmed_exchange))
                 if url.path=='/api/holding-quotes':
                     if fixture: return self.send(409,{'error':{'message':'테스트 데이터에서는 외부 가격을 조회하지 않습니다.'}})
-                    quotes.refresh(read_holdings(holdings_path,[])['holdings'])
+                    quotes.refresh(read_holdings(holdings_path,[],confirmed_exchange=confirmed_exchange)['holdings'])
                     return self.send(200,quotes.snapshot()[1])
                 if url.path=='/api/market-detail':
                     query=parse_qs(url.query); get=lambda key,default='':query.get(key,[default])[0]
@@ -208,6 +210,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--db',type=Path,required=True)
     parser.add_argument('--holdings-db',type=Path,help='Existing manual holdings journal; separate from PAPER')
+    parser.add_argument('--holdings-exchange',choices=['bithumb','upbit'],help='Explicit owner-confirmed exchange for this real-holdings portfolio; no DB write')
     parser.add_argument('--port',type=int,default=8766)
     parser.add_argument('--report',type=Path)
     parser.add_argument('--report-only',action='store_true',help='Save both observations and exit without a browser or server')
@@ -235,7 +238,7 @@ def main():
     server = None
     if not args.report_only:
         try:
-            server=ThreadingHTTPServer(('127.0.0.1',args.port),handler(args.db,fixture=args.fixture,holdings_path=args.holdings_db))
+            server=ThreadingHTTPServer(('127.0.0.1',args.port),handler(args.db,fixture=args.fixture,holdings_path=args.holdings_db,confirmed_exchange=args.holdings_exchange))
         except OSError:
             parser.error('Review port is in use. Use RUN_CHECK.cmd to check without opening a viewer.')
     try:
@@ -252,7 +255,7 @@ def run_review(args, build, server):
     exp=next((e for e in sample['data']['strategy_lab']['experiments'] if e['style']=='aggressive'),None)
     observation_stop = threading.Event()
     if args.report:
-        holdings = read_holdings(args.holdings_db, [])
+        holdings = read_holdings(args.holdings_db, [],confirmed_exchange=args.holdings_exchange)
         events=sample['data']['strategy_lab'].get('events',[])
         event_market='KRW-B3'
         if not events:
@@ -263,11 +266,13 @@ def run_review(args, build, server):
                 'mode':'read_only','scope':'bithumb|KRW-B3|aggressive','account':exp,
                 'event_review':{'exchange':'bithumb','market':event_market,'events':events[:1]},
                 'holdings_review':{'status':holdings['status'],'path_source':args.holdings_source,
+                    'confirmed_exchange':args.holdings_exchange,
                     'db_path':str(args.holdings_db) if args.holdings_db else None,
                     'holding_count':holdings.get('holding_count'),'closed_count':holdings.get('closed_count'),
                     'identity_complete_count':sum(1 for h in holdings['holdings'] if not h['closed'] and h['exchange'] and h['api_market']),
                     'krw_planning_count':sum(1 for h in holdings['holdings'] if h['planning_available']),
                     'unknown_exchange_count':sum(1 for h in holdings['holdings'] if not h['closed'] and not h['exchange']),
+                    'stored_unknown_exchange_count':sum(1 for h in holdings['holdings'] if not h['closed'] and not h['stored_exchange']),
                     'non_krw_count':sum(1 for h in holdings['holdings'] if not h['closed'] and h['quote_currency'] != 'KRW')},
                 'runtime_review':{'status':'waiting_for_second_observation','before':read_runtime(args.db)},
                 'limitations':['Stored drawdown is not fill-only replay.','No runner was started.','No remote publication.']}

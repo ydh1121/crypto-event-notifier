@@ -13,7 +13,9 @@ export function holdingsShell() {
 }
 export function priceRefreshHtml(data,{available=false,busy=false,error=''}={}) {
   if(!available)return '<span>실제 보유자산</span>';
-  const state=data?.public_quotes,status=error||({loading:'가격 조회 중…',partial:'일부 가격 조회 실패 · 기존 가격 유지',complete:state?.requested?'거래소 가격 반영':'조회할 거래소가 지정되지 않았습니다.'})[state?.status]||'';
+  const state=data?.public_quotes,reason=state?.failures?.[0]?.reason;
+  const failure=({timeout:'가격 조회 시간 초과',tls_error:'거래소 보안 연결 실패',connection:'거래소 연결 실패',rate_limit:'조회 요청 제한',http_error:'일부 마켓 조회 실패',incomplete:'일부 가격 미확보',invalid_response:'시세 응답 확인 필요'})[reason]||'일부 가격 조회 실패';
+  const status=error||({loading:'가격 조회 중…',partial:`${failure} · 확보된 시세 유지`,complete:state?.requested?'거래소 가격 반영':'조회할 거래소가 지정되지 않았습니다.'})[state?.status]||'';
   return `<button data-action="refresh-prices" ${busy?'disabled':''}>${busy?'가격 조회 중…':'현재가 새로고침'}</button><span class="subtle" role="status">${esc(status)}</span>`;
 }
 export function holdingsSummaryHtml(data) {
@@ -28,8 +30,11 @@ export function holdingsListHtml(data,selected) {
   return `<div class="holdings-list">${rows.map(h=>`<button data-holding="${esc(h.key)}" aria-pressed="${h.key===selected}"><span><b>${esc(h.symbol)}</b><small>${exchangeLabel(h.exchange)} · ${esc(h.quote_currency||'통화 미확인')}</small></span><span><b>${h.quote_currency==='KRW'?quote(h.value_quote,'KRW'):won(h.value_krw)}</b><small class="${color(h.unrealized_pnl_pct)}">${percent(h.unrealized_pnl_pct)}${h.quote_currency==='BTC'?' · BTC 기준':''}</small></span></button>`).join('')}</div>${data.closed_count?`<p class="subtle">매도 완료 ${data.closed_count}개</p>`:''}`;
 }
 export function holdingHeaderHtml(h) {
-  return `<header class="coin-heading"><div><span>${exchangeLabel(h.exchange)} · ${esc(h.quote_currency||'통화 미확인')}</span><h2>${esc(h.symbol)}</h2></div><div class="coin-price"><b>${quote(h.current_price,h.quote_currency)}</b>${freshnessHtml({source_ts:h.price_ts})}</div></header>
-    <dl class="holding-position">${metric('보유수량',number(h.volume,8))}${metric('내 평단',quote(h.avg_price,h.quote_currency))}${metric('평가손익',quote(h.unrealized_pnl_quote,h.quote_currency),color(h.unrealized_pnl_quote))}</dl>${h.quote_currency==='BTC'?`<p class="holding-conversion">원화 환산 평가액 <b>${won(h.value_krw)}</b> · ${exchangeLabel(h.exchange)} BTC ${won(h.quote_to_krw)} · ${time(h.conversion_ts)} 기준${h.valuation_stale?' · 가격 갱신 지연':''}</p>`:''}`;
+  const btc=h.quote_currency==='BTC',direct=h.valuation_basis==='krw_market';
+  const price=btc?won(h.current_price_krw):quote(h.current_price,h.quote_currency);
+  const basis=direct?`${exchangeLabel(h.exchange)} 원화마켓 평가가`:'BTC마켓 원화 환산가';
+  return `<header class="coin-heading"><div><span>${exchangeLabel(h.exchange)} · ${esc(h.quote_currency||'통화 미확인')}</span><h2>${esc(h.symbol)}</h2></div><div class="coin-price"><b>${price}</b>${btc?`<small>${basis}</small>`:''}${freshnessHtml({source_ts:btc?h.valuation_ts:h.price_ts})}</div></header>
+    <dl class="holding-position">${metric('보유수량',number(h.volume,8))}${metric('내 평단',quote(h.avg_price,h.quote_currency))}${metric('평가손익',quote(h.unrealized_pnl_quote,h.quote_currency),color(h.unrealized_pnl_quote))}</dl>${btc?`<p class="holding-conversion">원화 평가액 <b>${won(h.value_krw)}</b> · BTC마켓 ${quote(h.current_price,'BTC')} (${time(h.price_ts)}${h.price_stale?' · 갱신 지연':''}) · BTC ${won(h.quote_to_krw)} (${time(h.conversion_ts)})${h.valuation_stale?' · 평가 시세 갱신 지연':''}</p>`:''}`;
 }
 export function holdingStrategiesHtml(accounts,selected,{loading=false,error='',holding=null}={}) {
   if(error)return `<p class="notice">${esc(error)}</p><button data-action="retry-strategies">다시 불러오기</button>`;

@@ -62,7 +62,10 @@ def _number(value):
         return None
 
 
-def read_holdings(path: Path | None, prices: list[dict], *, now: float | None = None) -> dict:
+def read_holdings(path: Path | None, prices: list[dict], *, now: float | None = None,
+                  confirmed_exchange: str | None = None) -> dict:
+    if confirmed_exchange not in {None, 'bithumb', 'upbit'}:
+        raise ValueError('Unsupported confirmed holdings exchange')
     now = time.time() if now is None else now
     result = {"status": "configuration_required", "observed_at": now, "holdings": []}
     if path is None:
@@ -100,6 +103,10 @@ def read_holdings(path: Path | None, prices: list[dict], *, now: float | None = 
         exchange = str(row["exchange"] or "").strip().lower()
         if exchange not in {"bithumb", "upbit"}:
             exchange = None
+        stored_exchange = exchange
+        # An explicit portfolio-level owner declaration, never a ticker fallback
+        # or a change to the persisted journal/PAPER exchange identities.
+        exchange = confirmed_exchange or stored_exchange
         try:
             quote, symbol, api_market = holding_quote_currency(market), holding_base_currency(market), holding_api_market(market)
         except ValueError:
@@ -117,15 +124,27 @@ def read_holdings(path: Path | None, prices: list[dict], *, now: float | None = 
         fx_row = quotes.get((exchange, "KRW-BTC"), {}) if quote == "BTC" else {}
         fx = 1 if quote == "KRW" else fx_row.get("price")
         fx_ts = source_ts if quote == "KRW" else fx_row.get("signal_ts")
-        value_krw = value * fx if value is not None and fx is not None else None
+        converted_price = price * fx if price is not None and fx is not None else None
+        valuation_ts = min(source_ts, fx_ts) if converted_price is not None else None
+        valuation_basis = 'quote_conversion' if quote == 'BTC' else 'native_krw'
+        # A held unit of ETH can also be valued at the SAME exchange's actual
+        # KRW-ETH quote. This is a separate valuation basis, never a fabricated
+        # BTC-ETH fill/return or a replacement for the stored BTC cost basis.
+        direct = quotes.get((exchange, f'KRW-{symbol}'), {}) if quote == 'BTC' else {}
+        if direct and (converted_price is None or (now - valuation_ts > 1200 and now - direct['signal_ts'] <= 1200)):
+            converted_price, valuation_ts = direct['price'], direct['signal_ts']
+            valuation_basis = 'krw_market'
+        value_krw = quantity * converted_price if valid and converted_price is not None else None
         items.append({"key": f"{exchange or 'unknown'}|{market}|{quote or 'unknown'}",
             "exchange": exchange, "market": market, "api_market": api_market, "quote_currency": quote, "symbol": symbol,
+            "stored_exchange": stored_exchange, "exchange_source": 'owner_confirmed' if confirmed_exchange else 'journal',
             "volume": quantity, "avg_price": average, "updated_ts": _number(row["updated_ts"]),
             "valid": valid, "closed": valid and quantity == 0, "current_price": price,
             "price_ts": source_ts, "price_stale": stale, "invested_quote": invested,
             "price_source": price_row.get("price_source", "local_signal"),
             "value_krw": value_krw, "quote_to_krw": fx, "conversion_ts": fx_ts,
-            "valuation_stale": stale or fx_ts is None or now - fx_ts > 1200,
+            "current_price_krw": converted_price, "valuation_ts": valuation_ts, "valuation_basis": valuation_basis,
+            "valuation_stale": valuation_ts is None or now - valuation_ts > 1200,
             "value_quote": value, "unrealized_pnl_quote": pnl,
             "unrealized_pnl_pct": pnl / invested * 100 if pnl is not None and invested else None,
             "planning_available": bool(valid and quantity > 0 and exchange and quote == "KRW")})
@@ -134,7 +153,7 @@ def read_holdings(path: Path | None, prices: list[dict], *, now: float | None = 
     complete = len(priced) == len(active)
     # Today's BTC/KRW rate is not the historical acquisition cost in KRW.
     pnl_complete = complete and all(h["quote_currency"] == "KRW" for h in active)
-    return {**result, "status": "read", "holdings": items, "holding_count": len(active),
+    return {**result, "status": "read", "holdings": items, "confirmed_exchange": confirmed_exchange, "holding_count": len(active),
         "closed_count": len(items) - len(active), "priced_count": len(priced),
         "valuation_complete": complete, "valuation_stale": any(h["valuation_stale"] for h in priced),
         "known_value_krw": sum(h["value_krw"] for h in priced),

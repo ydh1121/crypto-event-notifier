@@ -40,7 +40,9 @@ def test_separate_journal_uses_exact_exchange_and_quote_and_does_not_mutate(tmp_
     assert rows['KRW-UNKNOWN']['current_price'] is None
     assert rows['KRW-UNKNOWN']['planning_available'] is False
     assert result['holding_count']==3 and result['closed_count']==1
-    assert result['known_value_krw']==1200 and result['value_krw'] is None
+    assert rows['KRW-B3/BTC']['valuation_basis']=='krw_market'
+    assert rows['KRW-B3/BTC']['value_krw']==240
+    assert result['known_value_krw']==1440 and result['value_krw'] is None
     assert result['pnl_krw'] is None and result['valuation_complete'] is False
     assert hashlib.sha256(path.read_bytes()).hexdigest()==before
 
@@ -131,3 +133,21 @@ def test_holdings_path_cannot_alias_paper(tmp_path,monkeypatch):
     path=tmp_path/'paper.db';path.touch()
     monkeypatch.setattr(sys,'argv',['review','--db',str(path),'--holdings-db',str(path)])
     with pytest.raises(SystemExit):review.main()
+
+
+def test_owner_confirmed_exchange_applies_only_to_holdings_projection_without_changing_journal(tmp_path):
+    path=tmp_path/'holdings.db'
+    journal(path,[('KRW-B3',10,100,950,'upbit'),('KRW-UP',2,50,950,None),('KRW-DEXE',0,5,950,None)])
+    quotes=prices()+[dict(exchange='bithumb',market='KRW-UP',price=60,signal_ts=999)]
+    before=hashlib.sha256(path.read_bytes()).hexdigest()
+    original=read_holdings(path,quotes,now=1000)
+    assert original['holdings'][0]['exchange']=='upbit'
+    confirmed=read_holdings(path,quotes,now=1000,confirmed_exchange='bithumb')
+    active=[h for h in confirmed['holdings'] if not h['closed']]
+    assert all(h['exchange']=='bithumb' and h['exchange_source']=='owner_confirmed' for h in active)
+    assert confirmed['priced_count']==2 and confirmed['value_krw']==1320
+    assert confirmed['closed_count']==1
+    assert confirmed['holdings'][0]['stored_exchange']=='upbit'
+    assert all(h['planning_available'] for h in active)
+    assert hashlib.sha256(path.read_bytes()).hexdigest()==before
+    assert read_holdings(path,quotes,now=1000)==original

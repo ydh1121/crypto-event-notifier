@@ -9,9 +9,11 @@ import json
 from http.client import HTTPException
 import math
 import re
+import ssl
 import threading
 import time
 from urllib.parse import urlencode
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, HTTPRedirectHandler, build_opener
 
 ENDPOINTS = {"bithumb": "https://api.bithumb.com/v1/ticker",
@@ -50,6 +52,7 @@ def public_markets(holdings: list[dict]) -> dict[str, list[str]]:
         groups[exchange].add(market)
         if market.startswith("BTC-"):
             groups[exchange].add("KRW-BTC")
+            groups[exchange].add("KRW-" + market.split('-',1)[1])
     return {exchange: sorted(markets) for exchange, markets in groups.items() if markets}
 
 
@@ -98,21 +101,40 @@ class HoldingQuotes:
             self.last_attempt = time.monotonic()
             groups = public_markets(holdings)
             requested, received = sum(map(len, groups.values())), []
+            failures = []
             with self.lock:
                 self.state = {"status": "loading", "requested": requested, "received": 0}
-            for exchange, markets in groups.items():
-                try:
-                    received.extend(parse_tickers(exchange, markets, self.fetch(exchange, markets), time.time()))
-                except (OSError, ValueError, TypeError, HTTPException):
-                    # Retain old quotes with their original trade clocks. A failed
-                    # request must not turn a saved price into a fresh price or 0.
-                    continue
+            for exchange, all_markets in groups.items():
+                # An unsupported BTC pair must not fail a batch of valid KRW
+                # quotes, including the BTC conversion rate and ETH valuation.
+                for quote in ('KRW', 'BTC'):
+                    markets = [m for m in all_markets if m.startswith(quote+'-')]
+                    if not markets:
+                        continue
+                    try:
+                        parsed = parse_tickers(exchange, markets, self.fetch(exchange, markets), time.time())
+                        received.extend(parsed)
+                        if len(parsed) != len(markets):
+                            failures.append({'exchange':exchange,'quote':quote,'reason':'incomplete'})
+                    except HTTPError as exc:
+                        failures.append({'exchange':exchange,'quote':quote,'reason':'rate_limit' if exc.code in {418,429} else 'http_error','http_status':exc.code})
+                        if exc.code in {418,429}:
+                            break
+                    except (OSError, ValueError, TypeError, HTTPException) as exc:
+                        cause = exc.reason if isinstance(exc, URLError) else exc
+                        reason = 'tls_error' if isinstance(cause, ssl.SSLError) else 'timeout' if isinstance(cause, TimeoutError) else 'connection' if isinstance(exc,OSError) else 'invalid_response'
+                        failures.append({'exchange':exchange,'quote':quote,'reason':reason})
+                        if reason in {'connection','timeout','tls_error'}:
+                            break
+                    # Two groups per exchange; do not fan out or retry failures.
+                    if quote == 'KRW' and any(m.startswith('BTC-') for m in all_markets):
+                        time.sleep(.12)
             with self.lock:
                 for row in received:
                     key = row["exchange"], row["market"]
                     if row["signal_ts"] >= self.cache.get(key, {}).get("signal_ts", 0):
                         self.cache[key] = row
                 self.state = {"status": "complete" if len(received) == requested else "partial",
-                              "requested": requested, "received": len(received)}
+                              "requested": requested, "received": len(received), "failures": failures}
         finally:
             self.refresh_lock.release()

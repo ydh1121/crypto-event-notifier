@@ -48,7 +48,7 @@ def test_native_quote_converts_only_exact_exchange_and_keeps_pnl_in_btc(tmp_path
 
 def test_public_requests_contain_only_known_active_market_codes(tmp_path):
     path=tmp_path/'actual.db';holdings_db(path)
-    assert public_markets(read_holdings(path,[])['holdings'])=={'bithumb':['BTC-ETH','KRW-B3','KRW-BTC']}
+    assert public_markets(read_holdings(path,[])['holdings'])=={'bithumb':['BTC-ETH','KRW-B3','KRW-BTC','KRW-ETH']}
     assert public_markets([{'exchange':'bithumb','valid':True,'api_market':'https://bad.invalid'}])=={}
     with pytest.raises(ValueError):request_tickers('unknown',['KRW-BTC'])
     with pytest.raises(ValueError):request_tickers('bithumb',['KRW-BTC&secret=x'])
@@ -65,16 +65,18 @@ def test_bad_duplicate_future_or_other_market_rows_never_become_prices():
 
 def test_clicks_are_throttled_and_failure_retains_original_clock():
     calls=[]
+    offline=False
     def fetch(exchange,markets):
         calls.append((exchange,markets))
-        if len(calls)>1:raise OSError('offline')
-        return [dict(market='BTC-ETH',trade_price=.04,trade_timestamp=999000)]
+        if offline:raise OSError('offline')
+        return [dict(market=m,trade_price={'BTC-ETH':.04,'KRW-BTC':100000000,'KRW-ETH':4000000}[m],trade_timestamp=999000) for m in markets]
     cache=HoldingQuotes(fetch)
     h=[dict(valid=True,exchange='bithumb',api_market='BTC-ETH')]
     cache.refresh(h);cache.refresh(h)
-    assert len(calls)==1 and cache.snapshot()[1]['status']=='partial'
-    saved=cache.snapshot()[0];cache.last_attempt=-1e20;cache.refresh(h)
+    assert len(calls)==2 and cache.snapshot()[1]['status']=='complete'
+    saved=cache.snapshot()[0];offline=True;cache.last_attempt=-1e20;cache.refresh(h)
     assert cache.snapshot()[0]==saved and cache.snapshot()[1]['received']==0
+    assert len(calls)==3 and cache.snapshot()[1]['failures'][0]['reason']=='connection'
 
 
 def test_http_price_action_updates_valuation_without_db_mutation_or_background_network(tmp_path):
@@ -86,7 +88,7 @@ def test_http_price_action_updates_valuation_without_db_mutation_or_background_n
     calls=[]
     def fetch(exchange,markets):
         calls.append((exchange,markets))
-        return [dict(market=m,trade_price={'KRW-B3':125,'KRW-BTC':100000000,'BTC-ETH':.04}[m],trade_timestamp=(now-1)*1000) for m in markets]
+        return [dict(market=m,trade_price={'KRW-B3':125,'KRW-BTC':100000000,'BTC-ETH':.04,'KRW-ETH':4100000}[m],trade_timestamp=(now-1)*1000) for m in markets]
     cache=HoldingQuotes(fetch);hashes={p:hashlib.sha256(p.read_bytes()).hexdigest() for p in (paper,actual)}
     server=review.ThreadingHTTPServer(('127.0.0.1',0),review.handler(paper,holdings_path=actual,quotes=cache))
     thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
@@ -101,7 +103,41 @@ def test_http_price_action_updates_valuation_without_db_mutation_or_background_n
         with urlopen(url+'/api/holding-quotes') as r:assert json.load(r)['status']=='complete'
         with urlopen(url+'/api/review-state') as r:data=json.load(r)['local_holdings']
         assert data['priced_count']==2 and data['known_value_krw']==8001250
-        assert len(calls)==1
+        assert len(calls)==2
         for p,digest in hashes.items():assert hashlib.sha256(p.read_bytes()).hexdigest()==digest
     finally:
         server.shutdown();thread.join(2);server.server_close()
+
+
+def test_btc_failure_does_not_drop_krw_quotes_or_invent_native_return(tmp_path):
+    path=tmp_path/'actual.db';holdings_db(path)
+    now=time.time();calls=[]
+    def fetch(exchange,markets):
+        calls.append(markets)
+        if markets==['BTC-ETH']:
+            raise HTTPError('public-ticker',404,'not found',{},None)
+        return [dict(market=m,trade_price={'KRW-B3':125,'KRW-BTC':100000000,'KRW-ETH':4000000}[m],trade_timestamp=(now-1)*1000) for m in markets]
+    cache=HoldingQuotes(fetch);cache.refresh(read_holdings(path,[])['holdings'])
+    prices,status=cache.snapshot()
+    assert len(calls)==2 and status['received']==3 and status['status']=='partial'
+    assert status['failures']==[{'exchange':'bithumb','quote':'BTC','reason':'http_error','http_status':404}]
+    eth=next(h for h in read_holdings(path,prices)['holdings'] if h['symbol']=='ETH')
+    assert eth['current_price_krw']==4000000 and eth['value_krw']==8000000
+    assert eth['valuation_basis']=='krw_market'
+    assert eth['current_price'] is None and eth['unrealized_pnl_quote'] is None
+
+
+def test_krw_price_is_per_unit_and_only_uses_same_exchange_with_explicit_basis(tmp_path):
+    path=tmp_path/'actual.db';holdings_db(path)
+    prices=[dict(exchange='upbit',market='KRW-ETH',price=999,signal_ts=999),
+            dict(exchange='bithumb',market='KRW-BTC',price=100000000,signal_ts=999)]
+    def eth(rows,now=1000):return next(h for h in read_holdings(path,rows,now=now)['holdings'] if h['symbol']=='ETH')
+    assert eth(prices)['current_price_krw'] is None
+    prices.append(dict(exchange='bithumb',market='KRW-ETH',price=4100000,signal_ts=999))
+    assert eth(prices)['current_price_krw']==4100000 and eth(prices)['valuation_basis']=='krw_market'
+    prices.append(dict(exchange='bithumb',market='BTC-ETH',price=.04,signal_ts=999))
+    assert eth(prices)['current_price_krw']==4000000 and eth(prices)['value_krw']==8000000
+    assert eth(prices)['valuation_basis']=='quote_conversion'
+    prices[-1]['signal_ts']=1
+    assert eth(prices,now=1500)['valuation_basis']=='krw_market'
+    assert eth(prices,now=2500)['valuation_stale'] is True

@@ -53,6 +53,7 @@ exit /b %CRYPTO_REVIEW_EXIT%
 README = '''가상매매 · 실전 계획 검토 화면
 
 이번 실행본: @BUILD@
+보유 거래소 적용: @HOLDINGS_EXCHANGE@
 압축을 풀면 버전이 붙은 새 폴더가 나옵니다. 이전 폴더에 덮어쓰지 마세요.
 
 수집 상태 점검: RUN_CHECK.cmd
@@ -117,7 +118,9 @@ BTC·ETH 탭은 동일 시각의 저장된 종가를 비교합니다.
 현재가 새로고침을 누르면 지정된 거래소의 공개 시세 API에서 해당 마켓 가격을 조회합니다.
 거래소에 전송되는 값은 공개 마켓 코드뿐입니다. 보유 수량·평단·DB·인증정보는 전송하지 않습니다.
 자동 갱신과 RUN_CHECK는 외부 시세를 요청하지 않습니다. 조회 결과는 실행 중 메모리에만 유지됩니다.
-BTC 마켓은 실제 BTC 마켓 체결가와 같은 거래소의 BTC 원화 가격으로 환산 평가합니다.
+BTC 마켓은 실제 BTC 마켓 체결가와 같은 거래소의 BTC 원화 가격으로 환산한 현재가를 우선 표시합니다.
+BTC 마켓 가격을 확보하지 못하면 같은 거래소의 해당 자산 원화마켓 시세를 별도 평가 기준으로 표시합니다.
+이 경우 원화마켓 시세를 BTC 마켓 체결가나 BTC 기준 수익률로 바꾸어 표시하지 않습니다.
 과거 매입 시점의 환율이 없으므로 BTC 마켓의 손익은 BTC로 표시하며 전체 원화 손익을 만들지 않습니다.
 거래소가 없는 보유분은 원화 합계에서 제외합니다. 조회 화면에서 보유정보를 임의 변경하지 않습니다.
 수량 0인 매도 완료 기록은 DB에 그대로 남습니다. 보유정보 수정이나 주문은 하지 않습니다.
@@ -130,7 +133,9 @@ BTC 마켓은 실제 BTC 마켓 체결가와 같은 거래소의 BTC 원화 가�
 '''
 
 
-def build(destination: Path) -> dict:
+def build(destination: Path, *, holdings_exchange: str | None = None) -> dict:
+    if holdings_exchange not in {None, 'bithumb', 'upbit'}:
+        raise ValueError('Unsupported confirmed holdings exchange')
     if subprocess.check_output(['git','status','--porcelain','--untracked-files=no'], cwd=ROOT, text=True).strip():
         raise ValueError('Commit tracked changes before building a versioned review package.')
     head = subprocess.check_output(['git','rev-parse','HEAD'], cwd=ROOT, text=True).strip()
@@ -159,10 +164,13 @@ def build(destination: Path) -> dict:
     for name, mode, report, extra in (
             ('RUN_REVIEW.cmd', 'VIEWER', 'CRYPTO_B3_REVIEW_RESULT.json', '--open-browser'),
             ('RUN_CHECK.cmd', 'CHECK', 'CRYPTO_CHECK_RESULT.json', '--report-only')):
+        if holdings_exchange:
+            extra += ' --holdings-exchange ' + holdings_exchange
         launcher = LAUNCHER.replace('@BUILD@', head[:12]).replace('@MODE@', mode).replace('@REPORT@', report).replace('@EXTRA@', extra)
         files[Path(name)] = launcher.replace('\n', '\r\n').encode('ascii')
-    files[Path('README.txt')] = README.replace('@BUILD@', head[:12]).encode('utf-8-sig')
-    manifest = {'source_commit': head, 'mode': 'read_only', 'files': {
+    exchange_note = '저장된 거래소 그대로' if holdings_exchange is None else ('사용자 확인: ' + {'bithumb':'빗썸','upbit':'업비트'}[holdings_exchange] + ' / 실제 보유 조회에만 적용, 원본 DB 수정 없음')
+    files[Path('README.txt')] = README.replace('@BUILD@', head[:12]).replace('@HOLDINGS_EXCHANGE@',exchange_note).encode('utf-8-sig')
+    manifest = {'source_commit': head, 'mode': 'read_only', 'confirmed_holdings_exchange':holdings_exchange, 'files': {
         path.as_posix(): hashlib.sha256(body).hexdigest() for path, body in sorted(files.items())}}
     files[Path('SOURCE_MANIFEST.json')] = json.dumps(manifest, indent=2).encode()
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -177,4 +185,6 @@ def build(destination: Path) -> dict:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
-    print(json.dumps(build(parser.parse_args().output), indent=2))
+    parser.add_argument('--holdings-exchange',choices=['bithumb','upbit'],help='Only when the portfolio owner explicitly confirmed this exchange')
+    args=parser.parse_args()
+    print(json.dumps(build(args.output,holdings_exchange=args.holdings_exchange), indent=2))

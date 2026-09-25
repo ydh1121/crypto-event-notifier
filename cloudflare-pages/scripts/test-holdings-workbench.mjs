@@ -53,9 +53,13 @@ test('holding target uses real average, not PAPER price or balance; empty plan h
 });
 test('BTC holding shows native price and PnL with separate KRW valuation',()=>{
  const h={...holding(),quote_currency:'BTC',market:'KRW-ETH/BTC',symbol:'ETH',current_price:.04,
-   avg_price:.03,volume:2,value_quote:.08,value_krw:8000000,unrealized_pnl_quote:.02,quote_to_krw:100000000,conversion_ts:now,planning_available:false};
+   avg_price:.03,volume:2,value_quote:.08,value_krw:8000000,current_price_krw:4000000,valuation_ts:now,valuation_basis:'quote_conversion',unrealized_pnl_quote:.02,quote_to_krw:100000000,conversion_ts:now,planning_available:false};
  const html=holdingHeaderHtml(h);assert.match(html,/0.04 BTC/);assert.match(html,/0.02 BTC/);assert.match(html,/8,000,000원/);
+ assert.match(html,/coin-price"><b>4,000,000원<\/b>/);assert.match(html,/BTC마켓 원화 환산가/);
  const list=holdingsListHtml({status:'read',holdings:[h]},h.key);assert.match(list,/BTC 기준/);assert.match(list,/8,000,000원/);
+ const direct=holdingHeaderHtml({...h,current_price:null,current_price_krw:4100000,value_krw:8200000,unrealized_pnl_quote:null,valuation_basis:'krw_market'});
+ assert.match(direct,/coin-price"><b>4,100,000원<\/b>/);assert.match(direct,/빗썸 원화마켓 평가가/);
+ assert.ok(!direct.includes('0.04 BTC'));assert.ok(!direct.includes('0.02 BTC'));
 });
 test('missing, stale, changed and mismatched sources cannot be imported as an actual plan',()=>{
  const h=holding(),d=holdingDraft(h),a=account();
