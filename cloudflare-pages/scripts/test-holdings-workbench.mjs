@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {JSDOM} from 'jsdom';
-import {holdingDraft,importHoldingPlan,scopedStrategies,holdingChanged,buyAllocations} from '../public/modules/shared/holdings-workbench-model.js';
+import {holdingDraft,importHoldingPlan,scopedStrategies,holdingChanged,buyAllocations,holdingTarget} from '../public/modules/shared/holdings-workbench-model.js';
+import {holdingHeaderHtml,holdingsListHtml,holdingCalculationHtml} from '../public/modules/shared/holdings-workbench-view.js';
 import {calculatePlan} from '../public/modules/shared/strategy-workbench-model.js';
 import {createHoldingsWorkbench} from '../public/modules/pages/holdings-workbench.js';
 
@@ -27,6 +28,35 @@ test('partial sells conserve cost, quantity and fees with actual holdings',()=>{
  d.sells[1].weight='71';assert.equal(calculatePlan(d).valid,false);
  d.volume='';assert.equal(calculatePlan(d).valid,false);
 });
+test('sell-only import needs no buy budget and buy-only import keeps edited exits',()=>{
+ const h=holding(),a=account(),d=holdingDraft(h);
+ const sale=importHoldingPlan(d,h,a,{part:'sell'}).draft;
+ assert.deepEqual(sale.buys,[]);assert.equal(sale.budget,'');
+ assert.ok(Math.abs(Number(sale.sells[0].price)-114)<1e-10);
+ assert.ok(Math.abs(calculatePlan(sale).realized-139.544)<1e-9);
+ const manual={...d,budget:'900',sells:[{price:'123',weight:'30'},{price:'140',weight:'40'}]};
+ const bought=importHoldingPlan(manual,h,a,{part:'buy'}).draft;
+ assert.deepEqual(bought.sells,manual.sells);assert.notEqual(bought.sells,manual.sells);
+ const changed=importHoldingPlan(bought,h,a,{part:'sell'}).draft;
+ assert.deepEqual(changed.buys,bought.buys);
+ assert.ok(Math.abs(Number(changed.sells[0].price)-calculatePlan({...bought,sells:[]}).average*1.14)<1e-9);
+ assert.ok(importHoldingPlan(d,h,{...a,plan:{...a.plan,entries:[]}},{part:'buy'}).error);
+});
+test('holding target uses real average, not PAPER price or balance; empty plan has no realized estimate',()=>{
+ const h={...holding(),avg_price:.7759,current_price:.9337},a=account();
+ const target=holdingTarget(h,a);assert.ok(Math.abs(target.price-.884526)<1e-12);assert.ok(target.distance>0);
+ assert.equal(holdingTarget(h,{...a,reconciliation:{matches:false}}),null);
+ assert.equal(holdingTarget({...h,price_ts:1},a).distance,null);
+ const html=holdingCalculationHtml(h,holdingDraft(h));
+ assert.match(html,/예상 실현손익<\/dt><dd class="">—<\/dd>/);
+ assert.match(holdingCalculationHtml(h,{...holdingDraft(h),sells:[{price:'',weight:''}]}),/예상 실현손익<\/dt><dd class="">—<\/dd>/);
+});
+test('BTC holding shows native price and PnL with separate KRW valuation',()=>{
+ const h={...holding(),quote_currency:'BTC',market:'KRW-ETH/BTC',symbol:'ETH',current_price:.04,
+   avg_price:.03,volume:2,value_quote:.08,value_krw:8000000,unrealized_pnl_quote:.02,quote_to_krw:100000000,conversion_ts:now,planning_available:false};
+ const html=holdingHeaderHtml(h);assert.match(html,/0.04 BTC/);assert.match(html,/0.02 BTC/);assert.match(html,/8,000,000원/);
+ const list=holdingsListHtml({status:'read',holdings:[h]},h.key);assert.match(list,/BTC 기준/);assert.match(list,/8,000,000원/);
+});
 test('missing, stale, changed and mismatched sources cannot be imported as an actual plan',()=>{
  const h=holding(),d=holdingDraft(h),a=account();
  assert.ok(importHoldingPlan(d,h,a).error);d.budget='900';
@@ -45,7 +75,11 @@ const data={status:'read',holdings:[holding(),holding('upbit')],holding_count:2,
 const state={snapshot:{local_holdings:data},ui:{}},listeners=new Set(),requests=[],ledger=[];
 const store={get:()=>state,subscribe(fn){listeners.add(fn);return()=>listeners.delete(fn);}};
 globalThis.fetch=async path=>{const u=new URL(path,'http://127.0.0.1:8766'),exchange=u.searchParams.get('exchange'),market=u.searchParams.get('market');requests.push([exchange,market]);return {ok:true,json:async()=>({detail:{exchange,market,data:{strategy_lab:{version:2,exchange,market,experiments:[account(exchange),account(exchange,'balanced')]}}}})};};
-const page=createHoldingsWorkbench({store,onPaper:(...args)=>ledger.push(args)});page.mount(document.getElementById('root'));
+let priceRequests=0,priceOffline=false;
+const page=createHoldingsWorkbench({store,onPaper:(...args)=>ledger.push(args),onRefreshPrices:async()=>{
+ priceRequests++;if(priceOffline)throw Error('offline');
+ state.snapshot.local_holdings={...data,public_quotes:{status:'complete',requested:2,received:2}};poll();
+}});page.mount(document.getElementById('root'));
 const flush=()=>new Promise(r=>setTimeout(r,20)),shadow=()=>document.getElementById('root').firstElementChild.shadowRoot;
 const click=selector=>{const e=shadow().querySelector(selector);assert.ok(e,selector);e.click();};
 const input=(selector,value)=>{const e=shadow().querySelector(selector);assert.ok(e,selector);e.value=value;e.dispatchEvent(new Event('input',{bubbles:true}));return e;};
@@ -60,7 +94,8 @@ test('holding selection and original ledger links use exact exchange identity',a
  click('[data-holding="bithumb|KRW-B3|KRW"]');await flush();
 });
 test('strategy import, edits, focus and disclosures survive polling and strategy switches',async()=>{
- input('[data-draft="budget"]','900');click('[data-action="import-holding-plan"]');
+ click('[data-action="import-holding-sell"]');assert.ok(shadow().querySelector('[data-sell-price="0"]'));
+ input('[data-draft="budget"]','900');click('[data-action="import-holding-buy"]');
  assert.equal(shadow().querySelector('[data-buy-amount="0"]').value,'600');
  const amount=input('[data-buy-amount="0"]','555');amount.focus();
  shadow().querySelector('[data-continuity-key="calculation-stages"]').open=true;
@@ -71,10 +106,21 @@ test('strategy import, edits, focus and disclosures survive polling and strategy
  click('[data-strategy="bithumb|balanced|v1"]');assert.equal(shadow().querySelector('[data-buy-amount]'),null);
  click('[data-strategy="bithumb|aggressive|v1"]');assert.equal(shadow().querySelector('[data-buy-amount="0"]').value,'555');
 });
+test('public quote refresh is explicit and preserves drafts through success and failure',async()=>{
+ assert.equal(priceRequests,0);click('[data-action="refresh-prices"]');
+ assert.equal(shadow().querySelector('[data-action="refresh-prices"]').disabled,true);await flush();
+ assert.equal(priceRequests,1);assert.match(shadow().textContent,/거래소 가격 반영/);
+ assert.equal(shadow().querySelector('[data-buy-amount="0"]').value,'555');
+ priceOffline=true;click('[data-action="refresh-prices"]');await flush();
+ assert.match(shadow().textContent,/가격을 조회하지 못했습니다/);
+ assert.equal(shadow().querySelector('[data-buy-amount="0"]').value,'555');
+ state.snapshot.local_holdings=data;
+});
 test('holding updates require explicit starting-position refresh and keep calculation rows',async()=>{
  data.holdings[0]={...data.holdings[0],volume:20,updated_ts:124};poll();await flush();
  assert.equal(shadow().querySelector('[data-draft="volume"]').value,'10');
- assert.equal(shadow().querySelector('[data-action="import-holding-plan"]').disabled,true);
+ assert.equal(shadow().querySelector('[data-action="import-holding-buy"]').disabled,true);
+ assert.equal(shadow().querySelector('[data-action="import-holding-sell"]').disabled,true);
  assert.ok(shadow().textContent.includes('보유정보가 갱신'));
  click('[data-action="reload-holding"]');assert.equal(shadow().querySelector('[data-draft="volume"]').value,'20');
  assert.equal(shadow().querySelector('[data-buy-amount="0"]').value,'555');

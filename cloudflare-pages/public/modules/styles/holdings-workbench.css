@@ -1,4 +1,8 @@
 /* Local real-holdings layout. Shared workbench primitives have one owner. */
+#holding-price-refresh{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
+.holding-target{font-size:24px;font-weight:650}
+.holding-target small{display:block;font-size:13px;font-weight:400;color:inherit;margin-top:8px}
+.holding-conversion{margin:16px 0;font-size:14px}
 .holdings-total{display:flex;flex-wrap:wrap;gap:24px 48px;padding:8px 0 24px;border-bottom:1px solid #dde2e8;margin-bottom:24px}
 .holdings-total dd{font-size:28px;font-weight:650;letter-spacing:-.5px}
 .holdings-layout{display:grid;grid-template-columns:260px minmax(0,1fr);gap:32px}
@@ -12,9 +16,9 @@
 .holding-position dd{font-size:19px;font-weight:600;overflow-wrap:anywhere}
 .holding-strategy-evidence{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:13px}
 .holding-strategy-prices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding:16px 0 24px;border-bottom:1px solid #e5e8ec}
-.holding-strategy-prices dd{font-size:18px;font-weight:600}
+.holding-strategy-prices dd:not(.holding-target){font-size:18px;font-weight:600}
 .holding-draft-state{display:flex;flex-wrap:wrap;align-items:center;gap:12px;justify-content:space-between;margin-top:20px}
-.holding-plan-import{display:flex;align-items:flex-end;gap:12px;margin-top:12px}
+.holding-plan-import{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-top:12px}
 .holding-plan-import label{flex:1;max-width:360px}
 .holding-plan-import input{margin-top:6px}
 .holding-plan-import button{min-height:44px}

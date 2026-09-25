@@ -41,10 +41,11 @@ export function calculatorHtml(draft,{origin='선택한 가상계좌 기준 · �
     <button class="text-button" data-action="add-sell" ${draft.sells.length>=20?'disabled':''}>+ 익절 회차</button>
     ${draft.buys.some(r=>r.basis==='conditional_recalculation')?'<p class="subtle">2차 이후는 체결 뒤 평단을 다시 계산한 가정입니다. 시장 조건은 다시 확인해야 합니다.</p>':''}${result?'<div id="calculation-result" aria-live="polite"></div>':''}`;
 }
-export function calculationHtml(draft,identity) {
+export function calculationHtml(draft,identity,{emptySellAsMissing=false}={}) {
   const r=calculatePlan(draft,identity);
   if(!r.valid)return `<p role="status" class="notice">${r.errors.map(esc).join('<br>')}</p>`;
-  return `<dl class="calculation-primary">${metric('예상 평단',won(r.average))}${metric('예상 실현손익',won(r.realized),color(r.realized))}</dl>
+  const realized=emptySellAsMissing&&!r.sellStages.length?null:r.realized;
+  return `<dl class="calculation-primary">${metric('예상 평단',won(r.average))}${metric('예상 실현손익',won(realized),color(realized))}</dl>
     <dl class="calculation-secondary">${metric('추가 투입',won(r.buyTotal))}${metric('총 수수료',won(r.fees))}${metric('매도 수령액',won(r.net))}${metric('잔여 수량',number(r.remaining,8))}</dl>
     <details data-continuity-key="calculation-stages"><summary>회차별 계산</summary><div class="table-scroll"><table><thead><tr><th>회차</th><th>평단 / 실현손익</th><th>누적 / 잔여 수량</th></tr></thead><tbody>${r.buyStages.map((s,i)=>`<tr><td>매수 ${i+1}</td><td>${won(s.average)}</td><td>${number(s.quantity,8)}</td></tr>`).join('')}${r.sellStages.map((s,i)=>`<tr><td>익절 ${i+1}</td><td>${won(s.realized)}</td><td>${number(s.remaining,8)}</td></tr>`).join('')}</tbody></table></div></details>`;
 }

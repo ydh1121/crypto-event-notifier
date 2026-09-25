@@ -87,7 +87,13 @@ def read_holdings(path: Path | None, prices: list[dict], *, now: float | None = 
             conn.close()
     except (OSError, sqlite3.Error):
         return {**result, "status": "read_failed"}
-    quotes = {(p.get("exchange"), p.get("market")): p for p in prices}
+    quotes = {}
+    for p in prices:
+        price, ts = _number(p.get("price")), _number(p.get("signal_ts"))
+        key = p.get("exchange"), p.get("market")
+        if price is not None and price > 0 and ts is not None and 0 < ts <= now:
+            if ts >= quotes.get(key, {}).get("signal_ts", 0):
+                quotes[key] = {**p, "price": price, "signal_ts": ts}
     items = []
     for row in rows:
         market = str(row["market"] or "")
@@ -108,20 +114,29 @@ def read_holdings(path: Path | None, prices: list[dict], *, now: float | None = 
         invested = quantity * average if valid else None
         value = quantity * price if valid and price is not None else None
         pnl = value - invested if value is not None else None
+        fx_row = quotes.get((exchange, "KRW-BTC"), {}) if quote == "BTC" else {}
+        fx = 1 if quote == "KRW" else fx_row.get("price")
+        fx_ts = source_ts if quote == "KRW" else fx_row.get("signal_ts")
+        value_krw = value * fx if value is not None and fx is not None else None
         items.append({"key": f"{exchange or 'unknown'}|{market}|{quote or 'unknown'}",
-            "exchange": exchange, "market": market, "quote_currency": quote, "symbol": symbol,
+            "exchange": exchange, "market": market, "api_market": api_market, "quote_currency": quote, "symbol": symbol,
             "volume": quantity, "avg_price": average, "updated_ts": _number(row["updated_ts"]),
             "valid": valid, "closed": valid and quantity == 0, "current_price": price,
             "price_ts": source_ts, "price_stale": stale, "invested_quote": invested,
+            "price_source": price_row.get("price_source", "local_signal"),
+            "value_krw": value_krw, "quote_to_krw": fx, "conversion_ts": fx_ts,
+            "valuation_stale": stale or fx_ts is None or now - fx_ts > 1200,
             "value_quote": value, "unrealized_pnl_quote": pnl,
             "unrealized_pnl_pct": pnl / invested * 100 if pnl is not None and invested else None,
             "planning_available": bool(valid and quantity > 0 and exchange and quote == "KRW")})
     active = [h for h in items if not h["closed"]]
-    priced = [h for h in active if h["valid"] and h["quote_currency"] == "KRW" and h["value_quote"] is not None]
+    priced = [h for h in active if h["valid"] and h["value_krw"] is not None]
     complete = len(priced) == len(active)
+    # Today's BTC/KRW rate is not the historical acquisition cost in KRW.
+    pnl_complete = complete and all(h["quote_currency"] == "KRW" for h in active)
     return {**result, "status": "read", "holdings": items, "holding_count": len(active),
         "closed_count": len(items) - len(active), "priced_count": len(priced),
-        "valuation_complete": complete, "valuation_stale": any(h["price_stale"] for h in priced),
-        "known_value_krw": sum(h["value_quote"] for h in priced),
-        "value_krw": sum(h["value_quote"] for h in priced) if complete else None,
-        "pnl_krw": sum(h["unrealized_pnl_quote"] for h in priced) if complete else None}
+        "valuation_complete": complete, "valuation_stale": any(h["valuation_stale"] for h in priced),
+        "known_value_krw": sum(h["value_krw"] for h in priced),
+        "value_krw": sum(h["value_krw"] for h in priced) if complete else None,
+        "pnl_krw": sum(h["unrealized_pnl_quote"] for h in priced) if pnl_complete else None}

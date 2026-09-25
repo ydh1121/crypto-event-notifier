@@ -1,7 +1,8 @@
 """Local, read-only review of the real coin/strategy journal. Python stdlib only.
 
-Never starts a runner, changes Git, loads credentials, migrates SQLite, sends data
-outside this PC, or accepts mutation routes. Bind address is fixed to loopback.
+Never starts a runner, changes Git, loads credentials, migrates SQLite, or accepts
+mutation routes. An explicit price refresh reads public exchange tickers only.
+Holdings amounts stay on this PC. Bind address is fixed to loopback.
 """
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ from urllib.parse import parse_qs, urlsplit
 from .strategy_lab_market import read_strategy_lab_market
 from .runtime_review import compare_activity, read_runtime
 from .holdings_review import read_holdings, resolve_holdings_path
+from .holding_quotes import HoldingQuotes
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / "cloudflare-pages/public"
@@ -34,7 +36,7 @@ const state={snapshot:null,ui:{paperExchange:'bithumb',paperMarket:'KRW-B3',pape
 const listeners=new Set();const store={get:()=>state,setUi(patch,meta={}){Object.assign(state.ui,patch);for(const f of listeners)f(state,{type:'ui',...meta});},subscribe(f){listeners.add(f);return()=>listeners.delete(f);}};
 const container=document.getElementById('pageRoot');const paperRoot=document.createElement('div'),holdingsRoot=document.createElement('div');container.append(paperRoot,holdingsRoot);holdingsRoot.hidden=true;
 const page=createPaperWorkbench({store,allowOverview:false});page.mount(paperRoot);
-const holdingsPage=createHoldingsWorkbench({store,onPaper:(exchange,market,style)=>{show('paper');page.openAccount(exchange,market,style);}});holdingsPage.mount(holdingsRoot);
+const holdingsPage=createHoldingsWorkbench({store,onRefreshPrices:async()=>{const r=await fetch('/api/holding-quotes');if(!r.ok)throw Error('가격을 조회하지 못했습니다.');await refresh();},onPaper:(exchange,market,style)=>{show('paper');page.openAccount(exchange,market,style);}});holdingsPage.mount(holdingsRoot);
 function show(name){paperRoot.hidden=name!=='paper';holdingsRoot.hidden=name!=='holdings';for(const b of document.querySelectorAll('[data-review-page]'))b.setAttribute('aria-pressed',String(b.dataset.reviewPage===name));}
 document.querySelector('#reviewRoot>nav').addEventListener('click',e=>{const b=e.target.closest('[data-review-page]');if(b)show(b.dataset.reviewPage);});
 async function refresh(first=false){try{const r=await fetch('/api/review-state');if(!r.ok)throw Error('DB 조회 실패');state.snapshot=await r.json();if(first){page.render();holdingsPage.refresh();}else for(const f of listeners)f(state,{type:'snapshot-live'});}catch(e){document.querySelector('.review-label').textContent=e.message;}}
@@ -42,7 +44,7 @@ await refresh(true);setInterval(()=>refresh(),10000);
 """
 
 
-def read_state(path: Path, holdings_path: Path | None = None) -> dict:
+def read_state(path: Path, holdings_path: Path | None = None, quotes: HoldingQuotes | None = None) -> dict:
     conn = sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True, timeout=10)
     conn.row_factory = sqlite3.Row
     try:
@@ -54,7 +56,9 @@ def read_state(path: Path, holdings_path: Path | None = None) -> dict:
             row = dict(r);row['symbol'] = row['market'].removeprefix('KRW-')
             if row['exchange'] in exchanges:
                 exchanges[row['exchange']]['leaderboard'].append(row)
-        holdings = read_holdings(holdings_path, [dict(r) for r in rows])
+        extra, quote_status = quotes.snapshot() if quotes else ([], {"status": "not_requested"})
+        holdings = read_holdings(holdings_path, [dict(r) for r in rows] + extra)
+        holdings['public_quotes'] = quote_status
         return {"public": {"exchanges": exchanges}, "private_visible": False, "local_holdings": holdings}
     finally:
         conn.close()
@@ -79,7 +83,8 @@ def review_journal(detail: dict, experiment: str, revision: str, offset: int, li
         "offset": offset, "limit": limit, "next_offset": offset+len(trades) if offset+len(trades)<journal['total'] else None}}
 
 
-def handler(path: Path, *, fixture: bool = False, holdings_path: Path | None = None):
+def handler(path: Path, *, fixture: bool = False, holdings_path: Path | None = None, quotes=None):
+    quotes = quotes if quotes is not None else HoldingQuotes()
     class ReviewHandler(BaseHTTPRequestHandler):
         def log_message(self, *_): pass
 
@@ -103,7 +108,11 @@ def handler(path: Path, *, fixture: bool = False, holdings_path: Path | None = N
             try:
                 if url.path=='/': return self.send(200,INDEX.replace('로컬 DB 조회 전용', '테스트 데이터 · 실제 계좌 아님') if fixture else INDEX,'text/html; charset=utf-8')
                 if url.path=='/review.js': return self.send(200,SCRIPT,'text/javascript; charset=utf-8')
-                if url.path=='/api/review-state': return self.send(200,read_state(path,holdings_path))
+                if url.path=='/api/review-state': return self.send(200,read_state(path,holdings_path,quotes))
+                if url.path=='/api/holding-quotes':
+                    if fixture: return self.send(409,{'error':{'message':'테스트 데이터에서는 외부 가격을 조회하지 않습니다.'}})
+                    quotes.refresh(read_holdings(holdings_path,[])['holdings'])
+                    return self.send(200,quotes.snapshot()[1])
                 if url.path=='/api/market-detail':
                     query=parse_qs(url.query); get=lambda key,default='':query.get(key,[default])[0]
                     exchange,market=get('exchange','bithumb'),get('market').upper()
@@ -256,7 +265,10 @@ def run_review(args, build, server):
                 'holdings_review':{'status':holdings['status'],'path_source':args.holdings_source,
                     'db_path':str(args.holdings_db) if args.holdings_db else None,
                     'holding_count':holdings.get('holding_count'),'closed_count':holdings.get('closed_count'),
-                    'identity_complete_count':sum(1 for h in holdings['holdings'] if h['planning_available'])},
+                    'identity_complete_count':sum(1 for h in holdings['holdings'] if not h['closed'] and h['exchange'] and h['api_market']),
+                    'krw_planning_count':sum(1 for h in holdings['holdings'] if h['planning_available']),
+                    'unknown_exchange_count':sum(1 for h in holdings['holdings'] if not h['closed'] and not h['exchange']),
+                    'non_krw_count':sum(1 for h in holdings['holdings'] if not h['closed'] and h['quote_currency'] != 'KRW')},
                 'runtime_review':{'status':'waiting_for_second_observation','before':read_runtime(args.db)},
                 'limitations':['Stored drawdown is not fill-only replay.','No runner was started.','No remote publication.']}
         write_report(args.report, report)

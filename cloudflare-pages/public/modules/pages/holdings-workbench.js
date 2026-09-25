@@ -2,13 +2,13 @@ import {getMarketDetail} from '../services/market-detail.js';
 import {patchPreservingUi} from '../shared/ui-continuity.js';
 import {holdingDraft,scopedStrategies} from '../shared/holdings-workbench-model.js';
 import {importHoldingPlan} from '../shared/holdings-workbench-model.js';
-import {holdingsShell,holdingsSummaryHtml,holdingsListHtml,holdingHeaderHtml,holdingStrategiesHtml,holdingCalculatorHtml,allocationHtml} from '../shared/holdings-workbench-view.js';
-import {calculationHtml} from '../shared/strategy-workbench-view.js';
+import {holdingsShell,holdingsSummaryHtml,holdingsListHtml,holdingHeaderHtml,holdingStrategiesHtml,holdingCalculatorHtml,holdingCalculationHtml,allocationHtml,priceRefreshHtml} from '../shared/holdings-workbench-view.js';
 
 /** Composition only. Reads the existing journal projection and scoped PAPER
  * accounts; all edits stay in per-holding/per-strategy calculation drafts. */
-export function createHoldingsWorkbench({store,onPaper=()=>{}}) {
+export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=null}) {
   let root,view,unsub,selected='',strategy='',detail=null,request=0,loading=false,error='';
+  let priceBusy=false,priceError='';
   const drafts=new Map(),selections=new Map();
   const data=()=>store.get().snapshot?.local_holdings;
   const holding=()=>data()?.holdings?.find(h=>h.key===selected&&!h.closed);
@@ -33,7 +33,8 @@ export function createHoldingsWorkbench({store,onPaper=()=>{}}) {
     if(selected)selections.set(selected,strategy);
     patchPreservingUi(view,()=>{
       set('holdings-summary',holdingsSummaryHtml(data()));set('holdings-list',holdingsListHtml(data(),selected));
-      set('holding-detail',h?`${holdingHeaderHtml(h)}<section id="holding-strategies">${holdingStrategiesHtml(rows,strategy,{loading,error})}</section><section id="holding-calculator">${holdingCalculatorHtml(h,draft(),account())}</section>`:'');
+      set('holding-price-refresh',priceRefreshHtml(data(),{available:Boolean(onRefreshPrices),busy:priceBusy,error:priceError}));
+      set('holding-detail',h?`${holdingHeaderHtml(h)}<section id="holding-strategies">${holdingStrategiesHtml(rows,strategy,{loading,error,holding:h})}</section><section id="holding-calculator">${holdingCalculatorHtml(h,draft(),account())}</section>`:'');
     });
   }
   async function load() {
@@ -52,10 +53,17 @@ export function createHoldingsWorkbench({store,onPaper=()=>{}}) {
   }
   function calculate() {
     const h=holding();if(!h)return;
-    patchPreservingUi(view,()=>{set('calculation-result',calculationHtml(draft(),{exchange:h.exchange,market:h.market}));set('holding-allocation',allocationHtml(draft()));});
+    patchPreservingUi(view,()=>{set('calculation-result',holdingCalculationHtml(h,draft()));set('holding-allocation',allocationHtml(draft()));});
+  }
+  async function refreshPrices() {
+    if(priceBusy||!onRefreshPrices)return;
+    priceBusy=true;priceError='';render();
+    try {await onRefreshPrices();}catch {priceError='가격을 조회하지 못했습니다. 잠시 후 다시 시도하세요.';}
+    finally {priceBusy=false;render();}
   }
   function click(e) {
     const b=e.target.closest('button');if(!b||b.disabled)return;
+    if(b.dataset.action==='refresh-prices'){void refreshPrices();return;}
     if(b.dataset.holding){selected=b.dataset.holding;strategy=selections.get(selected)||'';detail=null;error='';request++;render();void load();return;}
     if(b.dataset.strategy){strategy=b.dataset.strategy;selections.set(selected,strategy);render();return;}
     const action=b.dataset.action,h=holding();if(!h)return;
@@ -63,8 +71,8 @@ export function createHoldingsWorkbench({store,onPaper=()=>{}}) {
     if(action==='paper-ledger'){const a=account();if(a)onPaper(h.exchange,h.market,a.style);return;}
     if(!h.planning_available)return;
     if(action==='reload-holding'){const d=draft(),start=holdingDraft(h);d.volume=start.volume;d.average=start.average;d.holdingRevision=start.holdingRevision;renderCalculator();return;}
-    if(action==='import-holding-plan'){
-      const result=importHoldingPlan(draft(),h,account());
+    if(action==='import-holding-buy'||action==='import-holding-sell'){
+      const result=importHoldingPlan(draft(),h,account(),{part:action==='import-holding-buy'?'buy':'sell'});
       if(result.error){el('holding-plan-error').textContent=result.error;return;}
       drafts.set(key(),result.draft);renderCalculator();return;
     }
