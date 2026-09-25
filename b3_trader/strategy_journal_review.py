@@ -1,8 +1,9 @@
-"""Local, read-only review of the real coin/strategy journal. Python stdlib only.
+"""Local review of the real coin/strategy journal. Python stdlib only.
 
-Never starts a runner, changes Git, loads credentials, migrates SQLite, or accepts
-mutation routes. An explicit price refresh reads public exchange tickers only.
-Holdings amounts stay on this PC. Bind address is fixed to loopback.
+PAPER reads are always read-only. Opt-in planning saves versioned plans and manual
+executions in the separate holdings journal after a verified backup. No runner,
+Git change, credentials or exchange orders. Explicit price refresh uses public
+tickers only. Holdings amounts stay on this PC. Bind address is fixed to loopback.
 """
 from __future__ import annotations
 
@@ -12,6 +13,7 @@ import json
 import math
 import re
 import sqlite3
+import secrets
 import tempfile
 import threading
 import time
@@ -22,6 +24,8 @@ from urllib.parse import parse_qs, urlsplit
 from .strategy_lab_market import read_strategy_lab_market
 from .runtime_review import compare_activity, read_runtime
 from .holdings_review import read_holdings, resolve_holdings_path
+from .manual_planning_store import ManualPlanningStore
+from .manual_trading import PlanningError, identity
 from .holding_quotes import HoldingQuotes
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -85,8 +89,12 @@ def review_journal(detail: dict, experiment: str, revision: str, offset: int, li
 
 
 def handler(path: Path, *, fixture: bool = False, holdings_path: Path | None = None, quotes=None,
-            confirmed_exchange: str | None = None):
+            confirmed_exchange: str | None = None, enable_planning: bool = False):
     quotes = quotes if quotes is not None else HoldingQuotes()
+    planning = ManualPlanningStore(holdings_path) if enable_planning else None
+    if planning and planning.path == path.resolve():
+        raise ValueError('PAPER and manual journals must be separate')
+    csrf = secrets.token_urlsafe(32)
     class ReviewHandler(BaseHTTPRequestHandler):
         def log_message(self, *_): pass
 
@@ -108,9 +116,16 @@ def handler(path: Path, *, fixture: bool = False, holdings_path: Path | None = N
                 return self.send(403, {'error': {'message': 'Local review only'}})
             url=urlsplit(self.path)
             try:
-                if url.path=='/': return self.send(200,INDEX.replace('로컬 DB 조회 전용', '테스트 데이터 · 실제 계좌 아님') if fixture else INDEX,'text/html; charset=utf-8')
+                if url.path=='/': return self.send(200,INDEX.replace('로컬 DB 조회 전용', '테스트 데이터 · 실제 계좌 아님' if fixture else '계획·수동 체결 로컬 저장' if planning else '로컬 DB 조회 전용'),'text/html; charset=utf-8')
                 if url.path=='/review.js': return self.send(200,SCRIPT,'text/javascript; charset=utf-8')
-                if url.path=='/api/review-state': return self.send(200,read_state(path,holdings_path,quotes,confirmed_exchange))
+                if url.path=='/api/review-state':
+                    state=read_state(path,holdings_path,quotes,confirmed_exchange)
+                    state['local_holdings']['planning_enabled']=bool(planning)
+                    return self.send(200,state)
+                if url.path=='/api/manual-planning' and planning:
+                    query={k:v[0] for k,v in parse_qs(url.query).items()}
+                    account=self.planning_account(query)
+                    return self.send(200,{**planning.read(query,account),'csrf_token':csrf})
                 if url.path=='/api/holding-quotes':
                     if fixture: return self.send(409,{'error':{'message':'테스트 데이터에서는 외부 가격을 조회하지 않습니다.'}})
                     quotes.refresh(read_holdings(holdings_path,[],confirmed_exchange=confirmed_exchange)['holdings'])
@@ -134,11 +149,51 @@ def handler(path: Path, *, fixture: bool = False, holdings_path: Path | None = N
                     if PUBLIC.resolve() in target.parents and target.is_file() and target.suffix in {'.js','.css'}:
                         return self.send(200,target.read_bytes(),'text/javascript; charset=utf-8' if target.suffix=='.js' else 'text/css; charset=utf-8')
                 return self.send(404,{'error':{'message':'조회 경로가 없습니다.'}})
+            except PlanningError as exc:
+                return self.send(exc.status,{'error':{'message':str(exc)}})
             except (sqlite3.Error, ValueError, OSError):
                 return self.send(503,{'error':{'message':'로컬 데이터 조회를 완료하지 못했습니다.'}})
 
-        def do_POST(self): self.send(405,{'error':{'message':'조회 전용입니다.'}})
-        do_PUT=do_DELETE=do_PATCH=do_POST
+        def planning_account(self, selection):
+            exchange,market,_,experiment=identity(selection)
+            holdings=read_holdings(holdings_path,[],confirmed_exchange=confirmed_exchange)
+            if not any(h['exchange']==exchange and h['market']==market and h['recording_available'] for h in holdings['holdings']):
+                raise PlanningError('보유 목록에 등록된 원화 코인과 전략을 선택하세요.')
+            detail=read_detail(path,exchange,market)
+            account=next((a for a in detail['data']['strategy_lab']['experiments'] if a['experiment_id']==experiment),None)
+            if account is None:
+                raise PlanningError('이 코인의 전략 기록을 찾지 못했습니다.')
+            return account
+
+        def do_POST(self):
+            if not planning or self.path!='/api/manual-planning':
+                return self.send(405,{'error':{'message':'조회 전용입니다.'}})
+            expected=f'127.0.0.1:{self.server.server_port}'
+            token=self.headers.get('X-Planning-Token','')
+            if (self.headers.get('Host')!=expected or self.headers.get('Origin')!=f'http://{expected}'
+                or self.headers.get('Sec-Fetch-Site')=='cross-site'
+                or not token.isascii() or not secrets.compare_digest(token,csrf)):
+                return self.send(403,{'error':{'message':'이 조회창에서 다시 저장하세요.'}})
+            try:
+                if self.headers.get('Transfer-Encoding') or self.headers.get('Content-Type','').split(';')[0]!='application/json':
+                    raise PlanningError('저장 요청 형식을 확인하세요.')
+                size=int(self.headers.get('Content-Length','0'))
+                if not 0<size<=65536:raise PlanningError('저장 요청 크기를 확인하세요.')
+                self.connection.settimeout(10)
+                payload=json.loads(self.rfile.read(size))
+                if not isinstance(payload,dict):raise PlanningError('저장 요청을 확인하세요.')
+                account=self.planning_account(payload)
+                result=planning.write(payload,payload.get('action'),payload,account)
+                return self.send(200,{**result,'csrf_token':csrf})
+            except PlanningError as exc:
+                return self.send(exc.status,{'error':{'message':str(exc)}})
+            except (ValueError,UnicodeError):
+                return self.send(422,{'error':{'message':'입력한 저장 내용을 확인하세요.'}})
+            except (OSError,sqlite3.Error):
+                return self.send(503,{'error':{'message':'저장을 완료하지 못했습니다. 입력값을 유지합니다.'}})
+
+        def do_PUT(self): self.send(405,{'error':{'message':'지원하지 않는 저장 방식입니다.'}})
+        do_DELETE=do_PATCH=do_PUT
     return ReviewHandler
 
 
@@ -169,7 +224,7 @@ def review_build(root: Path = ROOT) -> dict:
         files = manifest.get('files')
         commit = manifest.get('source_commit')
         if (not isinstance(commit, str) or not re.fullmatch(r'[0-9a-f]{40}', commit)
-                or manifest.get('mode') != 'read_only' or not isinstance(files, dict)
+                or manifest.get('mode') not in {'read_only','local_planning'} or not isinstance(files, dict)
                 or 'b3_trader/strategy_journal_review.py' not in files
                 or 'b3_trader/runtime_review.py' not in files):
             raise ValueError('Invalid review manifest')
@@ -211,6 +266,7 @@ def main():
     parser.add_argument('--db',type=Path,required=True)
     parser.add_argument('--holdings-db',type=Path,help='Existing manual holdings journal; separate from PAPER')
     parser.add_argument('--holdings-exchange',choices=['bithumb','upbit'],help='Explicit owner-confirmed exchange for this real-holdings portfolio; no DB write')
+    parser.add_argument('--enable-planning',action='store_true',help='Allow explicit plan/manual-record saves in the separate existing holdings journal')
     parser.add_argument('--port',type=int,default=8766)
     parser.add_argument('--report',type=Path)
     parser.add_argument('--report-only',action='store_true',help='Save both observations and exit without a browser or server')
@@ -238,7 +294,7 @@ def main():
     server = None
     if not args.report_only:
         try:
-            server=ThreadingHTTPServer(('127.0.0.1',args.port),handler(args.db,fixture=args.fixture,holdings_path=args.holdings_db,confirmed_exchange=args.holdings_exchange))
+            server=ThreadingHTTPServer(('127.0.0.1',args.port),handler(args.db,fixture=args.fixture,holdings_path=args.holdings_db,confirmed_exchange=args.holdings_exchange,enable_planning=args.enable_planning))
         except OSError:
             parser.error('Review port is in use. Use RUN_CHECK.cmd to check without opening a viewer.')
     try:

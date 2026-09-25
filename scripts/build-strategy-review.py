@@ -17,13 +17,14 @@ PYTHON_FILES = (
     'strategy_lab_plan.py', 'strategy_lab_rules.py',
     'event_reaction_view.py', 'event_response_contract.py', 'event_price_archive.py',
     'runtime_review.py', 'runtime_process_contract.py', 'holdings_review.py', 'holding_quotes.py', 'user_tools.py',
+    'manual_planning_store.py', 'manual_trading.py',
 )
 LAUNCHER = r'''@echo off
 setlocal
 cd /d "%~dp0"
 title CRYPTO @MODE@ @BUILD@
 echo CRYPTO @MODE@ @BUILD@
-echo Keep the collection window open. This is a separate read-only check.
+echo Keep the collection window open. This is a separate viewer/check.
 set "CRYPTO_REVIEW_REPO=C:\Users\Administrator\Desktop\crypto-event-notifier-live"
 set "CRYPTO_REVIEW_DB=%CRYPTO_REVIEW_REPO%\b3_trader\data\auto_demo.sqlite3"
 if not "%~1"=="" set "CRYPTO_REVIEW_DB=%~1"
@@ -86,7 +87,7 @@ BTC·ETH 탭은 동일 시각의 저장된 종가를 비교합니다.
 매수·익절 회차와 수수료를 변경하면 예상 평단, 실현손익, 잔여 수량이 계산됩니다.
 실제 주문이나 보유자산 변경은 발생하지 않습니다.
 
-실제 DB는 읽기 전용으로 열립니다. DB·WAL·SHM 초기화나 교체를 하지 않습니다.
+가상매매·수집 DB는 읽기 전용으로 열립니다. DB·WAL·SHM 초기화나 교체를 하지 않습니다.
 이 폴더에 CRYPTO_B3_REVIEW_RESULT.json이 저장됩니다.
 이 파일에는 B3 공격적 전략의 실제 가상계좌·체결 원장과 대조 결과가 들어 있습니다.
 두 결과 파일에는 점검본 버전, 시작·종료 시각, 계좌 조회 시각이 기록됩니다.
@@ -124,7 +125,7 @@ BTC 마켓 가격을 확보하지 못하면 같은 거래소의 해당 자산 �
 과거 매입 시점의 환율이 없으므로 BTC 마켓의 손익은 BTC로 표시하며 전체 원화 손익을 만들지 않습니다.
 거래소가 없는 보유분은 원화 합계에서 제외합니다. 조회 화면에서 보유정보를 임의 변경하지 않습니다.
 수량 0인 매도 완료 기록은 DB에 그대로 남습니다. 보유정보 수정이나 주문은 하지 않습니다.
-계산 입력은 조회 창이 열린 동안 유지되며, 페이지 새로고침·창 종료 시 저장되지 않습니다.
+@PLANNING_NOTE@
 결과 파일의 holdings_review는 연결 상태와 건수만 담고 보유자산별 금액은 담지 않습니다.
 보유 DB를 찾지 못하면 기존 설정을 확인하며 새 DB를 만들지 않습니다.
 명시적 경로가 필요하면 Python 실행 인자 --holdings-db "기존 보유 DB 경로"를 사용할 수 있습니다.
@@ -133,7 +134,7 @@ BTC 마켓 가격을 확보하지 못하면 같은 거래소의 해당 자산 �
 '''
 
 
-def build(destination: Path, *, holdings_exchange: str | None = None) -> dict:
+def build(destination: Path, *, holdings_exchange: str | None = None, enable_planning: bool = False) -> dict:
     if holdings_exchange not in {None, 'bithumb', 'upbit'}:
         raise ValueError('Unsupported confirmed holdings exchange')
     if subprocess.check_output(['git','status','--porcelain','--untracked-files=no'], cwd=ROOT, text=True).strip():
@@ -166,11 +167,23 @@ def build(destination: Path, *, holdings_exchange: str | None = None) -> dict:
             ('RUN_CHECK.cmd', 'CHECK', 'CRYPTO_CHECK_RESULT.json', '--report-only')):
         if holdings_exchange:
             extra += ' --holdings-exchange ' + holdings_exchange
+        if enable_planning and name=='RUN_REVIEW.cmd':
+            extra += ' --enable-planning'
         launcher = LAUNCHER.replace('@BUILD@', head[:12]).replace('@MODE@', mode).replace('@REPORT@', report).replace('@EXTRA@', extra)
         files[Path(name)] = launcher.replace('\n', '\r\n').encode('ascii')
     exchange_note = '저장된 거래소 그대로' if holdings_exchange is None else ('사용자 확인: ' + {'bithumb':'빗썸','upbit':'업비트'}[holdings_exchange] + ' / 실제 보유 조회에만 적용, 원본 DB 수정 없음')
-    files[Path('README.txt')] = README.replace('@BUILD@', head[:12]).replace('@HOLDINGS_EXCHANGE@',exchange_note).encode('utf-8-sig')
-    manifest = {'source_commit': head, 'mode': 'read_only', 'confirmed_holdings_exchange':holdings_exchange, 'files': {
+    planning_note = '''매매 계획에서 계획 저장을 누르면 거래소·코인·전략별 매수/익절 회차와 수수료가 기존 보유 DB에 저장됩니다.
+다시 실행하면 저장본을 복원합니다. 보유정보가 바뀌면 최신 수량·평단 불러오기로 명시적으로 갱신하세요.
+처음 저장할 때 기존 보유 DB를 manual-planning-backups 폴더에 백업·검증한 뒤 별도 테이블만 추가합니다.
+기존 보유 수량·평단, 기존 물타기 계획, 가상 체결 원장은 수정하지 않습니다.
+소액 매매 탭은 직접 입력한 매수·매도만 누적합니다. 체결가, 수량, 실제 수수료와 한국시간을 입력합니다.
+수수료가 없으면 0을 명시적으로 입력하세요. 기록 취소도 이력으로 보존됩니다.
+보유수량이 0이 된 코인은 왼쪽 매도 완료 목록에서 선택하여 기존 기록을 다시 열 수 있습니다.
+입력된 매수 잔량을 초과하는 매도는 저장되지 않습니다. 계획은 수정 버전과 당시 전략 근거를 보존합니다.
+같은 기간 전략 비교는 첫 입력부터 마지막 입력 체결 사이에 시작하고 끝난 거래만 비교합니다.
+실제 주문·계좌 잔액 변경·자동 거래는 없습니다. RUN_CHECK는 기존과 같이 읽기만 합니다.''' if enable_planning else '계산 초안은 이 조회 창이 열려 있는 동안만 유지됩니다.'
+    files[Path('README.txt')] = README.replace('@BUILD@', head[:12]).replace('@HOLDINGS_EXCHANGE@',exchange_note).replace('@PLANNING_NOTE@',planning_note).encode('utf-8-sig')
+    manifest = {'source_commit': head, 'mode': 'local_planning' if enable_planning else 'read_only', 'confirmed_holdings_exchange':holdings_exchange, 'files': {
         path.as_posix(): hashlib.sha256(body).hexdigest() for path, body in sorted(files.items())}}
     files[Path('SOURCE_MANIFEST.json')] = json.dumps(manifest, indent=2).encode()
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -186,5 +199,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--holdings-exchange',choices=['bithumb','upbit'],help='Only when the portfolio owner explicitly confirmed this exchange')
+    parser.add_argument('--enable-planning',action='store_true')
     args=parser.parse_args()
-    print(json.dumps(build(args.output,holdings_exchange=args.holdings_exchange), indent=2))
+    print(json.dumps(build(args.output,holdings_exchange=args.holdings_exchange,enable_planning=args.enable_planning), indent=2))

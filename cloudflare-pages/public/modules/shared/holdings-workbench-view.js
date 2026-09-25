@@ -26,8 +26,9 @@ export function holdingsSummaryHtml(data) {
 export function holdingsListHtml(data,selected) {
   if(data?.status!=='read')return '';
   const rows=data.holdings.filter(h=>!h.closed);
-  if(!rows.length)return '<p class="placeholder">등록된 보유자산이 없습니다.</p>';
-  return `<div class="holdings-list">${rows.map(h=>`<button data-holding="${esc(h.key)}" aria-pressed="${h.key===selected}"><span><b>${esc(h.symbol)}</b><small>${exchangeLabel(h.exchange)} · ${esc(h.quote_currency||'통화 미확인')}</small></span><span><b>${h.quote_currency==='KRW'?quote(h.value_quote,'KRW'):won(h.value_krw)}</b><small class="${color(h.unrealized_pnl_pct)}">${percent(h.unrealized_pnl_pct)}${h.quote_currency==='BTC'?' · BTC 기준':''}</small></span></button>`).join('')}</div>${data.closed_count?`<p class="subtle">매도 완료 ${data.closed_count}개</p>`:''}`;
+  const closed=data.planning_enabled?data.holdings.filter(h=>h.closed&&h.recording_available):[];
+  const archive=closed.length?`<details data-continuity-key="closed-holdings"><summary>매도 완료 ${data.closed_count}개</summary><div class="holdings-list">${closed.map(h=>`<button data-holding="${esc(h.key)}" aria-pressed="${h.key===selected}"><span><b>${esc(h.symbol)}</b><small>${exchangeLabel(h.exchange)} · 기록 보기</small></span></button>`).join('')}</div></details>`:data.closed_count?`<p class="subtle">매도 완료 ${data.closed_count}개</p>`:'';
+  return (rows.length?`<div class="holdings-list">${rows.map(h=>`<button data-holding="${esc(h.key)}" aria-pressed="${h.key===selected}"><span><b>${esc(h.symbol)}</b><small>${exchangeLabel(h.exchange)} · ${esc(h.quote_currency||'통화 미확인')}</small></span><span><b>${h.quote_currency==='KRW'?quote(h.value_quote,'KRW'):won(h.value_krw)}</b><small class="${color(h.unrealized_pnl_pct)}">${percent(h.unrealized_pnl_pct)}${h.quote_currency==='BTC'?' · BTC 기준':''}</small></span></button>`).join('')}</div>`:'<p class="placeholder">등록된 보유자산이 없습니다.</p>')+archive;
 }
 export function holdingHeaderHtml(h) {
   const btc=h.quote_currency==='BTC',direct=h.valuation_basis==='krw_market';

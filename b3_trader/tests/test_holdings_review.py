@@ -37,6 +37,10 @@ def test_separate_journal_uses_exact_exchange_and_quote_and_does_not_mutate(tmp_
     assert rows['KRW-B3/BTC']['value_quote']==.000002
     assert rows['KRW-B3/BTC']['planning_available'] is False
     assert rows['KRW-DEXE']['closed'] is True
+    assert rows['KRW-DEXE']['recording_available'] is True
+    assert rows['KRW-DEXE']['planning_available'] is False
+    assert rows['KRW-B3/BTC']['recording_available'] is False
+    assert rows['KRW-UNKNOWN']['recording_available'] is False
     assert rows['KRW-UNKNOWN']['current_price'] is None
     assert rows['KRW-UNKNOWN']['planning_available'] is False
     assert result['holding_count']==3 and result['closed_count']==1

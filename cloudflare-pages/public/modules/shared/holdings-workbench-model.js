@@ -12,7 +12,7 @@ export function holdingChanged(draft,holding) {
 }
 export function scopedStrategies(detail,holding) {
   const lab=detail?.data?.strategy_lab;
-  if(!holding?.planning_available||detail?.exchange!==holding.exchange||detail?.market!==holding.market||
+  if(!(holding?.planning_available||holding?.recording_available)||detail?.exchange!==holding.exchange||detail?.market!==holding.market||
     lab?.exchange!==holding.exchange||lab?.market!==holding.market||!(lab?.version>=2))return [];
   return lab.experiments||[];
 }

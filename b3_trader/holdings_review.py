@@ -147,6 +147,7 @@ def read_holdings(path: Path | None, prices: list[dict], *, now: float | None = 
             "valuation_stale": valuation_ts is None or now - valuation_ts > 1200,
             "value_quote": value, "unrealized_pnl_quote": pnl,
             "unrealized_pnl_pct": pnl / invested * 100 if pnl is not None and invested else None,
+            "recording_available": bool(valid and exchange and quote == "KRW"),
             "planning_available": bool(valid and quantity > 0 and exchange and quote == "KRW")})
     active = [h for h in items if not h["closed"]]
     priced = [h for h in active if h["valid"] and h["value_krw"] is not None]
