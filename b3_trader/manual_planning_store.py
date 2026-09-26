@@ -11,9 +11,9 @@ import re
 import sqlite3
 import threading
 import time
-import uuid
 
 from .manual_trading import PlanningError, identity, clean_draft, clean_fill, replay, compare_journals
+from .journal_backup import backup_journal
 
 TABLES = {'manual_strategy_meta', 'manual_strategy_plans', 'manual_strategy_records'}
 SCHEMA = (
@@ -64,23 +64,7 @@ class ManualPlanningStore:
             if self.schema(source):
                 return
             # A consistent snapshot also includes WAL contents. File-copy is unsafe.
-            count = source.execute('SELECT COUNT(*) FROM manual_holdings').fetchone()[0]
-            folder = self.path.parent / 'manual-planning-backups'
-            folder.mkdir(exist_ok=True)
-            destination = folder / ('before-manual-plans-' + uuid.uuid4().hex + '.sqlite3')
-            deadline = time.monotonic() + 60
-            def progress(*_):
-                if time.monotonic() > deadline:
-                    raise PlanningError('DB 백업 시간이 초과됐습니다. 저장되지 않았습니다.', 503)
-            try:
-                with closing(sqlite3.connect(destination)) as target:
-                    source.backup(target, pages=2048, progress=progress, sleep=.02)
-                with closing(sqlite3.connect(destination.as_uri()+'?mode=ro', uri=True)) as verify:
-                    if verify.execute('PRAGMA quick_check').fetchall() != [('ok',)] or verify.execute('SELECT COUNT(*) FROM manual_holdings').fetchone()[0] != count:
-                        raise PlanningError('DB 백업 대조에 실패했습니다. 저장되지 않았습니다.', 503)
-            except Exception:
-                # Preserve even an incomplete backup for diagnosis. Never mutate source.
-                raise
+            destination = backup_journal(source, self.path.parent/'manual-planning-backups', 'before-manual-plans-')
         with closing(self.connect(write=True)) as conn, conn:
             conn.execute('BEGIN IMMEDIATE')
             if not self.schema(conn):

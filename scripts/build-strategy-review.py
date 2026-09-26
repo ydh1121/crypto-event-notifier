@@ -19,6 +19,7 @@ PYTHON_FILES = (
     'runtime_review.py', 'runtime_process_contract.py', 'holdings_review.py', 'holding_quotes.py', 'user_tools.py',
     'manual_planning_store.py', 'manual_trading.py',
     'workspace_tools.py', 'workspace_packages.py',
+    'journal_backup.py', 'holding_registration.py',
 )
 WORKSPACE_FOLDER = 'CRYPTO'
 TOOLS_LAUNCHER = r'''@echo off
@@ -45,6 +46,8 @@ START_COLLECTION.cmd  수집기 켜기 — 수집할 동안 창을 열어 둡니
 RUN_REVIEW.cmd        매매 화면 열기 — 화면을 닫아도 수집기는 계속 실행됩니다.
 RUN_CHECK.cmd         수집 상태 확인 — 결과를 남기고 끝납니다.
 CLEAN_OLD_FOLDERS.cmd  이전 버전 폴더 정리 — 결과 파일은 이 폴더 안에 보관합니다.
+
+@REGISTRATION_NOTE@
 
 처음 한 번: ZIP 안의 CRYPTO 폴더를 바탕화면에 둡니다.
 다음 업데이트: 조회 창만 닫고, 같은 위치의 CRYPTO 폴더에 모두 덮어씁니다.
@@ -176,7 +179,7 @@ BTC 마켓 가격을 확보하지 못하면 같은 거래소의 해당 자산 �
 이 경우 원화마켓 시세를 BTC 마켓 체결가나 BTC 기준 수익률로 바꾸어 표시하지 않습니다.
 과거 매입 시점의 환율이 없으므로 BTC 마켓의 손익은 BTC로 표시하며 전체 원화 손익을 만들지 않습니다.
 거래소가 없는 보유분은 원화 합계에서 제외합니다. 조회 화면에서 보유정보를 임의 변경하지 않습니다.
-수량 0인 매도 완료 기록은 DB에 그대로 남습니다. 보유정보 수정이나 주문은 하지 않습니다.
+수량 0인 매도 완료 기록은 DB에 그대로 남습니다. 기존 보유행을 덮어쓰거나 주문을 전송하지 않습니다.
 @PLANNING_NOTE@
 결과 파일의 holdings_review는 연결 상태와 건수만 담고 보유자산별 금액은 담지 않습니다.
 보유 DB를 찾지 못하면 기존 설정을 확인하며 새 DB를 만들지 않습니다.
@@ -228,8 +231,12 @@ def build(destination: Path, *, holdings_exchange: str | None = None, enable_pla
             ('CLEAN_OLD_FOLDERS.cmd', 'clean-old-folders', 'OLD FOLDER CLEANUP')):
         launcher = TOOLS_LAUNCHER.replace('@ACTION@', action).replace('@MODE@', mode)
         files[Path(name)] = launcher.replace('\n', '\r\n').encode('ascii')
-    exchange_note = '저장된 거래소 그대로' if holdings_exchange is None else ('사용자 확인: ' + {'bithumb':'빗썸','upbit':'업비트'}[holdings_exchange] + ' / 실제 보유 조회에만 적용, 원본 DB 수정 없음')
-    planning_note = '''매매 계획에서 계획 저장을 누르면 거래소·코인·전략별 매수/익절 회차와 수수료가 기존 보유 DB에 저장됩니다.
+    exchange_note = '저장된 거래소 그대로' if holdings_exchange is None else ('사용자 확인: ' + {'bithumb':'빗썸','upbit':'업비트'}[holdings_exchange] + ' / 실제 보유 거래소로 적용, 기존 행 수정 없음')
+    registration_note = '''자산 추가: 실전 계획 → + 코인 추가 → 티커·수량·평균 매수가 → 자산 목록에 저장.
+BTC로 매수했다면 매수 통화를 BTC로 선택하세요.
+기존 보유 DB에 저장하며 다시 실행해도 남습니다. 이미 등록된 코인은 덮어쓰지 않습니다.
+처음 추가할 때 기존 DB를 holding-registration-backups에 백업·검증합니다.''' if enable_planning else '이 실행본은 조회 전용입니다. 보유자산 추가·계획 저장은 비활성 상태입니다.'
+    planning_note = registration_note + '\n\n' + '''매매 계획에서 계획 저장을 누르면 거래소·코인·전략별 매수/익절 회차와 수수료가 기존 보유 DB에 저장됩니다.
 다시 실행하면 저장본을 복원합니다. 보유정보가 바뀌면 최신 수량·평단 불러오기로 명시적으로 갱신하세요.
 처음 저장할 때 기존 보유 DB를 manual-planning-backups 폴더에 백업·검증한 뒤 별도 테이블만 추가합니다.
 기존 보유 수량·평단, 기존 물타기 계획, 가상 체결 원장은 수정하지 않습니다.
@@ -240,7 +247,7 @@ def build(destination: Path, *, holdings_exchange: str | None = None, enable_pla
 같은 기간 전략 비교는 첫 입력부터 마지막 입력 체결 사이에 시작하고 끝난 거래만 비교합니다.
 실제 주문·계좌 잔액 변경·자동 거래는 없습니다. RUN_CHECK는 기존과 같이 읽기만 합니다.''' if enable_planning else '계산 초안은 이 조회 창이 열려 있는 동안만 유지됩니다.'
     files[Path('HELP.txt')] = README.replace('@BUILD@', head[:12]).replace('@HOLDINGS_EXCHANGE@',exchange_note).replace('@PLANNING_NOTE@',planning_note).encode('utf-8-sig')
-    files[Path('README.txt')] = WORKSPACE_README.replace('@BUILD@', head[:12]).encode('utf-8-sig')
+    files[Path('README.txt')] = WORKSPACE_README.replace('@BUILD@', head[:12]).replace('@REGISTRATION_NOTE@', registration_note).encode('utf-8-sig')
     manifest = {'source_commit': head, 'mode': 'local_planning' if enable_planning else 'read_only', 'confirmed_holdings_exchange':holdings_exchange, 'files': {
         path.as_posix(): hashlib.sha256(body).hexdigest() for path, body in sorted(files.items())}}
     manifest['layout'] = 'fixed_workspace_v1'

@@ -1,4 +1,12 @@
 /* Local real-holdings layout. Shared workbench primitives have one owner. */
+.holding-add-heading{display:flex;align-items:center;gap:16px;margin-bottom:20px}
+.holding-add-heading>span{font-size:14px}
+.holding-add-form{border:0;border-bottom:1px solid #dde2e8;padding:16px 0 20px;margin:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.holding-add-form legend{font-weight:650;font-size:18px;padding:0}
+.holding-add-form label{min-width:0}.holding-add-form input,.holding-add-form select{width:100%;min-width:0;box-sizing:border-box;margin-top:8px;min-height:44px;font:inherit}
+.holding-add-buttons{display:flex;align-items:end;gap:8px;flex-wrap:wrap}.holding-add-buttons button{min-height:44px}
+@media(max-width:760px){.holding-add-form{grid-template-columns:1fr 1fr}}
+@media(max-width:430px){.holding-add-form{grid-template-columns:1fr}}
 #holding-price-refresh{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
 .holding-target{font-size:24px;font-weight:650}
 .holding-target small{display:block;font-size:13px;font-weight:400;color:inherit;margin-top:8px}

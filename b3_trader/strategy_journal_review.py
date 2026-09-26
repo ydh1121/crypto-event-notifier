@@ -1,7 +1,7 @@
 """Local review of the real coin/strategy journal. Python stdlib only.
 
 PAPER reads are always read-only. Opt-in planning saves versioned plans and manual
-executions in the separate holdings journal after a verified backup. No runner,
+executions and explicit new holdings in the separate journal after a verified backup. No runner,
 Git change, credentials or exchange orders. Explicit price refresh uses public
 tickers only. Holdings amounts stay on this PC. Bind address is fixed to loopback.
 """
@@ -28,6 +28,7 @@ from .holdings_review import read_holdings, resolve_holdings_path
 from .manual_planning_store import ManualPlanningStore
 from .manual_trading import PlanningError, identity
 from .holding_quotes import HoldingQuotes
+from .holding_registration import HoldingRegistration
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / "cloudflare-pages/public"
@@ -39,12 +40,13 @@ SCRIPT = """import {createPaperWorkbench} from '/modules/pages/paper-workbench.j
 import {createHoldingsWorkbench} from '/modules/pages/holdings-workbench.js';
 const state={snapshot:null,ui:{paperExchange:'bithumb',paperMarket:'KRW-B3',paperLabStyle:'aggressive',paperTab:'coins',paperFilter:'all',paperStrategyFilter:'all',paperSort:'return_desc',paperSearch:'',paperRange:'24h'}};
 const listeners=new Set();const store={get:()=>state,setUi(patch,meta={}){Object.assign(state.ui,patch);for(const f of listeners)f(state,{type:'ui',...meta});},subscribe(f){listeners.add(f);return()=>listeners.delete(f);}};
+let refreshVersion=0;
 const container=document.getElementById('pageRoot');const paperRoot=document.createElement('div'),holdingsRoot=document.createElement('div');container.append(paperRoot,holdingsRoot);holdingsRoot.hidden=true;
 const page=createPaperWorkbench({store,allowOverview:false});page.mount(paperRoot);
-const holdingsPage=createHoldingsWorkbench({store,onRefreshPrices:async()=>{const r=await fetch('/api/holding-quotes');if(!r.ok)throw Error('가격을 조회하지 못했습니다.');await refresh();},onPaper:(exchange,market,style)=>{show('paper');page.openAccount(exchange,market,style);}});holdingsPage.mount(holdingsRoot);
+const holdingsPage=createHoldingsWorkbench({store,onHoldingsChanged:holdings=>{refreshVersion++;state.snapshot={...state.snapshot,local_holdings:holdings};for(const f of listeners)f(state,{type:'snapshot-live'});},onRefreshPrices:async()=>{const r=await fetch('/api/holding-quotes');if(!r.ok)throw Error('가격을 조회하지 못했습니다.');await refresh();},onPaper:(exchange,market,style)=>{show('paper');page.openAccount(exchange,market,style);}});holdingsPage.mount(holdingsRoot);
 function show(name){paperRoot.hidden=name!=='paper';holdingsRoot.hidden=name!=='holdings';for(const b of document.querySelectorAll('[data-review-page]'))b.setAttribute('aria-pressed',String(b.dataset.reviewPage===name));}
 document.querySelector('#reviewRoot>nav').addEventListener('click',e=>{const b=e.target.closest('[data-review-page]');if(b)show(b.dataset.reviewPage);});
-async function refresh(first=false){try{const r=await fetch('/api/review-state');if(!r.ok)throw Error('DB 조회 실패');state.snapshot=await r.json();if(first){page.render();holdingsPage.refresh();}else for(const f of listeners)f(state,{type:'snapshot-live'});}catch(e){document.querySelector('.review-label').textContent=e.message;}}
+async function refresh(first=false){const version=++refreshVersion;try{const r=await fetch('/api/review-state');if(!r.ok)throw Error('DB 조회 실패');const snapshot=await r.json();if(version!==refreshVersion)return;state.snapshot=snapshot;if(first){page.render();holdingsPage.refresh();}else for(const f of listeners)f(state,{type:'snapshot-live'});}catch(e){if(version===refreshVersion)document.querySelector('.review-label').textContent=e.message;}}
 await refresh(true);setInterval(()=>refresh(),10000);
 """
 
@@ -93,11 +95,17 @@ def handler(path: Path, *, fixture: bool = False, holdings_path: Path | None = N
             confirmed_exchange: str | None = None, enable_planning: bool = False):
     quotes = quotes if quotes is not None else HoldingQuotes()
     planning = ManualPlanningStore(holdings_path) if enable_planning else None
+    registration = HoldingRegistration(holdings_path) if enable_planning else None
     if planning and planning.path == path.resolve():
         raise ValueError('PAPER and manual journals must be separate')
     csrf = secrets.token_urlsafe(32)
     class ReviewHandler(BaseHTTPRequestHandler):
         def log_message(self, *_): pass
+
+        def state(self):
+            state=read_state(path,holdings_path,quotes,confirmed_exchange)
+            state['local_holdings'].update(planning_enabled=bool(planning), holding_registration_enabled=bool(registration))
+            return state
 
         def send(self, status, payload, content_type='application/json; charset=utf-8'):
             body = payload if isinstance(payload, bytes) else (json.dumps(payload,ensure_ascii=False,allow_nan=False).encode() if content_type.startswith('application/json') else payload.encode())
@@ -117,12 +125,12 @@ def handler(path: Path, *, fixture: bool = False, holdings_path: Path | None = N
                 return self.send(403, {'error': {'message': 'Local review only'}})
             url=urlsplit(self.path)
             try:
-                if url.path=='/': return self.send(200,INDEX.replace('로컬 DB 조회 전용', '테스트 데이터 · 실제 계좌 아님' if fixture else '계획·수동 체결 로컬 저장' if planning else '로컬 DB 조회 전용'),'text/html; charset=utf-8')
+                if url.path=='/': return self.send(200,INDEX.replace('로컬 DB 조회 전용', '테스트 데이터 · 실제 계좌 아님' if fixture else '보유자산·계획·수동 체결 로컬 저장' if planning else '로컬 DB 조회 전용'),'text/html; charset=utf-8')
                 if url.path=='/review.js': return self.send(200,SCRIPT,'text/javascript; charset=utf-8')
                 if url.path=='/api/review-state':
-                    state=read_state(path,holdings_path,quotes,confirmed_exchange)
-                    state['local_holdings']['planning_enabled']=bool(planning)
-                    return self.send(200,state)
+                    return self.send(200,self.state())
+                if url.path=='/api/holding-registration' and registration:
+                    return self.send(200,{'csrf_token':csrf})
                 if url.path=='/api/manual-planning' and planning:
                     query={k:v[0] for k,v in parse_qs(url.query).items()}
                     account=self.planning_account(query)
@@ -167,7 +175,7 @@ def handler(path: Path, *, fixture: bool = False, holdings_path: Path | None = N
             return account
 
         def do_POST(self):
-            if not planning or self.path!='/api/manual-planning':
+            if not planning or self.path not in {'/api/manual-planning','/api/holding-registration'}:
                 return self.send(405,{'error':{'message':'조회 전용입니다.'}})
             expected=f'127.0.0.1:{self.server.server_port}'
             token=self.headers.get('X-Planning-Token','')
@@ -183,6 +191,9 @@ def handler(path: Path, *, fixture: bool = False, holdings_path: Path | None = N
                 self.connection.settimeout(10)
                 payload=json.loads(self.rfile.read(size))
                 if not isinstance(payload,dict):raise PlanningError('저장 요청을 확인하세요.')
+                if self.path=='/api/holding-registration':
+                    result=registration.add(payload,confirmed_exchange)
+                    return self.send(200,{'holding_key':result['key'],'holdings':self.state()['local_holdings']})
                 account=self.planning_account(payload)
                 result=planning.write(payload,payload.get('action'),payload,account)
                 return self.send(200,{**result,'csrf_token':csrf})
@@ -267,7 +278,7 @@ def main():
     parser.add_argument('--db',type=Path,required=True)
     parser.add_argument('--holdings-db',type=Path,help='Existing manual holdings journal; separate from PAPER')
     parser.add_argument('--holdings-exchange',choices=['bithumb','upbit'],help='Explicit owner-confirmed exchange for this real-holdings portfolio; no DB write')
-    parser.add_argument('--enable-planning',action='store_true',help='Allow explicit plan/manual-record saves in the separate existing holdings journal')
+    parser.add_argument('--enable-planning',action='store_true',help='Allow explicit new holdings, plans and manual records in the separate existing holdings journal')
     parser.add_argument('--port',type=int,default=8766)
     parser.add_argument('--report',type=Path)
     parser.add_argument('--report-only',action='store_true',help='Save both observations and exit without a browser or server')

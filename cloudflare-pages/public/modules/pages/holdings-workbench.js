@@ -5,15 +5,19 @@ import {importHoldingPlan} from '../shared/holdings-workbench-model.js';
 import {holdingsShell,holdingsSummaryHtml,holdingsListHtml,holdingHeaderHtml,holdingStrategiesHtml,holdingCalculatorHtml,holdingCalculationHtml,allocationHtml,priceRefreshHtml} from '../shared/holdings-workbench-view.js';
 import {createHoldingRecordsSession} from '../shared/holding-records-session.js';
 import {savedPlanHtml,manualRecordsHtml} from '../shared/holding-records-view.js';
+import {createHoldingRegistration,holdingRegistrationHtml} from '../shared/holding-registration.js';
 
 /** Composition only. Per-holding/strategy drafts persist only through the
  * explicitly enabled local planning service; actual holdings remain separate. */
-export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=null,manualClient}) {
+export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=null,onHoldingsChanged=null,manualClient,registrationClient}) {
   let root,view,unsub,selected='',strategy='',detail=null,request=0,loading=false,error='';
   let priceBusy=false,priceError='';
   const drafts=new Map(),selections=new Map();
   const edited=new Set(),panels=new Map();
   const records=createHoldingRecordsSession({client:manualClient,restore:(k,d)=>{drafts.set(k,d);edited.delete(k);},changed:()=>render()});
+  const registration=createHoldingRegistration({client:registrationClient,changed:()=>render(),onAdded:result=>{
+    selected=result.holding_key;strategy='';detail=null;error='';request++;onHoldingsChanged?.(result.holdings);render();void load();
+  }});
   const data=()=>store.get().snapshot?.local_holdings;
   const selectable=()=>data()?.holdings?.filter(h=>!h.closed||(data().planning_enabled&&h.recording_available))||[];
   const holding=()=>selectable().find(h=>h.key===selected);
@@ -45,6 +49,7 @@ export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=nu
     patchPreservingUi(view,()=>{
       set('holdings-summary',holdingsSummaryHtml(data()));set('holdings-list',holdingsListHtml(data(),selected));
       set('holding-price-refresh',priceRefreshHtml(data(),{available:Boolean(onRefreshPrices),busy:priceBusy,error:priceError}));
+      set('holding-registration',holdingRegistrationHtml(registration.state,Boolean(onHoldingsChanged&&data()?.status==='read'&&data()?.holding_registration_enabled),data()?.confirmed_exchange));
       set('holding-detail',h?`${holdingHeaderHtml(h)}<section id="holding-strategies">${holdingStrategiesHtml(rows,strategy,{loading,error,holding:h})}</section>${saved?`<nav class="holding-work-tabs" aria-label="실전 기록">${h.closed?'':'<button data-holding-panel="plan" aria-pressed="'+!recordPanel+'">매매 계획</button>'}<button data-holding-panel="records" aria-pressed="${recordPanel}">소액 매매${h.closed?' · 매도 완료':''}</button></nav><div id="holding-save-state">${savedPlanHtml(saved,panel())}</div>`:''}<section id="holding-calculator" ${recordPanel||h.closed?'hidden':''}>${holdingCalculatorHtml(h,draft(),account())}</section>${saved?`<section id="holding-records" ${recordPanel?'':'hidden'}>${manualRecordsHtml(saved,{closed:h.closed})}</section>`:''}`:'');
     });
   }
@@ -75,6 +80,8 @@ export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=nu
   function click(e) {
     const b=e.target.closest('button');if(!b||b.disabled)return;
     if(b.dataset.action==='refresh-prices'){void refreshPrices();return;}
+    if(b.dataset.action==='open-holding-add'){registration.open(data()?.confirmed_exchange);el('holding-add-form')?.querySelector('[data-add-holding="symbol"]')?.focus();return;}
+    if(b.dataset.action==='close-holding-add'){registration.close();return;}
     if(b.dataset.holding){selected=b.dataset.holding;strategy=selections.get(selected)||'';detail=null;error='';request++;render();void load();return;}
     if(b.dataset.strategy){strategy=b.dataset.strategy;selections.set(selected,strategy);render();return;}
     if(b.dataset.holdingPanel){panels.set(key(),b.dataset.holdingPanel);render();return;}
@@ -102,6 +109,7 @@ export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=nu
   }
   function input(e) {
     const field=e.target;
+    if(field.dataset.addHolding){registration.input(field.dataset.addHolding,field.value);if(field.dataset.addHolding==='quote_currency')render();return;}
     if(field.dataset.recordField){records.input(key(),field.dataset.recordField,field.value);if(field.dataset.recordField==='side')render();return;}
     if(!holding()?.planning_available)return;
     const d=draft();
@@ -113,6 +121,6 @@ export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=nu
     else return;
     d.origin='manual';markEdited();calculate();
   }
-  return {mount(node){root=node;root.innerHTML='<crypto-holdings-workbench data-raw-text></crypto-holdings-workbench>';view=root.firstElementChild.attachShadow({mode:'open'});view.innerHTML=holdingsShell();syncTheme();view.addEventListener('click',click);view.addEventListener('input',input);document.addEventListener('viewer-theme-change',syncTheme);unsub=store.subscribe((_,meta)=>{if(['snapshot','snapshot-live'].includes(meta?.type)){render();void load();}});render();void load();},render,refresh(){render();void load();},
-    destroy(){request++;unsub?.();records.destroy();document.removeEventListener('viewer-theme-change',syncTheme);view=null;root=null;}};
+  return {mount(node){root=node;root.innerHTML='<crypto-holdings-workbench data-raw-text></crypto-holdings-workbench>';view=root.firstElementChild.attachShadow({mode:'open'});view.innerHTML=holdingsShell();syncTheme();view.addEventListener('click',click);view.addEventListener('input',input);view.addEventListener('submit',e=>{if(e.target.id==='holding-add-form'){e.preventDefault();void registration.save();}});document.addEventListener('viewer-theme-change',syncTheme);unsub=store.subscribe((_,meta)=>{if(['snapshot','snapshot-live'].includes(meta?.type)){render();void load();}});render();void load();},render,refresh(){render();void load();},
+    destroy(){request++;unsub?.();records.destroy();registration.destroy();document.removeEventListener('viewer-theme-change',syncTheme);view=null;root=null;}};
 }

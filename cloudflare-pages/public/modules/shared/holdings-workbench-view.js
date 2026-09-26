@@ -9,7 +9,7 @@ const metric=(label,value,cls='')=>`<div><dt>${label}</dt><dd class="${cls}">${v
 export function holdingsShell() {
   return `<link rel="stylesheet" href="/modules/styles/strategy-workbench.css?v=3"><link rel="stylesheet" href="/modules/styles/holdings-workbench.css">
     <main><header class="workbench-header"><h1>실전 계획</h1><div id="holding-price-refresh"></div></header><div id="holdings-summary"></div>
-    <div class="holdings-layout"><aside aria-label="보유자산"><div id="holdings-list"></div></aside><section id="holding-detail"></section></div></main>`;
+    <div id="holding-registration"></div><div class="holdings-layout"><aside aria-label="보유자산"><div id="holdings-list"></div></aside><section id="holding-detail"></section></div></main>`;
 }
 export function priceRefreshHtml(data,{available=false,busy=false,error=''}={}) {
   if(!available)return '<span>실제 보유자산</span>';
