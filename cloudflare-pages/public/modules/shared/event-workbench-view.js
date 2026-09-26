@@ -10,16 +10,20 @@ const pendingLabels={before_horizon:'대기 중',missing_baseline:'기준가 미
 const reaction=(e,h,name)=>finite(e.responses?.[h]?.[name])!==null?percent(e.responses[h][name]):pendingLabels[e.price_progress?.[name]?.[h]?.status]||'—';
 const priceCell=p=>`${won(p?.price)}<small>${stamp(p?.trade_ts)}${p?.origin==='archive'?' · 보존':''}</small>`;
 
-export function eventsHtml(events,selected='') {
+export function eventsHtml(events,selected='',horizon='1h') {
   if(!Array.isArray(events))return '<p class="placeholder">이 코인의 이벤트 반응 기록이 아직 전송되지 않았습니다.</p>';
   if(!events.length)return '<p class="placeholder">저장된 이벤트 가격·반응이 없습니다.</p>';
   const e=events.find(row=>eventKey(row)===selected)||events[0];
+  const period=periods.some(([h])=>h===horizon)?horizon:'1h';
   const evidence=periods.flatMap(([h,label])=>['coin','btc','eth'].map(name=>{
     const sample=e.responses?.[h]?.observations?.[name],p=e.price_progress?.[name]?.[h];
     return {label,name,baseline:p?.baseline||(sample?{price:sample.baseline_price,trade_ts:sample.baseline_trade_ts}:null),target:p?.target||(sample?{price:sample.target_price,trade_ts:sample.target_trade_ts}:null)};
   }));
-  return `<div class="section-heading"><h2>이벤트 반응</h2><span>최근 ${events.length}개</span></div>
-    <label class="event-choice">이벤트 선택<select id="event-picker" data-continuity-key="event-picker">${events.map(row=>`<option value="${esc(eventKey(row))}" ${row===e?'selected':''}>${esc(row.title)} · ${stamp(row.event_ts)}</option>`).join('')}</select></label>
+  return `<div class="section-heading event-toolbar"><h2>뉴스·지표 반응</h2><div class="range-picker" role="group" aria-label="발표 후 시간">${periods.map(([h,label])=>`<button data-event-horizon="${h}" data-continuity-key="event-horizon-${h}" aria-pressed="${h===period}">${label}</button>`).join('')}</div></div>
+    <div class="table-scroll event-index" data-preserve-scroll><table><caption class="subtle">최근 ${events.length}개 · ${periods.find(([h])=>h===period)[1]} 반응</caption><thead><tr><th>발표</th><th>${esc(e.market?.replace('KRW-','')||'코인')}</th><th>BTC 대비</th><th>ETH 대비</th><th>과거 표본</th></tr></thead><tbody>${events.map(row=>{
+      const r=row.responses?.[period]||{},key=esc(eventKey(row));
+      return `<tr><th scope="row"><button data-event="${key}" data-continuity-key="event-row-${key}" aria-pressed="${row===e}" title="${esc(row.title)}"><span>${esc(row.title)}</span><time>${stamp(row.event_ts)}</time></button></th><td class="${color(r.coin)}" title="${esc(reaction(row,period,'coin'))}">${finite(r.coin)===null?'—':percent(r.coin)}</td><td class="${color(r.vs_btc_pp)}">${relative(r.vs_btc_pp)}</td><td class="${color(r.vs_eth_pp)}">${relative(r.vs_eth_pp)}</td><td>${row.history?.[period]?`${number(row.history[period].samples,0)}회`:'—'}</td></tr>`;
+    }).join('')}</tbody></table></div>
     <article class="event-detail"><header><h3>${esc(e.title)}</h3><div class="event-meta"><time>${stamp(e.event_ts)} · 한국시간</time><a href="${sourceHref(e.source_url)}" target="_blank" rel="noopener noreferrer">발표 원문 ↗</a></div></header>
     ${e.anchor_changed?'<p class="notice">발표 시각이 수정되었습니다. 아래 반응은 저장 당시의 발표 시각 기준입니다.</p>':''}
     ${e.anchor_conflict?'<p class="notice">발표 시각·출처가 다른 반응 기록이 있습니다.</p>':''}

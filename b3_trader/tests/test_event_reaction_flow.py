@@ -3,7 +3,8 @@ from __future__ import annotations
 import hashlib
 import sqlite3
 
-from b3_trader.event_reaction_view import read_event_context
+from b3_trader.event_reaction_view import read_event_context, review_event_index
+from b3_trader.event_response_contract import HORIZONS
 from b3_trader.intelligence_event_response import IntelligenceEventResponseCollector
 from b3_trader.tests.test_intelligence_event_response import _init_db, _insert_event
 
@@ -103,6 +104,47 @@ def test_revised_event_clock_does_not_rewrite_or_mix_saved_horizons(tmp_path):
     assert revised['price_progress']['coin']['1h']['status']=='invalid_response'
     assert revised['price_progress']['coin']['1h']['target']['price']==120
     conn.close()
+
+
+def test_review_keeps_complete_coin_comparison_when_latest_event_has_no_baseline(tmp_path):
+    db = tmp_path/'event-index.db'; conn = setup(db)
+    coins = ('KRW-B3', 'KRW-BTC', 'KRW-ETH')
+    collector = IntelligenceEventResponseCollector(conn, benchmarks=[('bithumb', m) for m in coins])
+    old = 1000000; recent = old + 100000
+    _insert_event(db, event_id='complete', event_ts=old)
+    for market, price in zip(coins, (105, 100, 98)):
+        trade(conn, market, old-1, 100)
+        for _, seconds in HORIZONS:
+            trade(conn, market, old+seconds+1, price)
+    assert collector.run_once(now=old+86402)['samples_inserted'] == 12
+    _insert_event(db, event_id='recent-missing', event_ts=recent)
+    for market in coins[1:]:
+        trade(conn, market, recent-1, 100)
+        trade(conn, market, recent+901, 100)
+    assert collector.run_once(now=recent+1000)['samples_inserted'] == 2
+    conn.close(); digest = hashlib.sha256(db.read_bytes()).hexdigest()
+    with sqlite3.connect(db.resolve().as_uri()+'?mode=ro', uri=True) as ro:
+        ro.row_factory = sqlite3.Row; ro.execute('PRAGMA query_only=ON')
+        events = read_event_context(ro, 'bithumb', 'KRW-B3', now=recent+1000)
+        review = review_event_index(events)
+    assert review['displayed_event_count'] == 2
+    newest, complete = review['index']
+    assert newest['event_id'] == 'recent-missing' and newest['complete_comparisons'] == []
+    assert newest['horizons']['15m']['coin'] is None
+    assert newest['horizons']['15m']['btc'] == 0
+    assert newest['horizons']['15m']['status']['coin'] == 'missing_baseline'
+    assert complete['event_id'] == 'complete'
+    assert complete['complete_comparisons'] == [h for h, _ in HORIZONS]
+    assert [e['event_id'] for e in review['events']] == ['recent-missing', 'complete']
+    for h, _ in HORIZONS:
+        r = complete['horizons'][h]
+        assert abs(r['coin']-5) < 1e-8 and r['btc'] == 0 and abs(r['eth']+2) < 1e-8
+        assert abs(r['vs_btc_pp']-5) < 1e-8 and abs(r['vs_eth_pp']-7) < 1e-8
+    assert hashlib.sha256(db.read_bytes()).hexdigest() == digest
+    assert review_event_index([])['events'] == []
+    # Revised event identities may be inspected, but are not a complete comparison.
+    events[1]['anchor_conflict'] = True
+    assert review_event_index(events)['index'][1]['complete_comparisons'] == []
 
 
 def test_event_view_matches_baselines_benchmarks_and_past_available_samples(tmp_path):

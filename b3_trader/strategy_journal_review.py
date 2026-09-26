@@ -23,6 +23,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from .strategy_lab_market import read_strategy_lab_market
 from .runtime_review import compare_activity, read_runtime
+from .event_reaction_view import review_event_index
 from .holdings_review import read_holdings, resolve_holdings_path
 from .manual_planning_store import ManualPlanningStore
 from .manual_trading import PlanningError, identity
@@ -320,7 +321,7 @@ def run_review(args, build, server):
         report={'review_build':build,'review_started_at':started_at,'account_observed_at':account_observed_at,
                 'db_path':str(args.db.resolve()),'db_size':args.db.stat().st_size,'paper_only':True,
                 'mode':'read_only','scope':'bithumb|KRW-B3|aggressive','account':exp,
-                'event_review':{'exchange':'bithumb','market':event_market,'events':events[:1]},
+                'event_review':{'exchange':'bithumb','market':event_market,**review_event_index(events)},
                 'holdings_review':{'status':holdings['status'],'path_source':args.holdings_source,
                     'confirmed_exchange':args.holdings_exchange,
                     'db_path':str(args.holdings_db) if args.holdings_db else None,

@@ -12,6 +12,38 @@ from .event_price_archive import TABLE as PRICE_TABLE, read_price
 HISTORY_SECONDS = 365 * 86400
 
 
+def review_event_index(events: list[dict]) -> dict:
+    """Bounded report of the same saved observations exposed in the coin view.
+
+    Keep a recent event and the strongest complete comparison as exact price
+    evidence. The compact index covers every displayed event, not just the first.
+    It is not a count of all collected news or a probability of an event's effect.
+    """
+    items = events[:20]
+    index = []
+    for e in items:
+        complete = []
+        horizons = {}
+        for h, _ in HORIZONS:
+            r = e.get('responses', {}).get(h, {})
+            values = {k: r.get(k) for k in ('coin', 'btc', 'eth', 'vs_btc_pp', 'vs_eth_pp')}
+            usable = not e.get('anchor_conflict') and not e.get('anchor_changed')
+            if usable and all(values[k] is not None for k in ('coin', 'btc', 'eth')):
+                complete.append(h)
+            horizons[h] = {**values, 'status': {
+                name: e.get('price_progress', {}).get(name, {}).get(h, {}).get('status', 'unavailable')
+                for name in ('coin', 'btc', 'eth')}}
+        index.append({**{k: e.get(k) for k in ('event_id', 'event_ts', 'source_id', 'event_type', 'title')},
+                      'complete_comparisons': complete, 'horizons': horizons})
+    witnesses = []
+    if items:
+        best = max(range(len(items)), key=lambda n: (len(index[n]['complete_comparisons']),
+                   sum(index[n]['horizons'][h]['coin'] is not None for h, _ in HORIZONS)))
+        witnesses = [items[n] for n in dict.fromkeys((0, best))]
+    return {'selection': 'latest_20_events_with_local_price_evidence',
+            'displayed_event_count': len(index), 'index': index, 'events': witnesses}
+
+
 def _history(conn: sqlite3.Connection, event: dict, exchange: str, market: str) -> dict:
     """Only earlier same-source/type results already known at this event's time."""
     groups: dict[str, list[float]] = {h: [] for h, _ in HORIZONS}

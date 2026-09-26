@@ -10,7 +10,7 @@ import {eventsHtml,eventKey} from '../shared/event-workbench-view.js';
 /** One coin stays selected while independent strategy accounts change beneath it. */
 export function createPaperWorkbench({store, allowOverview=true}) {
   let root,view,legacy,unsub,detail=null,journal=null,journalError='',detailError='',loading=false,requestId=0,journalId=0;
-  let selected='',currentRevision='',selectedEvent='',search='',section='strategy',range='7d',calculatorOpen=false;
+  let selected='',currentRevision='',selectedEvent='',eventHorizon='1h',search='',section='strategy',range='7d',calculatorOpen=false;
   const drafts=new Map();
   const ui=()=>store.get().ui;
   const exchange=()=>ui().paperExchange==='upbit'?'upbit':'bithumb';
@@ -40,7 +40,7 @@ export function createPaperWorkbench({store, allowOverview=true}) {
     view.innerHTML=`<link rel="stylesheet" href="/modules/styles/strategy-workbench.css?v=2">
       <main><header class="workbench-header"><h1>가상매매</h1>${allowOverview?'<nav aria-label="전체 가상매매"><button data-overview="summary">전체 계좌</button><button data-overview="compare">거래소 비교</button></nav>':''}</header>
       <div class="workspace"><aside aria-label="코인 선택"><div class="exchange-picker" role="group" aria-label="거래소"><button data-exchange="bithumb" aria-pressed="${exchange()==='bithumb'}">빗썸</button><button data-exchange="upbit" aria-pressed="${exchange()==='upbit'}">업비트</button></div><label class="search-label">코인 검색<input id="coin-search" type="search" placeholder="이름 또는 티커" value="${esc(search)}"></label><div id="coin-list" class="coin-list" data-preserve-scroll></div><label class="mobile-picker">코인 선택<select id="mobile-coin"></select></label></aside>
-      <div class="coin-detail"><header id="coin-heading" class="coin-heading"></header><nav class="section-tabs" aria-label="코인 분석"><button data-section="strategy" aria-current="page">전략</button><button data-section="relative">BTC·ETH</button><button data-section="events">이벤트</button></nav><div id="coin-content"></div></div></div></main>`;
+      <div class="coin-detail"><header id="coin-heading" class="coin-heading"></header><nav class="section-tabs" aria-label="코인 분석"><button data-section="strategy" aria-current="page">전략</button><button data-section="relative">BTC·ETH</button><button data-section="events">뉴스·지표</button></nav><div id="coin-content"></div></div></div></main>`;
     view.addEventListener('click',click);view.addEventListener('input',input);view.addEventListener('change',change);
     renderCoins();renderHeading();void loadDetail();
   }
@@ -121,7 +121,7 @@ export function createPaperWorkbench({store, allowOverview=true}) {
   function renderEvents() {
     const events=detail?.data?.strategy_lab?.events;
     if(Array.isArray(events)&&!events.some(e=>eventKey(e)===selectedEvent))selectedEvent=events[0]?eventKey(events[0]):'';
-    patchPreservingUi(view,()=>set('coin-content',eventsHtml(events,selectedEvent)));
+    patchPreservingUi(view,()=>set('coin-content',eventsHtml(events,selectedEvent,eventHorizon)));
   }
   function openOverview(tab) {
     if(!allowOverview)return;
@@ -138,6 +138,8 @@ export function createPaperWorkbench({store, allowOverview=true}) {
   }
   function click(event) {
     const b=event.target.closest('button');if(!b||b.disabled)return;
+    if(b.dataset.event){selectedEvent=b.dataset.event;renderEvents();return;}
+    if(b.dataset.eventHorizon){eventHorizon=b.dataset.eventHorizon;renderEvents();return;}
     if(b.dataset.overview) {openOverview(b.dataset.overview);return;}
     if(b.dataset.exchange) {store.setUi({paperExchange:b.dataset.exchange,paperMarket:''},{scope:'paper-workbench'});detail=null;journal=null;calculatorOpen=false;render();return;}
     if(b.dataset.coin) {chooseCoin(b.dataset.coin);return;}
@@ -172,7 +174,6 @@ export function createPaperWorkbench({store, allowOverview=true}) {
   }
   function change(event) {
     if(event.target.id==='mobile-coin')chooseCoin(event.target.value);
-    if(event.target.id==='event-picker'){selectedEvent=event.target.value;renderEvents();}
   }
   return {mount(node){root=node;document.addEventListener('viewer-theme-change',syncTheme);unsub=store.subscribe((_,meta)=>{if(['snapshot','snapshot-live'].includes(meta.type)&&!legacy) {pickMarket();renderHeading();void loadDetail();}});},render,
     openAccount(exchange,market,style){selected='';section='strategy';detail=null;journal=null;currentRevision='';selectedEvent='';calculatorOpen=false;store.setUi({paperExchange:exchange,paperMarket:market,paperLabStyle:style},{scope:'paper-workbench'});render();},

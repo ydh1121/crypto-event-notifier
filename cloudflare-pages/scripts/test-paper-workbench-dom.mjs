@@ -49,18 +49,21 @@ test('ticker identifiers remain intact and existing accounts remain reachable',a
  root.querySelector('[data-return-workbench]').click();await flush();assert.ok(shadow().getElementById('coin-heading').textContent.includes('DEXE'));
 });
 test('event selection joins reaction, historical sample and evidence without polling reset',async()=>{
- click('[data-section="events"]');let select=shadow().getElementById('event-picker');
- const oldKey=select.options[1].value;select.value=oldKey;select.dispatchEvent(new window.Event('change',{bubbles:true}));
+ click('[data-section="events"]');const oldKey=shadow().querySelectorAll('[data-event]')[1].dataset.event;
+ shadow().querySelectorAll('[data-event]')[1].click();click('[data-event-horizon="15m"]');
  assert.equal(shadow().querySelector('.event-detail h3').textContent,'old 발표');
+ assert.ok(shadow().querySelector('.event-index').textContent.includes('+2%'));
+ assert.ok(shadow().querySelector('.event-index').textContent.includes('+1%p'));
  const details=shadow().querySelector('[data-continuity-key^="event-history"]');details.open=true;
- const prices=shadow().querySelector('[data-continuity-key^="event-prices"]');prices.open=true;shadow().getElementById('event-picker').focus();
+ const prices=shadow().querySelector('[data-continuity-key^="event-prices"]');prices.open=true;shadow().querySelector('[data-event][aria-pressed="true"]').focus();
  assert.ok(details.textContent.includes('2/3회'));assert.ok(shadow().querySelector('.reaction-table').textContent.includes('—'));
  addNewEvent=true;archivedTarget={price:107,trade_ts:clock/1000,origin:'archive'};clock+=21000;for(const fn of listeners)fn(state,{type:'snapshot-live'});await flush();
- assert.equal(shadow().getElementById('event-picker').value,oldKey);
- assert.equal(shadow().getElementById('event-picker').options.length,3);
+ assert.equal(shadow().querySelector('[data-event][aria-pressed="true"]').dataset.event,oldKey);
+ assert.equal(shadow().querySelectorAll('[data-event]').length,3);
+ assert.equal(shadow().querySelector('[data-event-horizon][aria-pressed="true"]').dataset.eventHorizon,'15m');
  assert.equal(shadow().querySelector('[data-continuity-key^="event-history"]').open,true);
  assert.equal(shadow().querySelector('[data-continuity-key^="event-prices"]').open,true);
- assert.equal(shadow().activeElement,shadow().getElementById('event-picker'));
+ assert.equal(shadow().activeElement,shadow().querySelector('[data-event][aria-pressed="true"]'));
  assert.ok(shadow().querySelector('.reaction-table').textContent.includes('계산 대기'));
  assert.ok(shadow().querySelector('[data-continuity-key^="event-prices"]').textContent.includes('107원'));
  assert.equal(shadow().querySelector('.event-meta a').href,'https://example.com/old');
