@@ -18,7 +18,57 @@ PYTHON_FILES = (
     'event_reaction_view.py', 'event_response_contract.py', 'event_price_archive.py',
     'runtime_review.py', 'runtime_process_contract.py', 'holdings_review.py', 'holding_quotes.py', 'user_tools.py',
     'manual_planning_store.py', 'manual_trading.py',
+    'workspace_tools.py', 'workspace_packages.py',
 )
+WORKSPACE_FOLDER = 'CRYPTO'
+TOOLS_LAUNCHER = r'''@echo off
+setlocal
+cd /d "%~dp0"
+title CRYPTO @MODE@
+set "CRYPTO_WORKSPACE_REPO=C:\Users\Administrator\Desktop\crypto-event-notifier-live"
+if not "%~1"=="" set "CRYPTO_WORKSPACE_REPO=%~1"
+if not exist "%CRYPTO_WORKSPACE_REPO%\.venv\Scripts\python.exe" (
+  echo Existing project Python not found. The project folder must be kept.
+  pause
+  exit /b 2
+)
+"%CRYPTO_WORKSPACE_REPO%\.venv\Scripts\python.exe" -B -S -m b3_trader.workspace_tools @ACTION@ --repo "%CRYPTO_WORKSPACE_REPO%"
+set "CRYPTO_WORKSPACE_EXIT=%ERRORLEVEL%"
+pause
+exit /b %CRYPTO_WORKSPACE_EXIT%
+'''
+WORKSPACE_README = '''CRYPTO — 앞으로 계속 사용하는 고정 폴더
+
+현재 도구 버전: @BUILD@
+
+START_COLLECTION.cmd  수집기 켜기 — 수집할 동안 창을 열어 둡니다.
+RUN_REVIEW.cmd        매매 화면 열기 — 화면을 닫아도 수집기는 계속 실행됩니다.
+RUN_CHECK.cmd         수집 상태 확인 — 결과를 남기고 끝납니다.
+CLEAN_OLD_FOLDERS.cmd  이전 버전 폴더 정리 — 결과 파일은 이 폴더 안에 보관합니다.
+
+처음 한 번: ZIP 안의 CRYPTO 폴더를 바탕화면에 둡니다.
+다음 업데이트: 조회 창만 닫고, 같은 위치의 CRYPTO 폴더에 모두 덮어씁니다.
+수집기 코드는 이 폴더에 들어 있지 않으므로 조회 도구 업데이트 때문에 수집기를 끄지 않습니다.
+버전별 새 폴더를 만들지 않습니다. 다운로드한 ZIP 파일은 적용 후 지워도 됩니다.
+압축 해제 도구가 바깥 폴더를 하나 더 만들었다면 그 안의 CRYPTO 내용만 기존 CRYPTO에 덮어쓰세요.
+
+반드시 보관할 본체: C:\\Users\\Administrator\\Desktop\\crypto-event-notifier-live
+실제 수집 코드·Python·가상매매 DB·보유 DB·계획·백업은 본체에 있습니다. 본체를 삭제하지 마세요.
+수집기가 꺼졌으면 앞으로는 이 CRYPTO 폴더의 START_COLLECTION.cmd만 실행합니다.
+기존 본체에 설치된 수집 소스를 그대로 실행하며 Git 업데이트나 DB 교체는 하지 않습니다.
+이미 수집 중이거나 실행 상태를 확인할 수 없으면 중복 실행을 막습니다.
+수집 종료는 Ctrl+C 후 종료가 끝날 때까지 기다립니다.
+
+이전 폴더 정리: 조회 창을 닫고 CLEAN_OLD_FOLDERS.cmd를 실행합니다.
+바탕화면·다운로드·이 CRYPTO의 옆 폴더에서 확인된 이전 실행본만 정리합니다.
+버전 폴더 안의 결과 JSON은 reports\\previous에 보관한 뒤 프로그램 파일을 삭제합니다.
+DB·사용자 파일·수정 파일·연결된 폴더가 있거나 실행 상태가 불명확하면 남깁니다.
+현재 구버전 수집 창이 실행 중이면 복구 실행본 폴더도 남깁니다.
+그 수집 창이 나중에 종료되면 START_COLLECTION.cmd로 켠 뒤 다시 정리하면 됩니다.
+정리 내역은 CLEANUP_RESULT.json에 저장됩니다. 다른 위치는 자동으로 뒤지지 않습니다.
+
+기능 설명과 데이터 보존 기준: HELP.txt
+'''
 LAUNCHER = r'''@echo off
 setlocal
 cd /d "%~dp0"
@@ -55,7 +105,7 @@ README = '''가상매매 · 실전 계획 검토 화면
 
 이번 실행본: @BUILD@
 보유 거래소 적용: @HOLDINGS_EXCHANGE@
-압축을 풀면 버전이 붙은 새 폴더가 나옵니다. 이전 폴더에 덮어쓰지 마세요.
+고정된 CRYPTO 폴더를 사용합니다. 조회 창을 닫은 뒤 기존 CRYPTO에 덮어씁니다.
 
 수집 상태 점검: RUN_CHECK.cmd
 수집 창을 열어 둔 채 RUN_CHECK.cmd를 두 번 클릭합니다.
@@ -140,7 +190,7 @@ def build(destination: Path, *, holdings_exchange: str | None = None, enable_pla
     if holdings_exchange not in {None, 'bithumb', 'upbit'}:
         raise ValueError('Unsupported confirmed holdings exchange')
     if subprocess.check_output(['git','status','--porcelain','--untracked-files=no'], cwd=ROOT, text=True).strip():
-        raise ValueError('Commit tracked changes before building a versioned review package.')
+        raise ValueError('Commit tracked changes before building a verified workspace package.')
     head = subprocess.check_output(['git','rev-parse','HEAD'], cwd=ROOT, text=True).strip()
     files = {Path('b3_trader') / name: (ROOT/'b3_trader'/name).read_bytes() for name in PYTHON_FILES}
     pending = [PUBLIC/'modules/pages/paper-workbench.js', PUBLIC/'modules/pages/holdings-workbench.js']
@@ -173,6 +223,11 @@ def build(destination: Path, *, holdings_exchange: str | None = None, enable_pla
             extra += ' --enable-planning'
         launcher = LAUNCHER.replace('@BUILD@', head[:12]).replace('@MODE@', mode).replace('@REPORT@', report).replace('@EXTRA@', extra)
         files[Path(name)] = launcher.replace('\n', '\r\n').encode('ascii')
+    for name, action, mode in (
+            ('START_COLLECTION.cmd', 'start-collection', 'COLLECTION - KEEP OPEN'),
+            ('CLEAN_OLD_FOLDERS.cmd', 'clean-old-folders', 'OLD FOLDER CLEANUP')):
+        launcher = TOOLS_LAUNCHER.replace('@ACTION@', action).replace('@MODE@', mode)
+        files[Path(name)] = launcher.replace('\n', '\r\n').encode('ascii')
     exchange_note = '저장된 거래소 그대로' if holdings_exchange is None else ('사용자 확인: ' + {'bithumb':'빗썸','upbit':'업비트'}[holdings_exchange] + ' / 실제 보유 조회에만 적용, 원본 DB 수정 없음')
     planning_note = '''매매 계획에서 계획 저장을 누르면 거래소·코인·전략별 매수/익절 회차와 수수료가 기존 보유 DB에 저장됩니다.
 다시 실행하면 저장본을 복원합니다. 보유정보가 바뀌면 최신 수량·평단 불러오기로 명시적으로 갱신하세요.
@@ -184,14 +239,16 @@ def build(destination: Path, *, holdings_exchange: str | None = None, enable_pla
 입력된 매수 잔량을 초과하는 매도는 저장되지 않습니다. 계획은 수정 버전과 당시 전략 근거를 보존합니다.
 같은 기간 전략 비교는 첫 입력부터 마지막 입력 체결 사이에 시작하고 끝난 거래만 비교합니다.
 실제 주문·계좌 잔액 변경·자동 거래는 없습니다. RUN_CHECK는 기존과 같이 읽기만 합니다.''' if enable_planning else '계산 초안은 이 조회 창이 열려 있는 동안만 유지됩니다.'
-    files[Path('README.txt')] = README.replace('@BUILD@', head[:12]).replace('@HOLDINGS_EXCHANGE@',exchange_note).replace('@PLANNING_NOTE@',planning_note).encode('utf-8-sig')
+    files[Path('HELP.txt')] = README.replace('@BUILD@', head[:12]).replace('@HOLDINGS_EXCHANGE@',exchange_note).replace('@PLANNING_NOTE@',planning_note).encode('utf-8-sig')
+    files[Path('README.txt')] = WORKSPACE_README.replace('@BUILD@', head[:12]).encode('utf-8-sig')
     manifest = {'source_commit': head, 'mode': 'local_planning' if enable_planning else 'read_only', 'confirmed_holdings_exchange':holdings_exchange, 'files': {
         path.as_posix(): hashlib.sha256(body).hexdigest() for path, body in sorted(files.items())}}
+    manifest['layout'] = 'fixed_workspace_v1'
     files[Path('SOURCE_MANIFEST.json')] = json.dumps(manifest, indent=2).encode()
     destination.parent.mkdir(parents=True, exist_ok=True)
     with ZipFile(destination, 'w', ZIP_DEFLATED) as archive:
         for path, body in sorted(files.items()):
-            archive.writestr('CRYPTO_STRATEGY_REVIEW_'+head[:12]+'/'+path.as_posix(), body)
+            archive.writestr(WORKSPACE_FOLDER+'/'+path.as_posix(), body)
     return {'file': str(destination.resolve()), 'bytes': destination.stat().st_size,
             'files': len(files), 'sha256': hashlib.sha256(destination.read_bytes()).hexdigest(),
             'source_commit': head}

@@ -44,13 +44,15 @@ ERROR_PATTERNS = {
 }
 
 
-def _processes(root):
+def _processes(root, *, include_review=False):
     if os.name != "nt":
         return {"status": "unsupported_host", "items": []}
     roles = {module: role for role, module, _, _ in SIDECARS}
     roles.update({APP_MODULE: "app", "b3_trader.local_process_host": "host"})
     roles.update({"b3_trader.paper_recovery": "recovery", "b3_trader.auto_demo": "legacy_paper",
                   "b3_trader.auto_demo_v2": "legacy_paper", "b3_trader.multi_exchange_demo": "legacy_paper"})
+    if include_review:
+        roles['b3_trader.strategy_journal_review'] = 'review'
     # Command lines are inspected inside PowerShell, never returned or saved.
     script = r'''
 $ErrorActionPreference = 'Stop'
