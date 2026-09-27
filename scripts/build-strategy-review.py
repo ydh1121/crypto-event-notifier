@@ -16,7 +16,7 @@ PYTHON_FILES = (
     'strategy_lab_market.py', 'strategy_lab_context.py', 'strategy_lab_journal.py',
     'strategy_lab_plan.py', 'strategy_lab_rules.py',
     'event_reaction_view.py', 'event_response_contract.py', 'event_price_archive.py',
-    'runtime_review.py', 'runtime_process_contract.py', 'holdings_review.py', 'holding_quotes.py', 'user_tools.py',
+    'runtime_review.py', 'runtime_process_contract.py', 'event_capture_review.py', 'holdings_review.py', 'holding_quotes.py', 'user_tools.py',
     'manual_planning_store.py', 'manual_trading.py',
     'workspace_tools.py', 'workspace_packages.py',
     'journal_backup.py', 'holding_registration.py',
@@ -113,6 +113,7 @@ README = '''가상매매 · 실전 계획 검토 화면
 수집 상태 점검: RUN_CHECK.cmd
 수집 창을 열어 둔 채 RUN_CHECK.cmd를 두 번 클릭합니다.
 약 30초 뒤 점검 창이 자동으로 닫히고, 같은 폴더에 CRYPTO_CHECK_RESULT.json이 저장됩니다.
+결과에는 B3·BTC·ETH 각각의 체결 수집 전후 시각과 최근 발표 기준가가 남아 있는 위치도 포함됩니다.
 기존 조회 화면이 열려 있어도 점검할 수 있습니다. 점검은 브라우저나 서버를 열지 않습니다.
 수집 창은 계속 열어 둡니다. 수집 창을 닫으면 자동 누적이 중단됩니다.
 

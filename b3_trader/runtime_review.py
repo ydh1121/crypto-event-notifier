@@ -12,6 +12,7 @@ import subprocess
 import time
 
 from .runtime_process_contract import APP_MODULE, HOST_LOGS, HOST_STATUS, SIDECARS
+from .event_capture_review import read_event_capture, compare_event_capture, stream_subscription_evidence
 
 STATUS_FILES = {
     "host": HOST_STATUS,
@@ -173,6 +174,8 @@ def _status(root, role, processes):
                                   "error_kinds": _error_kinds(row.get("last_error", "")),
                                   "last_result": _result_evidence(row.get("last_result"))}
                                  for row in rows if isinstance(row, dict)]
+    if role == "market_flow":
+        summary["subscription"] = stream_subscription_evidence(value)
     return summary
 
 
@@ -243,7 +246,7 @@ def _positive_clock(value):
 
 
 def read_runtime(db: Path):
-    result = {"observed_at": time.time(), "activity": read_activity(db)}
+    result = {"observed_at": time.time(), "activity": read_activity(db), "event_capture": read_event_capture(db)}
     if db.name != "auto_demo.sqlite3" or db.parent.name != "data" or db.parent.parent.name != "b3_trader":
         return {**result, "status": "runtime_root_unresolved", "processes": {"status": "not_read", "items": []}}
     root = db.resolve().parents[2]
@@ -266,4 +269,7 @@ def compare_activity(before, after):
         if first.get("status") == last.get("status") == "read" and a is not None and b is not None:
             outcome = "advanced" if b > a else "unchanged" if b == a else "latest_regressed"
         compared[name] = {"observation": outcome, "before": a, "after": b}
+    # Preserve the uniform per-series shape used by recovery report consumers.
+    compared.update({f'event_price_stream:{key}': value
+                     for key, value in compare_event_capture(before, after).items()})
     return compared
