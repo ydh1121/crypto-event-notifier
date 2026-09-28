@@ -14,14 +14,16 @@ import websocket
 
 from .market_flow_orderbook_stream_store import MarketFlowOrderbookStreamStore
 from .market_flow_stream_store import MarketFlowStreamStore
+from .market_flow_store import MarketFlowStore
+from .market_flow_subscription import (
+    DEFAULT_MARKETS, MAX_MARKETS, REFRESH_SECONDS, SubscriptionSelector, market_list,
+)
 from .market_orderbook_ladder import MarketOrderbookLadderStore
 from .research_control import atomic_json
 from .research_work_lock import ResearchWorkLock
 
 STATUS_PATH = Path("b3_trader/data/research-platform/market-flow-stream.json")
 PROCESS_LOCK_PATH = Path("b3_trader/data/research-platform/market-flow-stream-process.lock")
-DEFAULT_MARKETS = ("KRW-BTC", "KRW-ETH")
-MAX_MARKETS = 8
 STATUS_INTERVAL_SECONDS = 2.0
 FEATURE_INTERVAL_SECONDS = 60.0
 FLUSH_INTERVAL_SECONDS = 0.25
@@ -163,20 +165,7 @@ def _subscription(exchange: str, markets: tuple[str, ...]) -> str:
 
 
 def _parse_markets(raw: str | None) -> tuple[str, ...]:
-    items = []
-    for value in str(raw or "").split(","):
-        market = value.strip().upper()
-        if not market or not market.startswith("KRW-") or market in items:
-            continue
-        items.append(market)
-        if len(items) >= MAX_MARKETS:
-            break
-    if not items:
-        items = list(DEFAULT_MARKETS)
-    for benchmark in reversed(DEFAULT_MARKETS):
-        if benchmark not in items:
-            items.insert(0, benchmark)
-    return tuple(items[:MAX_MARKETS])
+    return tuple(dict.fromkeys((*DEFAULT_MARKETS, *market_list(raw))))[:MAX_MARKETS]
 
 
 class StreamWorker:
@@ -192,6 +181,7 @@ class StreamWorker:
         self.exchange = exchange
         self.endpoint = ENDPOINTS[exchange]
         self.markets = markets
+        self.pending_markets = markets
         self.stop_event = stop_event
         self.state = state
         self.state_lock = state_lock
@@ -229,6 +219,10 @@ class StreamWorker:
         self._increment("rows_inserted", int(result.get("inserted") or 0))
 
     def _on_open(self, ws: websocket.WebSocketApp) -> None:
+        with self.state_lock:
+            if self.pending_markets != self.markets:
+                ws.close()
+                return
         now = time.time()
         self.opened_in_run = True
         if self.ever_connected:
@@ -319,6 +313,9 @@ class StreamWorker:
         backoff = 1.0
         try:
             while not self.stop_event.is_set():
+                with self.state_lock:
+                    self.markets = self.pending_markets
+                    self.state['markets'] = list(self.markets)
                 self.opened_in_run = False
                 self._update(status="connecting", endpoint=self.endpoint)
                 self.app = websocket.WebSocketApp(
@@ -338,8 +335,13 @@ class StreamWorker:
                     self._on_error(self.app, exc)
                 finally:
                     self._flush(force=True)
+                    self.store.mark_disconnected(self.exchange, self.markets, disconnected_at=time.time())
+                    self._update(connected=False)
                 if self.stop_event.is_set():
                     break
+                if self.pending_markets != self.markets:
+                    backoff = 1.0
+                    continue
                 if self.opened_in_run:
                     backoff = 1.0
                 self.stop_event.wait(backoff)
@@ -368,18 +370,30 @@ class StreamWorker:
             except Exception:
                 pass
 
+    def request_markets(self, markets: tuple[str, ...]) -> None:
+        with self.state_lock:
+            if self.pending_markets == markets:
+                return
+            self.pending_markets = markets
+        # Close just this venue's socket. Its worker flushes the old subscription
+        # before applying the new list, and records a real continuity boundary.
+        self.stop()
+
 
 class MarketFlowStreamService:
     """Dedicated public WebSocket process for continuous high-frequency flow."""
 
     def __init__(self, markets: tuple[str, ...] | None = None) -> None:
-        self.markets = markets or _parse_markets(os.getenv("MARKET_FLOW_STREAM_MARKETS"))
+        self.markets = markets or DEFAULT_MARKETS
+        self.markets_by_exchange = {exchange: self.markets for exchange in ENDPOINTS}
+        self.selector = None if markets is not None else SubscriptionSelector(Path.cwd())
         self.stop_event = threading.Event()
         self.started_at = time.time()
         self.state_lock = threading.RLock()
         self.states: dict[str, dict[str, Any]] = {
             exchange: {
                 "exchange": exchange,
+                "markets": list(self.markets),
                 "endpoint": endpoint,
                 "status": "starting",
                 "connected": False,
@@ -410,6 +424,8 @@ class MarketFlowStreamService:
         self.last_feature_at = 0.0
         self.last_feature_error = ""
         self.last_orderbook_feature_error = ""
+        self.last_price_archive_error = ""
+        self.raw_rows_pruned = 0
 
     def stop(self) -> None:
         self.stop_event.set()
@@ -420,7 +436,7 @@ class MarketFlowStreamService:
         with self.state_lock:
             exchanges = {name: dict(state) for name, state in self.states.items()}
         return {
-            "ok": not bool(self.last_feature_error or self.last_orderbook_feature_error),
+            "ok": not bool(self.last_feature_error or self.last_orderbook_feature_error or self.last_price_archive_error),
             "status": "running" if running and not self.stop_event.is_set() else "stopped",
             "pid": os.getpid(),
             "running": bool(running) and not self.stop_event.is_set(),
@@ -428,12 +444,16 @@ class MarketFlowStreamService:
             "updated_at": time.time(),
             "process_lock_acquired": self.process_lock_acquired,
             "markets": list(self.markets),
+            "markets_by_exchange": {e: list(m) for e, m in self.markets_by_exchange.items()},
+            "subscription_selection": self.selector.evidence if self.selector else {},
             "exchanges": exchanges,
             "window_features_written": self.window_features_written,
             "orderbook_window_features_written": self.orderbook_window_features_written,
             "last_feature_at": self.last_feature_at,
             "last_feature_error": self.last_feature_error,
             "last_orderbook_feature_error": self.last_orderbook_feature_error,
+            "last_price_archive_error": self.last_price_archive_error,
+            "raw_rows_pruned": self.raw_rows_pruned,
             "network_public_only": True,
             "authentication_used": False,
             "paper_only": True,
@@ -466,6 +486,25 @@ class MarketFlowStreamService:
         except Exception as exc:
             self.last_orderbook_feature_error = f"{type(exc).__name__}: {exc}"[:500]
 
+    def _refresh_subscriptions(self, now: float) -> None:
+        if self.selector is None:
+            return
+        self.markets_by_exchange = self.selector.refresh(now)
+        self.markets = tuple(dict.fromkeys(m for group in self.markets_by_exchange.values() for m in group))
+        for exchange, worker in self.workers.items():
+            worker.request_markets(self.markets_by_exchange[exchange])
+
+    def _preserve_prices(self, store: MarketFlowStore) -> None:
+        try:
+            for exchange, markets in self.markets_by_exchange.items():
+                for market in markets:
+                    # The existing owner archives exact event observations and
+                    # prunes atomically at the existing 20,000-trade limit.
+                    self.raw_rows_pruned += store.prune_trades(exchange, market)
+            self.last_price_archive_error = ''
+        except Exception as exc:
+            self.last_price_archive_error = type(exc).__name__
+
     def run(self) -> None:
         process_lock = ResearchWorkLock(PROCESS_LOCK_PATH)
         if not process_lock.acquire():
@@ -473,11 +512,13 @@ class MarketFlowStreamService:
         self.process_lock_acquired = True
         aggregate_store = MarketFlowStreamStore()
         aggregate_orderbook_store = MarketFlowOrderbookStreamStore()
+        price_store = MarketFlowStore()
         try:
+            self._refresh_subscriptions(time.time())
             for exchange in ENDPOINTS:
                 worker = StreamWorker(
                     exchange,
-                    self.markets,
+                    self.markets_by_exchange[exchange],
                     self.stop_event,
                     self.states[exchange],
                     self.state_lock,
@@ -492,10 +533,15 @@ class MarketFlowStreamService:
                 self.threads[exchange] = thread
                 thread.start()
             next_feature = time.time() + 5.0
+            next_subscription = time.time() + REFRESH_SECONDS
             while not self.stop_event.wait(STATUS_INTERVAL_SECONDS):
                 now = time.time()
+                if now >= next_subscription:
+                    self._refresh_subscriptions(now)
+                    next_subscription = now + REFRESH_SECONDS
                 if now >= next_feature:
                     self._aggregate_windows(aggregate_store, aggregate_orderbook_store)
+                    self._preserve_prices(price_store)
                     next_feature = now + FEATURE_INTERVAL_SECONDS
                 self._write_status(running=True)
         finally:
@@ -503,6 +549,8 @@ class MarketFlowStreamService:
             for thread in self.threads.values():
                 thread.join(timeout=5.0)
             self._aggregate_windows(aggregate_store, aggregate_orderbook_store)
+            self._preserve_prices(price_store)
+            price_store.close()
             aggregate_store.close()
             aggregate_orderbook_store.close()
             self.process_lock_acquired = False

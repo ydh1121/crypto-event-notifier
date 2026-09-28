@@ -140,7 +140,7 @@ def _anchor_checks(reader, events, now):
         precise = str(event['event_type']).strip().upper() not in EXCLUDED_EVENT_TYPES
         current = now - EVENT_LOOKBACK_SECONDS <= stamp <= now
         item = {**event, "in_collection_window": current, "precise_clock": precise,
-                "receipt_delay_seconds": event['received_at'] - stamp if _clock(event['received_at']) else None,
+                "latest_receipt_minus_source_seconds": event['received_at'] - stamp if _clock(event['received_at']) else None,
                 "markets": {}}
         checks.append(item)
         if not precise:
@@ -208,13 +208,27 @@ def compare_event_capture(before, after):
 
 def stream_subscription_evidence(value):
     """Saved configuration only. Runtime ownership is reported separately."""
-    markets = value.get('markets')
-    valid = isinstance(markets, list) and all(isinstance(m, str) for m in markets)
     exchanges = value.get('exchanges')
     state = exchanges.get(EXCHANGE, {}) if isinstance(exchanges, dict) else {}
     state = state if isinstance(state, dict) else {}
+    # Actual per-venue worker state takes precedence over the legacy shared list.
+    # A global union (or pending request) does not prove this venue subscribed.
+    markets = state['markets'] if 'markets' in state else value.get('markets')
+    valid = isinstance(markets, list) and all(isinstance(m, str) for m in markets)
+    selections = value.get('subscription_selection')
+    selection = selections.get(EXCHANGE, {}) if isinstance(selections, dict) else {}
+    selection = selection if isinstance(selection, dict) else {}
+    selected = {}
+    for key in ('desired_markets', 'deferred_markets', 'unavailable_markets'):
+        rows = selection.get(key)
+        known = isinstance(rows, list) and all(isinstance(m, str) for m in rows)
+        selected[key] = {market: market in rows if known else None for market in MARKETS}
+    catalog = selection.get('catalog_status')
     return {"scope": "saved_configuration", "market_count": len(markets) if valid else None,
             "membership": {market: market in markets if valid else None for market in MARKETS},
+            "selection": {**selected, "capacity": _number(selection.get('capacity')),
+                          "catalog_status": catalog if catalog in {'current', 'cached', 'unavailable'} else None,
+                          "catalog_received_at": _clock(selection.get('catalog_received_at'))},
             "exchange": EXCHANGE,
             "connected": state['connected'] if type(state.get('connected')) is bool else None,
             **{key: _clock(state.get(key)) for key in

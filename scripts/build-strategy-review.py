@@ -18,7 +18,7 @@ PYTHON_FILES = (
     'event_reaction_view.py', 'event_response_contract.py', 'event_price_archive.py',
     'runtime_review.py', 'runtime_process_contract.py', 'event_capture_review.py', 'holdings_review.py', 'holding_quotes.py', 'user_tools.py',
     'manual_planning_store.py', 'manual_trading.py',
-    'workspace_tools.py', 'workspace_packages.py',
+    'workspace_tools.py', 'workspace_packages.py', 'collection_update.py',
     'journal_backup.py', 'holding_registration.py',
     'check_report_output.py', 'intelligence_review.py',
 )
@@ -44,6 +44,7 @@ WORKSPACE_README = '''CRYPTO — 앞으로 계속 사용하는 고정 폴더
 현재 도구 버전: @BUILD@
 
 START_COLLECTION.cmd  수집기 켜기 — 수집할 동안 창을 열어 둡니다.
+UPDATE_COLLECTION.cmd 수집 코드 갱신 후 켜기 — 기존 수집·조회 창을 먼저 종료합니다.
 RUN_REVIEW.cmd        매매 화면 열기 — 화면을 닫아도 수집기는 계속 실행됩니다.
 RUN_CHECK.cmd         수집 상태 확인 — 결과를 남기고 끝납니다.
 CLEAN_OLD_FOLDERS.cmd  이전 버전 폴더 정리 — 결과 파일은 이 폴더 안에 보관합니다.
@@ -53,6 +54,10 @@ CLEAN_OLD_FOLDERS.cmd  이전 버전 폴더 정리 — 결과 파일은 이 폴�
 처음 한 번: ZIP 안의 CRYPTO 폴더를 바탕화면에 둡니다.
 다음 업데이트: 조회 창만 닫고, 같은 위치의 CRYPTO 폴더에 모두 덮어씁니다.
 수집기 코드는 이 폴더에 들어 있지 않으므로 조회 도구 업데이트 때문에 수집기를 끄지 않습니다.
+이번 수집 수정 적용: 기존 수집 창에서 Ctrl+C → 종료를 기다림 → UPDATE_COLLECTION.cmd 실행.
+기존 본체를 이 실행본의 소스 버전으로 갱신한 뒤 수집을 시작합니다. 이 창은 계속 열어 둡니다.
+UPDATE_COLLECTION은 GitHub 연결이 필요합니다. 진행 중인 수집·수정 파일·다른 브랜치가 있으면 중단합니다.
+기존 DB·설정 파일을 덮어쓰거나 강제 초기화하지 않습니다.
 버전별 새 폴더를 만들지 않습니다. 다운로드한 ZIP 파일은 적용 후 지워도 됩니다.
 압축 해제 도구가 바깥 폴더를 하나 더 만들었다면 그 안의 CRYPTO 내용만 기존 CRYPTO에 덮어쓰세요.
 
@@ -60,6 +65,7 @@ CLEAN_OLD_FOLDERS.cmd  이전 버전 폴더 정리 — 결과 파일은 이 폴�
 실제 수집 코드·Python·가상매매 DB·보유 DB·계획·백업은 본체에 있습니다. 본체를 삭제하지 마세요.
 수집기가 꺼졌으면 앞으로는 이 CRYPTO 폴더의 START_COLLECTION.cmd만 실행합니다.
 기존 본체에 설치된 수집 소스를 그대로 실행하며 Git 업데이트나 DB 교체는 하지 않습니다.
+수집 코드 갱신은 UPDATE_COLLECTION에서만 실행합니다.
 이미 수집 중이거나 실행 상태를 확인할 수 없으면 중복 실행을 막습니다.
 수집 종료는 Ctrl+C 후 종료가 끝날 때까지 기다립니다.
 
@@ -112,6 +118,13 @@ README = '''가상매매 · 실전 계획 검토 화면
 보유 거래소 적용: @HOLDINGS_EXCHANGE@
 고정된 CRYPTO 폴더를 사용합니다. 조회 창을 닫은 뒤 기존 CRYPTO에 덮어씁니다.
 
+이번 수집 코드 적용: 수집 창 Ctrl+C → 종료 대기 → UPDATE_COLLECTION.cmd.
+갱신 후 수집이 자동 시작됩니다. 이 창은 켜 두고 RUN_CHECK.cmd로 확인합니다.
+빗썸·업비트별 상장 종목을 확인하여 보유 코인과 관심 코인을 체결 수집에 연결합니다.
+BTC·ETH 포함 거래소당 최대 8개를 지속 구독하며, 자산 추가는 약 1분마다 반영합니다.
+새로 상장된 종목은 목록 갱신까지 최대 5분이 걸릴 수 있습니다.
+이미 놓친 발표 기준가를 가짜 가격으로 채우지 않습니다.
+
 수집 상태 점검: RUN_CHECK.cmd
 수집 창을 열어 둔 채 RUN_CHECK.cmd를 두 번 클릭합니다.
 약 30초 이상 기다려 CHECK COMPLETE가 표시되면, 탐색기에서 선택된 CRYPTO_CHECK_RESULT.json을 첨부합니다.
@@ -127,7 +140,7 @@ README = '''가상매매 · 실전 계획 검토 화면
 조회 창을 닫으면 이 조회 화면만 종료됩니다.
 
 Python 3.10 이상을 사용합니다. 기존 프로젝트의 Python 또는 PC의 Python을 자동으로 찾습니다.
-별도 설치, Git 변경, 기존 수집기 재시작 없이 실행됩니다.
+조회·점검은 별도 설치, Git 변경, 기존 수집기 재시작 없이 실행됩니다.
 기본 DB: C:\\Users\\Administrator\\Desktop\\crypto-event-notifier-live\\b3_trader\\data\\auto_demo.sqlite3
 주소: http://127.0.0.1:8766/
 다른 DB 경로는 RUN_REVIEW.cmd "기존 SQLite 파일 경로"로 지정합니다.
@@ -236,6 +249,7 @@ def build(destination: Path, *, holdings_exchange: str | None = None, enable_pla
         files[Path(name)] = launcher.replace('\n', '\r\n').encode('ascii')
     for name, action, mode in (
             ('START_COLLECTION.cmd', 'start-collection', 'COLLECTION - KEEP OPEN'),
+            ('UPDATE_COLLECTION.cmd', 'update-collection', 'UPDATE COLLECTION - KEEP OPEN'),
             ('CLEAN_OLD_FOLDERS.cmd', 'clean-old-folders', 'OLD FOLDER CLEANUP')):
         launcher = TOOLS_LAUNCHER.replace('@ACTION@', action).replace('@MODE@', mode)
         files[Path(name)] = launcher.replace('\n', '\r\n').encode('ascii')

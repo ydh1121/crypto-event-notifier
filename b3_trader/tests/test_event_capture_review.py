@@ -159,6 +159,15 @@ def test_actual_saved_subscription_is_sanitized_not_guessed_from_defaults(tmp_pa
     assert review.stream_subscription_evidence({})['membership']['KRW-B3'] is None
 
 
+def test_subscription_does_not_borrow_global_union_or_pending_list():
+    value={'markets':['KRW-BTC','KRW-ETH','KRW-B3'],
+           'markets_by_exchange':{'bithumb':['KRW-BTC','KRW-ETH','KRW-B3']},
+           'exchanges':{'bithumb':{'markets':['KRW-BTC','KRW-ETH']}}}
+    assert review.stream_subscription_evidence(value)['membership']['KRW-B3'] is False
+    value['exchanges']['bithumb']['markets']=None
+    assert review.stream_subscription_evidence(value)['membership']['KRW-B3'] is None
+
+
 def test_retention_count_can_be_bounded_without_claiming_continuity(tmp_path, monkeypatch):
     path = tmp_path/'count.db'
     store = database(path)

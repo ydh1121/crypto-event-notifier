@@ -1,4 +1,4 @@
-"""Stable user entrypoints. No Git update, installation or automatic restart."""
+"""Stable entrypoints; source updates require the explicit idle-update action."""
 from __future__ import annotations
 
 import argparse
@@ -16,7 +16,7 @@ DEFAULT_REPO = Path(r'C:\Users\Administrator\Desktop\crypto-event-notifier-live'
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def start_collection(repo: Path) -> int:
+def start_collection(repo: Path, *, confirmed_exchange: str | None = None) -> int:
     repo = repo.resolve()
     python = repo/'.venv'/'Scripts'/'python.exe'
     if not all(p.is_file() for p in (python, repo/'b3_trader/local_process_host.py',
@@ -39,8 +39,11 @@ def start_collection(repo: Path) -> int:
     print('Keep this window open. Ctrl+C stops this collection session.', flush=True)
     # Existing checkout and recovery allowlist own collection semantics. The
     # viewer package never supplies or copies collector code into this checkout.
+    environment = {**os.environ, **RECOVERY_ENV}
+    if confirmed_exchange in {'bithumb', 'upbit'}:
+        environment['MARKET_FLOW_HOLDINGS_EXCHANGE'] = confirmed_exchange
     process = subprocess.Popen([str(python), '-B', '-m', 'b3_trader.local_process_host', '--recovery'],
-                               cwd=repo, env={**os.environ, **RECOVERY_ENV})
+                               cwd=repo, env=environment)
     while True:
         try:
             return process.wait()
@@ -52,7 +55,7 @@ def start_collection(repo: Path) -> int:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=('start-collection', 'clean-old-folders'))
+    parser.add_argument('action', choices=('start-collection', 'update-collection', 'clean-old-folders'))
     parser.add_argument('--repo', type=Path, default=DEFAULT_REPO)
     parser.add_argument('--scan-root', type=Path, action='append')
     args = parser.parse_args()
@@ -60,8 +63,11 @@ def main():
         manifest = verified_manifest(ROOT)
         if manifest.get('layout') != 'fixed_workspace_v1':
             raise ValueError('Use the complete CRYPTO folder from the current package.')
-        if args.action == 'start-collection':
-            return start_collection(args.repo)
+        if args.action in {'start-collection', 'update-collection'}:
+            if args.action == 'update-collection':
+                from .collection_update import update_collection
+                update_collection(args.repo, manifest['source_commit'])
+            return start_collection(args.repo, confirmed_exchange=manifest.get('confirmed_holdings_exchange'))
         roots = args.scan_root or [ROOT.parent, args.repo.parent, Path.home()/'Downloads']
         result = cleanup_old_packages(ROOT, args.repo, roots,
                                       lambda: _processes(args.repo, include_review=True))

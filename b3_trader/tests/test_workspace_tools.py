@@ -41,13 +41,14 @@ def test_start_existing_canonical_host_and_wait_for_clean_ctrl_c_stop(collector,
         starts.append((command, kwargs))
         return SimpleNamespace(wait=wait)
     monkeypatch.setattr(tools.subprocess, 'Popen', start)
-    assert tools.start_collection(repo) == 0
+    assert tools.start_collection(repo, confirmed_exchange='bithumb') == 0
     command, kwargs = starts[0]
     assert command == [str(repo/'.venv/Scripts/python.exe'), '-B', '-m', 'b3_trader.local_process_host', '--recovery']
     assert kwargs['cwd'] == repo
     assert kwargs['env']['LIVE_TRADING_ENABLED'] == 'false'
     assert kwargs['env']['AUTO_GIT_SYNC'] == 'false'
     assert kwargs['env']['AUTO_GIT_PUSH_CONTROL'] == 'false'
+    assert kwargs['env']['MARKET_FLOW_HOLDINGS_EXCHANGE'] == 'bithumb'
     assert len(starts) == 1 and len(waits) == 2
     assert {row[3] for row in git_calls} == {'rev-parse', 'status'}
     assert (repo/'b3_trader/data/auto_demo.sqlite3').read_text() == 'existing'
@@ -112,6 +113,7 @@ def test_two_revisions_overlay_one_folder_preserving_outputs_and_canonical_db(tm
         assert check.count('--expected-build '+head)==3
         assert 'explorer.exe /select,"%~dp0CRYPTO_CHECK_RESULT.json"' in check
         assert '@FULL_BUILD@' not in check and '@SUCCESS@' not in check
+        assert 'update-collection' in (workspace/'UPDATE_COLLECTION.cmd').read_text()
         if head[0] == 'a':
             (workspace/'CRYPTO_B3_REVIEW_RESULT.json').write_text('actual result')
         else:
