@@ -46,6 +46,15 @@ def test_one_shot_reports_actual_account_without_socket_browser_or_db_write(tmp_
                 conn.execute(f'UPDATE "{table}" SET market=? WHERE market=?', ('KRW-B3', 'KRW-BTC'))
     before = hashlib.sha256(db.read_bytes()).hexdigest()
     report = tmp_path / 'result.json'
+    report.write_text('previous attachment')
+    original_finish = review.finish_runtime_observation
+    def observe_without_publishing(db_path, progress, value, seconds, stop):
+        assert not report.exists()
+        assert json.loads(progress.read_text())['runtime_review']['status'] == 'waiting_for_second_observation'
+        previous = list((tmp_path/'reports/previous').glob('*.json'))
+        assert len(previous) == 1 and previous[0].read_text() == 'previous attachment'
+        original_finish(db_path, progress, value, seconds, stop)
+    monkeypatch.setattr(review,'finish_runtime_observation',observe_without_publishing)
     monkeypatch.setattr(sys, 'argv', ['review', '--db', str(db), '--report', str(report),
                                      '--report-only', '--observe-seconds', '0'])
     monkeypatch.setattr(runtime_review, '_processes', lambda _: {'status': 'unsupported', 'items': []})
@@ -61,6 +70,7 @@ def test_one_shot_reports_actual_account_without_socket_browser_or_db_write(tmp_
     assert result['review_build']['report_schema'] == 2
     assert 'strategy_lab_metrics' in result['runtime_review']['after']['activity']
     assert hashlib.sha256(db.read_bytes()).hexdigest() == before
+    assert list((tmp_path/'reports/in-progress').glob('*.json')) == []
 
 
 @pytest.mark.parametrize('keyboard', [False, True])
@@ -100,3 +110,36 @@ def test_event_market_coverage_is_counted_without_exporting_identifiers():
         'markets': ['private-list'], 'missing_baseline': 4}})
     assert result['event_response_capture'] == {
         'markets_considered': 400, 'market_selection': 'observed_krw_markets', 'missing_baseline': 4}
+
+
+def test_launcher_version_mismatch_stops_before_reading_db_or_replacing_report(tmp_path, monkeypatch):
+    db = tmp_path/'paper.db';db.touch()
+    report = tmp_path/'result.json';report.write_text('previous attachment')
+    monkeypatch.setattr(sys,'argv',['review','--db',str(db),'--report',str(report),
+        '--report-only','--expected-build','a'*40])
+    monkeypatch.setattr(review,'review_build',lambda: {'integrity':'verified','source_commit':'b'*40})
+    def no_read(*args,**kwargs): raise AssertionError('Mismatched launcher cannot reach database')
+    monkeypatch.setattr(review,'read_detail',no_read)
+    with pytest.raises(SystemExit): review.main()
+    assert report.read_text() == 'previous attachment'
+
+
+@pytest.mark.parametrize('state',['interrupted','read_failed','waiting_for_second_observation'])
+def test_incomplete_check_cannot_be_published_as_attachment(tmp_path,state):
+    from b3_trader.check_report_output import CheckReportOutput
+    report=tmp_path/'CRYPTO_CHECK_RESULT.json';report.write_text('old')
+    output=CheckReportOutput(report);output.prepare()
+    review.write_report(output.progress,{'runtime_review':{'status':state},'review_finished_at':1})
+    with pytest.raises(ValueError,match='not completed'): output.publish()
+    assert not report.exists()
+    assert output.progress.exists()
+    assert next((tmp_path/'reports/previous').glob('*.json')).read_text()=='old'
+
+
+def test_report_history_symlink_cannot_move_an_existing_attachment(tmp_path):
+    from b3_trader.check_report_output import CheckReportOutput
+    report=tmp_path/'result.json';report.write_text('keep')
+    other=tmp_path/'other';other.mkdir()
+    (tmp_path/'reports').symlink_to(other,target_is_directory=True)
+    with pytest.raises(ValueError,match='symbolic'): CheckReportOutput(report).prepare()
+    assert report.read_text()=='keep' and list(other.iterdir())==[]

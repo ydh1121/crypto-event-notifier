@@ -20,6 +20,7 @@ PYTHON_FILES = (
     'manual_planning_store.py', 'manual_trading.py',
     'workspace_tools.py', 'workspace_packages.py',
     'journal_backup.py', 'holding_registration.py',
+    'check_report_output.py', 'intelligence_review.py',
 )
 WORKSPACE_FOLDER = 'CRYPTO'
 TOOLS_LAUNCHER = r'''@echo off
@@ -88,16 +89,17 @@ if not exist "%CRYPTO_REVIEW_DB%" (
   exit /b 1
 )
 if exist "%CRYPTO_REVIEW_REPO%\.venv\Scripts\python.exe" (
-  "%CRYPTO_REVIEW_REPO%\.venv\Scripts\python.exe" -B -S -m b3_trader.strategy_journal_review --db "%CRYPTO_REVIEW_DB%" --report "%~dp0@REPORT@" @EXTRA@
+  "%CRYPTO_REVIEW_REPO%\.venv\Scripts\python.exe" -B -S -m b3_trader.strategy_journal_review --db "%CRYPTO_REVIEW_DB%" --report "%~dp0@REPORT@" --expected-build @FULL_BUILD@ @EXTRA@
 ) else (
   where py >nul 2>nul
   if not errorlevel 1 (
-    py -3 -B -S -m b3_trader.strategy_journal_review --db "%CRYPTO_REVIEW_DB%" --report "%~dp0@REPORT@" @EXTRA@
+    py -3 -B -S -m b3_trader.strategy_journal_review --db "%CRYPTO_REVIEW_DB%" --report "%~dp0@REPORT@" --expected-build @FULL_BUILD@ @EXTRA@
   ) else (
-    python -B -S -m b3_trader.strategy_journal_review --db "%CRYPTO_REVIEW_DB%" --report "%~dp0@REPORT@" @EXTRA@
+    python -B -S -m b3_trader.strategy_journal_review --db "%CRYPTO_REVIEW_DB%" --report "%~dp0@REPORT@" --expected-build @FULL_BUILD@ @EXTRA@
   )
 )
 set "CRYPTO_REVIEW_EXIT=%errorlevel%"
+@SUCCESS@
 if not "%CRYPTO_REVIEW_EXIT%"=="0" (
   echo Check did not complete. The collection window is separate.
   pause
@@ -112,7 +114,9 @@ README = '''가상매매 · 실전 계획 검토 화면
 
 수집 상태 점검: RUN_CHECK.cmd
 수집 창을 열어 둔 채 RUN_CHECK.cmd를 두 번 클릭합니다.
-약 30초 뒤 점검 창이 자동으로 닫히고, 같은 폴더에 CRYPTO_CHECK_RESULT.json이 저장됩니다.
+약 30초 이상 기다려 CHECK COMPLETE가 표시되면, 탐색기에서 선택된 CRYPTO_CHECK_RESULT.json을 첨부합니다.
+완료 전에는 제출할 결과 파일을 만들지 않습니다. 이전 결과는 reports\\previous에 보관합니다.
+완료 후 점검 창은 아무 키나 눌러 닫습니다. 수집 창은 계속 열어 둡니다.
 결과에는 B3·BTC·ETH 각각의 체결 수집 전후 시각과 최근 발표 기준가가 남아 있는 위치도 포함됩니다.
 기존 조회 화면이 열려 있어도 점검할 수 있습니다. 점검은 브라우저나 서버를 열지 않습니다.
 수집 창은 계속 열어 둡니다. 수집 창을 닫으면 자동 누적이 중단됩니다.
@@ -225,7 +229,10 @@ def build(destination: Path, *, holdings_exchange: str | None = None, enable_pla
             extra += ' --holdings-exchange ' + holdings_exchange
         if enable_planning and name=='RUN_REVIEW.cmd':
             extra += ' --enable-planning'
-        launcher = LAUNCHER.replace('@BUILD@', head[:12]).replace('@MODE@', mode).replace('@REPORT@', report).replace('@EXTRA@', extra)
+        success = ('if "%CRYPTO_REVIEW_EXIT%"=="0" (\n'
+                   '  explorer.exe /select,"%~dp0CRYPTO_CHECK_RESULT.json"\n'
+                   '  pause\n)') if name == 'RUN_CHECK.cmd' else ''
+        launcher = LAUNCHER.replace('@BUILD@', head[:12]).replace('@FULL_BUILD@', head).replace('@MODE@', mode).replace('@REPORT@', report).replace('@EXTRA@', extra).replace('@SUCCESS@', success)
         files[Path(name)] = launcher.replace('\n', '\r\n').encode('ascii')
     for name, action, mode in (
             ('START_COLLECTION.cmd', 'start-collection', 'COLLECTION - KEEP OPEN'),

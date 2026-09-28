@@ -13,6 +13,7 @@ import time
 
 from .runtime_process_contract import APP_MODULE, HOST_LOGS, HOST_STATUS, SIDECARS
 from .event_capture_review import read_event_capture, compare_event_capture, stream_subscription_evidence
+from .intelligence_review import source_result_evidence
 
 STATUS_FILES = {
     "host": HOST_STATUS,
@@ -202,6 +203,8 @@ def _result_evidence(result, *, include_response=True):
         evidence["market_selection"] = result["market_selection"]
     if include_response and isinstance(result.get("event_response_capture"), dict):
         evidence["event_response_capture"] = _result_evidence(result["event_response_capture"], include_response=False)
+    if include_response:
+        evidence.update(source_result_evidence(result, _error_kinds))
     return evidence
 
 

@@ -108,6 +108,10 @@ def test_two_revisions_overlay_one_folder_preserving_outputs_and_canonical_db(tm
         assert manifest['confirmed_holdings_exchange'] == 'bithumb'
         assert '--enable-planning' in (workspace/'RUN_REVIEW.cmd').read_text()
         assert '--enable-planning' not in (workspace/'RUN_CHECK.cmd').read_text()
+        check=(workspace/'RUN_CHECK.cmd').read_text()
+        assert check.count('--expected-build '+head)==3
+        assert 'explorer.exe /select,"%~dp0CRYPTO_CHECK_RESULT.json"' in check
+        assert '@FULL_BUILD@' not in check and '@SUCCESS@' not in check
         if head[0] == 'a':
             (workspace/'CRYPTO_B3_REVIEW_RESULT.json').write_text('actual result')
         else:

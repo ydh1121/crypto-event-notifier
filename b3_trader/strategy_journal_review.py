@@ -29,6 +29,7 @@ from .manual_planning_store import ManualPlanningStore
 from .manual_trading import PlanningError, identity
 from .holding_quotes import HoldingQuotes
 from .holding_registration import HoldingRegistration
+from .check_report_output import CheckReportOutput
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / "cloudflare-pages/public"
@@ -282,6 +283,7 @@ def main():
     parser.add_argument('--port',type=int,default=8766)
     parser.add_argument('--report',type=Path)
     parser.add_argument('--report-only',action='store_true',help='Save both observations and exit without a browser or server')
+    parser.add_argument('--expected-build',help='Require the complete package revision embedded in the launcher')
     parser.add_argument('--fixture',action='store_true',help='Label synthetic test data explicitly')
     parser.add_argument('--open-browser',action='store_true')
     parser.add_argument('--observe-seconds',type=float,default=30)
@@ -300,7 +302,10 @@ def main():
     build = review_build()
     print(f'Review schema {REPORT_SCHEMA} / package {build["source_commit"] or "unversioned"} / {build["integrity"]}',flush=True)
     if build['integrity'] == 'mismatch':
-        parser.error('Review package files do not match. Extract the complete ZIP into its own new folder.')
+        parser.error('Review package files do not match. Overwrite every file in the existing CRYPTO folder from the complete ZIP.')
+    if args.expected_build and (not re.fullmatch(r'[0-9a-f]{40}',args.expected_build)
+            or build['integrity'] != 'verified' or build['source_commit'] != args.expected_build):
+        parser.error('Launcher and package versions differ. Overwrite the existing CRYPTO folder with the complete ZIP.')
     # Bind before generating output, so an old viewer occupying this port cannot
     # leave a new report that appears to belong to the old browser window.
     server = None
@@ -317,6 +322,9 @@ def main():
 
 
 def run_review(args, build, server):
+    output = CheckReportOutput(args.report) if args.report_only else None
+    if output:
+        output.prepare()
     started_at = time.time()
     sample=read_detail(args.db,'bithumb','KRW-B3')
     account_observed_at = time.time()
@@ -344,11 +352,16 @@ def run_review(args, build, server):
                     'non_krw_count':sum(1 for h in holdings['holdings'] if not h['closed'] and h['quote_currency'] != 'KRW')},
                 'runtime_review':{'status':'waiting_for_second_observation','before':read_runtime(args.db)},
                 'limitations':['Stored drawdown is not fill-only replay.','No runner was started.','No remote publication.']}
-        write_report(args.report, report)
+        write_report(output.progress if output else args.report, report)
         print(f'Checking for {args.observe_seconds:g} seconds. Keep the collection window open; this check ends separately.',flush=True)
     if args.report_only:
-        finish_runtime_observation(args.db,args.report,report,args.observe_seconds,observation_stop)
-        return 0 if report['runtime_review']['status'] == 'complete' else 1
+        finish_runtime_observation(args.db,output.progress,report,args.observe_seconds,observation_stop)
+        if report['runtime_review']['status'] != 'complete':
+            print(f'CHECK INCOMPLETE: {output.progress}',flush=True)
+            return 1
+        output.publish()
+        print(f'CHECK COMPLETE: {output.final}',flush=True)
+        return 0
     print(f'READ ONLY: http://127.0.0.1:{server.server_port}/',flush=True)
     print(f'B3 aggressive journal match: {exp.get("reconciliation",{}).get("matches") if exp else "account unavailable"}',flush=True)
     if args.open_browser:
