@@ -14,6 +14,7 @@ import time
 from .runtime_process_contract import APP_MODULE, HOST_LOGS, HOST_STATUS, SIDECARS
 from .event_capture_review import read_event_capture, compare_event_capture, stream_subscription_evidence
 from .intelligence_review import source_result_evidence
+from .collection_source import read_collection_source
 
 STATUS_FILES = {
     "host": HOST_STATUS,
@@ -255,6 +256,7 @@ def read_runtime(db: Path):
     root = db.resolve().parents[2]
     processes = _processes(root)
     result.update(status="observed", processes=processes,
+                  collection_source=read_collection_source(root),
                   saved_statuses={role: _status(root, role, processes) for role in STATUS_FILES})
     result["research_log"] = _log_kinds(root / "b3_trader/data/research-platform/supervisor.log")
     result["process_logs"] = {role: _log_kinds(root / HOST_LOGS / f"{role}.log")

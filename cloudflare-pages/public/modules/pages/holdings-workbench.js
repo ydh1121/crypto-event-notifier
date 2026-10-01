@@ -6,10 +6,12 @@ import {holdingsShell,holdingsSummaryHtml,holdingsListHtml,holdingHeaderHtml,hol
 import {createHoldingRecordsSession} from '../shared/holding-records-session.js';
 import {savedPlanHtml,manualRecordsHtml} from '../shared/holding-records-view.js';
 import {createHoldingRegistration,holdingRegistrationHtml} from '../shared/holding-registration.js';
+import {createHoldingManagement} from '../shared/holding-management-session.js';
+import {holdingManagementHtml} from '../shared/holding-management-view.js';
 
 /** Composition only. Per-holding/strategy drafts persist only through the
  * explicitly enabled local planning service; actual holdings remain separate. */
-export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=null,onHoldingsChanged=null,manualClient,registrationClient}) {
+export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=null,onHoldingsChanged=null,manualClient,registrationClient,managementClient}) {
   let root,view,unsub,selected='',strategy='',detail=null,request=0,loading=false,error='';
   let priceBusy=false,priceError='';
   const drafts=new Map(),selections=new Map();
@@ -18,8 +20,9 @@ export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=nu
   const registration=createHoldingRegistration({client:registrationClient,changed:()=>render(),onAdded:result=>{
     selected=result.holding_key;strategy='';detail=null;error='';request++;onHoldingsChanged?.(result.holdings);render();void load();
   }});
+  const management=createHoldingManagement({client:managementClient,changed:()=>render(),onSaved:result=>{onHoldingsChanged?.(result.holdings);render();}});
   const data=()=>store.get().snapshot?.local_holdings;
-  const selectable=()=>data()?.holdings?.filter(h=>!h.closed||(data().planning_enabled&&h.recording_available))||[];
+  const selectable=()=>data()?.holdings?.filter(h=>!h.closed||(data().planning_enabled&&h.recording_available)||(data().holding_management_enabled&&h.management_available))||[];
   const holding=()=>selectable().find(h=>h.key===selected);
   const accounts=()=>scopedStrategies(detail,holding()).slice().sort((a,b)=>(b.return_pct??-Infinity)-(a.return_pct??-Infinity));
   const account=()=>accounts().find(a=>a.experiment_id===strategy);
@@ -50,7 +53,7 @@ export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=nu
       set('holdings-summary',holdingsSummaryHtml(data()));set('holdings-list',holdingsListHtml(data(),selected));
       set('holding-price-refresh',priceRefreshHtml(data(),{available:Boolean(onRefreshPrices),busy:priceBusy,error:priceError}));
       set('holding-registration',holdingRegistrationHtml(registration.state,Boolean(onHoldingsChanged&&data()?.status==='read'&&data()?.holding_registration_enabled),data()?.confirmed_exchange));
-      set('holding-detail',h?`${holdingHeaderHtml(h)}<section id="holding-strategies">${holdingStrategiesHtml(rows,strategy,{loading,error,holding:h})}</section>${saved?`<nav class="holding-work-tabs" aria-label="실전 기록">${h.closed?'':'<button data-holding-panel="plan" aria-pressed="'+!recordPanel+'">매매 계획</button>'}<button data-holding-panel="records" aria-pressed="${recordPanel}">소액 매매${h.closed?' · 매도 완료':''}</button></nav><div id="holding-save-state">${savedPlanHtml(saved,panel())}</div>`:''}<section id="holding-calculator" ${recordPanel||h.closed?'hidden':''}>${holdingCalculatorHtml(h,draft(),account())}</section>${saved?`<section id="holding-records" ${recordPanel?'':'hidden'}>${manualRecordsHtml(saved,{closed:h.closed})}</section>`:''}`:'');
+      set('holding-detail',h?`${holdingHeaderHtml(h)}${holdingManagementHtml(h,management.get(h.key),Boolean(onHoldingsChanged&&data()?.holding_management_enabled))}<section id="holding-strategies">${holdingStrategiesHtml(rows,strategy,{loading,error,holding:h})}</section>${saved?`<nav class="holding-work-tabs" aria-label="실전 기록">${h.closed?'':'<button data-holding-panel="plan" aria-pressed="'+!recordPanel+'">매매 계획</button>'}<button data-holding-panel="records" aria-pressed="${recordPanel}">소액 매매${h.closed?' · 매도 완료':''}</button></nav><div id="holding-save-state">${savedPlanHtml(saved,panel())}</div>`:''}<section id="holding-calculator" ${recordPanel||h.closed?'hidden':''}>${holdingCalculatorHtml(h,draft(),account())}</section>${saved?`<section id="holding-records" ${recordPanel?'':'hidden'}>${manualRecordsHtml(saved,{closed:h.closed})}</section>`:''}`:'');
     });
   }
   async function load() {
@@ -86,6 +89,8 @@ export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=nu
     if(b.dataset.strategy){strategy=b.dataset.strategy;selections.set(selected,strategy);render();return;}
     if(b.dataset.holdingPanel){panels.set(key(),b.dataset.holdingPanel);render();return;}
     const action=b.dataset.action,h=holding();if(!h)return;
+    if(b.dataset.manageOpen){management.open(h,b.dataset.manageOpen);return;}
+    if(b.dataset.manageAction){const a=b.dataset.manageAction;if(a==='close')management.close(h);if(a==='all')management.all(h);if(a==='reload')void management.read(h);if(a==='apply')void management.apply(h);return;}
     if(action==='retry-strategies'){void load();return;}
     if(action==='paper-ledger'){const a=account();if(a)onPaper(h.exchange,h.market,a.style);return;}
     if(action==='load-holding-plan'){void records.read(key(),true);return;}
@@ -109,6 +114,7 @@ export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=nu
   }
   function input(e) {
     const field=e.target;
+    if(field.dataset.manageField&&holding()){management.input(holding(),field.dataset.manageField,field.value);view.querySelector('.holding-change-preview')?.remove();const notice=view.querySelector('.holding-manage-editor [role=alert]');if(notice)notice.textContent='';return;}
     if(field.dataset.addHolding){registration.input(field.dataset.addHolding,field.value);if(field.dataset.addHolding==='quote_currency')render();return;}
     if(field.dataset.recordField){records.input(key(),field.dataset.recordField,field.value);if(field.dataset.recordField==='side')render();return;}
     if(!holding()?.planning_available)return;
@@ -121,6 +127,6 @@ export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=nu
     else return;
     d.origin='manual';markEdited();calculate();
   }
-  return {mount(node){root=node;root.innerHTML='<crypto-holdings-workbench data-raw-text></crypto-holdings-workbench>';view=root.firstElementChild.attachShadow({mode:'open'});view.innerHTML=holdingsShell();syncTheme();view.addEventListener('click',click);view.addEventListener('input',input);view.addEventListener('submit',e=>{if(e.target.id==='holding-add-form'){e.preventDefault();void registration.save();}});document.addEventListener('viewer-theme-change',syncTheme);unsub=store.subscribe((_,meta)=>{if(['snapshot','snapshot-live'].includes(meta?.type)){render();void load();}});render();void load();},render,refresh(){render();void load();},
-    destroy(){request++;unsub?.();records.destroy();registration.destroy();document.removeEventListener('viewer-theme-change',syncTheme);view=null;root=null;}};
+  return {mount(node){root=node;root.innerHTML='<crypto-holdings-workbench data-raw-text></crypto-holdings-workbench>';view=root.firstElementChild.attachShadow({mode:'open'});view.innerHTML=holdingsShell();syncTheme();view.addEventListener('click',click);view.addEventListener('input',input);view.addEventListener('submit',e=>{if(e.target.id==='holding-add-form'){e.preventDefault();void registration.save();}if(e.target.id==='holding-manage-form'){e.preventDefault();if(holding())void management.preview(holding());}});document.addEventListener('viewer-theme-change',syncTheme);unsub=store.subscribe((_,meta)=>{if(['snapshot','snapshot-live'].includes(meta?.type)){render();void load();}});render();void load();},render,refresh(){render();void load();},
+    destroy(){request++;unsub?.();records.destroy();registration.destroy();management.destroy();document.removeEventListener('viewer-theme-change',syncTheme);view=null;root=null;}};
 }

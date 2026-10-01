@@ -9,6 +9,7 @@ import subprocess
 from .runtime_review import _processes
 
 BRANCH = 'agent/crypto-product-data-recovery-20260921'
+PRIMARY_BRANCH = 'b3-auto-trader-phase1'
 
 
 def _git(repo, *args):
@@ -30,8 +31,10 @@ def _idle(repo):
 def _clean(repo):
     if _git(repo, 'status', '--porcelain', '--untracked-files=no'):
         raise ValueError('Tracked files have local edits. The existing files were kept; update was not applied.')
-    if _git(repo, 'symbolic-ref', '--short', 'HEAD') != BRANCH:
-        raise ValueError('The checkout is not on the recovery branch. No branch was switched or merged.')
+    branch = _git(repo, 'symbolic-ref', '--short', 'HEAD')
+    if branch not in {BRANCH, PRIMARY_BRANCH}:
+        raise ValueError('Unrecognized working branch. Existing files and branches were kept.')
+    return branch
 
 
 def update_collection(repo: Path, target: str):
@@ -44,9 +47,9 @@ def update_collection(repo: Path, target: str):
     if Path(_git(repo, 'rev-parse', '--show-toplevel')).resolve() != repo:
         raise ValueError('The configured folder is not the existing project root.')
     _idle(repo)
-    _clean(repo)
+    branch = _clean(repo)
     before = _git(repo, 'rev-parse', 'HEAD')
-    if before == target:
+    if before == target and branch == BRANCH:
         print('COLLECTION SOURCE ALREADY CURRENT: '+target, flush=True)
         return
     remote = _git(repo, 'remote', 'get-url', 'origin')
@@ -57,10 +60,19 @@ def update_collection(repo: Path, target: str):
     # Pin to the package revision, even if newer documents/source were pushed.
     _git(repo, 'merge-base', '--is-ancestor', before, target)
     _git(repo, 'merge-base', '--is-ancestor', target, 'FETCH_HEAD')
+    recovery = _git(repo, 'for-each-ref', '--format=%(objectname)', 'refs/heads/'+BRANCH)
+    if recovery:
+        _git(repo, 'merge-base', '--is-ancestor', recovery, target)
     _idle(repo)
-    _clean(repo)
-    if _git(repo, 'rev-parse', 'HEAD') != before:
+    if _clean(repo) != branch or _git(repo, 'rev-parse', 'HEAD') != before:
         raise ValueError('The checkout changed during update. Retry after other Git work finishes.')
+    if branch == PRIMARY_BRANCH:
+        # Preserve the primary branch reference. Explicit UPDATE switches only to
+        # the verified recovery line; no reset, primary merge or forced checkout.
+        if _git(repo, 'for-each-ref', '--format=%(objectname)', 'refs/heads/'+BRANCH) != recovery:
+            raise ValueError('The recovery branch changed during update. Retry after other Git work finishes.')
+        _git(repo, 'switch', BRANCH) if recovery else _git(repo, 'switch', '-c', BRANCH, before)
+        _clean(repo)
     _git(repo, 'merge', '--ff-only', target)
     if _git(repo, 'rev-parse', 'HEAD') != target:
         raise ValueError('Source revision verification failed; collection was not started.')

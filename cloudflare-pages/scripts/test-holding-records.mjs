@@ -87,7 +87,7 @@ test('workbench saves and restores on remount, scopes plans, retains changed hol
    holdings[0]={...holdings[0],volume:0,closed:true,planning_available:false,recording_available:true};data.closed_count=1;
    for(const f of listeners)f(null,{type:'snapshot-live'});await flush();
    assert.equal(shadow().querySelector('#holding-records').hidden,false);
-   assert.match(shadow().querySelector('#holdings-list').textContent,/매도 완료 1개/);
+   assert.match(shadow().querySelector('#holdings-list').textContent,/보유 종료 1개/);
    assert.equal(shadow().querySelector('[data-action="save-holding-plan"]'),null);
    input('[data-record-field="price"]','126');assert.equal(shadow().querySelector('[data-record-field="price"]').value,'126');
    click('[data-holding="upbit|KRW-B3|KRW"]');await flush();

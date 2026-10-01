@@ -101,6 +101,19 @@ def clean_fill(raw, now=None):
     return {'ts': ts, 'side': raw['side'], 'price': str(price), 'volume': str(volume), 'fee': str(fee), 'stage': stage}
 
 
+def position_fill(qty, cost, side, volume, net):
+    """Average-cost position arithmetic shared by actual holdings and journals."""
+    if side == 'buy':
+        return qty + volume, cost + net, None
+    if side != 'sell':
+        raise PlanningError('체결 종류를 확인하세요.')
+    if volume > qty or qty == 0:
+        raise PlanningError('보유수량보다 많이 매도할 수 없습니다.')
+    basis = cost * volume / qty
+    remaining = qty - volume
+    return remaining, cost - basis if remaining else Decimal(0), net - basis
+
+
 def replay(trades, *, paper=False):
     """Average-cost manual ledger, actual paid fees. No mark or opening holding is guessed.
 
@@ -122,8 +135,7 @@ def replay(trades, *, paper=False):
         if side == 'buy':
             if qty == 0:
                 opened, cycle_cost, cycle_pnl = t['ts'], Decimal(0), Decimal(0)
-            qty += volume
-            cost += net
+            qty, cost, pnl = position_fill(qty, cost, side, volume, net)
             invested += net
             cycle_cost += net
         elif side == 'sell':
@@ -132,10 +144,7 @@ def replay(trades, *, paper=False):
                 volume = qty
             if volume > qty or qty == 0:
                 raise PlanningError('기록된 매수 잔량보다 많이 매도할 수 없습니다. 앞선 매수부터 기록하세요.')
-            basis = cost * volume / qty
-            pnl = net - basis
-            qty -= volume
-            cost -= basis
+            qty, cost, pnl = position_fill(qty, cost, side, volume, net)
             realized += pnl
             cycle_pnl += pnl
             if qty == 0:

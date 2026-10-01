@@ -122,3 +122,15 @@ def test_two_revisions_overlay_one_folder_preserving_outputs_and_canonical_db(tm
     assert list(desktop.iterdir()) == [workspace]
     (workspace/'b3_trader/workspace_tools.py').write_text('mixed update')
     with pytest.raises(ValueError, match='modified_package'): verified_manifest(workspace)
+
+
+def test_old_source_cannot_silently_start_after_viewer_update(collector,monkeypatch):
+    import subprocess
+    repo,_=collector
+    original=tools.subprocess.check_output
+    def git(args,**kw):
+        if args[3]=='merge-base':raise subprocess.CalledProcessError(1,args)
+        return original(args,**kw)
+    monkeypatch.setattr(tools.subprocess,'check_output',git)
+    with pytest.raises(ValueError,match='UPDATE_COLLECTION'):
+        tools.start_collection(repo,minimum_source='b'*40)

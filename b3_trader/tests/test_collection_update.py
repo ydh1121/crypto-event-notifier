@@ -63,7 +63,7 @@ def test_unsafe_update_stops_without_overwriting_checkout(checkout,monkeypatch,p
         monkeypatch.setattr(update,'_processes',lambda *a,**kw:{'status':'read' if problem=='running' else 'partial_read',
                                                               'items':[{'role':'paper'}] if problem=='running' else []})
     elif problem=='dirty': (repo/'b3_trader/local_process_host.py').write_text('user edit')
-    elif problem=='wrong_branch': git(repo,'checkout','-b','b3-auto-trader-phase1')
+    elif problem=='wrong_branch': git(repo,'checkout','-b','unrelated-work')
     elif problem=='wrong_origin': git(repo,'remote','set-url','origin','https://example.test/other.git')
     elif problem=='diverged':
         (repo/'own.txt').write_text('own change');git(repo,'add','.');git(repo,'commit','-m','own')
@@ -81,3 +81,17 @@ def test_unsafe_update_stops_without_overwriting_checkout(checkout,monkeypatch,p
     assert git(repo,'rev-parse','HEAD')==before
     assert (repo/'b3_trader/data/auto_demo.sqlite3').read_text()=='existing user data'
     assert not any(c[0]=='merge' for c in calls)
+
+
+@pytest.mark.parametrize('existing_recovery',[True,False])
+def test_primary_checkout_switches_to_verified_recovery_preserving_primary(checkout,existing_recovery):
+    repo,base,target,calls=checkout
+    git(repo,'switch','-c',update.PRIMARY_BRANCH)
+    if not existing_recovery:git(repo,'branch','-d',update.BRANCH)
+    update.update_collection(repo,target)
+    assert git(repo,'symbolic-ref','--short','HEAD')==update.BRANCH
+    assert git(repo,'rev-parse',update.PRIMARY_BRANCH)==base
+    assert git(repo,'rev-parse','HEAD')==target
+    assert (repo/'b3_trader/data/auto_demo.sqlite3').read_text()=='existing user data'
+    assert (repo/'.env').read_text()=='existing user data'
+    assert not any(c[0] in {'reset','clean'} for c in calls)

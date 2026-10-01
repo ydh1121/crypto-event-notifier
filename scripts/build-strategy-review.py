@@ -19,8 +19,8 @@ PYTHON_FILES = (
     'runtime_review.py', 'runtime_process_contract.py', 'event_capture_review.py', 'holdings_review.py', 'holding_quotes.py', 'user_tools.py',
     'manual_planning_store.py', 'manual_trading.py',
     'workspace_tools.py', 'workspace_packages.py', 'collection_update.py',
-    'journal_backup.py', 'holding_registration.py',
-    'check_report_output.py', 'intelligence_review.py',
+    'journal_backup.py', 'holding_registration.py', 'holding_identity.py', 'holding_management.py',
+    'check_report_output.py', 'intelligence_review.py', 'collection_source.py',
 )
 WORKSPACE_FOLDER = 'CRYPTO'
 TOOLS_LAUNCHER = r'''@echo off
@@ -56,7 +56,8 @@ CLEAN_OLD_FOLDERS.cmd  이전 버전 폴더 정리 — 결과 파일은 이 폴�
 수집기 코드는 이 폴더에 들어 있지 않으므로 조회 도구 업데이트 때문에 수집기를 끄지 않습니다.
 이번 수집 수정 적용: 기존 수집 창에서 Ctrl+C → 종료를 기다림 → UPDATE_COLLECTION.cmd 실행.
 기존 본체를 이 실행본의 소스 버전으로 갱신한 뒤 수집을 시작합니다. 이 창은 계속 열어 둡니다.
-UPDATE_COLLECTION은 GitHub 연결이 필요합니다. 진행 중인 수집·수정 파일·다른 브랜치가 있으면 중단합니다.
+UPDATE_COLLECTION은 GitHub 연결이 필요합니다. 진행 중인 수집·수정 파일·알 수 없는 브랜치가 있으면 중단합니다.
+기존 기본 브랜치라면 recovery 브랜치로 이동하며 기본 브랜치와 DB는 그대로 보존합니다.
 기존 DB·설정 파일을 덮어쓰거나 강제 초기화하지 않습니다.
 버전별 새 폴더를 만들지 않습니다. 다운로드한 ZIP 파일은 적용 후 지워도 됩니다.
 압축 해제 도구가 바깥 폴더를 하나 더 만들었다면 그 안의 CRYPTO 내용만 기존 CRYPTO에 덮어쓰세요.
@@ -257,14 +258,24 @@ def build(destination: Path, *, holdings_exchange: str | None = None, enable_pla
     registration_note = '''자산 추가: 실전 계획 → + 코인 추가 → 티커·수량·평균 매수가 → 자산 목록에 저장.
 BTC로 매수했다면 매수 통화를 BTC로 선택하세요.
 기존 보유 DB에 저장하며 다시 실행해도 남습니다. 이미 등록된 코인은 덮어쓰지 않습니다.
-처음 추가할 때 기존 DB를 holding-registration-backups에 백업·검증합니다.''' if enable_planning else '이 실행본은 조회 전용입니다. 보유자산 추가·계획 저장은 비활성 상태입니다.'
+처음 추가할 때 기존 DB를 holding-registration-backups에 백업·검증합니다.
+
+기존 자산 관리: 코인 선택 → 추가매수 / 매도 / 수량·평단 수정 / 목록에서 정리.
+실제 체결가·수량·수수료 입력 → 변경 내용 확인 → 보유정보에 반영.
+매도 화면의 전량 버튼으로 전체 수량을 불러옵니다. 부분매도는 실제 매도 수량을 입력하세요.
+추가매수는 수수료 포함 평단, 매도는 잔량과 실현손익을 계산합니다.
+가격 없이 목록에서 정리하면 수량 0으로 보존하며 매도 손익은 미확인입니다.
+보유 종료 목록 → 코인 선택 → 변경 내역 / 다시 매수. 기존 행·계획·내역은 삭제하지 않습니다.
+최초 변경 전 holding-management-backups에 기존 DB를 백업·검증합니다.
+계산기의 시작 수량·평단은 최신 수량·평단 불러오기로 갱신하세요.''' if enable_planning else '이 실행본은 조회 전용입니다. 보유자산 추가·계획 저장은 비활성 상태입니다.'
     planning_note = registration_note + '\n\n' + '''매매 계획에서 계획 저장을 누르면 거래소·코인·전략별 매수/익절 회차와 수수료가 기존 보유 DB에 저장됩니다.
 다시 실행하면 저장본을 복원합니다. 보유정보가 바뀌면 최신 수량·평단 불러오기로 명시적으로 갱신하세요.
 처음 저장할 때 기존 보유 DB를 manual-planning-backups 폴더에 백업·검증한 뒤 별도 테이블만 추가합니다.
-기존 보유 수량·평단, 기존 물타기 계획, 가상 체결 원장은 수정하지 않습니다.
+계획 저장과 소액 매매 기록은 실제 보유 수량·평단을 바꾸지 않습니다.
+실제 보유분 변경은 위 자산 관리에서 별도로 반영합니다. 기존 물타기 계획·가상 체결 원장은 보존합니다.
 소액 매매 탭은 직접 입력한 매수·매도만 누적합니다. 체결가, 수량, 실제 수수료와 한국시간을 입력합니다.
 수수료가 없으면 0을 명시적으로 입력하세요. 기록 취소도 이력으로 보존됩니다.
-보유수량이 0이 된 코인은 왼쪽 매도 완료 목록에서 선택하여 기존 기록을 다시 열 수 있습니다.
+보유수량이 0이 된 코인은 왼쪽 보유 종료 목록에서 선택하여 기존 기록을 다시 열 수 있습니다.
 입력된 매수 잔량을 초과하는 매도는 저장되지 않습니다. 계획은 수정 버전과 당시 전략 근거를 보존합니다.
 같은 기간 전략 비교는 첫 입력부터 마지막 입력 체결 사이에 시작하고 끝난 거래만 비교합니다.
 실제 주문·계좌 잔액 변경·자동 거래는 없습니다. RUN_CHECK는 기존과 같이 읽기만 합니다.''' if enable_planning else '계산 초안은 이 조회 창이 열려 있는 동안만 유지됩니다.'

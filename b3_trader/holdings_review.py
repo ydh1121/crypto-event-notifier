@@ -13,6 +13,7 @@ import sqlite3
 import time
 
 from .user_tools import holding_api_market, holding_base_currency, holding_quote_currency
+from .holding_identity import holding_revision
 
 
 def resolve_holdings_path(paper: Path, explicit: Path | None = None) -> tuple[Path | None, str]:
@@ -136,6 +137,7 @@ def read_holdings(path: Path | None, prices: list[dict], *, now: float | None = 
             valuation_basis = 'krw_market'
         value_krw = quantity * converted_price if valid and converted_price is not None else None
         items.append({"key": f"{exchange or 'unknown'}|{market}|{quote or 'unknown'}",
+            "revision": holding_revision(row), "management_available": bool(valid and exchange and quote in {'KRW', 'BTC'}),
             "exchange": exchange, "market": market, "api_market": api_market, "quote_currency": quote, "symbol": symbol,
             "stored_exchange": stored_exchange, "exchange_source": 'owner_confirmed' if confirmed_exchange else 'journal',
             "volume": quantity, "avg_price": average, "updated_ts": _number(row["updated_ts"]),

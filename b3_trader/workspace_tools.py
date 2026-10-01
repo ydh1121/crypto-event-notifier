@@ -11,12 +11,13 @@ import tempfile
 from .runtime_process_contract import RECOVERY_ENV
 from .runtime_review import _processes
 from .workspace_packages import cleanup_old_packages, verified_manifest
+from .collection_source import MIN_COLLECTION_SOURCE
 
 DEFAULT_REPO = Path(r'C:\Users\Administrator\Desktop\crypto-event-notifier-live')
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def start_collection(repo: Path, *, confirmed_exchange: str | None = None) -> int:
+def start_collection(repo: Path, *, confirmed_exchange: str | None = None, minimum_source: str | None = None) -> int:
     repo = repo.resolve()
     python = repo/'.venv'/'Scripts'/'python.exe'
     if not all(p.is_file() for p in (python, repo/'b3_trader/local_process_host.py',
@@ -29,6 +30,11 @@ def start_collection(repo: Path, *, confirmed_exchange: str | None = None) -> in
         raise ValueError('The configured path is not the existing project root.')
     if git('status', '--porcelain', '--untracked-files=no'):
         raise ValueError('Tracked project files have local edits; collector was not started.')
+    if minimum_source:
+        try:
+            git('merge-base', '--is-ancestor', minimum_source, 'HEAD')
+        except subprocess.CalledProcessError:
+            raise ValueError('Collector source needs the subscription fix. Run UPDATE_COLLECTION.cmd once; the viewer update alone does not update the collector.') from None
     state = _processes(repo)
     if state.get('status') != 'read':
         raise ValueError('Process state could not be verified; collector was not started.')
@@ -67,7 +73,7 @@ def main():
             if args.action == 'update-collection':
                 from .collection_update import update_collection
                 update_collection(args.repo, manifest['source_commit'])
-            return start_collection(args.repo, confirmed_exchange=manifest.get('confirmed_holdings_exchange'))
+            return start_collection(args.repo, confirmed_exchange=manifest.get('confirmed_holdings_exchange'), minimum_source=MIN_COLLECTION_SOURCE)
         roots = args.scan_root or [ROOT.parent, args.repo.parent, Path.home()/'Downloads']
         result = cleanup_old_packages(ROOT, args.repo, roots,
                                       lambda: _processes(args.repo, include_review=True))

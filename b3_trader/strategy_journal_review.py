@@ -29,6 +29,7 @@ from .manual_planning_store import ManualPlanningStore
 from .manual_trading import PlanningError, identity
 from .holding_quotes import HoldingQuotes
 from .holding_registration import HoldingRegistration
+from .holding_management import HoldingManagement
 from .check_report_output import CheckReportOutput
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -97,6 +98,7 @@ def handler(path: Path, *, fixture: bool = False, holdings_path: Path | None = N
     quotes = quotes if quotes is not None else HoldingQuotes()
     planning = ManualPlanningStore(holdings_path) if enable_planning else None
     registration = HoldingRegistration(holdings_path) if enable_planning else None
+    management = HoldingManagement(holdings_path) if enable_planning else None
     if planning and planning.path == path.resolve():
         raise ValueError('PAPER and manual journals must be separate')
     csrf = secrets.token_urlsafe(32)
@@ -105,7 +107,7 @@ def handler(path: Path, *, fixture: bool = False, holdings_path: Path | None = N
 
         def state(self):
             state=read_state(path,holdings_path,quotes,confirmed_exchange)
-            state['local_holdings'].update(planning_enabled=bool(planning), holding_registration_enabled=bool(registration))
+            state['local_holdings'].update(planning_enabled=bool(planning), holding_registration_enabled=bool(registration), holding_management_enabled=bool(management))
             return state
 
         def send(self, status, payload, content_type='application/json; charset=utf-8'):
@@ -132,6 +134,9 @@ def handler(path: Path, *, fixture: bool = False, holdings_path: Path | None = N
                     return self.send(200,self.state())
                 if url.path=='/api/holding-registration' and registration:
                     return self.send(200,{'csrf_token':csrf})
+                if url.path=='/api/holding-management' and management:
+                    query={k:v[0] for k,v in parse_qs(url.query).items()}
+                    return self.send(200,{**management.read(query,confirmed_exchange),'csrf_token':csrf})
                 if url.path=='/api/manual-planning' and planning:
                     query={k:v[0] for k,v in parse_qs(url.query).items()}
                     account=self.planning_account(query)
@@ -176,7 +181,7 @@ def handler(path: Path, *, fixture: bool = False, holdings_path: Path | None = N
             return account
 
         def do_POST(self):
-            if not planning or self.path not in {'/api/manual-planning','/api/holding-registration'}:
+            if not planning or self.path not in {'/api/manual-planning','/api/holding-registration','/api/holding-management'}:
                 return self.send(405,{'error':{'message':'조회 전용입니다.'}})
             expected=f'127.0.0.1:{self.server.server_port}'
             token=self.headers.get('X-Planning-Token','')
@@ -195,6 +200,12 @@ def handler(path: Path, *, fixture: bool = False, holdings_path: Path | None = N
                 if self.path=='/api/holding-registration':
                     result=registration.add(payload,confirmed_exchange)
                     return self.send(200,{'holding_key':result['key'],'holdings':self.state()['local_holdings']})
+                if self.path=='/api/holding-management':
+                    if payload.get('mode') not in {'preview','apply'}:
+                        raise PlanningError('변경 내용을 먼저 확인하세요.')
+                    applied=payload['mode']=='apply'
+                    result=management.change(payload,confirmed_exchange,apply=applied)
+                    return self.send(200,{'result':result,**({'holdings':self.state()['local_holdings']} if applied else {})})
                 account=self.planning_account(payload)
                 result=planning.write(payload,payload.get('action'),payload,account)
                 return self.send(200,{**result,'csrf_token':csrf})
