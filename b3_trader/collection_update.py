@@ -32,7 +32,9 @@ def _clean(repo):
     if _git(repo, 'status', '--porcelain', '--untracked-files=no'):
         raise ValueError('Tracked files have local edits. The existing files were kept; update was not applied.')
     branch = _git(repo, 'symbolic-ref', '--short', 'HEAD')
-    if branch not in {BRANCH, PRIMARY_BRANCH}:
+    # Names emitted by paper_recovery.py. Ancestry is still verified after
+    # fetching, before switching; unrelated or diverged work is never reset.
+    if branch not in {BRANCH, PRIMARY_BRANCH} and not re.fullmatch(r'recovery/paper-\d{8}-\d{6}-[0-9a-f]{8}', branch):
         raise ValueError('Unrecognized working branch. Existing files and branches were kept.')
     return branch
 
@@ -66,7 +68,7 @@ def update_collection(repo: Path, target: str):
     _idle(repo)
     if _clean(repo) != branch or _git(repo, 'rev-parse', 'HEAD') != before:
         raise ValueError('The checkout changed during update. Retry after other Git work finishes.')
-    if branch == PRIMARY_BRANCH:
+    if branch != BRANCH:
         # Preserve the primary branch reference. Explicit UPDATE switches only to
         # the verified recovery line; no reset, primary merge or forced checkout.
         if _git(repo, 'for-each-ref', '--format=%(objectname)', 'refs/heads/'+BRANCH) != recovery:

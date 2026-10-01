@@ -10,6 +10,11 @@ export function holdingDraft(holding) {
 export function holdingChanged(draft,holding) {
   return draft.holdingRevision!==[holding.updated_ts,holding.volume,holding.avg_price].join('|');
 }
+/** Explicit holding edits refresh the starting position, retaining planned rows. */
+export function refreshHoldingDraft(draft,holding) {
+  const start=holdingDraft(holding);
+  return {...draft,volume:start.volume,average:start.average,holdingRevision:start.holdingRevision};
+}
 export function scopedStrategies(detail,holding) {
   const lab=detail?.data?.strategy_lab;
   if(!(holding?.planning_available||holding?.recording_available)||detail?.exchange!==holding.exchange||detail?.market!==holding.market||

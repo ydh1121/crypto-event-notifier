@@ -61,3 +61,41 @@ test('full sell form, duplicate-click guard, polling continuity and archived BTC
  input('price','.03');input('volume','1');input('fee','0');submit();await flush();
  assert.equal(calls.at(-1).p.market,'KRW-ETH/BTC');assert.equal(calls.at(-1).p.quote_currency,'BTC');page.destroy();dom.window.close();
 });
+
+test('own buy/partial sale refreshes calculator money and preserves planned prices; polling does not',async()=>{
+ const dom=new JSDOM('<div id="root"></div>',{url:'http://127.0.0.1:8766/',pretendToBeVisual:true});
+ for(const name of ['window','document','HTMLElement','HTMLInputElement','HTMLTextAreaElement','Node','Element','Document','DocumentFragment','Event'])globalThis[name]=dom.window[name];
+ globalThis.CSS={escape:v=>String(v)};globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);window.scrollTo=()=>{};
+ let owned={...h,volume:10,avg_price:100,updated_ts:1,planning_available:true};
+ const state={snapshot:{local_holdings:{status:'read',holdings:[owned],holding_count:1,holding_management_enabled:true}}};
+ const listeners=new Set(),store={get:()=>state,subscribe(fn){listeners.add(fn);return()=>listeners.delete(fn);}};
+ const oldFetch=globalThis.fetch;
+ globalThis.fetch=async()=>({ok:true,json:async()=>({detail:{exchange:h.exchange,market:h.market,data:{strategy_lab:{version:2,exchange:h.exchange,market:h.market,experiments:[{experiment_id:'a',label:'공격적'},{experiment_id:'b',label:'균형'}]}}}})});
+ const managementClient={read:async()=>({...current,current:owned}),change:async(p,mode)=>{
+  const next=p.action==='buy'?{...owned,volume:20,avg_price:75.025,updated_ts:2}:{...owned,volume:15,avg_price:75.025,updated_ts:3};
+  const result={key:h.key,before:owned,after:next,amounts:{gross:p.action==='buy'?500:600,fee:.5,net:p.action==='buy'?500.5:599.5}};
+  if(mode==='preview')return {result};
+  owned=next;return {result,holdings:{...state.snapshot.local_holdings,holdings:[owned]}};
+ }};
+ const page=createHoldingsWorkbench({store,managementClient,onHoldingsChanged:v=>{state.snapshot.local_holdings=v;}});
+ try {
+  page.mount(document.getElementById('root'));await flush();const v=document.querySelector('crypto-holdings-workbench').shadowRoot;
+  const click=sel=>v.querySelector(sel).click(),input=(sel,value)=>{const f=v.querySelector(sel);f.value=value;f.dispatchEvent(new Event('input',{bubbles:true}));return f;};
+  click('[data-action="add-sell"]');input('[data-sell-price="0"]','120');input('[data-sell-weight="0"]','100');
+  click('[data-strategy="b"]');click('[data-action="add-sell"]');input('[data-sell-price="0"]','130');input('[data-sell-weight="0"]','50');click('[data-strategy="a"]');
+  for(const side of ['buy','sell']) {
+   click(`[data-manage-open="${side}"]`);await flush();
+   input('[data-manage-field="price"]',side==='buy'?'50':'120');const f=input('[data-manage-field="volume"]',side==='buy'?'10':'5');
+   assert.equal(v.querySelector('[data-manage-field="volume"]'),f);
+   assert.match(v.querySelector('#holding-execution-amounts').textContent,side==='buy'?/500원/:/600원/);
+   input('[data-manage-field="fee"]','.5');assert.match(v.querySelector('#holding-execution-amounts').textContent,side==='buy'?/500.5원/:/599.5원/);
+   v.querySelector('#holding-manage-form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));await flush();click('[data-manage-action="apply"]');await flush();
+   assert.equal(v.querySelector('[data-draft="volume"]').value,side==='buy'?'20':'15');
+   assert.equal(v.querySelector('[data-draft="average"]').value,'75.025');assert.equal(v.querySelector('[data-sell-price="0"]').value,'120');
+   assert.match(v.querySelector('#calculation-result').textContent,side==='buy'?/2,400원/:/1,800원/);
+  }
+  click('[data-strategy="b"]');assert.equal(v.querySelector('[data-draft="volume"]').value,'15');assert.equal(v.querySelector('[data-sell-price="0"]').value,'130');
+  state.snapshot.local_holdings.holdings=[{...owned,volume:17,updated_ts:4}];for(const notify of listeners)notify(state,{type:'snapshot-live'});await flush();
+  assert.equal(v.querySelector('[data-draft="volume"]').value,'15');assert.match(v.textContent,/이전 시작값/);
+ }finally{page.destroy();dom.window.close();globalThis.fetch=oldFetch;}
+});

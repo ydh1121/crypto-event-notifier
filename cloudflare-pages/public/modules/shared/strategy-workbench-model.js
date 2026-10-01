@@ -1,6 +1,12 @@
 import {tradingCost, holdingQuoteCurrency} from './trading-fees-v16.js';
 
 export function finite(value) { return value===null||value===undefined||value===''||!Number.isFinite(Number(value)) ? null : Number(value); }
+export function executionAmounts(fill,side) {
+  const price=finite(fill?.price),volume=finite(fill?.volume),fee=finite(fill?.fee);
+  const gross=price>0&&volume>0&&Number.isFinite(price*volume)?price*volume:null;
+  return {gross,fee:fee!==null&&fee>=0?fee:null,
+    net:gross!==null&&fee!==null&&fee>=0&&fee<=gross&&['buy','sell'].includes(side)?gross+(side==='buy'?fee:-fee):null};
+}
 export function freshness(sourceTs, now=Date.now()/1000) {
   const value=finite(sourceTs);
   if(!value || value>now+60) return {stale:true,label:'기준 시각 확인 필요'};
@@ -33,7 +39,8 @@ export function calculatePlan(draft, {exchange='bithumb',market='KRW-B3'}={}) {
   if(feePct===null||feePct<0||feePct>=100||slipPct===null||slipPct<0||slipPct>=100) errors.push('수수료와 체결 차이를 확인하세요.');
   if(errors.length) return {valid:false,errors};
   const fee=feePct/100, slip=slipPct/100;
-  let cost=quantity*average, buyTotal=0, fees=0;
+  const initialCost=quantity*average;
+  let cost=initialCost, buyTotal=0, fees=0;
   const buyStages=[],sellStages=[];
   for(const [i,row] of (draft.buys||[]).entries()) {
     if(row.price===''&&row.amount==='') continue;
@@ -44,10 +51,10 @@ export function calculatePlan(draft, {exchange='bithumb',market='KRW-B3'}={}) {
     const charge=tradingCost({buyGross:gross,exchange,market,rate:fee});
     const bought=gross/fill;
     quantity+=bought;cost+=charge.buy_total;buyTotal+=charge.buy_total;fees+=charge.buy_fee;
-    buyStages.push({quantity,average:cost/quantity,fee:charge.buy_fee,bought,amount:charge.buy_total});
+    buyStages.push({stage:i+1,quantity,average:cost/quantity,fee:charge.buy_fee,bought,amount:charge.buy_total,gross,fill});
   }
   const afterBuyQuantity=quantity,afterBuyAverage=quantity>0?cost/quantity:0;
-  let realized=0,net=0,totalWeight=0;
+  let realized=0,net=0,totalWeight=0,sellGross=0,soldCost=0;
   for(const [i,row] of (draft.sells||[]).entries()) {
     if(row.price===''&&row.weight==='') continue;
     const price=finite(row.price),weight=finite(row.weight);
@@ -60,10 +67,12 @@ export function calculatePlan(draft, {exchange='bithumb',market='KRW-B3'}={}) {
     const charge=tradingCost({sellGross:gross,exchange,market,rate:fee});
     const pnl=charge.sell_net-sold*afterBuyAverage;
     quantity-=sold;cost-=sold*afterBuyAverage;fees+=charge.sell_fee;realized+=pnl;net+=charge.sell_net;
-    sellStages.push({sold,net:charge.sell_net,realized:pnl,fee:charge.sell_fee,remaining:Math.max(0,quantity)});
+    sellGross+=gross;soldCost+=sold*afterBuyAverage;
+    sellStages.push({stage:i+1,sold,gross,net:charge.sell_net,realized:pnl,fee:charge.sell_fee,remaining:Math.max(0,quantity)});
   }
   return {valid:!errors.length,errors,buyStages,sellStages,average:afterBuyAverage,afterBuyQuantity,
-    remaining:Math.max(0,quantity),remainingCost:Math.max(0,cost),realized,net,buyTotal,fees};
+    remaining:Math.max(0,quantity),remainingCost:Math.max(0,cost),realized,net,buyTotal,fees,
+    initialCost,totalCost:initialCost+buyTotal,sellGross,soldCost,returnPct:soldCost>0?realized/soldCost*100:null};
 }
 export function relativeSeries(memory) {
   return (Array.isArray(memory)?memory:[]).map(r=>{

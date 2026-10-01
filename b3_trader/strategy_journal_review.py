@@ -31,6 +31,7 @@ from .holding_quotes import HoldingQuotes
 from .holding_registration import HoldingRegistration
 from .holding_management import HoldingManagement
 from .check_report_output import CheckReportOutput
+from .storage_review import read_storage
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / "cloudflare-pages/public"
@@ -352,6 +353,7 @@ def run_review(args, build, server):
                 'db_path':str(args.db.resolve()),'db_size':args.db.stat().st_size,'paper_only':True,
                 'mode':'read_only','scope':'bithumb|KRW-B3|aggressive','account':exp,
                 'event_review':{'exchange':'bithumb','market':event_market,**review_event_index(events)},
+                'storage_review':read_storage(args.db, args.holdings_db) if args.report_only else {'status':'run_check_required'},
                 'holdings_review':{'status':holdings['status'],'path_source':args.holdings_source,
                     'confirmed_exchange':args.holdings_exchange,
                     'db_path':str(args.holdings_db) if args.holdings_db else None,

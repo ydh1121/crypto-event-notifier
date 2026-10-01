@@ -130,3 +130,26 @@ def test_http_mutation_requires_local_token_readonly_preview_and_paper_unchanged
     with serving(paper,journal,False) as call:
         assert call('POST',p,header,path=url)[0]==405
     assert paper.read_bytes()==original
+
+
+def test_existing_receipt_amounts_derived_readonly_and_retry_keeps_id(journal):
+    import json
+    store = management.HoldingManagement(journal)
+    p = body(store)
+    result = store.change(p, 'bithumb', apply=True)
+    assert result['amounts'] == {'gross': 6, 'fee': .1, 'net': 6.1}
+    # Emulate a receipt saved by the delivered previous build: no derived money.
+    del result['amounts']
+    with sqlite3.connect(journal) as conn:
+        conn.execute('UPDATE holding_mutation_receipts SET result_json=? WHERE mutation_id=?',
+                     (json.dumps(result), result['mutation_id']))
+    before = journal.read_bytes()
+    read = store.read(SCOPE, 'bithumb')['history'][0]
+    assert read['amounts']['net'] == 6.1
+    assert store.change(p, 'bithumb', apply=True) == read
+    assert journal.read_bytes() == before
+    sell = store.change(body(store, 'sell', fill={'ts': time.time()-1, 'price': '1.2', 'volume': '5', 'fee': '.1'}), 'bithumb')
+    assert sell['amounts'] == {'gross': 6, 'fee': .1, 'net': 5.9}
+    assert sell['realized_quote'] == pytest.approx(2.375)
+    adjust = store.change(body(store, 'adjust', volume='2', avg_price='1'), 'bithumb')
+    assert adjust['amounts'] is None

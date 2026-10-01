@@ -1,13 +1,13 @@
 import {getMarketDetail} from '../services/market-detail.js';
 import {patchPreservingUi} from '../shared/ui-continuity.js';
-import {holdingDraft,scopedStrategies} from '../shared/holdings-workbench-model.js';
+import {holdingDraft,scopedStrategies,refreshHoldingDraft} from '../shared/holdings-workbench-model.js';
 import {importHoldingPlan} from '../shared/holdings-workbench-model.js';
 import {holdingsShell,holdingsSummaryHtml,holdingsListHtml,holdingHeaderHtml,holdingStrategiesHtml,holdingCalculatorHtml,holdingCalculationHtml,allocationHtml,priceRefreshHtml} from '../shared/holdings-workbench-view.js';
 import {createHoldingRecordsSession} from '../shared/holding-records-session.js';
 import {savedPlanHtml,manualRecordsHtml} from '../shared/holding-records-view.js';
 import {createHoldingRegistration,holdingRegistrationHtml} from '../shared/holding-registration.js';
 import {createHoldingManagement} from '../shared/holding-management-session.js';
-import {holdingManagementHtml} from '../shared/holding-management-view.js';
+import {holdingManagementHtml,holdingAmountsHtml} from '../shared/holding-management-view.js';
 
 /** Composition only. Per-holding/strategy drafts persist only through the
  * explicitly enabled local planning service; actual holdings remain separate. */
@@ -20,7 +20,13 @@ export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=nu
   const registration=createHoldingRegistration({client:registrationClient,changed:()=>render(),onAdded:result=>{
     selected=result.holding_key;strategy='';detail=null;error='';request++;onHoldingsChanged?.(result.holdings);render();void load();
   }});
-  const management=createHoldingManagement({client:managementClient,changed:()=>render(),onSaved:result=>{onHoldingsChanged?.(result.holdings);render();}});
+  const management=createHoldingManagement({client:managementClient,changed:()=>render(),onSaved:result=>{
+    const h=result.holdings?.holdings?.find(h=>h.key===result.result?.key);
+    if(h)for(const [k,d] of drafts)if(k.startsWith(h.key+'|')) {
+      drafts.set(k,refreshHoldingDraft(d,h));edited.add(k);records.edit(k);
+    }
+    onHoldingsChanged?.(result.holdings);render();
+  }});
   const data=()=>store.get().snapshot?.local_holdings;
   const selectable=()=>data()?.holdings?.filter(h=>!h.closed||(data().planning_enabled&&h.recording_available)||(data().holding_management_enabled&&h.management_available))||[];
   const holding=()=>selectable().find(h=>h.key===selected);
@@ -98,7 +104,7 @@ export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=nu
     if(b.dataset.voidRecord){void records.write(key(),'void',null,b.dataset.voidRecord);return;}
     if(!h.planning_available)return;
     if(action==='save-holding-plan'){void records.write(key(),'save',draft());return;}
-    if(action==='reload-holding'){const d=draft(),start=holdingDraft(h);d.volume=start.volume;d.average=start.average;d.holdingRevision=start.holdingRevision;markEdited();renderCalculator();calculate();return;}
+    if(action==='reload-holding'){drafts.set(key(),refreshHoldingDraft(draft(),h));markEdited();renderCalculator();calculate();return;}
     if(action==='import-holding-buy'||action==='import-holding-sell'){
       const result=importHoldingPlan(draft(),h,account(),{part:action==='import-holding-buy'?'buy':'sell'});
       if(result.error){el('holding-plan-error').textContent=result.error;return;}
@@ -114,7 +120,7 @@ export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=nu
   }
   function input(e) {
     const field=e.target;
-    if(field.dataset.manageField&&holding()){management.input(holding(),field.dataset.manageField,field.value);view.querySelector('.holding-change-preview')?.remove();const notice=view.querySelector('.holding-manage-editor [role=alert]');if(notice)notice.textContent='';return;}
+    if(field.dataset.manageField&&holding()){const h=holding();management.input(h,field.dataset.manageField,field.value);const s=management.get(h.key);set('holding-execution-amounts',holdingAmountsHtml(s.form,s.action,h.quote_currency));view.querySelector('.holding-change-preview')?.remove();const notice=view.querySelector('.holding-manage-editor [role=alert]');if(notice)notice.textContent='';return;}
     if(field.dataset.addHolding){registration.input(field.dataset.addHolding,field.value);if(field.dataset.addHolding==='quote_currency')render();return;}
     if(field.dataset.recordField){records.input(key(),field.dataset.recordField,field.value);if(field.dataset.recordField==='side')render();return;}
     if(!holding()?.planning_available)return;

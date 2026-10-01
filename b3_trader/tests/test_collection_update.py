@@ -95,3 +95,23 @@ def test_primary_checkout_switches_to_verified_recovery_preserving_primary(check
     assert (repo/'b3_trader/data/auto_demo.sqlite3').read_text()=='existing user data'
     assert (repo/'.env').read_text()=='existing user data'
     assert not any(c[0] in {'reset','clean'} for c in calls)
+
+
+@pytest.mark.parametrize('diverged', [False, True])
+def test_generated_paper_recovery_branch_is_preserved_and_requires_ancestry(checkout, diverged):
+    repo, base, target, calls = checkout
+    branch = 'recovery/paper-20260924-110445-3a82105c'
+    git(repo, 'switch', '-c', branch)
+    if diverged:
+        (repo/'user.txt').write_text('user work')
+        git(repo, 'add', '.'); git(repo, 'commit', '-m', 'own work')
+    before = git(repo, 'rev-parse', 'HEAD')
+    if diverged:
+        with pytest.raises(ValueError): update.update_collection(repo, target)
+        assert git(repo, 'symbolic-ref', '--short', 'HEAD') == branch
+    else:
+        update.update_collection(repo, target)
+        assert git(repo, 'symbolic-ref', '--short', 'HEAD') == update.BRANCH
+        assert git(repo, 'rev-parse', 'HEAD') == target
+    assert git(repo, 'rev-parse', branch) == before
+    assert (repo/'b3_trader/data/auto_demo.sqlite3').read_text() == 'existing user data'

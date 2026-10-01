@@ -39,6 +39,22 @@ def position(row):
     return {'volume': float(qty), 'avg_price': float(avg), 'updated_ts': row['updated_ts']}
 
 
+def execution_amounts(change):
+    """Derive money from the recorded execution, including pre-existing receipts."""
+    if change['action'] not in {'buy', 'sell'}:
+        return None
+    fill = change['fill']
+    gross = Decimal(fill['price']) * Decimal(fill['volume'])
+    fee = Decimal(fill['fee'])
+    return {'gross': gross, 'fee': fee,
+            'net': gross + (fee if change['action'] == 'buy' else -fee)}
+
+
+def with_amounts(change):
+    amounts = execution_amounts(change)
+    return {**change, 'amounts': {k: float(v) for k, v in amounts.items()} if amounts else None}
+
+
 def clean_change(payload, confirmed_exchange):
     clean = scope(payload, confirmed_exchange)
     action = payload.get('action')
@@ -71,8 +87,8 @@ def calculate_change(row, clean):
     realized = None
     if clean['action'] in {'buy', 'sell'}:
         fill = clean['fill']
-        volume, price, fee = (Decimal(fill[k]) for k in ('volume', 'price', 'fee'))
-        net = volume * price + (fee if clean['action'] == 'buy' else -fee)
+        volume = Decimal(fill['volume'])
+        net = execution_amounts(clean)['net']
         qty, cost, realized = position_fill(qty, qty * avg, clean['action'], volume, net)
         avg = cost / qty if qty else Decimal(0)
     elif clean['action'] == 'adjust':
@@ -119,7 +135,7 @@ class HoldingManagement:
                 saved = json.loads(row[0])
                 if saved.get('fingerprint') != fingerprint:
                     raise PlanningError('같은 요청 번호의 내용이 다릅니다.', 409)
-                return saved
+                return with_amounts(saved)
 
     def read(self, payload, confirmed_exchange=None):
         clean = scope(payload, confirmed_exchange)
@@ -133,7 +149,7 @@ class HoldingManagement:
                 rows = conn.execute('''SELECT result_json FROM holding_mutation_receipts
                     WHERE mutation_id LIKE 'local-holding-%' AND json_valid(result_json)
                     AND json_extract(result_json,'$.key')=? ORDER BY applied_ts DESC,mutation_id DESC LIMIT 101''', (clean['key'],))
-                history = [json.loads(r[0]) for r in rows]
+                history = [with_amounts(json.loads(r[0])) for r in rows]
             return {**clean, 'current': position(row), 'revision': holding_revision(row),
                     'history': history[:100], 'has_more': len(history) > 100}
 
@@ -149,7 +165,7 @@ class HoldingManagement:
                 row = self.current(conn, clean, confirmed_exchange)
                 if holding_revision(row) != clean['expected_revision']:
                     raise PlanningError('보유정보가 바뀌었습니다. 최신 정보로 다시 확인하세요.', 409)
-                preview = {**clean, **calculate_change(row, clean)}
+                preview = with_amounts({**clean, **calculate_change(row, clean)})
                 if not apply:
                     return preview
                 if not self.backed_up:
@@ -163,8 +179,8 @@ class HoldingManagement:
                 row = self.current(conn, clean, confirmed_exchange)
                 if holding_revision(row) != clean['expected_revision']:
                     raise PlanningError('보유정보가 바뀌었습니다. 최신 정보로 다시 확인하세요.', 409)
-                result = {**clean, **calculate_change(row, clean), 'mutation_id': request_id,
-                          'fingerprint': fingerprint, 'applied_ts': time.time()}
+                result = with_amounts({**clean, **calculate_change(row, clean), 'mutation_id': request_id,
+                                      'fingerprint': fingerprint, 'applied_ts': time.time()})
                 after = result['after']
                 conn.execute('UPDATE manual_holdings SET volume=?,avg_price=?,updated_ts=? WHERE market=?',
                              (after['volume'], after['avg_price'], result['applied_ts'], clean['market']))

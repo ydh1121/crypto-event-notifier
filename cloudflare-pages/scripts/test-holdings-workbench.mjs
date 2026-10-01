@@ -140,3 +140,13 @@ test('read failures, theme, and explicit zero closeout retain truthful state',as
  assert.ok(shadow().querySelector('[data-holding="upbit|KRW-B3|KRW"]'));
 });
 test.after(()=>{page.destroy();dom.window.close();});
+
+test('calculator exposes fee-inclusive principal and per-stage gross/net money without losing cost basis',()=>{
+ const h=holding(),d={...holdingDraft(h),fee:'1',slippage:'0',buys:[{price:'50',amount:'505'}],sells:[{price:'120',weight:'25'},{price:'100',weight:'25'}]};
+ const r=calculatePlan(d);
+ assert.equal(r.initialCost,1000);assert.equal(r.totalCost,1505);assert.equal(r.buyStages[0].gross,500);
+ assert.equal(r.buyStages[0].amount,505);assert.equal(r.sellGross,1100);assert.equal(r.net,1089);
+ assert.equal(r.remainingCost,752.5);assert.equal(r.realized,336.5);assert.equal(r.soldCost+r.remainingCost,r.totalCost);
+ assert.deepEqual(r.sellStages.map(s=>s.gross),[600,500]);assert.deepEqual(r.sellStages.map(s=>s.net),[594,495]);
+ const html=holdingCalculationHtml(h,d);for(const word of ['시작 보유금액','총 매수원금','매수·매도 금액','1,505원','594원','495원'])assert.ok(html.includes(word),word);
+});

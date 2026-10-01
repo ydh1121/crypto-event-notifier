@@ -12,14 +12,16 @@
 .holding-manage-fields{border:0;padding:0;margin:20px 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 .holding-manage-fields label{display:block;min-width:0}
 .holding-manage-fields input{width:100%;min-width:0;box-sizing:border-box;margin-top:8px;min-height:44px;font-size:16px}
+.holding-manage-fields #holding-execution-amounts{grid-column:1/-1}
 .holding-manage-fields>p,.holding-manage-fields>div:last-child{grid-column:1/-1}
+.holding-amounts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:8px 0}.holding-amounts dd{font-size:18px;overflow-wrap:anywhere}
 .holding-change-preview{border-left:3px solid #2374c6;padding:0 0 4px 20px;margin:24px 0}
 .holding-change-preview dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin:16px 0}
 .holding-change-preview dd{font-size:18px;overflow-wrap:anywhere}
 .holding-history{margin-top:24px;min-width:0}.holding-history h4{margin-bottom:16px}
 .holding-history-scroll{overflow-x:auto;max-width:100%;overscroll-behavior:contain}
 .holding-history table{white-space:nowrap}.holding-history small{display:block;margin-top:6px}
-@media(max-width:430px){.holding-manage-fields,.holding-change-preview dl{grid-template-columns:1fr}.holding-manage-actions{gap:6px}}
+@media(max-width:430px){.holding-manage-fields,.holding-change-preview dl,.holding-amounts{grid-template-columns:1fr}.holding-manage-actions{gap:6px}}
 @media(max-width:760px){.holding-add-form{grid-template-columns:1fr 1fr}}
 @media(max-width:430px){.holding-add-form{grid-template-columns:1fr}}
 #holding-price-refresh{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}

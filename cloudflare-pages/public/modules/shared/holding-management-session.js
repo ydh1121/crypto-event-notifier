@@ -42,7 +42,7 @@ export function createHoldingManagement({client=createHoldingManagementClient(),
       s.busy=true;s.error='';notify();
       try {
         const result=await client.change(s.pending.payload,'apply');if(!alive)return;
-        s.preview=null;s.pending=null;s.open=false;s.data=null;s.notice='보유정보에 반영했습니다.';
+        s.preview=null;s.pending=null;s.open=false;s.data=null;s.notice=h.quote_currency==='KRW'?'보유정보와 계산기에 반영했습니다.':'보유정보에 반영했습니다.';
         onSaved(result);
       }catch(e){s.error=e.message;}
       finally{s.busy=false;notify();}

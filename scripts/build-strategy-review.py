@@ -20,7 +20,7 @@ PYTHON_FILES = (
     'manual_planning_store.py', 'manual_trading.py',
     'workspace_tools.py', 'workspace_packages.py', 'collection_update.py',
     'journal_backup.py', 'holding_registration.py', 'holding_identity.py', 'holding_management.py',
-    'check_report_output.py', 'intelligence_review.py', 'collection_source.py',
+    'check_report_output.py', 'intelligence_review.py', 'collection_source.py', 'storage_review.py',
 )
 WORKSPACE_FOLDER = 'CRYPTO'
 TOOLS_LAUNCHER = r'''@echo off
@@ -58,6 +58,7 @@ CLEAN_OLD_FOLDERS.cmd  이전 버전 폴더 정리 — 결과 파일은 이 폴�
 기존 본체를 이 실행본의 소스 버전으로 갱신한 뒤 수집을 시작합니다. 이 창은 계속 열어 둡니다.
 UPDATE_COLLECTION은 GitHub 연결이 필요합니다. 진행 중인 수집·수정 파일·알 수 없는 브랜치가 있으면 중단합니다.
 기존 기본 브랜치라면 recovery 브랜치로 이동하며 기본 브랜치와 DB는 그대로 보존합니다.
+이전 복구 도구의 recovery/paper-날짜-식별자 브랜치도 이력을 확인한 뒤 새 수집 코드로 옮깁니다.
 기존 DB·설정 파일을 덮어쓰거나 강제 초기화하지 않습니다.
 버전별 새 폴더를 만들지 않습니다. 다운로드한 ZIP 파일은 적용 후 지워도 됩니다.
 압축 해제 도구가 바깥 폴더를 하나 더 만들었다면 그 안의 CRYPTO 내용만 기존 CRYPTO에 덮어쓰세요.
@@ -79,6 +80,12 @@ DB·사용자 파일·수정 파일·연결된 폴더가 있거나 실행 상태
 정리 내역은 CLEANUP_RESULT.json에 저장됩니다. 다른 위치는 자동으로 뒤지지 않습니다.
 
 기능 설명과 데이터 보존 기준: HELP.txt
+
+이번 변경: 체결 금액·수수료·총 지출/실수령을 입력 화면과 변경 내역에서 확인합니다.
+보유정보에 반영하면 모든 전략 계산기의 시작 수량·평단도 갱신됩니다. 분할 계획은 유지합니다.
+계산 결과에 시작 보유금액·총 매수원금·매도 금액·수령액·회차별 금액을 표시합니다.
+RUN_CHECK 결과에는 다음 용량 관리 작업을 위한 DB 할당/재사용 공간, WAL, 백업 폴더 용량·시각이 포함됩니다.
+이번 진단은 파일이나 DB를 삭제하지 않습니다. 다음 작업은 필수 기록 보존·백업 최근 48시간 유지입니다.
 '''
 LAUNCHER = r'''@echo off
 setlocal
@@ -267,7 +274,8 @@ BTC로 매수했다면 매수 통화를 BTC로 선택하세요.
 가격 없이 목록에서 정리하면 수량 0으로 보존하며 매도 손익은 미확인입니다.
 보유 종료 목록 → 코인 선택 → 변경 내역 / 다시 매수. 기존 행·계획·내역은 삭제하지 않습니다.
 최초 변경 전 holding-management-backups에 기존 DB를 백업·검증합니다.
-계산기의 시작 수량·평단은 최신 수량·평단 불러오기로 갱신하세요.''' if enable_planning else '이 실행본은 조회 전용입니다. 보유자산 추가·계획 저장은 비활성 상태입니다.'
+여기서 반영한 매수·매도·수정은 계산기의 시작 수량·평단에도 반영됩니다.
+다른 창에서 바뀐 보유정보는 최신 수량·평단 불러오기로 갱신하세요.''' if enable_planning else '이 실행본은 조회 전용입니다. 보유자산 추가·계획 저장은 비활성 상태입니다.'
     planning_note = registration_note + '\n\n' + '''매매 계획에서 계획 저장을 누르면 거래소·코인·전략별 매수/익절 회차와 수수료가 기존 보유 DB에 저장됩니다.
 다시 실행하면 저장본을 복원합니다. 보유정보가 바뀌면 최신 수량·평단 불러오기로 명시적으로 갱신하세요.
 처음 저장할 때 기존 보유 DB를 manual-planning-backups 폴더에 백업·검증한 뒤 별도 테이블만 추가합니다.
