@@ -38,14 +38,14 @@ def test_add_backup_restart_retry_and_btc_identity_preserve_existing_records(jou
     body=payload(symbol=' xrp ')
     saved=registration.HoldingRegistration(journal).add(body,'bithumb')
     assert saved['key']=='bithumb|KRW-XRP|KRW'
-    backups=list((journal.parent/'holding-registration-backups').glob('*.sqlite3'))
+    backups=list((journal.parent/'managed-backups').glob('journal-*/data.sqlite3'))
     assert len(backups)==1
     with sqlite3.connect(backups[0]) as c:
         assert c.execute('SELECT COUNT(*) FROM manual_holdings').fetchone()[0]==3
         assert c.execute('PRAGMA quick_check').fetchone()==('ok',)
     restart=registration.HoldingRegistration(journal)
     assert restart.add(body,'bithumb')==saved
-    assert len(list((journal.parent/'holding-registration-backups').glob('*.sqlite3')))==1
+    assert len(list((journal.parent/'managed-backups').glob('journal-*/data.sqlite3')))==1
     with pytest.raises(PlanningError,match='같은 요청'):
         restart.add({**body,'volume':'21'},'bithumb')
     restart.add(payload(symbol='ETH',quote_currency='BTC',volume='2',avg_price='.03'),'bithumb')
@@ -71,7 +71,7 @@ def test_invalid_or_existing_holdings_never_overwrite_or_add_schema(journal,chan
     before=hashlib.sha256(journal.read_bytes()).hexdigest()
     with pytest.raises(PlanningError):registration.HoldingRegistration(journal).add(payload(**changes),'bithumb')
     assert hashlib.sha256(journal.read_bytes()).hexdigest()==before
-    assert not (journal.parent/'holding-registration-backups').exists()
+    assert not (journal.parent/'managed-backups').exists()
 
 
 def test_backup_failure_and_missing_journal_do_not_write(journal,tmp_path,monkeypatch):
@@ -106,7 +106,7 @@ def test_missing_exchange_column_added_after_backup(tmp_path):
     registration.HoldingRegistration(path).add(payload(),'bithumb')
     with sqlite3.connect(path) as c:
         assert c.execute("SELECT volume,avg_price,exchange,updated_ts FROM manual_holdings WHERE market='KRW-B3'").fetchone()==(1,2,None,3)
-    with sqlite3.connect(next((path.parent/'holding-registration-backups').iterdir())) as c:
+    with sqlite3.connect(next((path.parent/'managed-backups').glob('journal-*/data.sqlite3'))) as c:
         assert 'exchange' not in {r[1] for r in c.execute('PRAGMA table_info(manual_holdings)')}
 
 

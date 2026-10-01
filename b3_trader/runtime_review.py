@@ -17,6 +17,7 @@ from .intelligence_review import source_result_evidence
 from .collection_source import read_collection_source
 
 STATUS_FILES = {
+    "storage": "b3_trader/data/storage-maintenance.json",
     "host": HOST_STATUS,
     "research": "b3_trader/data/research-platform/status.json",
     "paper": "b3_trader/data/paper-runtime-supervisor.json",

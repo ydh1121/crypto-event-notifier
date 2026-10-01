@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import shutil
-import sqlite3
 import subprocess
 import threading
 import time
-from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from .backup_retention import prune_local_backups
+from .managed_backup import maintain
 from .runtime_state import RuntimeState
 from .telegram_notify import TelegramNotifier
 
@@ -328,7 +326,7 @@ class BackupManager:
     def __init__(self, *, sqlite_path: str, local_dir: str, interval_seconds: float, state: RuntimeState, rclone_remote: str = "", repo_dir: str = ".", notifier: TelegramNotifier | None = None) -> None:
         self.sqlite_path = Path(sqlite_path)
         self.local_dir = Path(local_dir)
-        self.interval_seconds = max(300.0, interval_seconds)
+        self.interval_seconds = max(86400.0, interval_seconds)
         self.state = state
         self.rclone_remote = rclone_remote.strip().rstrip("/")
         self.repo_dir = Path(repo_dir).resolve()
@@ -342,27 +340,19 @@ class BackupManager:
             raise RuntimeError(completed.stderr.strip() or completed.stdout.strip())
 
     def backup_once(self) -> dict:
-        self.local_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        destination = self.local_dir / f"crypto-trader-{timestamp}.sqlite3"
         if not self.sqlite_path.exists():
             payload = {"status": "skipped", "ts": time.time(), "reason": "sqlite_not_created_yet"}
             self.state.set_backup(payload)
             return payload
-        source = sqlite3.connect(str(self.sqlite_path))
-        target = sqlite3.connect(str(destination))
-        try:
-            source.backup(target)
-        finally:
-            target.close()
-            source.close()
-        retention = prune_local_backups(self.local_dir)
+        managed = maintain(self.sqlite_path.absolute(), role='journal')
+        destination = Path(managed['backup']['path'])
+        retention = managed['retention']
         drive_status = "disabled"
         if self.rclone_remote:
             if shutil.which("rclone") is None:
                 drive_status = "rclone_not_installed"
             else:
-                self._rclone("copyto", str(destination), f"{self.rclone_remote}/{destination.name}")
+                self._rclone("copyto", str(destination), f"{self.rclone_remote}/{destination.parent.name}.sqlite3")
                 base = self.rclone_remote.rsplit("/", 1)[0] if "/" in self.rclone_remote else self.rclone_remote
                 control_dir = self.repo_dir / "control"
                 dashboard_dir = self.repo_dir / "dashboard"

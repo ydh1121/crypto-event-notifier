@@ -3,6 +3,7 @@
 # Preserve the existing launcher order and arguments. The holdings consumer is
 # started by that launcher as before, but gains no new automatic retry policy.
 SIDECARS = (
+    ("storage", "b3_trader.storage_maintenance", (), True),
     ("forward", "b3_trader.forward_pipeline_scheduler", (), True),
     ("market_flow", "b3_trader.market_flow_stream", (), True),
     ("research", "b3_trader.research_supervisor", (), True),
@@ -16,7 +17,7 @@ HOST_LOGS = "b3_trader/data/local-process-logs"
 
 # A user-started recovery session never opens the app, consumes real holdings
 # mutations, or publishes local data to Cloudflare. Saved controls still apply.
-RECOVERY_ROLES = frozenset({"forward", "market_flow", "research", "paper"})
+RECOVERY_ROLES = frozenset({"forward", "market_flow", "research", "paper", "storage"})
 RECOVERY_COMPONENTS = frozenset({
     "warehouse-export", "market-notice-watch", "market-ohlcv-history",
     "phase5-intelligence-ingest", "upbit-paper-research", "strategy-lab-shadow",

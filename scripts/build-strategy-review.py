@@ -21,6 +21,7 @@ PYTHON_FILES = (
     'workspace_tools.py', 'workspace_packages.py', 'collection_update.py',
     'journal_backup.py', 'holding_registration.py', 'holding_identity.py', 'holding_management.py',
     'check_report_output.py', 'intelligence_review.py', 'collection_source.py', 'storage_review.py',
+    'managed_backup.py', 'storage_cleanup.py', 'research_work_lock.py',
 )
 WORKSPACE_FOLDER = 'CRYPTO'
 TOOLS_LAUNCHER = r'''@echo off
@@ -48,6 +49,16 @@ UPDATE_COLLECTION.cmd 수집 코드 갱신 후 켜기 — 기존 수집·조회 
 RUN_REVIEW.cmd        매매 화면 열기 — 화면을 닫아도 수집기는 계속 실행됩니다.
 RUN_CHECK.cmd         수집 상태 확인 — 결과를 남기고 끝납니다.
 CLEAN_OLD_FOLDERS.cmd  이전 버전 폴더 정리 — 결과 파일은 이 폴더 안에 보관합니다.
+CLEAN_STORAGE.cmd      오래된 백업 정리 — 수집·조회 창을 먼저 종료합니다.
+
+이번 적용 순서: 조회 창 종료 → 수집 창 Ctrl+C 후 종료 대기 → 이 폴더 덮어쓰기
+→ CLEAN_STORAGE.cmd → UPDATE_COLLECTION.cmd → RUN_REVIEW.cmd → RUN_CHECK.cmd.
+처음 정리할 때 현재 DB 두 개의 복구본을 만들고 검사하므로 시간이 걸립니다. 완료까지 창을 유지하세요.
+정리 결과는 CRYPTO_STORAGE_RESULT.json에, 이후 자동 관리 상태는 CRYPTO_CHECK_RESULT.json에 포함됩니다.
+새 백업은 본체 b3_trader/data/managed-backups 한 곳에 모읍니다.
+DB별 24시간에 한 번 생성하고 최근 48시간만 보관합니다. 당일 복구본은 재실행 시 재사용합니다.
+수집 창이 열려 있으면 자동 관리됩니다. 공간 부족·검증 실패 시 기존 백업을 보존합니다.
+기존 체결·학습·점수·이벤트 DB와 research-warehouse는 정리하지 않습니다.
 
 @REGISTRATION_NOTE@
 
@@ -258,6 +269,7 @@ def build(destination: Path, *, holdings_exchange: str | None = None, enable_pla
     for name, action, mode in (
             ('START_COLLECTION.cmd', 'start-collection', 'COLLECTION - KEEP OPEN'),
             ('UPDATE_COLLECTION.cmd', 'update-collection', 'UPDATE COLLECTION - KEEP OPEN'),
+            ('CLEAN_STORAGE.cmd', 'clean-storage', 'STORAGE CLEANUP'),
             ('CLEAN_OLD_FOLDERS.cmd', 'clean-old-folders', 'OLD FOLDER CLEANUP')):
         launcher = TOOLS_LAUNCHER.replace('@ACTION@', action).replace('@MODE@', mode)
         files[Path(name)] = launcher.replace('\n', '\r\n').encode('ascii')
@@ -265,7 +277,7 @@ def build(destination: Path, *, holdings_exchange: str | None = None, enable_pla
     registration_note = '''자산 추가: 실전 계획 → + 코인 추가 → 티커·수량·평균 매수가 → 자산 목록에 저장.
 BTC로 매수했다면 매수 통화를 BTC로 선택하세요.
 기존 보유 DB에 저장하며 다시 실행해도 남습니다. 이미 등록된 코인은 덮어쓰지 않습니다.
-처음 추가할 때 기존 DB를 holding-registration-backups에 백업·검증합니다.
+처음 추가하기 전 최근 일일 복구본을 확인하고, 없으면 백업·검증합니다.
 
 기존 자산 관리: 코인 선택 → 추가매수 / 매도 / 수량·평단 수정 / 목록에서 정리.
 실제 체결가·수량·수수료 입력 → 변경 내용 확인 → 보유정보에 반영.
@@ -273,12 +285,12 @@ BTC로 매수했다면 매수 통화를 BTC로 선택하세요.
 추가매수는 수수료 포함 평단, 매도는 잔량과 실현손익을 계산합니다.
 가격 없이 목록에서 정리하면 수량 0으로 보존하며 매도 손익은 미확인입니다.
 보유 종료 목록 → 코인 선택 → 변경 내역 / 다시 매수. 기존 행·계획·내역은 삭제하지 않습니다.
-최초 변경 전 holding-management-backups에 기존 DB를 백업·검증합니다.
+변경 전 공용 일일 복구본을 확인합니다. 실행할 때마다 중복 복사하지 않습니다.
 여기서 반영한 매수·매도·수정은 계산기의 시작 수량·평단에도 반영됩니다.
 다른 창에서 바뀐 보유정보는 최신 수량·평단 불러오기로 갱신하세요.''' if enable_planning else '이 실행본은 조회 전용입니다. 보유자산 추가·계획 저장은 비활성 상태입니다.'
     planning_note = registration_note + '\n\n' + '''매매 계획에서 계획 저장을 누르면 거래소·코인·전략별 매수/익절 회차와 수수료가 기존 보유 DB에 저장됩니다.
 다시 실행하면 저장본을 복원합니다. 보유정보가 바뀌면 최신 수량·평단 불러오기로 명시적으로 갱신하세요.
-처음 저장할 때 기존 보유 DB를 manual-planning-backups 폴더에 백업·검증한 뒤 별도 테이블만 추가합니다.
+처음 저장할 때 공용 복구본을 확인한 뒤 별도 테이블만 추가합니다.
 계획 저장과 소액 매매 기록은 실제 보유 수량·평단을 바꾸지 않습니다.
 실제 보유분 변경은 위 자산 관리에서 별도로 반영합니다. 기존 물타기 계획·가상 체결 원장은 보존합니다.
 소액 매매 탭은 직접 입력한 매수·매도만 누적합니다. 체결가, 수량, 실제 수수료와 한국시간을 입력합니다.

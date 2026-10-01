@@ -103,48 +103,18 @@ def fetch_source(root, commit):
 
 
 def backup_database(source, folder):
+    # Compatibility entrypoint; all backup owners share the restart-safe policy.
+    from .managed_backup import ensure_backup
     if not source.is_file():
-        raise RecoveryBlocked("existing_database_missing")
-    folder.mkdir(parents=True, exist_ok=False)
-    destination = folder / "auto_demo.sqlite3"
-    conn = sqlite3.connect(source.resolve().as_uri() + "?mode=ro", uri=True, timeout=10)
+        raise RecoveryBlocked('existing_database_missing')
     try:
-        conn.execute("PRAGMA query_only=ON")
-        conn.execute("BEGIN")
-        required = conn.execute("PRAGMA page_count").fetchone()[0] * conn.execute("PRAGMA page_size").fetchone()[0]
-        if shutil.disk_usage(folder).free < required + 512 * 1024 * 1024:
-            raise RecoveryBlocked("insufficient_backup_space")
-        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        count_tables = (*BACKUP_TABLES, *(t for t in EVENT_BACKUP_TABLES if t in tables))
-        counts = {t: conn.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0] for t in count_tables}
-        deadline = time.monotonic() + 1800
-        progress_band = [-1]
-
-        def progress(_status, remaining, total):
-            if time.monotonic() > deadline:
-                raise RecoveryBlocked("backup_timeout")
-            band = int((total - remaining) * 10 / total) if total else 10
-            if band > progress_band[0]:
-                print(f"Database backup: {band * 10}%", flush=True)
-                progress_band[0] = band
-
-        with closing(sqlite3.connect(destination)) as target:
-            conn.backup(target, pages=2048, progress=progress, sleep=.05)
-        print("Checking backup integrity and account/trade counts...", flush=True)
-        with closing(sqlite3.connect(destination.as_uri() + "?mode=ro", uri=True)) as verify:
-            verify.execute("PRAGMA query_only=ON")
-            integrity = verify.execute("PRAGMA quick_check").fetchall()
-            copied = {t: verify.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0] for t in count_tables}
-        if integrity != [("ok",)] or counts != copied:
-            raise RecoveryBlocked("backup_readback_failed")
-        receipt = {"path": str(destination), "bytes": destination.stat().st_size,
-                   "quick_check": "ok", "ledger_counts": {t: counts[t] for t in BACKUP_TABLES},
-                   "event_counts": {t: counts[t] for t in EVENT_BACKUP_TABLES if t in counts},
-                   "completed_at": time.time()}
-        write_report(folder / "backup-receipt.json", receipt)
-        return receipt
-    finally:
-        conn.close()
+        copy = ensure_backup(source.absolute(), role="paper")
+    except ValueError as exc:
+        reason = 'insufficient_backup_space' if str(exc).startswith('Insufficient') else 'backup_readback_failed'
+        raise RecoveryBlocked(reason) from exc
+    return {**copy, "bytes": copy["fingerprint"][2],
+            "ledger_counts": {t: n for t, n in copy["counts"].items() if t in BACKUP_TABLES},
+            "event_counts": {t: n for t, n in copy["counts"].items() if t in EVENT_BACKUP_TABLES}}
 
 
 def verify_dependencies(root):

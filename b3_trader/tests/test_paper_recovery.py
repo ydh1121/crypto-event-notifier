@@ -51,8 +51,9 @@ def test_backup_never_creates_missing_source_or_overwrites_destination(tmp_path)
     db = make_db(missing); db.close()
     destination = tmp_path/'already'; destination.mkdir()
     (destination/'auto_demo.sqlite3').write_bytes(b'keep me')
-    with pytest.raises(FileExistsError):
-        recovery.backup_database(missing, destination)
+    created = recovery.backup_database(missing, destination)
+    reused = recovery.backup_database(missing, destination)
+    assert reused["path"] == created["path"] and not reused["created"]
     assert (destination/'auto_demo.sqlite3').read_bytes() == b'keep me'
 
 

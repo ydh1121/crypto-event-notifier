@@ -8,7 +8,7 @@ import time
 
 BACKUP_FOLDERS = ('backups', 'maintenance-backups', 'recovery-backups',
                   'holding-management-backups', 'holding-registration-backups',
-                  'manual-planning-backups')
+                  'manual-planning-backups', 'managed-backups')
 DATA_FOLDERS = ('research-warehouse', 'research-platform', 'local-process-logs')
 
 
@@ -93,12 +93,27 @@ def folder_info(path, *, deadline, now, backup=False):
 def read_storage(paper, holdings=None, *, seconds=5):
     directory = Path(paper).absolute().parent
     now = time.time()
-    deadline = time.monotonic()+seconds
+    # A large archive must not prevent observing all later folders.
+    budget = seconds / (len(BACKUP_FOLDERS)+len(DATA_FOLDERS))
     return {'observed_at': now, 'mode': 'read_only', 'data_directory': str(directory),
             'paper': database_info(paper), 'holdings': database_info(holdings),
-            'folders': [folder_info(directory/name, deadline=deadline, now=now, backup=name in BACKUP_FOLDERS)
+            'folders': [folder_info(directory/name, deadline=time.monotonic()+budget, now=now, backup=name in BACKUP_FOLDERS)
                         for name in (*BACKUP_FOLDERS, *DATA_FOLDERS)],
             'requested_backup_retention_hours': 48, 'cleanup_applied': False,
+            'last_cleanup': read_status(directory/'storage-cleanup-result.json'),
+            'maintenance': read_status(directory/'storage-maintenance.json'),
             'limitations': ['Folder ages do not establish that a backup is safe to delete.',
                             'No full table scan or database integrity scan was run.',
                             'Active files may change during this observation.']}
+
+
+def read_status(path):
+    import json
+    try:
+        if not path.exists():
+            return {'status': 'absent'}
+        if linked(path) or path.stat().st_size > 1_000_000:
+            return {'status': 'unavailable'}
+        return json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return {'status': 'unavailable'}

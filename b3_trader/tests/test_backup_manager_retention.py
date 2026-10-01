@@ -29,7 +29,7 @@ def _make_sqlite(path: Path) -> None:
         conn.close()
 
 
-def test_backup_manager_applies_local_generational_retention(tmp_path: Path) -> None:
+def test_backup_manager_reuses_shared_daily_copy_and_leaves_legacy_for_idle_cleanup(tmp_path: Path) -> None:
     source = tmp_path / "source.sqlite3"
     local_dir = tmp_path / "backups"
     local_dir.mkdir()
@@ -58,10 +58,12 @@ def test_backup_manager_applies_local_generational_retention(tmp_path: Path) -> 
     assert Path(payload["local"]).exists()
     assert manual.exists()
     retention = payload["local_retention"]
-    assert retention["policy"] == "recent=8,daily=7,weekly=4"
-    assert retention["recognized_before"] == 37
-    assert retention["removed"] > 0
-    assert retention["retained"] <= 19
-    assert retention["ignored_unrecognized"] == 1
-    assert state.backup == payload
+    assert retention["policy"] == "verified-local-48h"
+    assert retention["removed"] == 0
+    assert len(list(local_dir.glob("crypto-trader-*"))) == 36
+    assert manager.interval_seconds == 86400
+    assert manager.backup_once()["local"] == payload["local"]
+    restart = BackupManager(sqlite_path=str(source), local_dir=str(local_dir), interval_seconds=300, state=state)
+    assert restart.backup_once()["local"] == payload["local"]
+    assert len(list((tmp_path/"managed-backups").glob("journal-*"))) == 1
     assert state.errors == []

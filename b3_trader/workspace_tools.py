@@ -61,7 +61,7 @@ def start_collection(repo: Path, *, confirmed_exchange: str | None = None, minim
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=('start-collection', 'update-collection', 'clean-old-folders'))
+    parser.add_argument('action', choices=('start-collection', 'update-collection', 'clean-old-folders', 'clean-storage'))
     parser.add_argument('--repo', type=Path, default=DEFAULT_REPO)
     parser.add_argument('--scan-root', type=Path, action='append')
     args = parser.parse_args()
@@ -74,6 +74,10 @@ def main():
                 from .collection_update import update_collection
                 update_collection(args.repo, manifest['source_commit'])
             return start_collection(args.repo, confirmed_exchange=manifest.get('confirmed_holdings_exchange'), minimum_source=MIN_COLLECTION_SOURCE)
+        if args.action == 'clean-storage':
+            from .storage_cleanup import clean_storage
+            clean_storage(args.repo, ROOT/'CRYPTO_STORAGE_RESULT.json')
+            return 0
         roots = args.scan_root or [ROOT.parent, args.repo.parent, Path.home()/'Downloads']
         result = cleanup_old_packages(ROOT, args.repo, roots,
                                       lambda: _processes(args.repo, include_review=True))

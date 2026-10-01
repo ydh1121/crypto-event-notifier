@@ -10,9 +10,9 @@ import shutil
 import uuid
 
 LEGACY = re.compile(r'CRYPTO_(STRATEGY_REVIEW|PAPER_RECOVERY)_[0-9a-f]{7,40}')
-REPORT = re.compile(r'CRYPTO_(B3_REVIEW|CHECK|RECOVERY)_RESULT(?:\(\d+\))?\.json')
+REPORT = re.compile(r'CRYPTO_(B3_REVIEW|CHECK|RECOVERY|STORAGE)_RESULT(?:\(\d+\))?\.json')
 ROOT_FILES = {'RUN_REVIEW.cmd', 'RUN_CHECK.cmd', 'RUN_RECOVERY.cmd', 'START_COLLECTION.cmd',
-              'UPDATE_COLLECTION.cmd', 'CLEAN_OLD_FOLDERS.cmd', 'README.txt', 'HELP.txt'}
+              'UPDATE_COLLECTION.cmd', 'CLEAN_OLD_FOLDERS.cmd', 'CLEAN_STORAGE.cmd', 'README.txt', 'HELP.txt'}
 
 
 def linked(path: Path) -> bool:

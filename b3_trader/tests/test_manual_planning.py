@@ -48,11 +48,11 @@ def test_read_is_immutable_and_first_save_backs_up_without_replacing_legacy(stor
     before=hashlib.sha256(store.path.read_bytes()).hexdigest()
     assert store.read(SELECTION)['plan'] is None
     assert hashlib.sha256(store.path.read_bytes()).hexdigest()==before
-    assert not (store.path.parent/'manual-planning-backups').exists()
+    assert not (store.path.parent/'managed-backups').exists()
     data=save(store)
     assert data['plan']['draft']==draft()
     assert ManualPlanningStore(store.path).read(SELECTION)['plan']==data['plan']
-    backups=list((store.path.parent/'manual-planning-backups').glob('*.sqlite3'))
+    backups=list((store.path.parent/'managed-backups').glob('journal-*/data.sqlite3'))
     assert len(backups)==1
     with sqlite3.connect(backups[0]) as b, sqlite3.connect(store.path) as c:
         assert b.execute('PRAGMA quick_check').fetchone()[0]=='ok'
@@ -60,7 +60,7 @@ def test_read_is_immutable_and_first_save_backs_up_without_replacing_legacy(stor
             assert b.execute('SELECT * FROM '+table).fetchall()==c.execute('SELECT * FROM '+table).fetchall()
         assert b.execute("SELECT name FROM sqlite_master WHERE name LIKE 'manual_strategy_%'").fetchall()==[]
     save(store,1)
-    assert len(list((store.path.parent/'manual-planning-backups').glob('*.sqlite3')))==1
+    assert len(list((store.path.parent/'managed-backups').glob('journal-*/data.sqlite3')))==1
 
 
 def test_missing_db_and_backup_failure_never_create_or_mutate_source(store,tmp_path,monkeypatch):

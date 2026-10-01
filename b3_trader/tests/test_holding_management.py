@@ -24,7 +24,7 @@ def test_preview_buy_partial_full_sell_reopen_history_and_backup(journal):
     preview=store.change(p,'bithumb')
     assert preview['after']=={'volume':20,'avg_price':.705}
     assert journal.read_bytes()==original
-    assert not (journal.parent/'holding-management-backups').exists()
+    assert not (journal.parent/'managed-backups').exists()
     first=store.change(p,'bithumb',apply=True)
     assert first['after']==preview['after'] and first['realized_quote'] is None
     assert management.HoldingManagement(journal).change(p,'bithumb',apply=True)==first
@@ -45,7 +45,7 @@ def test_preview_buy_partial_full_sell_reopen_history_and_backup(journal):
     current=store.read(SCOPE,'bithumb')
     assert current['current']['volume']==10 and current['current']['avg_price']==.61
     assert len(current['history'])==4
-    backup=next((journal.parent/'holding-management-backups').glob('*.sqlite3'))
+    backup=next((journal.parent/'managed-backups').glob('journal-*/data.sqlite3'))
     with sqlite3.connect(backup) as c:
         assert c.execute("SELECT volume,avg_price FROM manual_holdings WHERE market='KRW-B3'").fetchone()==(10,.8)
         assert c.execute('PRAGMA quick_check').fetchone()==('ok',)
@@ -88,7 +88,7 @@ def test_invalid_change_is_readonly_without_backup(journal,change):
     store=management.HoldingManagement(journal);p={**body(store),**change};before=journal.read_bytes()
     with pytest.raises(PlanningError):store.change(p,'bithumb',apply=True)
     assert journal.read_bytes()==before
-    assert not (journal.parent/'holding-management-backups').exists()
+    assert not (journal.parent/'managed-backups').exists()
 
 
 def test_backup_failure_concurrency_and_explicit_zero(journal,monkeypatch):

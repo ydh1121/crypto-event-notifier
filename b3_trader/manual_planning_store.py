@@ -70,7 +70,7 @@ class ManualPlanningStore:
             if not self.schema(conn):
                 for statement in SCHEMA:
                     conn.execute(statement)
-                conn.execute('INSERT INTO manual_strategy_meta VALUES (1,?,?)', (destination.name, time.time()))
+                conn.execute('INSERT INTO manual_strategy_meta VALUES (1,?,?)', (str(destination.relative_to(self.path.parent)), time.time()))
 
     def state(self, conn, scope):
         if not self.schema(conn):

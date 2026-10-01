@@ -46,7 +46,6 @@ def clean_registration(payload, confirmed_exchange):
 class HoldingRegistration:
     def __init__(self, path):
         self.store = ManualPlanningStore(path)
-        self.backed_up = False
 
     def current(self, conn, clean, request_id, fingerprint):
         self.store.schema(conn)
@@ -78,9 +77,7 @@ class HoldingRegistration:
                 saved = self.current(conn, clean, request_id, fingerprint)
                 if saved:
                     return saved
-                if not self.backed_up:
-                    backup_journal(conn, self.store.path.parent/'holding-registration-backups', 'before-add-holding-')
-                    self.backed_up = True
+                backup_journal(conn)
             with closing(self.store.connect(write=True)) as conn, conn:
                 conn.execute('BEGIN IMMEDIATE')
                 saved = self.current(conn, clean, request_id, fingerprint)

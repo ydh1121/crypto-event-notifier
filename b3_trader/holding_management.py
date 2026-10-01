@@ -108,7 +108,6 @@ def calculate_change(row, clean):
 class HoldingManagement:
     def __init__(self, path):
         self.store = ManualPlanningStore(path)
-        self.backed_up = False
 
     def current(self, conn, clean, confirmed_exchange):
         self.store.schema(conn)
@@ -168,9 +167,7 @@ class HoldingManagement:
                 preview = with_amounts({**clean, **calculate_change(row, clean)})
                 if not apply:
                     return preview
-                if not self.backed_up:
-                    backup_journal(conn, self.store.path.parent / 'holding-management-backups', 'before-manage-holding-')
-                    self.backed_up = True
+                backup_journal(conn)
             with closing(self.store.connect(write=True)) as conn, conn:
                 conn.execute('BEGIN IMMEDIATE')
                 saved = self.receipt(conn, request_id, fingerprint)
