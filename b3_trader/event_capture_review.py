@@ -64,19 +64,22 @@ class _Reader:
         return self.read(query)
 
 
-def _raw_coverage(conn, market, now):
+def _raw_bounds(conn, market, now):
     bounds = []
     for order in ("ASC", "DESC"):
         row = conn.execute(f'''SELECT trade_ts,received_at FROM {TRADE_TABLE}
             WHERE exchange=? AND market=? ORDER BY trade_ts {order} LIMIT 1''',
             (EXCHANGE, market)).fetchone()
         bounds.append({key: _clock(row[key]) for key in row.keys()} if row else None)
+    latest = bounds[1]["trade_ts"] if bounds[1] else None
+    return {"first": bounds[0], "last": bounds[1],
+            "latest_age_seconds": now - latest if latest is not None else None}
+
+
+def _raw_count(conn, market):
     count = conn.execute(f'''SELECT COUNT(*) FROM (SELECT 1 FROM {TRADE_TABLE}
         WHERE exchange=? AND market=? LIMIT ?)''', (EXCHANGE, market, ROW_COUNT_LIMIT + 1)).fetchone()[0]
-    latest = bounds[1]["trade_ts"] if bounds[1] else None
-    return {"row_count": min(count, ROW_COUNT_LIMIT), "row_count_capped": count > ROW_COUNT_LIMIT,
-            "first": bounds[0], "last": bounds[1],
-            "latest_age_seconds": now - latest if latest is not None else None}
+    return {"row_count": min(count, ROW_COUNT_LIMIT), "row_count_capped": count > ROW_COUNT_LIMIT}
 
 
 def _events(conn, now):
@@ -178,7 +181,7 @@ def read_event_capture(db: Path, *, now=None):
         reader = _Reader(conn)
         for market in MARKETS:
             result['markets'][market] = {
-                "raw": reader.read(lambda: _raw_coverage(conn, market, current)),
+                "raw": reader.read(lambda: _raw_bounds(conn, market, current)),
                 "rest_cursor": reader.record("research_market_flow_cursor_mx", market,
                     ("coverage_start_ts", "covered_through_ts", "last_seen_trade_ts", "updated_at"),
                     ("last_pages", "last_rows"), ("last_cycle_complete",)),
@@ -188,6 +191,13 @@ def read_event_capture(db: Path, *, now=None):
             }
         result['events'] = reader.read(lambda: _events(conn, current))
         result['anchor_checks'] = _anchor_checks(reader, result['events'].pop('recent', []), current)
+        # Counts are secondary evidence. A slow count must neither discard an
+        # indexed latest tick nor consume the budget needed for event anchors.
+        for market in MARKETS:
+            count = reader.read(lambda: _raw_count(conn, market))
+            result['markets'][market]['raw'].update(
+                count_status=count['status'], row_count=count.get('row_count'),
+                row_count_capped=count.get('row_count_capped'))
         return {**result, "status": "observed", "finished_at": time.time()}
     finally:
         conn.close()

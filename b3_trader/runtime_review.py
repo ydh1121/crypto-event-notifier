@@ -222,21 +222,26 @@ def read_activity(db):
             conn.set_progress_handler(lambda: int(time.monotonic() > deadline), 10_000)
             try:
                 scope = "all_rows"
-                if name == "trade_flow":
+                if name in {"trade_flow", "market_memory"}:
                     # Use the existing (exchange,market,trade_ts DESC) index.
                     # This measures only the four benchmark streams, not all coins.
-                    scope = "bithumb,upbit / KRW-BTC,KRW-ETH"
+                    memory = name == "market_memory"
+                    markets = ("KRW-B3", "KRW-BTC", "KRW-ETH") if memory else ("KRW-BTC", "KRW-ETH")
+                    scope = "bithumb,upbit / " + ",".join(markets) + (" / adaptive" if memory else "")
                     streams = {}
                     for exchange in ("bithumb", "upbit"):
-                        for market in ("KRW-BTC", "KRW-ETH"):
-                            row = conn.execute(f'SELECT trade_ts FROM "{table}" WHERE exchange=? AND market=? ORDER BY trade_ts DESC LIMIT 1', (exchange, market)).fetchone()
+                        for market in markets:
+                            # The memory index starts with exchange, market,
+                            # strategy. Global MAX(ts) scans every retained row.
+                            strategy = " AND strategy='adaptive'" if memory else ""
+                            row = conn.execute(f'SELECT {clock} FROM "{table}" WHERE exchange=? AND market=?{strategy} ORDER BY {clock} DESC LIMIT 1', (exchange, market)).fetchone()
                             streams[f"{exchange}|{market}"] = _positive_clock(row[0] if row else None)
                     latest = max((v for v in streams.values() if v is not None), default=None)
                 else:
                     row = conn.execute(f'SELECT MAX({clock}) FROM "{table}"').fetchone()
                     latest = _positive_clock(row[0] if row else None)
                 result[name] = {"status": "read", "latest": latest, "table": table, "clock": clock, "scope": scope}
-                if name == "trade_flow":
+                if name in {"trade_flow", "market_memory"}:
                     result[name]["streams"] = streams
             except sqlite3.OperationalError as exc:
                 kind = "query_timeout" if str(exc) == "interrupted" else "unavailable"
@@ -272,9 +277,19 @@ def compare_activity(before, after):
         last = after.get("activity", {}).get(name, {})
         a, b = first.get("latest"), last.get("latest")
         outcome = "unknown"
-        if first.get("status") == last.get("status") == "read" and a is not None and b is not None:
+        if (first.get("status") == last.get("status") == "read"
+                and first.get('scope') == last.get('scope') and a is not None and b is not None):
             outcome = "advanced" if b > a else "unchanged" if b == a else "latest_regressed"
         compared[name] = {"observation": outcome, "before": a, "after": b}
+    first = before.get('activity', {}).get('market_memory', {})
+    last = after.get('activity', {}).get('market_memory', {})
+    for key in sorted(first.get('streams', {}).keys() | last.get('streams', {}).keys()):
+        a, b = first.get('streams', {}).get(key), last.get('streams', {}).get(key)
+        outcome = 'unknown'
+        if (first.get('status') == last.get('status') == 'read'
+                and first.get('scope') == last.get('scope') and a is not None and b is not None):
+            outcome = 'advanced' if b > a else 'unchanged' if b == a else 'latest_regressed'
+        compared[f'market_memory_stream:{key}'] = {'observation': outcome, 'before': a, 'after': b}
     # Preserve the uniform per-series shape used by recovery report consumers.
     compared.update({f'event_price_stream:{key}': value
                      for key, value in compare_event_capture(before, after).items()})

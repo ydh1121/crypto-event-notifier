@@ -136,6 +136,30 @@ def test_query_timeout_is_unknown_and_never_creates_or_changes_data(tmp_path, mo
     assert hashlib.sha256(path.read_bytes()).hexdigest() == before
 
 
+def test_slow_row_count_preserves_ticks_event_anchors_and_actual_progress(tmp_path, monkeypatch):
+    path = tmp_path/'count-timeout.db'
+    store = database(path)
+    store.insert_trades([trade('KRW-B3',99999), trade('KRW-B3',100901,110)])
+    collector = IntelligenceEventResponseCollector(store.conn, benchmarks=[('bithumb','KRW-B3')])
+    assert collector.run_once(now=101000)['samples_inserted'] == 1
+    def slow_count(*_):
+        raise sqlite3.OperationalError('interrupted')
+    monkeypatch.setattr(review, '_raw_count', slow_count)
+    before = read(path)
+    raw = before['markets']['KRW-B3']['raw']
+    assert raw['status'] == 'read' and raw['last']['trade_ts'] == 100901
+    assert raw['count_status'] == 'query_timeout' and raw['row_count'] is None
+    assert raw['row_count_capped'] is None
+    assert before['anchor_checks'][0]['markets']['KRW-B3']['responses']['recorded']['15m']['return_pct'] == pytest.approx(10)
+    store.insert_trades([trade('KRW-B3',100950,111)])
+    original = hashlib.sha256(path.read_bytes()).hexdigest()
+    after = read(path)
+    changes = review.compare_event_capture({'event_capture':before}, {'event_capture':after})
+    assert changes['bithumb|KRW-B3']['observation'] == 'advanced'
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == original
+    store.close()
+
+
 def test_actual_saved_subscription_is_sanitized_not_guessed_from_defaults(tmp_path, monkeypatch):
     path = tmp_path/'b3_trader/data/auto_demo.sqlite3'
     path.parent.mkdir(parents=True)

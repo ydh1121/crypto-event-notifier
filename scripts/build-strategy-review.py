@@ -51,9 +51,13 @@ RUN_CHECK.cmd         수집 상태 확인 — 결과를 남기고 끝납니다.
 CLEAN_OLD_FOLDERS.cmd  이전 버전 폴더 정리 — 결과 파일은 이 폴더 안에 보관합니다.
 CLEAN_STORAGE.cmd      오래된 백업 정리 — 수집·조회 창을 먼저 종료합니다.
 
-이번 적용 순서: 조회 창 종료 → 수집 창 Ctrl+C 후 종료 대기 → 이 폴더 덮어쓰기
-→ CLEAN_STORAGE.cmd → UPDATE_COLLECTION.cmd → RUN_REVIEW.cmd → RUN_CHECK.cmd.
+조회 도구 갱신: 조회 창 종료 → 이 폴더에 덮어쓰기 → RUN_REVIEW.cmd → RUN_CHECK.cmd.
+수집기가 이미 켜져 있으면 그대로 둡니다. 꺼져 있으면 START_COLLECTION.cmd로 켠 뒤 창을 유지하세요.
+수집 코드 변경을 안내받은 경우에만 UPDATE_COLLECTION.cmd를 사용합니다.
+
+백업 첫 정리: 조회 창 종료 → 수집 창 Ctrl+C 후 종료 대기 → CLEAN_STORAGE.cmd.
 처음 정리할 때 현재 DB 두 개의 복구본을 만들고 검사하므로 시간이 걸립니다. 완료까지 창을 유지하세요.
+정리 완료 후 START_COLLECTION.cmd로 수집을 다시 켭니다. 정리가 완료됐다면 매번 재실행하지 않습니다.
 정리 결과는 CRYPTO_STORAGE_RESULT.json에, 이후 자동 관리 상태는 CRYPTO_CHECK_RESULT.json에 포함됩니다.
 새 백업은 본체 b3_trader/data/managed-backups 한 곳에 모읍니다.
 DB별 24시간에 한 번 생성하고 최근 48시간만 보관합니다. 당일 복구본은 재실행 시 재사용합니다.
@@ -65,7 +69,7 @@ DB별 24시간에 한 번 생성하고 최근 48시간만 보관합니다. 당�
 처음 한 번: ZIP 안의 CRYPTO 폴더를 바탕화면에 둡니다.
 다음 업데이트: 조회 창만 닫고, 같은 위치의 CRYPTO 폴더에 모두 덮어씁니다.
 수집기 코드는 이 폴더에 들어 있지 않으므로 조회 도구 업데이트 때문에 수집기를 끄지 않습니다.
-이번 수집 수정 적용: 기존 수집 창에서 Ctrl+C → 종료를 기다림 → UPDATE_COLLECTION.cmd 실행.
+수집 코드 변경이 있을 때: 기존 수집 창에서 Ctrl+C → 종료를 기다림 → UPDATE_COLLECTION.cmd 실행.
 기존 본체를 이 실행본의 소스 버전으로 갱신한 뒤 수집을 시작합니다. 이 창은 계속 열어 둡니다.
 UPDATE_COLLECTION은 GitHub 연결이 필요합니다. 진행 중인 수집·수정 파일·알 수 없는 브랜치가 있으면 중단합니다.
 기존 기본 브랜치라면 recovery 브랜치로 이동하며 기본 브랜치와 DB는 그대로 보존합니다.

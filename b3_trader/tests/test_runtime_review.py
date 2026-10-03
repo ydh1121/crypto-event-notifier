@@ -113,6 +113,55 @@ def test_actual_receipt_time_and_indexed_benchmark_scope(tmp_path):
     assert review.read_activity(db)['events']['latest'] is None
 
 
+def test_large_memory_uses_scoped_index_without_confusing_b3_with_benchmarks(tmp_path, monkeypatch):
+    db = database(tmp_path)
+    with sqlite3.connect(db) as conn:
+        conn.executescript('''CREATE TABLE research_market_memory_mx(
+            exchange TEXT,market TEXT,strategy TEXT,ts REAL);
+            CREATE INDEX idx_research_market_memory_mx_scope_ts
+            ON research_market_memory_mx(exchange,market,strategy,ts DESC);''')
+        conn.executemany('INSERT INTO research_market_memory_mx VALUES(?,?,?,?)',
+            [('bithumb','KRW-B3','adaptive',i+1) for i in range(50000)])
+        conn.executemany('INSERT INTO research_market_memory_mx VALUES(?,?,?,?)', [
+            ('bithumb','KRW-BTC','adaptive',51000), ('bithumb','KRW-B3','other',99000),
+            ('upbit','KRW-B3','adaptive',48000), ('bithumb','KRW-OTHER','adaptive',99999)])
+    actual_connect = sqlite3.connect
+    class BoundedConnection(sqlite3.Connection):
+        def set_progress_handler(self, callback, steps):
+            # A VM-instruction bound catches a retained-history scan without
+            # depending on machine speed or increasing the production timeout.
+            calls = 0
+            def bounded():
+                nonlocal calls
+                calls += 1
+                return calls > 10 or callback()
+            super().set_progress_handler(bounded if callback else None, 1000 if callback else 0)
+    monkeypatch.setattr(review.sqlite3, 'connect', lambda *a,**k: actual_connect(*a,**k,factory=BoundedConnection))
+    original = hashlib.sha256(db.read_bytes()).hexdigest()
+    first = {'activity':review.read_activity(db)}
+    memory = first['activity']['market_memory']
+    assert memory['status'] == 'read' and memory['latest'] == 51000
+    assert memory['streams']['bithumb|KRW-B3'] == 50000
+    assert memory['streams']['upbit|KRW-B3'] == 48000
+    assert memory['streams']['upbit|KRW-BTC'] is None
+    assert memory['scope'] == 'bithumb,upbit / KRW-B3,KRW-BTC,KRW-ETH / adaptive'
+    assert hashlib.sha256(db.read_bytes()).hexdigest() == original
+    with actual_connect(db) as conn:
+        conn.execute("INSERT INTO research_market_memory_mx VALUES('bithumb','KRW-BTC','adaptive',52000)")
+    second = {'activity':review.read_activity(db)}
+    changes = review.compare_activity(first,second)
+    assert changes['market_memory']['observation'] == 'advanced'
+    assert changes['market_memory_stream:bithumb|KRW-B3']['observation'] == 'unchanged'
+    assert changes['market_memory_stream:bithumb|KRW-BTC']['observation'] == 'advanced'
+    assert changes['market_memory_stream:upbit|KRW-BTC']['observation'] == 'unknown'
+
+
+def test_activity_scope_change_is_not_reported_as_progress():
+    first = {'activity':{'market_memory':{'status':'read','latest':100,'scope':'all_rows'}}}
+    last = {'activity':{'market_memory':{'status':'read','latest':200,'scope':'specific_scope'}}}
+    assert review.compare_activity(first,last)['market_memory']['observation'] == 'unknown'
+
+
 def test_recovery_helper_is_observed_as_host_owner(tmp_path, monkeypatch):
     db = database(tmp_path)
     (tmp_path/review.STATUS_FILES['host']).write_text(json.dumps({'pid':111,'started_at':100,'profile':'collection_recovery'}))
