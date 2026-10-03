@@ -14,7 +14,9 @@
 
 - **Interim package verified:** source a69fe85cabc95f6a8f947b39035c64fe0424146e; same CRYPTO.zip version17, 153002bytes/71files, SHA256285280f3996a6f5c04ce07836d36c132d599ce953636a07cdcd170535be78d80, manifest20a55ab1f21ccd956e39d2cec91866a33a5fe512b8c798547269553eb5f905b7. All70 payloads verified. Extracted Python -B -S HTTP buy/restart/retry/partial-sale and cleanup/retry/read-only byte comparisons pass. Drive CURRENT SNAPSHOT/BATON, append-only Ledger and existing WBS F04/F30/F32 updated with revision guards; complete text readback matches. Actual PC application remains pending.
 
-- **Windows flush correction:** completed backup files now use a writable handle for fsync (required by Win32 FlushFileBuffers); canonical sources remain read-only. Added a regression that rejects read-only flush descriptors. All15 storage tests pass;131 distinct affected tests including the earlier130. Final package replaces interim version17 before user application.
+- **Windows flush correction:** completed backup files now use a writable handle for fsync (required by Win32 FlushFileBuffers); canonical sources remain read-only. Added a regression that rejects read-only flush descriptors. All15 storage tests pass;131 distinct affected tests including the earlier130. Final package version18 replaces interim version17 before user application.
+
+- **Final delivery:** source0f4dd5288f7ff69b929d3cb93a9d499cf7f860b1; same CRYPTO.zip version18,153061bytes/71files; SHA256e2b1a6faeb9bb0b00144b32701788b5300cb9656f202297b3fc2c2ca5dad01bd; manifest5eb4d30782b899ff86a11441c1137f5138435a25c672c258978e24c9322e62e1. All70 payload hashes verified. Final extracted stdlib-only cleanup/retry/readback preserves original database bytes. Previous HTTP flow verification also passed; the only later code change is the backup flush handle.131 distinct relevant tests passed (130 + new Windows descriptor regression); final storage suite15/15. Drive CURRENT/BATON/Ledger/WBS final package pointers and states are updated and exact full-text readback verified. PC application is pending.
 
 ### Previous checkpoint — execution amounts and calculator sync delivered; storage management next
 
