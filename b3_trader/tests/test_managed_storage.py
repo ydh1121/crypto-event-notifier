@@ -57,6 +57,18 @@ def test_wal_rows_survive_reopen_and_journal_owners_share_one_copy(tmp_path):
     writer.close()
 
 
+def test_backup_flush_uses_writable_copy_handle_required_on_windows(tmp_path, monkeypatch):
+    source = database(tmp_path/'crypto_trader.sqlite3')
+    original = source.read_bytes()
+    actual_fsync = os.fsync
+    def require_writable(fd):
+        os.write(fd, b'')  # EBADF on a read-only descriptor, without changing bytes.
+        actual_fsync(fd)
+    monkeypatch.setattr(backup.os, 'fsync', require_writable)
+    result = backup.ensure_backup(source, role='journal')
+    assert result['quick_check'] == 'ok' and source.read_bytes() == original
+
+
 def test_48h_boundary_unknowns_other_database_and_future_copy_are_preserved(tmp_path):
     now = time.time()
     source = database(tmp_path/'crypto_trader.sqlite3')

@@ -230,7 +230,9 @@ def ensure_locked(source, *, role, connection=None, now=None, progress=None, tim
                 raise ValueError('Backup cannot be made self-contained')
         expected = {'schema': schema, 'counts': counts}
         verify_copy(target_path, expected, timeout=timeout)
-        with target_path.open('rb') as handle:
+        # Windows FlushFileBuffers requires a writable handle. This is the
+        # completed backup copy, never the read-only canonical source.
+        with target_path.open('r+b') as handle:
             os.fsync(handle.fileno())
         receipt = {'version': 1, 'role': role, 'source': identity, 'snapshot_at': now,
                    'completed_at': time.time(), 'quick_check': 'ok', **expected,
