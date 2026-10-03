@@ -60,16 +60,16 @@ export function priceChart(history,trades,range='7d') {
   const x=t=>60+(t-t0)/(t1-t0||1)*730,y=v=>18+(high-v)/span*185;
   return `<figure><svg viewBox="0 0 820 238" role="img" aria-label="가격 흐름과 현재 원장 페이지의 매수·매도 체결"><text x="0" y="22">${number(high,8)}</text><text x="0" y="203">${number(low,8)}</text><line class="gridline" x1="60" y1="204" x2="790" y2="204"/><polyline class="price-line" points="${points.map(p=>`${x(p.ts)},${y(p.price)}`).join(' ')}"/>${visible.map(t=>`<g class="${t.side==='buy'?'buy':'sell'}"><circle cx="${x(t.ts)}" cy="${y(t.price)}" r="5"/><text x="${x(t.ts)}" y="${y(t.price)-10}" text-anchor="middle">${t.side==='buy'?'매수':'매도'}</text><title>${time(t.ts)} · ${won(t.price)} · ${number(t.volume,8)}개</title></g>`).join('')}<text x="60" y="232">${time(t0)}</text><text x="790" y="232" text-anchor="end">${time(t1)}</text></svg><figcaption>표에 표시된 체결 ${visible.length}건 · 저장된 가격 기록</figcaption></figure>`;
 }
-export function relativeHtml(memory, aligned) {
+export function relativeHtml(memory, aligned, symbol='코인') {
   if(aligned?.windows?.length) return `<div class="section-heading"><h2>BTC·ETH 대비 움직임</h2><span>${time(aligned.source_ts)} 기준</span></div>
-    <p class="subtle">같은 시각의 1시간봉 종가로 비교합니다.</p><div class="table-scroll"><table><thead><tr><th>기간</th><th>코인</th><th>BTC</th><th>ETH</th><th>BTC 대비</th><th>ETH 대비</th></tr></thead><tbody>${aligned.windows.map(r=>`<tr><td>${({ '1h':'1시간','4h':'4시간','1d':'1일','7d':'7일' })[r.horizon]||esc(r.horizon)}</td><td>${percent(r.coin)}</td><td>${percent(r.btc)}</td><td>${percent(r.eth)}</td><td>${finite(r.vs_btc_pp)===null?'—':percent(r.vs_btc_pp)+'p'}</td><td>${finite(r.vs_eth_pp)===null?'—':percent(r.vs_eth_pp)+'p'}</td></tr>`).join('')}</tbody></table></div>`;
+    <p class="subtle">같은 시각의 1시간봉 종가로 비교합니다.</p><div class="table-scroll"><table><thead><tr><th>기간</th><th>${esc(symbol)}</th><th>BTC</th><th>ETH</th><th>BTC 대비</th><th>ETH 대비</th></tr></thead><tbody>${aligned.windows.map(r=>`<tr><td>${({ '1h':'1시간','4h':'4시간','1d':'1일','7d':'7일' })[r.horizon]||esc(r.horizon)}</td><td>${percent(r.coin)}</td><td>${percent(r.btc)}</td><td>${percent(r.eth)}</td><td>${finite(r.vs_btc_pp)===null?'—':percent(r.vs_btc_pp)+'p'}</td><td>${finite(r.vs_eth_pp)===null?'—':percent(r.vs_eth_pp)+'p'}</td></tr>`).join('')}</tbody></table></div>`;
 
   const rows=relativeSeries(memory),last=rows.at(-1);
   if(!last)return '<p class="placeholder">상대 움직임 기록이 없습니다.</p>';
   return `<div class="section-heading"><h2>BTC·ETH 대비 움직임</h2><span>${time(last.ts)} 기준</span></div>
     <dl class="account-primary">${metric('코인 수익률',percent(last.coin),color(last.coin))}${metric('BTC 수익률',percent(last.btc),color(last.btc))}${metric('ETH 수익률',percent(last.eth),color(last.eth))}</dl>
     <p class="subtle">기존 수집기의 수익률 기록입니다. 서로 다른 산출 구간일 수 있어 상대 강도로 단정하지 않습니다.</p>
-    <div class="table-scroll"><table><thead><tr><th>시각</th><th>코인</th><th>BTC</th><th>ETH</th></tr></thead><tbody>${rows.slice(-30).reverse().map(r=>`<tr><td>${time(r.ts)}</td><td>${percent(r.coin)}</td><td>${percent(r.btc)}</td><td>${percent(r.eth)}</td></tr>`).join('')}</tbody></table></div>`;
+    <div class="table-scroll"><table><thead><tr><th>시각</th><th>${esc(symbol)}</th><th>BTC</th><th>ETH</th></tr></thead><tbody>${rows.slice(-30).reverse().map(r=>`<tr><td>${time(r.ts)}</td><td>${percent(r.coin)}</td><td>${percent(r.btc)}</td><td>${percent(r.eth)}</td></tr>`).join('')}</tbody></table></div>`;
 }
 export function freshnessHtml(a) {
   const fresh=freshness(a?.source_ts);

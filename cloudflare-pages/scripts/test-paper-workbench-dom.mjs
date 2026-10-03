@@ -14,11 +14,11 @@ const listeners=new Set();const store={get:()=>state,setUi(p){Object.assign(stat
 const requests=[];
 let addNewEvent=false,archivedTarget=null;
 const eventAnchor=clock/1000-7*86400;
-const eventRows=market=>(addNewEvent?['new','recent','old']:['recent','old']).map(id=>({event_id:id,event_ts:eventAnchor+({old:0,recent:86400,new:172800})[id],title:`${id} 발표`,market,source_url:`https://example.com/${id}`,responses:{'15m':{coin:2,btc:1,eth:null,vs_btc_pp:1,vs_eth_pp:null,observations:{coin:{baseline_price:100,baseline_trade_ts:clock/1000-901,target_price:102,target_trade_ts:clock/1000}}}},price_progress:{coin:{'1h':{status:archivedTarget?'awaiting_capture':'missing_target',baseline:{price:100,trade_ts:clock/1000-3601,origin:'response'},target:archivedTarget}}},history:{'15m':{samples:3,positive_samples:2,mean_pct:1.2,median_pct:1}}}));
+const eventRows=market=>(addNewEvent?['new','recent','old']:['recent','old']).map(id=>({event_id:id,event_ts:eventAnchor+({old:0,recent:86400,new:172800})[id],title:`${id} 발표`,category:'news',short_label:'SEC · 규제',market,source_url:`https://example.com/${id}`,responses:{'15m':{coin:2,btc:1,eth:null,vs_btc_pp:1,vs_eth_pp:null,observations:{coin:{baseline_price:100,baseline_trade_ts:clock/1000-901,target_price:102,target_trade_ts:clock/1000}}}},price_progress:{coin:{'1h':{status:archivedTarget?'awaiting_capture':'missing_target',baseline:{price:100,trade_ts:clock/1000-3601,origin:'response'},target:archivedTarget}}},history:{'15m':{samples:3,positive_samples:2,mean_pct:1.2,median_pct:1}}}));
 globalThis.fetch=async path=>{const u=new URL(path,'http://127.0.0.1:8766'),ex=u.searchParams.get('exchange'),market=u.searchParams.get('market');requests.push(u);
  const accounts=['aggressive','balanced'].map(s=>acc(s,ex));let body;
  if(u.searchParams.has('experiment')) {const account=accounts.find(a=>a.experiment_id===u.searchParams.get('experiment'));body={exchange:ex,market,journal:{account,trades:[],revision:account.revision,total:0,offset:0,limit:30,next_offset:null}};}
- else body={detail:{exchange:ex,market,data:{strategy_lab:{version:2,exchange:ex,market,experiments:accounts,price_history:[{ts:clock/1000-7200,price:98},{ts:clock/1000-3600,price:100}],events:eventRows(market)}}}};
+ else body={detail:{exchange:ex,market,data:{strategy_lab:{version:2,exchange:ex,market,experiments:accounts,price_history:[{ts:clock/1000-7200,price:98},{ts:clock/1000-3600,price:100}],events:[...eventRows(market),{event_id:'cpi',event_ts:eventAnchor,category:'economic',short_label:'소비자물가 · CPI',title:'Consumer Price Index DEXE',market,responses:{},source_url:'https://example.com/cpi'}]}}}};
  return {ok:true,json:async()=>structuredClone(body)};
 };
 const page=createPaperWorkbench({store});const root=document.getElementById('root');page.mount(root);page.render();
@@ -49,9 +49,10 @@ test('ticker identifiers remain intact and existing accounts remain reachable',a
  root.querySelector('[data-return-workbench]').click();await flush();assert.ok(shadow().getElementById('coin-heading').textContent.includes('DEXE'));
 });
 test('event selection joins reaction, historical sample and evidence without polling reset',async()=>{
- click('[data-section="events"]');const oldKey=shadow().querySelectorAll('[data-event]')[1].dataset.event;
+ click('[data-section="reaction"]');click('[data-reaction="news"]');const oldKey=shadow().querySelectorAll('[data-event]')[1].dataset.event;
  shadow().querySelectorAll('[data-event]')[1].click();click('[data-event-horizon="15m"]');
- assert.equal(shadow().querySelector('.event-detail h3').textContent,'old 발표');
+ assert.equal(shadow().querySelector('.event-detail h3').textContent,'SEC · 규제');
+ assert.ok(shadow().querySelector('.event-original').textContent.includes('old 발표'));
  assert.ok(shadow().querySelector('.event-index').textContent.includes('+2%'));
  assert.ok(shadow().querySelector('.event-index').textContent.includes('+1%p'));
  const details=shadow().querySelector('[data-continuity-key^="event-history"]');details.open=true;
@@ -69,6 +70,24 @@ test('event selection joins reaction, historical sample and evidence without pol
  assert.equal(shadow().querySelector('.event-meta a').href,'https://example.com/old');
  click('[data-section="strategy"]');await flush();
 });
+test('reaction categories preserve separate selections and time window across tabs and polling',async()=>{
+ click('[data-section="reaction"]');click('[data-reaction="news"]');
+ const selected=shadow().querySelector('[data-event][aria-pressed="true"]').dataset.event;
+ click('[data-event-horizon="4h"]');click('[data-reaction="economic"]');
+ assert.equal(shadow().querySelectorAll('[data-event]').length,1);
+ assert.equal(shadow().querySelector('.event-detail h3').textContent,'소비자물가 · CPI');
+ assert.ok(!shadow().querySelector('.event-index').textContent.includes('Consumer Price Index'));
+ assert.ok(shadow().querySelector('.event-original').textContent.includes('DEXE'));
+ assert.equal(shadow().querySelector('.event-index td').textContent,'—');
+ const disclosure=shadow().querySelector('.event-original');disclosure.open=true;
+ clock+=21000;for(const fn of listeners)fn(state,{type:'snapshot-live'});await flush();
+ assert.equal(shadow().querySelector('[data-reaction][aria-pressed="true"]').dataset.reaction,'economic');
+ assert.equal(shadow().querySelector('.event-original').open,true);
+ assert.equal(shadow().querySelector('[data-event-horizon][aria-pressed="true"]').dataset.eventHorizon,'4h');
+ click('[data-reaction="news"]');assert.equal(shadow().querySelector('[data-event][aria-pressed="true"]').dataset.event,selected);
+ click('[data-reaction="relative"]');assert.equal(shadow().querySelector('.event-index'),null);
+ click('[data-section="strategy"]');await flush();
+});
 test('pending evidence remains distinct from a recorded zero and keeps full event identity',()=>{
  const e={event_id:'same|release',event_ts:100000,source_id:'source-a',event_type:'TYPE',title:'발표',market:'KRW-DEXE',responses:{'15m':{coin:null,btc:0,eth:null,vs_btc_pp:null,vs_eth_pp:null}},price_progress:{coin:{'15m':{status:'awaiting_capture',baseline:{price:100,trade_ts:99999,origin:'archive'},target:{price:105,trade_ts:100901,origin:'archive'}},'1h':{status:'before_horizon'},'4h':{status:'missing_baseline'},'1d':{status:'invalid_response'}},eth:{'15m':{status:'missing_target'}}}};
  const other={...e,source_id:'source-b'};assert.notEqual(eventKey(e),eventKey(other));
@@ -82,7 +101,7 @@ test('pending evidence remains distinct from a recorded zero and keeps full even
  assert.ok(!box.querySelector('.reaction-table').textContent.includes('+5%'));
 });
 test('actual-holding ledger navigation explicitly opens its strategy even from an event tab',async()=>{
- click('[data-section="events"]');page.openAccount('bithumb','KRW-B3','aggressive');await flush();
+ click('[data-section="reaction"]');click('[data-reaction="news"]');page.openAccount('bithumb','KRW-B3','aggressive');await flush();
  assert.equal(state.ui.paperMarket,'KRW-B3');assert.equal(state.ui.paperLabStyle,'aggressive');
  assert.equal(shadow().querySelector('[data-section][aria-current="page"]').dataset.section,'strategy');
  assert.equal(shadow().querySelector('[role="tab"][aria-selected="true"]').dataset.experiment,'bithumb|aggressive|v1');

@@ -172,7 +172,10 @@ def test_event_view_matches_baselines_benchmarks_and_past_available_samples(tmp_
     h=current['history']['15m']
     assert h['samples']==1 and abs(h['mean_pct']-2)<1e-9
     assert current['history']['1d']['samples']==0 and current['history']['1d']['mean_pct'] is None
-    assert read_event_context(ro,'upbit','KRW-B3')==[]
+    other_exchange=read_event_context(ro,'upbit','KRW-B3')
+    assert other_exchange and all(e['exchange']=='upbit' for e in other_exchange)
+    assert all(e['responses'][h]['coin'] is None and e['responses'][h]['btc'] is None
+               for e in other_exchange for h,_ in HORIZONS)
     ro.close();assert hashlib.sha256(db.read_bytes()).hexdigest()==before
 
 
@@ -187,4 +190,49 @@ def test_corrupt_saved_response_blocks_anchor_reuse_and_is_not_shown_as_zero(tmp
     assert result['anchor_conflicts'] and not result['samples_inserted']
     row=read_event_context(conn,'bithumb','KRW-B3')[0]
     assert row['responses']['15m']['coin'] is None and row['invalid_observations']==1
+    conn.close()
+
+
+def test_collected_macro_without_prices_is_visible_but_future_and_date_only_are_not(tmp_path):
+    db=tmp_path/'metadata.db';conn=setup(db)
+    IntelligenceEventResponseCollector(conn)
+    for name,stamp,event_type,source in (
+        ('cpi',100000,'US_CPI','us_bls_release_calendar'),
+        ('future',110000,'US_EMPLOYMENT','us_bls_release_calendar'),
+        ('date-only',90000,'FOMC_MEETING','us_fed_fomc_calendar'),
+        ('late-received',100001,'US_PPI','us_bls_release_calendar'),
+        ('unknown-source',100002,'US_CPI','unverified'),
+    ):
+        _insert_event(db,event_id=name,event_ts=stamp,event_type=event_type,source_id=source)
+    conn.execute("UPDATE research_intelligence_events SET received_at=110001 WHERE event_id='late-received'")
+    conn.commit();conn.close();before=hashlib.sha256(db.read_bytes()).hexdigest()
+    with sqlite3.connect(db.resolve().as_uri()+'?mode=ro',uri=True) as ro:
+        ro.row_factory=sqlite3.Row;ro.execute('PRAGMA query_only=ON')
+        events=read_event_context(ro,'bithumb','KRW-DEXE',now=101000)
+    assert len(events)==1
+    event=events[0]
+    assert event['event_id']=='cpi' and event['market']=='KRW-DEXE'
+    assert event['category']=='economic' and event['short_label']=='소비자물가 · CPI'
+    assert event['title']=='US_CPI fixture' and event['event_ts']==100000
+    assert all(event['responses'][h][name] is None for h,_ in HORIZONS for name in ('coin','btc','eth'))
+    assert all(event['price_progress']['coin'][h]['status']=='missing_baseline' for h,_ in HORIZONS)
+    assert hashlib.sha256(db.read_bytes()).hexdigest()==before
+
+
+def test_news_burst_cannot_displace_collected_macro_releases(tmp_path):
+    db=tmp_path/'categories.db';conn=setup(db)
+    IntelligenceEventResponseCollector(conn)
+    _insert_event(db,event_id='macro',event_ts=100000,event_type='US_GDP',source_id='us_bea_release_schedule')
+    for i in range(100):
+        _insert_event(db,event_id=f'news-{i:03}',event_ts=200000+i,
+                      event_type='US_SEC_ENFORCEMENT',source_id='us_sec_press_releases')
+    events=read_event_context(conn,'bithumb','KRW-B3',now=300000)
+    assert len(events)==20 and events[-1]['event_id']=='macro'
+    assert events[0]['event_id']=='news-099'
+    assert sum(e['category']=='news' for e in events)==19
+    for limit in (1,3,10):
+        bounded=read_event_context(conn,'bithumb','KRW-B3',now=300000,limit=limit)
+        assert len(bounded)==limit
+        if limit>1:
+            assert any(e['event_id']=='macro' for e in bounded)
     conn.close()

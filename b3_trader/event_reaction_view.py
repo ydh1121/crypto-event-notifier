@@ -6,8 +6,10 @@ import time
 from statistics import mean, median
 from typing import Any
 
-from .event_response_contract import HORIZONS, MAX_EVENTS, OBSERVATION_TOLERANCE_SECONDS, PROVIDER_ID, observation
+from .event_response_contract import (HORIZONS, MAX_EVENTS, OBSERVATION_TOLERANCE_SECONDS,
+                                      PROVIDER_ID, OFFICIAL_EVENT_SOURCES, EXCLUDED_EVENT_TYPES, observation)
 from .event_price_archive import TABLE as PRICE_TABLE, read_price
+from .event_reaction_catalog import presentation, select_events
 
 HISTORY_SECONDS = 365 * 86400
 
@@ -33,14 +35,14 @@ def review_event_index(events: list[dict]) -> dict:
             horizons[h] = {**values, 'status': {
                 name: e.get('price_progress', {}).get(name, {}).get(h, {}).get('status', 'unavailable')
                 for name in ('coin', 'btc', 'eth')}}
-        index.append({**{k: e.get(k) for k in ('event_id', 'event_ts', 'source_id', 'event_type', 'title')},
+        index.append({**{k: e.get(k) for k in ('event_id', 'event_ts', 'source_id', 'event_type', 'title', 'category', 'short_label')},
                       'complete_comparisons': complete, 'horizons': horizons})
     witnesses = []
     if items:
         best = max(range(len(items)), key=lambda n: (len(index[n]['complete_comparisons']),
                    sum(index[n]['horizons'][h]['coin'] is not None for h, _ in HORIZONS)))
         witnesses = [items[n] for n in dict.fromkeys((0, best))]
-    return {'selection': 'latest_20_events_with_local_price_evidence',
+    return {'selection': 'up_to_20_category_balanced_saved_events',
             'displayed_event_count': len(index), 'index': index, 'events': witnesses}
 
 
@@ -71,7 +73,7 @@ def _event_list(conn, exchange, market, limit, now, has_archive):
         FROM research_intelligence_event_responses
         WHERE exchange=? AND market IN (?,?,?) AND provider_id=? AND captured_at<=? AND event_ts<=?
         GROUP BY event_id,event_ts,source_id,event_type ORDER BY event_ts DESC,event_id LIMIT ?''',
-        (exchange, market, 'KRW-BTC', 'KRW-ETH', PROVIDER_ID, now, now, limit)))
+        (exchange, market, 'KRW-BTC', 'KRW-ETH', PROVIDER_ID, now, now, MAX_EVENTS)))
     if has_archive:
         rows.extend(conn.execute(f'''SELECT event_id,event_ts,source_id,event_type,NULL AS captured_at
             FROM {PRICE_TABLE} WHERE event_id IN (
@@ -80,12 +82,25 @@ def _event_list(conn, exchange, market, limit, now, has_archive):
             AND exchange=? AND market IN (?,?,?) AND provider_id=? AND archived_at<=? AND event_ts<=?
             GROUP BY event_id,event_ts,source_id,event_type
             ORDER BY event_ts DESC,event_id LIMIT ?''',
-            (MAX_EVENTS, exchange, market, 'KRW-BTC', 'KRW-ETH', PROVIDER_ID, now, now, limit)))
+            (MAX_EVENTS, exchange, market, 'KRW-BTC', 'KRW-ETH', PROVIDER_ID, now, now, MAX_EVENTS)))
+    # A collected release remains visible even when this coin has no price
+    # evidence. Bound each source independently so a news burst cannot hide all
+    # macro releases. Keep source clocks, exclude future/date-only events, and
+    # never synthesize a response or borrow another exchange's prices.
+    excluded = tuple(sorted(EXCLUDED_EVENT_TYPES))
+    placeholders = ','.join('?' for _ in excluded)
+    for source in OFFICIAL_EVENT_SOURCES:
+        rows.extend(conn.execute(f'''SELECT event_id,source_ts AS event_ts,source_id,event_type,
+                NULL AS captured_at FROM research_intelligence_events
+            WHERE source_id=? AND source_ts>0 AND source_ts<=?
+              AND (received_at IS NULL OR received_at<=?)
+              AND event_type NOT IN ({placeholders})
+            ORDER BY source_ts DESC,event_id LIMIT ?''', (source, now, now, *excluded, limit)))
     unique = {}
     for row in rows:
         key = tuple(row[k] for k in ('event_id', 'event_ts', 'source_id', 'event_type'))
         unique.setdefault(key, dict(row))
-    return sorted(unique.values(), key=lambda e: (-e['event_ts'], e['event_id'], e['source_id'], e['event_type']))[:limit]
+    return select_events(list(unique.values()), limit)
 
 
 def _point(price, stamp, origin):
@@ -141,6 +156,7 @@ def read_event_context(conn: sqlite3.Connection, exchange: str, market: str, *, 
         meta = conn.execute('''SELECT title,source_url,source_ts,published_at,scheduled_at,received_at
             FROM research_intelligence_events WHERE event_id=?''', (item['event_id'],)).fetchone()
         item.update(dict(meta) if meta else {'title': item['event_type'], 'source_url': ''})
+        item.update(presentation(item))
         item['anchor_changed'] = meta is not None and meta['source_ts'] != item['event_ts']
         item['exchange'], item['market'], item['observed_at'] = exchange, market, current
         responses = {}

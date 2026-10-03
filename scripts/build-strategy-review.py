@@ -15,7 +15,7 @@ PYTHON_FILES = (
     '__init__.py', 'paper_constants.py', 'strategy_journal_review.py',
     'strategy_lab_market.py', 'strategy_lab_context.py', 'strategy_lab_journal.py',
     'strategy_lab_plan.py', 'strategy_lab_rules.py',
-    'event_reaction_view.py', 'event_response_contract.py', 'event_price_archive.py',
+    'event_reaction_view.py', 'event_reaction_catalog.py', 'event_response_contract.py', 'event_price_archive.py',
     'runtime_review.py', 'runtime_process_contract.py', 'event_capture_review.py', 'holdings_review.py', 'holding_quotes.py', 'user_tools.py',
     'manual_planning_store.py', 'manual_trading.py',
     'workspace_tools.py', 'workspace_packages.py', 'collection_update.py',
@@ -63,6 +63,10 @@ CLEAN_STORAGE.cmd      오래된 백업 정리 — 수집·조회 창을 먼저 
 DB별 24시간에 한 번 생성하고 최근 48시간만 보관합니다. 당일 복구본은 재실행 시 재사용합니다.
 수집 창이 열려 있으면 자동 관리됩니다. 공간 부족·검증 실패 시 기존 백업을 보존합니다.
 기존 체결·학습·점수·이벤트 DB와 research-warehouse는 정리하지 않습니다.
+
+가상매매: 코인 선택 → 반응도 → BTC·ETH / 경제지표 / 정책·뉴스.
+발표 목록에서 15분·1시간·4시간·1일을 선택합니다. 원문 제목과 가격·시각은 펼쳐서 봅니다.
+가격 기록이 없는 발표도 목록에 남으며 수익률은 —로 표시합니다.
 
 @REGISTRATION_NOTE@
 
