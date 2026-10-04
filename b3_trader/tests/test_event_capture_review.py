@@ -160,6 +160,74 @@ def test_slow_row_count_preserves_ticks_event_anchors_and_actual_progress(tmp_pa
     store.close()
 
 
+def test_universe_liveness_cost_does_not_grow_with_retained_history(tmp_path):
+    from b3_trader.event_trade_samples import TABLE, ensure_schema
+    path=tmp_path/'many-samples.db'
+    conn=sqlite3.connect(path);conn.row_factory=sqlite3.Row;ensure_schema(conn)
+    now=200000
+    conn.executemany(f'INSERT INTO {TABLE} VALUES(?,?,?,?,?,?,?,?,?,?)',
+        ((exchange,f'KRW-A{i}',180000+minute*60,180001+minute*60,100,'first',
+          180059+minute*60,101,'last',180060+minute*60)
+         for exchange in ('bithumb','upbit') for i in range(400) for minute in range(300)))
+    def insert(exchange,market,stamp):
+        conn.execute(f'INSERT INTO {TABLE} VALUES(?,?,?,?,?,?,?,?,?,?)',
+            (exchange,market,int(stamp//60)*60,stamp,100,'first',stamp,101,'last',stamp+1))
+    for ex in ('bithumb','upbit'):
+        insert(ex,'KRW-BTC',now-1);insert(ex,'KRW-ALT',now-119)
+    insert('bithumb','KRW-OLD',now-121)
+    insert('bithumb','KRW-FUTURE',now+1)
+    conn.commit();conn.close()
+    before=hashlib.sha256(path.read_bytes()).hexdigest()
+    conn=sqlite3.connect(path.as_uri()+'?mode=ro',uri=True);conn.row_factory=sqlite3.Row
+    instructions=0
+    def budget():
+        nonlocal instructions
+        instructions+=1000
+        return instructions>100000
+    # A deterministic work budget, independent of machine/disk speed. The old
+    # 240k-row aggregate exhausts this; indexed recent rows must not.
+    conn.set_progress_handler(budget,1000)
+    try:
+        result=review._universe_samples(conn,now)
+    finally:conn.set_progress_handler(None,0);conn.close()
+    assert result['scope']=='last_120s' and result['history_counts']=='not_scanned'
+    assert len(result['exchanges'])==2
+    for row in result['exchanges']:
+        assert row['window_rows']==row['window_markets']==2
+        assert row['last_120s']=={'markets':2,'alt_markets':1}
+        assert row['first_trade_ts']==now-119 and row['last_trade_ts']==now-1
+        assert 'rows' not in row and 'markets' not in row
+    assert hashlib.sha256(path.read_bytes()).hexdigest()==before
+
+
+def test_recent_window_expiry_is_not_claimed_as_missing_history_or_progress(tmp_path):
+    from b3_trader.event_trade_samples import TABLE, ensure_schema
+    path=tmp_path/'expiry.db';conn=sqlite3.connect(path);conn.row_factory=sqlite3.Row;ensure_schema(conn)
+    conn.execute(f'INSERT INTO {TABLE} VALUES(?,?,?,?,?,?,?,?,?,?)',
+                 ('bithumb','KRW-ALT',99960,99999,100,'first',99999,101,'last',100000))
+    conn.commit()
+    before=review._universe_samples(conn,100000);after=review._universe_samples(conn,100130)
+    assert before['exchanges'][0]['window_markets']==1
+    assert after['exchanges'][0]['window_markets']==0
+    assert after['exchanges'][0]['last_trade_ts'] is None
+    assert conn.execute(f'SELECT COUNT(*) FROM {TABLE}').fetchone()[0]==1
+    def wrap(x):return {'event_capture':{'universe_samples':{'status':'read',**x}}}
+    result=review.compare_event_capture(wrap(before),wrap(after))
+    assert result['universe:bithumb']['observation']=='unknown'
+    assert result['universe:bithumb']['recent_alt_markets_after']==0
+    conn.close()
+
+
+def test_missing_sample_index_is_unknown_without_schema_repair(tmp_path):
+    from b3_trader.event_trade_samples import ensure_schema
+    path=tmp_path/'missing-index.db';conn=sqlite3.connect(path);conn.row_factory=sqlite3.Row;ensure_schema(conn)
+    conn.execute('DROP INDEX idx_event_samples_expiry');conn.commit();conn.close()
+    before=hashlib.sha256(path.read_bytes()).hexdigest()
+    data=read(path)['universe_samples']
+    assert data['status']=='unavailable' and 'exchanges' not in data
+    assert hashlib.sha256(path.read_bytes()).hexdigest()==before
+
+
 def test_actual_saved_subscription_is_sanitized_not_guessed_from_defaults(tmp_path, monkeypatch):
     path = tmp_path/'b3_trader/data/auto_demo.sqlite3'
     path.parent.mkdir(parents=True)

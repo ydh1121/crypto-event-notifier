@@ -182,7 +182,8 @@ def test_check_reports_actual_alt_prices_separate_from_configured_subscription(t
     s.flush(100001,force=True);store.close()
     before=hashlib.sha256(db.read_bytes()).hexdigest()
     result=read_event_capture(db,now=100002)['universe_samples']
-    assert result['exchanges'][0]['markets'] == 2
+    assert result['scope'] == 'last_120s'
+    assert result['exchanges'][0]['window_markets'] == 2
     assert result['exchanges'][0]['last_120s']['alt_markets'] == 1
     assert result['continuous_coverage_proven'] is False
     assert hashlib.sha256(db.read_bytes()).hexdigest() == before

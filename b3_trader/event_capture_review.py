@@ -111,17 +111,31 @@ def _tick(row):
 
 def _universe_samples(conn, now):
     from .event_trade_samples import TABLE, RETENTION_SECONDS
-    rows = [dict(r) for r in conn.execute(f'''SELECT exchange,COUNT(*) AS rows,
-        COUNT(DISTINCT market) AS markets,MIN(first_ts) AS first_trade_ts,
+    start = now - 120
+    # This is a liveness query, not a six-hour inventory. Force the existing time
+    # index: GROUP BY exchange can otherwise choose a scan of the primary index.
+    # If the index is absent, report unknown rather than scan or create schema.
+    rows = {r['exchange']:dict(r) for r in conn.execute(f'''SELECT exchange,
+        COUNT(*) AS window_rows,COUNT(DISTINCT market) AS window_markets,
+        COUNT(DISTINCT CASE WHEN market NOT IN ('KRW-BTC','KRW-ETH') THEN market END) AS alt_markets,
+        MIN(CASE WHEN first_ts>=? THEN first_ts ELSE last_ts END) AS first_trade_ts,
         MAX(last_ts) AS last_trade_ts,MAX(received_at) AS last_received_at
-        FROM {TABLE} GROUP BY exchange''')]
-    recent = {r['exchange']:dict(r) for r in conn.execute(f'''SELECT exchange,
-        COUNT(DISTINCT market) AS markets,
-        COUNT(DISTINCT CASE WHEN market NOT IN ('KRW-BTC','KRW-ETH') THEN market END) AS alt_markets
-        FROM {TABLE} WHERE bucket_ts>=? AND last_ts BETWEEN ? AND ? GROUP BY exchange''',
-        (int((now-120)//60)*60,now-120,now))}
-    return {'retention_seconds':RETENTION_SECONDS, 'continuous_coverage_proven':False,
-            'exchanges':[{**r, 'last_120s':recent.get(r['exchange'], {'markets':0,'alt_markets':0})} for r in rows]}
+        FROM {TABLE} INDEXED BY idx_event_samples_expiry
+        WHERE bucket_ts BETWEEN ? AND ? AND exchange IN ('bithumb','upbit')
+          AND market LIKE 'KRW-%' AND last_ts BETWEEN ? AND ?
+          AND first_ts>=bucket_ts AND first_ts<=last_ts AND last_ts<bucket_ts+60
+          AND received_at>=last_ts AND received_at<=?
+          AND first_price>0 AND first_price<=1e308 AND last_price>0 AND last_price<=1e308
+        GROUP BY exchange''', (start,int(start//60)*60,int(now//60)*60,start,now,now))}
+    exchanges = []
+    for exchange in ('bithumb','upbit'):
+        row = rows.get(exchange, {'exchange':exchange, 'window_rows':0, 'window_markets':0,
+            'alt_markets':0, 'first_trade_ts':None, 'last_trade_ts':None, 'last_received_at':None})
+        row['last_120s'] = {'markets':row['window_markets'], 'alt_markets':row.pop('alt_markets')}
+        exchanges.append(row)
+    return {'version':2, 'scope':'last_120s', 'window_start':start, 'window_end':now,
+            'history_counts':'not_scanned', 'retention_seconds':RETENTION_SECONDS,
+            'continuous_coverage_proven':False, 'exchanges':exchanges}
 
 
 def _raw_point(conn, event, market, point, now):
