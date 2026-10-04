@@ -44,11 +44,11 @@ WORKSPACE_README = '''CRYPTO — 앞으로 계속 사용하는 고정 폴더
 
 현재 도구 버전: @BUILD@
 
-이번 변경: 빗썸·업비트 전체 원화 종목의 이벤트 반응용 가격 수집.
-적용: 조회 창 종료 → 수집 창 Ctrl+C 후 종료 대기 → 이 CRYPTO 폴더에 덮어쓰기
-→ UPDATE_COLLECTION.cmd 실행·창 유지 → RUN_REVIEW.cmd → 2분 후 RUN_CHECK.cmd.
-이벤트 가격은 보존하고 임시 분별 체결 표본만 6시간 후 자동 정리합니다.
-과거 미확보 가격은 새로 만들어 채우지 않습니다. CLEAN_STORAGE 재실행은 필요 없습니다.
+이번 변경: 펼친 표 위에서 페이지 스크롤이 멈추던 문제 수정.
+적용: 조회 창만 종료 → 기존 CRYPTO 폴더에 덮어쓰기 → RUN_REVIEW.cmd.
+실행 중인 수집 창은 그대로 유지합니다. CLEAN_STORAGE 재실행은 필요 없습니다.
+반응도에서 실제 가격·시각을 펼치고 표 위에서 마우스 휠을 위아래로 움직여 보세요.
+수집기가 꺼진 뒤 START_COLLECTION이 버전 갱신을 요청하면 UPDATE_COLLECTION.cmd를 한 번 실행합니다.
 
 START_COLLECTION.cmd  수집기 켜기 — 수집할 동안 창을 열어 둡니다.
 UPDATE_COLLECTION.cmd 수집 코드 갱신 후 켜기 — 기존 수집·조회 창을 먼저 종료합니다.
@@ -151,7 +151,7 @@ README = '''가상매매 · 실전 계획 검토 화면
 보유 거래소 적용: @HOLDINGS_EXCHANGE@
 고정된 CRYPTO 폴더를 사용합니다. 조회 창을 닫은 뒤 기존 CRYPTO에 덮어씁니다.
 
-이번 수집 코드 적용: 수집 창 Ctrl+C → 종료 대기 → UPDATE_COLLECTION.cmd.
+이번 화면 수정: 조회 창만 종료 → 덮어쓰기 → RUN_REVIEW.cmd. 실행 중인 수집기는 유지합니다.
 갱신 후 수집이 자동 시작됩니다. 이 창은 켜 두고 RUN_CHECK.cmd로 확인합니다.
 이벤트 반응용 체결 가격은 빗썸·업비트 전체 원화 종목을 구독합니다.
 체결량·호가는 기존 보유·관심 종목 최대 8개 범위를 유지합니다. 자산 추가는 약 1분마다 반영합니다.
