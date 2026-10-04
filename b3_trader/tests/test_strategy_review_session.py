@@ -67,6 +67,9 @@ def test_one_shot_reports_actual_account_without_socket_browser_or_db_write(tmp_
     assert result['review_started_at'] <= result['account_observed_at'] <= result['review_finished_at']
     assert result['account']['reconciliation']['matches'] is True
     assert result['account']['journal']['total'] > 0
+    assert result['event_study_review']['market'] == 'KRW-B3'
+    assert result['event_study_review']['exchange'] == 'bithumb'
+    assert result['event_study_review']['status'] == 'unavailable'
     assert result['review_build']['report_schema'] == 2
     assert 'strategy_lab_metrics' in result['runtime_review']['after']['activity']
     assert hashlib.sha256(db.read_bytes()).hexdigest() == before

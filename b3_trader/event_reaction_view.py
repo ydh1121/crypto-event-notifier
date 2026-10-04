@@ -3,11 +3,10 @@ from __future__ import annotations
 
 import sqlite3
 import time
-from statistics import mean, median
 from typing import Any
 
 from .event_response_contract import (HORIZONS, MAX_EVENTS, OBSERVATION_TOLERANCE_SECONDS,
-                                      PROVIDER_ID, OFFICIAL_EVENT_SOURCES, EXCLUDED_EVENT_TYPES, observation)
+                                      PROVIDER_ID, OFFICIAL_EVENT_SOURCES, EXCLUDED_EVENT_TYPES, observation, summarize_returns)
 from .event_price_archive import TABLE as PRICE_TABLE, read_price
 from .event_reaction_catalog import presentation, select_events
 
@@ -59,10 +58,7 @@ def _history(conn: sqlite3.Connection, event: dict, exchange: str, market: str) 
         sample = observation(row)
         if sample:
             groups[row['horizon_label']].append(sample['return_pct'])
-    return {h: {'samples': len(values), 'mean_pct': mean(values) if values else None,
-                'median_pct': median(values) if values else None,
-                'positive_samples': sum(v > 0 for v in values) if values else None}
-            for h, values in groups.items()}
+    return {h: summarize_returns(values) for h, values in groups.items()}
 
 
 def _event_list(conn, exchange, market, limit, now, has_archive):

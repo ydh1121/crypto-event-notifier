@@ -14,7 +14,7 @@ PUBLIC = ROOT / 'cloudflare-pages/public'
 PYTHON_FILES = (
     '__init__.py', 'paper_constants.py', 'strategy_journal_review.py',
     'strategy_lab_market.py', 'strategy_lab_context.py', 'strategy_lab_journal.py',
-    'strategy_lab_plan.py', 'strategy_lab_rules.py',
+    'strategy_lab_plan.py', 'strategy_lab_rules.py', 'event_strategy_study.py',
     'event_reaction_view.py', 'event_reaction_catalog.py', 'event_response_contract.py', 'event_price_archive.py', 'event_trade_samples.py',
     'runtime_review.py', 'runtime_process_contract.py', 'event_capture_review.py', 'holdings_review.py', 'holding_quotes.py', 'user_tools.py',
     'manual_planning_store.py', 'manual_trading.py',
@@ -44,10 +44,13 @@ WORKSPACE_README = '''CRYPTO — 앞으로 계속 사용하는 고정 폴더
 
 현재 도구 버전: @BUILD@
 
-이번 변경: 펼친 표 위에서 페이지 스크롤이 멈추던 문제 수정.
+이번 변경: 발표 종류별 누적 반응과 해당 발표 뒤 진입한 전략별 가상매매 성과 연결.
 적용: 조회 창만 종료 → 기존 CRYPTO 폴더에 덮어쓰기 → RUN_REVIEW.cmd.
 실행 중인 수집 창은 그대로 유지합니다. CLEAN_STORAGE 재실행은 필요 없습니다.
-반응도에서 실제 가격·시각을 펼치고 표 위에서 마우스 휠을 위아래로 움직여 보세요.
+가상매매 → 코인 선택 → 반응도 → 경제지표 또는 정책·뉴스 → 종류별 누적.
+기간·발표 종류·전략을 고르면 반응 표본과 매매 금액·손익을 확인할 수 있습니다.
+체결 원장에서 검증된 종료 거래만 성과를 집계합니다. 발표와 거래의 인과관계를 뜻하지 않습니다.
+확인 후 RUN_CHECK.cmd를 실행하고 CRYPTO_CHECK_RESULT.json을 첨부하세요.
 수집기가 꺼진 뒤 START_COLLECTION이 버전 갱신을 요청하면 UPDATE_COLLECTION.cmd를 한 번 실행합니다.
 
 START_COLLECTION.cmd  수집기 켜기 — 수집할 동안 창을 열어 둡니다.

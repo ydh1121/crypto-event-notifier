@@ -12,13 +12,21 @@ const acc=(style,ex='bithumb')=>({experiment_id:`${ex}|${style}|v1`,style,label:
 const state={snapshot:{public:{exchanges:{bithumb:{leaderboard:[{market:'KRW-B3',symbol:'B3',price:100,signal_ts:clock/1000},{market:'KRW-DEXE',symbol:'DEXE',price:200,signal_ts:clock/1000}]},upbit:{leaderboard:[{market:'KRW-B3',symbol:'B3',price:101,signal_ts:clock/1000}]}}}},ui:{paperExchange:'bithumb',paperMarket:'KRW-B3',paperLabStyle:'aggressive'}};
 const listeners=new Set();const store={get:()=>state,setUi(p){Object.assign(state.ui,p)},subscribe(fn){listeners.add(fn);return()=>listeners.delete(fn)}};
 const requests=[];
-let addNewEvent=false,archivedTarget=null;
+let addNewEvent=false,archivedTarget=null,delayStudy=false,releaseStudy;
+const studyBody=(u,accounts)=>{
+ const category=u.searchParams.get('category'),market=u.searchParams.get('market'),exchange=u.searchParams.get('exchange');
+ const groups=(category==='news'?['US_SEC_REGULATION','US_SEC_POLICY']:['US_CPI']).map((event_type,i)=>({source_id:category==='news'?'us_sec_press_releases':'us_bls_release_calendar',event_type,label:event_type==='US_CPI'?'소비자물가 · CPI':i?'SEC · 정책':'SEC · 규제',samples:2,mean_pct:market==='KRW-B3'?2:4,median_pct:2,positive_samples:1,missing_events:1,waiting_events:0,vs_btc:{mean_pct:1,samples:2},vs_eth:{mean_pct:null,samples:0}}));
+ const group=groups.find(g=>g.event_type===u.searchParams.get('event_type'))||groups[0];
+ const selected=accounts.find(a=>a.experiment_id===u.searchParams.get('experiment'))||accounts[0];
+ return {study:{status:'ok',exchange,market,category,horizon:u.searchParams.get('horizon'),groups,selected:{source_id:group.source_id,event_type:group.event_type},selected_experiment:selected.experiment_id,strategies:accounts.map(a=>({...a,status:'ok',closed:1,open:0,wins:1,realized_pnl_krw:10,invested_krw:200,return_pct:5,reaction_matched_closed:1,linked_events:1,ambiguous_excluded:0})),witnesses_total:1,witnesses_limit:20,witnesses:[{event_ts:eventAnchor,entry_ts:eventAnchor+10,entry_price:100,exit_ts:eventAnchor+3600,exit_price:105,invested_krw:200,proceeds_krw:210,realized_pnl_krw:10,return_pct:5,buy_count:2,reaction_recorded:true}]}};
+};
 const eventAnchor=clock/1000-7*86400;
 const eventRows=market=>(addNewEvent?['new','recent','old']:['recent','old']).map(id=>({event_id:id,event_ts:eventAnchor+({old:0,recent:86400,new:172800})[id],title:`${id} 발표`,category:'news',short_label:'SEC · 규제',market,source_url:`https://example.com/${id}`,responses:{'15m':{coin:2,btc:1,eth:null,vs_btc_pp:1,vs_eth_pp:null,observations:{coin:{baseline_price:100,baseline_trade_ts:clock/1000-901,target_price:102,target_trade_ts:clock/1000}}}},price_progress:{coin:{'1h':{status:archivedTarget?'awaiting_capture':'missing_target',baseline:{price:100,trade_ts:clock/1000-3601,origin:'response'},target:archivedTarget}}},history:{'15m':{samples:3,positive_samples:2,mean_pct:1.2,median_pct:1}}}));
 globalThis.fetch=async path=>{const u=new URL(path,'http://127.0.0.1:8766'),ex=u.searchParams.get('exchange'),market=u.searchParams.get('market');requests.push(u);
  const accounts=['aggressive','balanced'].map(s=>acc(s,ex));let body;
- if(u.searchParams.has('experiment')) {const account=accounts.find(a=>a.experiment_id===u.searchParams.get('experiment'));body={exchange:ex,market,journal:{account,trades:[],revision:account.revision,total:0,offset:0,limit:30,next_offset:null}};}
- else body={detail:{exchange:ex,market,data:{strategy_lab:{version:2,exchange:ex,market,experiments:accounts,price_history:[{ts:clock/1000-7200,price:98},{ts:clock/1000-3600,price:100}],events:[...eventRows(market),{event_id:'cpi',event_ts:eventAnchor,category:'economic',short_label:'소비자물가 · CPI',title:'Consumer Price Index DEXE',market,responses:{},source_url:'https://example.com/cpi'}]}}}};
+ if(u.pathname==='/api/event-study') {body=studyBody(u,accounts);if(delayStudy){delayStudy=false;await new Promise(resolve=>{releaseStudy=resolve;});}}
+ else if(u.searchParams.has('experiment')) {const account=accounts.find(a=>a.experiment_id===u.searchParams.get('experiment'));body={exchange:ex,market,journal:{account,trades:[],revision:account.revision,total:0,offset:0,limit:30,next_offset:null}};}
+ else body={detail:{exchange:ex,market,data:{strategy_lab:{version:2,event_study_available:true,exchange:ex,market,experiments:accounts,price_history:[{ts:clock/1000-7200,price:98},{ts:clock/1000-3600,price:100}],events:[...eventRows(market),{event_id:'cpi',event_ts:eventAnchor,category:'economic',short_label:'소비자물가 · CPI',title:'Consumer Price Index DEXE',market,responses:{},source_url:'https://example.com/cpi'}]}}}};
  return {ok:true,json:async()=>structuredClone(body)};
 };
 const page=createPaperWorkbench({store});const root=document.getElementById('root');page.mount(root);page.render();
@@ -106,6 +114,44 @@ test('actual-holding ledger navigation explicitly opens its strategy even from a
  assert.equal(shadow().querySelector('[data-section][aria-current="page"]').dataset.section,'strategy');
  assert.equal(shadow().querySelector('[role="tab"][aria-selected="true"]').dataset.experiment,'bithumb|aggressive|v1');
  assert.equal(requests.at(-1).searchParams.get('experiment'),'bithumb|aggressive|v1');
+});
+test('cumulative study is lazy, shows money, preserves scope and opens the selected journal',async()=>{
+ assert.equal(requests.filter(u=>u.pathname==='/api/event-study').length,0);
+ click('[data-section="reaction"]');click('[data-reaction="news"]');click('[data-reaction-mode="study"]');await flush();
+ assert.equal(requests.at(-1).pathname,'/api/event-study');
+ assert.ok(shadow().querySelector('.study-groups').textContent.includes('+2%'));
+ const witness=shadow().querySelector('[data-continuity-key="study-witnesses"]');
+ for(const amount of ['200원','210원','10원'])assert.ok(witness.textContent.includes(amount));
+ click('[data-study-type="US_SEC_POLICY"]');await flush();
+ click('[data-study-horizon="4h"]');await flush();
+ click('[data-study-experiment="bithumb|balanced|v1"]');await flush();
+ shadow().querySelector('[data-continuity-key="study-method"]').open=true;
+ shadow().querySelector('[data-study-experiment][aria-pressed="true"]').focus();
+ clock+=21000;for(const fn of listeners)fn(state,{type:'snapshot-live'});await flush();
+ assert.equal(shadow().querySelector('[data-study-type][aria-pressed="true"]').dataset.studyType,'US_SEC_POLICY');
+ assert.equal(shadow().querySelector('[data-study-horizon][aria-pressed="true"]').dataset.studyHorizon,'4h');
+ assert.equal(shadow().querySelector('[data-study-experiment][aria-pressed="true"]').dataset.studyExperiment,'bithumb|balanced|v1');
+ assert.ok(shadow().querySelector('[data-continuity-key="study-method"]').open);
+ assert.equal(shadow().activeElement.dataset.studyExperiment,'bithumb|balanced|v1');
+ click('[data-reaction="economic"]');await flush();assert.ok(shadow().querySelector('.study-groups').textContent.includes('CPI'));
+ click('[data-reaction="news"]');await flush();
+ assert.equal(shadow().querySelector('[data-study-type][aria-pressed="true"]').dataset.studyType,'US_SEC_POLICY');
+ click('[data-study-journal]');await flush();
+ assert.equal(shadow().querySelector('[role="tab"][aria-selected="true"]').dataset.experiment,'bithumb|balanced|v1');
+ assert.equal(requests.at(-1).searchParams.get('experiment'),'bithumb|balanced|v1');
+});
+test('a late study response cannot replace another coin or exchange',async()=>{
+ click('[data-section="reaction"]');click('[data-reaction="news"]');await flush();
+ delayStudy=true;click('[data-study-horizon="1d"]');await flush();
+ assert.equal(shadow().querySelector('.study-groups'),null);
+ click('[data-coin="KRW-DEXE"]');await flush();
+ assert.ok(shadow().querySelector('.study-groups').textContent.includes('+4%'));
+ releaseStudy();await flush();
+ assert.ok(shadow().querySelector('#event-study').textContent.includes('DEXE'));
+ assert.equal(shadow().querySelector('[data-study-horizon][aria-pressed="true"]').dataset.studyHorizon,'15m');
+ click('[data-exchange="upbit"]');await flush();
+ assert.ok([...shadow().querySelectorAll('[data-study-experiment]')].every(b=>b.dataset.studyExperiment.startsWith('upbit|')));
+ click('[data-section="strategy"]');await flush();
 });
 test('theme changes reach the isolated coin view; standalone review has no unsupported aggregate routes',async()=>{
  const {applyTheme}=await import('../public/modules/shared/theme.js');

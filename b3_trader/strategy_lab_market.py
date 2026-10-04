@@ -3,9 +3,11 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+import time
 from pathlib import Path
 from typing import Any
 
+from .event_strategy_study import read_event_study
 from .paper_constants import DB_PATH, START_KRW
 from .strategy_lab_context import read_coin_context
 from .strategy_lab_journal import TRADE_COLUMNS, reconcile_account
@@ -13,7 +15,8 @@ from .strategy_lab_plan import project_plan
 from .strategy_lab_rules import STYLE_SPECS, StyleSpec, _num
 
 
-def read_strategy_lab_market(exchange: str, market: str, path: Path = DB_PATH) -> dict[str, Any]:
+def read_strategy_lab_market(exchange: str, market: str, path: Path = DB_PATH, *,
+                             event_study_request: dict | None = None, now: float | None = None) -> dict[str, Any]:
     """One consistent, read-only account + COMPLETE journal view, scoped to one coin.
 
     Publication may put large journals into immutable detail chunks. API pagination
@@ -84,7 +87,14 @@ def read_strategy_lab_market(exchange: str, market: str, path: Path = DB_PATH) -
             item["revision"] = hashlib.sha256(json.dumps(item, sort_keys=True, ensure_ascii=False,
                 separators=(",", ":"), allow_nan=False).encode()).hexdigest()[:24]
             base["experiments"].append(item)
-        base.update(read_coin_context(conn, tables, exchange, market))
+        if event_study_request is not None:
+            try:
+                base['event_study'] = read_event_study(conn, exchange, market, base['experiments'], grouped,
+                    event_study_request, now=time.time() if now is None else now)
+            except (sqlite3.Error, ValueError):
+                base['event_study'] = {'status': 'read_error', 'exchange': exchange, 'market': market}
+        else:
+            base.update(read_coin_context(conn, tables, exchange, market))
         base["status"] = "ok" if rows else "no_account"
         return base
     except (sqlite3.Error, ValueError):

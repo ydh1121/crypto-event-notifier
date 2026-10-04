@@ -63,3 +63,43 @@ def reconcile_account(account: dict[str, Any], trades: list[dict[str, Any]], ini
             "differences": differences, "issues": issues,
             # Fill-only replay cannot reproduce intratrade marking drawdown.
             "drawdown_reproduced": False}
+
+
+def position_cycles(trades: list[dict], *, now: float) -> list[dict] | None:
+    """Group an already reconciled full-position ledger; reject invalid clocks.
+
+    The caller must require reconcile_account.matches. This adds no new fill or
+    profit formula: closed results come from the reconciled sell row.
+    """
+    cycles, pending = [], []
+    previous = 0.0
+    for trade in trades:
+        ts = trade.get('ts')
+        if (not isinstance(ts, (int, float)) or not math.isfinite(ts)
+                or ts <= 0 or ts < previous or ts > now or trade['price'] <= 0):
+            return None
+        previous = ts
+        if trade['side'] == 'buy':
+            if trade['krw'] <= 0:
+                return None
+            pending.append(trade)
+        elif trade['side'] == 'sell':
+            if not pending:
+                return None
+            cycles.append(_position_cycle(pending, trade))
+            pending = []
+        else:
+            return None
+    if pending:
+        cycles.append(_position_cycle(pending, None))
+    return cycles
+
+
+def _position_cycle(buys: list[dict], sell: dict | None) -> dict:
+    first = buys[0]
+    return {'entry_trade_id': first['id'], 'entry_ts': first['ts'], 'entry_price': first['price'],
+            'buy_count': len(buys), 'invested_krw': sum(t['krw'] for t in buys),
+            'exit_trade_id': sell['id'] if sell else None, 'exit_ts': sell['ts'] if sell else None,
+            'exit_price': sell['price'] if sell else None, 'proceeds_krw': sell['krw'] if sell else None,
+            'realized_pnl_krw': sell['realized_pnl'] if sell else None,
+            'return_pct': sell['return_pct'] if sell else None}

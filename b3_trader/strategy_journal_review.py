@@ -77,7 +77,13 @@ def read_state(path: Path, holdings_path: Path | None = None, quotes: HoldingQuo
 
 def read_detail(path: Path, exchange: str, market: str) -> dict:
     lab = read_strategy_lab_market(exchange, market, path)
+    lab['event_study_available'] = True
     return {"exchange": exchange, "market": market, "strategy": "adaptive", "data": {"version": 5, "strategy_lab": lab}}
+
+
+def review_event_study(path: Path, exchange: str, market: str, selection: dict) -> dict:
+    lab = read_strategy_lab_market(exchange, market, path, event_study_request=selection)
+    return lab.get('event_study', {'status': lab['status'], 'exchange': exchange, 'market': market})
 
 
 def review_journal(detail: dict, experiment: str, revision: str, offset: int, limit: int) -> tuple[int, dict]:
@@ -146,11 +152,19 @@ def handler(path: Path, *, fixture: bool = False, holdings_path: Path | None = N
                     if fixture: return self.send(409,{'error':{'message':'테스트 데이터에서는 외부 가격을 조회하지 않습니다.'}})
                     quotes.refresh(read_holdings(holdings_path,[],confirmed_exchange=confirmed_exchange)['holdings'])
                     return self.send(200,quotes.snapshot()[1])
-                if url.path=='/api/market-detail':
+                if url.path in {'/api/market-detail','/api/event-study'}:
                     query=parse_qs(url.query); get=lambda key,default='':query.get(key,[default])[0]
                     exchange,market=get('exchange','bithumb'),get('market').upper()
                     if exchange not in {'bithumb','upbit'} or not market.startswith('KRW-') or len(market)>80:
                         return self.send(422,{'error':{'message':'코인 선택을 확인하세요.'}})
+                    if url.path=='/api/event-study':
+                        selection={k:get(k) for k in ('source_id','event_type','experiment','style')}
+                        selection.update(horizon=get('horizon','15m'),category=get('category','all'))
+                        if (selection['horizon'] not in {'15m','1h','4h','1d'}
+                                or selection['category'] not in {'all','economic','news'}
+                                or any(len(v)>200 for v in selection.values())):
+                            return self.send(422,{'error':{'message':'발표 종류와 기간을 확인하세요.'}})
+                        return self.send(200,{'study':review_event_study(path,exchange,market,selection)})
                     detail=read_detail(path,exchange,market)
                     if get('experiment'):
                         offset,limit=int(get('offset','0')),int(get('limit','30'))
@@ -353,6 +367,7 @@ def run_review(args, build, server):
                 'db_path':str(args.db.resolve()),'db_size':args.db.stat().st_size,'paper_only':True,
                 'mode':'read_only','scope':'bithumb|KRW-B3|aggressive','account':exp,
                 'event_review':{'exchange':'bithumb','market':event_market,**review_event_index(events)},
+                'event_study_review':review_event_study(args.db,'bithumb','KRW-B3',{'horizon':'15m','category':'all','style':'aggressive'}),
                 'storage_review':read_storage(args.db, args.holdings_db) if args.report_only else {'status':'run_check_required'},
                 'holdings_review':{'status':holdings['status'],'path_source':args.holdings_source,
                     'confirmed_exchange':args.holdings_exchange,

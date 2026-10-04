@@ -6,11 +6,12 @@ import {esc} from '../shared/format.js';
 import {patchPreservingUi} from '../shared/ui-continuity.js';
 import {accountHtml,planHtml,journalHtml,calculatorHtml,calculationHtml,priceChart,relativeHtml,freshnessHtml,won,percent} from '../shared/strategy-workbench-view.js';
 import {eventsHtml,eventKey} from '../shared/event-workbench-view.js';
+import {createEventStudy} from '../shared/event-study-workbench.js';
 
 /** One coin stays selected while independent strategy accounts change beneath it. */
 export function createPaperWorkbench({store, allowOverview=true}) {
   let root,view,legacy,unsub,detail=null,journal=null,journalError='',detailError='',loading=false,requestId=0,journalId=0;
-  let selected='',currentRevision='',reactionSection='relative',eventHorizon='15m',search='',section='strategy',range='7d',calculatorOpen=false;
+  let selected='',currentRevision='',reactionSection='relative',reactionMode='events',eventHorizon='15m',search='',section='strategy',range='7d',calculatorOpen=false;
   const drafts=new Map(),selectedEvents=new Map();
   const ui=()=>store.get().ui;
   const exchange=()=>ui().paperExchange==='upbit'?'upbit':'bithumb';
@@ -18,6 +19,11 @@ export function createPaperWorkbench({store, allowOverview=true}) {
   const identity=()=>`${exchange()}|${market()}`;
   const draftKey=()=>`${identity()}|${selected}`;
   const account=()=>accountModel(detail,exchange(),market(),selected);
+  const eventStudy=createEventStudy({openJournal(experiment){
+    selected=experiment;section='strategy';journal=null;calculatorOpen=false;
+    store.setUi({paperLabStyle:account()?.style},{scope:'paper-workbench'});
+    currentRevision=account()?.revision||'';renderContent();void loadJournal(0);
+  }});
   function coins() {
     const pub=store.get().snapshot?.public||{};
     const source=pub.exchanges?.[exchange()]||(String(pub.exchange||'bithumb')===exchange()?pub:null);
@@ -37,7 +43,7 @@ export function createPaperWorkbench({store, allowOverview=true}) {
     root.innerHTML='<crypto-paper-workbench data-raw-text></crypto-paper-workbench>';
     view=root.firstElementChild.attachShadow({mode:'open'});
     syncTheme();
-    view.innerHTML=`<link rel="stylesheet" href="/modules/styles/strategy-workbench.css?v=4">
+    view.innerHTML=`<link rel="stylesheet" href="/modules/styles/strategy-workbench.css?v=5">
       <main><header class="workbench-header"><h1>가상매매</h1>${allowOverview?'<nav aria-label="전체 가상매매"><button data-overview="summary">전체 계좌</button><button data-overview="compare">거래소 비교</button></nav>':''}</header>
       <div class="workspace"><aside aria-label="코인 선택"><div class="exchange-picker" role="group" aria-label="거래소"><button data-exchange="bithumb" aria-pressed="${exchange()==='bithumb'}">빗썸</button><button data-exchange="upbit" aria-pressed="${exchange()==='upbit'}">업비트</button></div><label class="search-label">코인 검색<input id="coin-search" type="search" placeholder="이름 또는 티커" value="${esc(search)}"></label><div id="coin-list" class="coin-list" data-preserve-scroll></div><label class="mobile-picker">코인 선택<select id="mobile-coin"></select></label></aside>
       <div class="coin-detail"><header id="coin-heading" class="coin-heading"></header><nav class="section-tabs" aria-label="코인 분석"><button data-section="strategy" aria-current="page">전략</button><button data-section="reaction">반응도</button></nav><div id="coin-content"></div></div></div></main>`;
@@ -123,10 +129,14 @@ export function createPaperWorkbench({store, allowOverview=true}) {
     const key=`${identity()}|${reactionSection}`;
     if(Array.isArray(events)&&!events.some(e=>eventKey(e)===selectedEvents.get(key)))selectedEvents.set(key,events[0]?eventKey(events[0]):'');
     const label=reactionSection==='economic'?'경제지표':'정책·뉴스';
+    const canStudy=reactionSection!=='relative'&&detail?.data?.strategy_lab?.event_study_available===true;
+    const scope={exchange:exchange(),market:market(),category:reactionSection,style:account()?.style||'aggressive'};
+    const showStudy=canStudy&&reactionMode==='study';
     const content=reactionSection==='relative'
       ?relativeHtml(detail?.data?.market_memory,detail?.data?.strategy_lab?.relative,market().replace('KRW-',''))
-      :eventsHtml(events,selectedEvents.get(key),eventHorizon,label);
-    patchPreservingUi(view,()=>set('coin-content',`<nav class="reaction-tabs" aria-label="반응도 분야" data-preserve-scroll>${[['relative','BTC·ETH'],['economic','경제지표'],['news','정책·뉴스']].map(([key,label])=>`<button data-reaction="${key}" data-continuity-key="reaction-${key}" aria-pressed="${key===reactionSection}">${label}</button>`).join('')}</nav><section class="reaction-content">${content}</section>`));
+      :showStudy?`<div id="event-study">${eventStudy.html(scope)}</div>`:eventsHtml(events,selectedEvents.get(key),eventHorizon,label);
+    patchPreservingUi(view,()=>set('coin-content',`<nav class="reaction-tabs" aria-label="반응도 분야" data-preserve-scroll>${[['relative','BTC·ETH'],['economic','경제지표'],['news','정책·뉴스']].map(([key,label])=>`<button data-reaction="${key}" data-continuity-key="reaction-${key}" aria-pressed="${key===reactionSection}">${label}</button>`).join('')}</nav>${canStudy?`<nav class="reaction-modes" aria-label="반응도 보기">${[['events','발표별'],['study','종류별 누적']].map(([k,l])=>`<button data-reaction-mode="${k}" data-continuity-key="reaction-mode-${k}" aria-pressed="${reactionMode===k}">${l}</button>`).join('')}</nav>`:''}<section class="reaction-content">${content}</section>`));
+    if(showStudy)eventStudy.mount(el('event-study'),scope);
   }
   function openOverview(tab) {
     if(!allowOverview)return;
@@ -144,6 +154,7 @@ export function createPaperWorkbench({store, allowOverview=true}) {
   function click(event) {
     const b=event.target.closest('button');if(!b||b.disabled)return;
     if(b.dataset.reaction){reactionSection=b.dataset.reaction;renderReaction();return;}
+    if(b.dataset.reactionMode){reactionMode=b.dataset.reactionMode;renderReaction();return;}
     if(b.dataset.event){selectedEvents.set(`${identity()}|${reactionSection}`,b.dataset.event);renderReaction();return;}
     if(b.dataset.eventHorizon){eventHorizon=b.dataset.eventHorizon;renderReaction();return;}
     if(b.dataset.overview) {openOverview(b.dataset.overview);return;}
@@ -183,5 +194,5 @@ export function createPaperWorkbench({store, allowOverview=true}) {
   }
   return {mount(node){root=node;document.addEventListener('viewer-theme-change',syncTheme);unsub=store.subscribe((_,meta)=>{if(['snapshot','snapshot-live'].includes(meta.type)&&!legacy) {pickMarket();renderHeading();void loadDetail();}});},render,
     openAccount(exchange,market,style){selected='';section='strategy';detail=null;journal=null;currentRevision='';calculatorOpen=false;store.setUi({paperExchange:exchange,paperMarket:market,paperLabStyle:style},{scope:'paper-workbench'});render();},
-    destroy(){requestId++;journalId++;document.removeEventListener('viewer-theme-change',syncTheme);unsub?.();legacy?.destroy();root=null;view=null;}};
+    destroy(){requestId++;journalId++;eventStudy.destroy();document.removeEventListener('viewer-theme-change',syncTheme);unsub?.();legacy?.destroy();root=null;view=null;}};
 }

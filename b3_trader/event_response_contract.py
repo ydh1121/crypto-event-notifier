@@ -5,6 +5,7 @@ import math
 import json
 import sqlite3
 from typing import Any
+from statistics import mean, median
 
 HORIZONS = (("15m", 900), ("1h", 3600), ("4h", 14400), ("1d", 86400))
 PROVIDER_ID = "local_public_exchange_trade_stream"
@@ -51,3 +52,9 @@ def observation(row: sqlite3.Row | None) -> dict[str, Any] | None:
             if attrs.get(key) in {'trade', 'minute_endpoints'}:
                 result[key] = attrs[key]
     return result
+
+
+def summarize_returns(values: list[float]) -> dict:
+    return {'samples': len(values), 'mean_pct': mean(values) if values else None,
+            'median_pct': median(values) if values else None,
+            'positive_samples': sum(v > 0 for v in values) if values else None}
