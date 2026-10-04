@@ -1,18 +1,19 @@
 # Dashboard v1 handoff
 
-### Current — actual alt capture observed; expanded-table scroll fix delivered
+### Current — cumulative event reactions linked to scoped PAPER evidence
 
-- **State: ALT_CAPTURE_OBSERVED / SCROLL_FIX_PC_CHECK_PENDING.** Active WO CRYPTO-WO-20260921-RECOVERY-001.
-- ACTUAL = CRYPTO_CHECK_RESULT(7).json /263450bytes/SHA256f54593d6b66f75a705f43db048efbd6398b3d7b44231f7786436abdb9ae8a79d. Viewer·수집기 b3c72eba3c85ab51e5f170f9dc4cee65bbdfa98a/clean. canonical auto_demo.sqlite3는5780217856bytes. host/storage/forward/market_flow/research/paper 가동 관측. 직접 Windows 접근은 없음.
-- COLLECTION = 실제 빗썸289종목·980분별 행, 업비트247종목·1252분별 행 확보. 약31초 검사에서 두 거래소 모두 마지막 저장 체결시각 증가. 최근120초 알트 수신109/142종목. 구독482/291종목과 실제 수신 수를 구분. 양쪽 연결·저장 오류 없음. 전체 종목 장기 연속성·새 발표 네 구간 완료는 아직 미확인.
-- EVENTS = 이번 관측에서 이벤트 반응·가격 원장 갱신 없음. 직전 새 수집기 가동 전 고용 발표 기준가 결측 유지. B3/SEC15m +0.187969925%, BTC−0.079964537%, ETH+0.027300027% 유지. 새 알트 가격 누적을 과거 결측 복원이나 전략 검증 성과로 확대하지 않음. B3/공격적13체결·6완료·2승 원장 일치.
-- STORAGE = 새 일일 복구본 snapshot_at PAPER1791079876.9124906/보유1791079971.7194412 확인. 관측된 다음 관리 주기1791082601.0220222에서 둘 다 검증·created=false로 재사용, 추가 삭제0. 실제48h 만료 삭제 경계는 남음. DB·원장·학습·반응 데이터 변경 없음.
-- CHANGED = 펼친 이벤트 가격표·과거 반응표·계산기·체결 내역에서 세로 휠을 막던 overscroll-behavior:contain을 가로축 전용으로 변경. 동일 원인의 전략/반응도 탭·코인/보유 목록도 수정. 내부 가로 스크롤과 네이티브 동작 유지, JS 휠 가로채기나 스크롤 복원 소유자 추가 없음. 기존 CSS 두 파일 수정 및 실제 로딩 URL 캐시 버전 갱신.
-- VERIFY = DOM9검사·패키지/시작 보호 Python10검사·typecheck·compile·diff 통과. 최종 ZIP72개 payload 해시 검증. Python payload는 이전 실행본과 동일, CMD 차이는 빌드 식별자뿐. 실제 휠 검증은 로컬 브라우저 실행 파일 부재/다운로드 차단 및 Cloud Browser loopback ERR_BLOCKED_BY_CLIENT로 미완료. 사용자 PC에서 펼친 표 위 위아래 휠 확인 필요.
-- GIT = 소스24618b1cc9c38c60867a8801a734fca91b6794b9 / agent/crypto-product-data-recovery-20260921. 기본 브랜치·PR#1 Draft/Open/Unmerged 유지.
-- PACKAGE = 동일 CRYPTO.zip version22 /160358bytes/73files/SHA256e512dab4acfbbca6d73679cebc9d3045653b1a3e568af9a80520e4b9ad641356. manifest251d3ff75df3951388365947e90a3c63c3b93fe85198059822c88ebca382cb39. Desktop/CRYPTO 한 폴더 사용.
-- APPLY = 조회 창만 종료→기존 Desktop/CRYPTO에 덮어쓰기→RUN_REVIEW.cmd. 실행 중인 수집기는 켜 둔다. CLEAN_STORAGE 재실행 불필요. 추후 수집 창이 종료되고 START_COLLECTION이 새 버전 적용을 요구할 때만 UPDATE_COLLECTION을 실행한다. 이번 화면 적용 때문에 수집을 중단하지 않음.
-- NEXT = 펼친 실제 가격·시각/계산기 표의 휠 동작 확인. 새 이벤트의 알트/BTC/ETH 기준가와15m/1h/4h/1d 누적을 확인하면서 기존 종류별 과거 반응·표본을 코인×전략 성과 근거에 연결. BTC 도미넌스·OTHERS·SNS·온체인·지정학은 미완료. 운영 배포·실주문 없음.
+- STATE = SCROLL_USER_CONFIRMED / EVENT_STUDY_IMPLEMENTED_PC_CHECK_PENDING. Active WO CRYPTO-WO-20260921-RECOVERY-001.
+- ACTUAL = 마지막 실제 PC 증거는 CRYPTO_CHECK_RESULT(7).json. Viewer·수집기 b3c72eba3c85ab51e5f170f9dc4cee65bbdfa98a, auto_demo.sqlite3 5780217856bytes. 빗썸289/업비트247종목 임시 가격 누적·약31초 T0→T1 증가. B3/공격적13체결·6완료·2승 원장 일치. 직접 Windows 접근이나 신규 실제 DB 결과는 없음.
+- SCROLL = 사용자가 펼친 영역 스크롤 정상 작동을 확인했다. 이전 SCROLL_FIX_PC_CHECK_PENDING은 종료한다.
+- CHANGED = 반응도 경제지표/정책·뉴스에 종류별 누적 보기를 추가. 최근1년·최대4000개 공식 발표 범위에서 코인 반응 표본/평균/중앙값/상승 횟수/BTC·ETH 대비를 비교하고 선택 발표 종류의 전략별 완료·보유·금액·손익·실제 체결 원장을 연결한다. 해당 탭에서만 로컬 읽기 전용 API를 호출하며 기존 배포 데이터 크기는 늘리지 않는다.
+- CONTRACT = 거래소·코인·발표 기관·종류·기간을 분리. 원장 일치 계좌의 첫 매수를 직전 가장 가까운 발표에 한 번만 연결하며 동시 발표/잘못된 시각은 제외. 발표 전 보유 포지션 제외, 추가매수는 첫 진입과 같은 포지션, 보유 중 손익은 완료 성과에 미포함. 비용 포함 원장 금액 사용. 결측은0%가 아니며 시각 연결은 인과관계·추천 확률·전략 우위 검증이 아니다. 전략/PAPER 의사결정·수집기·DB 스키마 변경 없음.
+- VERIFY = 신규 집계14검사·DOM11검사와 관련 원장/이벤트/보고서/패키지 검사 통과. typecheck·compile·diff 통과. 최종 압축 해제 Python -B -S 실행에서 네 반응 구간·매매 금액·API/모듈 연결·조회 전후 DB 바이트 일치 확인. 이 검증은 통제 fixture이며 실제 PC 승인/데이터 충분성의 증거가 아니다.
+- GIT = 소스12fcbb3bc43cc7d93f3590b30f9730629036d67d / agent/crypto-product-data-recovery-20260921. 기본 브랜치·PR#1 Draft/Open/Unmerged 유지.
+- PACKAGE = 동일 CRYPTO.zip version23 /170156bytes/77files/76payloads/SHA25668ad0a782505a9a89fab26bbd3292181b67c0764e61a100cefe7a5616d9c5ec8. manifestb792bb2e0ac6d5b3e2edd5af6f33002784e6331db68924dec705e12baa927452. 기존 Desktop/CRYPTO 한 폴더에 덮어쓰기.
+- APPLY = 조회 창만 종료→기존 CRYPTO에 덮어쓰기→RUN_REVIEW.cmd→가상매매/코인/반응도/경제지표 또는 정책·뉴스/종류별 누적→RUN_CHECK.cmd. 결과 CRYPTO_CHECK_RESULT.json의 event_study_review에 B3 누적 집계·선택 전략 근거를 포함한다. 수집 창은 켜 둔다. CLEAN_STORAGE 재실행 불필요. 추후 START_COLLECTION이 버전 갱신을 요청할 때만 UPDATE_COLLECTION을 실행한다.
+- GAPS = 새 기능의 실제 Windows 화면·canonical DB 집계 수치는 확인 대기. 새 발표의 알트/BTC/ETH 기준가와15m/1h/4h/1d 전체 누적,48h 백업 만료 경계, 전체 종목 장기 연속성은 미확인. report7에서 새 일일 백업 재사용과 과거 SEC15m 반응은 확인했으며 미확보 고용 발표 기준가는 그대로다.
+- NEXT = 새 RUN_CHECK와 종류별 누적 화면으로 실제 반응 표본·선택 전략 원장 금액을 대조하고 새 발표 네 구간 누적을 확인한다. 이후 검증된 반응 근거를 코인별 전략 비교·상승 관찰 후보에 연결하되 시간 순 검증 전 자동 점수/매매 승격은 하지 않는다. 도미넌스/OTHERS·SNS·온체인·지정학 등 P2 소스 확장은 미완료. 운영 배포·실주문 없음.
+- DURABLE = Drive CURRENT SNAPSHOT/BATON, append-only Ledger, 기존 WBS F11/F28/F30 갱신 후 전체 텍스트 readback 일치 확인. 동일 CRYPTO.zip version23 저장 완료.
 
 ### Previous checkpoint — shared daily backups and safe 48-hour cleanup implemented
 
