@@ -134,3 +134,14 @@ def test_old_source_cannot_silently_start_after_viewer_update(collector,monkeypa
     monkeypatch.setattr(tools.subprocess,'check_output',git)
     with pytest.raises(ValueError,match='UPDATE_COLLECTION'):
         tools.start_collection(repo,minimum_source='b'*40)
+
+
+def test_packaged_start_requires_this_build_not_only_the_old_subscription_fix(collector,monkeypatch):
+    repo,_=collector
+    monkeypatch.setattr(tools,'verified_manifest',lambda _: {'layout':'fixed_workspace_v1',
+        'source_commit':'c'*40,'confirmed_holdings_exchange':'bithumb'})
+    monkeypatch.setattr('sys.argv',['tools','start-collection','--repo',str(repo)])
+    observed=[]
+    monkeypatch.setattr(tools,'start_collection',lambda *args,**kwargs:observed.append(kwargs) or 0)
+    assert tools.main() == 0
+    assert observed[0]['minimum_source'] == 'c'*40

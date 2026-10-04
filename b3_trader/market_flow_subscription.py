@@ -42,6 +42,10 @@ class SubscriptionSelector:
         self.holdings = {exchange: () for exchange in EXCHANGES}
         self.evidence = {}
 
+    def event_markets(self, exchange):
+        """Price evidence uses the whole validated catalog, not the flow budget."""
+        return tuple(sorted(self.catalogs.get(exchange, set(DEFAULT_MARKETS))))
+
     def _inputs(self):
         profile_status = 'read'
         try:

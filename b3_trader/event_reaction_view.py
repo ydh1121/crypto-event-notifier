@@ -119,6 +119,8 @@ def _price_progress(conn, event, exchange, market, indexed, now, has_archive, id
         for point in ('baseline', *(h for h, _ in HORIZONS)):
             tick = read_price(conn, anchor, exchange, market, point, now, OBSERVATION_TOLERANCE_SECONDS)
             archive[point] = _point(tick['trade_price'], tick['trade_ts'], 'archive') if tick else None
+            if tick and tick['observation_kind'] == 'minute_endpoints':
+                archive[point]['observation_kind'] = 'minute_endpoints'
         if not conflict:
             baseline = baseline or archive['baseline']
     result = {}

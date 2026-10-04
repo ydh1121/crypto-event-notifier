@@ -109,6 +109,21 @@ def _tick(row):
     return {"trade_ts": row['trade_ts'], "price": row['trade_price']} if row else None
 
 
+def _universe_samples(conn, now):
+    from .event_trade_samples import TABLE, RETENTION_SECONDS
+    rows = [dict(r) for r in conn.execute(f'''SELECT exchange,COUNT(*) AS rows,
+        COUNT(DISTINCT market) AS markets,MIN(first_ts) AS first_trade_ts,
+        MAX(last_ts) AS last_trade_ts,MAX(received_at) AS last_received_at
+        FROM {TABLE} GROUP BY exchange''')]
+    recent = {r['exchange']:dict(r) for r in conn.execute(f'''SELECT exchange,
+        COUNT(DISTINCT market) AS markets,
+        COUNT(DISTINCT CASE WHEN market NOT IN ('KRW-BTC','KRW-ETH') THEN market END) AS alt_markets
+        FROM {TABLE} WHERE bucket_ts>=? AND last_ts BETWEEN ? AND ? GROUP BY exchange''',
+        (int((now-120)//60)*60,now-120,now))}
+    return {'retention_seconds':RETENTION_SECONDS, 'continuous_coverage_proven':False,
+            'exchanges':[{**r, 'last_120s':recent.get(r['exchange'], {'markets':0,'alt_markets':0})} for r in rows]}
+
+
 def _raw_point(conn, event, market, point, now):
     target = event['source_ts'] + POINTS[point]
     baseline = point == 'baseline'
@@ -179,6 +194,7 @@ def read_event_capture(db: Path, *, now=None):
         conn.execute("PRAGMA query_only=ON")
         conn.execute("BEGIN")
         reader = _Reader(conn)
+        result['universe_samples'] = reader.read(lambda: _universe_samples(conn, current))
         for market in MARKETS:
             result['markets'][market] = {
                 "raw": reader.read(lambda: _raw_bounds(conn, market, current)),
@@ -213,6 +229,19 @@ def compare_event_capture(before, after):
         if all(r.get('status') == 'read' for r in pair) and all(_clock(v) is not None for v in clocks):
             state = 'advanced' if clocks[1] > clocks[0] else 'unchanged' if clocks[1] == clocks[0] else 'latest_regressed'
         compared[f'{EXCHANGE}|{market}'] = {"observation": state, "before": clocks[0], "after": clocks[1]}
+    for exchange in ('bithumb', 'upbit'):
+        pair = []
+        for record in (before, after):
+            data = record.get('event_capture', {}).get('universe_samples', {})
+            pair.append(next((row for row in data.get('exchanges', []) if row.get('exchange') == exchange), {})
+                        if data.get('status') == 'read' else {})
+        clocks = [r.get('last_trade_ts') for r in pair]
+        state = 'unknown'
+        if all(_clock(v) is not None for v in clocks):
+            state = 'advanced' if clocks[1] > clocks[0] else 'unchanged' if clocks[1] == clocks[0] else 'latest_regressed'
+        compared[f'universe:{exchange}'] = {'observation':state, 'before':clocks[0], 'after':clocks[1],
+            'recent_alt_markets_after':pair[1].get('last_120s', {}).get('alt_markets'),
+            'all_markets_continuous':False}
     return compared
 
 
@@ -234,7 +263,22 @@ def stream_subscription_evidence(value):
         known = isinstance(rows, list) and all(isinstance(m, str) for m in rows)
         selected[key] = {market: market in rows if known else None for market in MARKETS}
     catalog = selection.get('catalog_status')
-    return {"scope": "saved_configuration", "market_count": len(markets) if valid else None,
+    event_capture = {}
+    for exchange in ('bithumb', 'upbit'):
+        venue = exchanges.get(exchange, {}) if isinstance(exchanges, dict) else {}
+        venue = venue if isinstance(venue, dict) else {}
+        event_markets = venue.get('event_markets')
+        evidence = venue.get('event_capture')
+        evidence = evidence if isinstance(evidence, dict) else {}
+        event_capture[exchange] = {
+            'subscribed_markets':len(event_markets) if isinstance(event_markets, list) else None,
+            'connected':venue.get('connected') if type(venue.get('connected')) is bool else None,
+            'error':bool(venue.get('event_capture_error')),
+            **{key:_number(evidence.get(key)) for key in ('observed_markets','recent_markets','messages',
+                'last_trade_ts','last_flush_at','sample_writes','exact_prices_archived','retention_seconds')},
+        }
+    return {"scope": "saved_configuration", "event_price_collection":event_capture,
+            "market_count": len(markets) if valid else None,
             "membership": {market: market in markets if valid else None for market in MARKETS},
             "selection": {**selected, "capacity": _number(selection.get('capacity')),
                           "catalog_status": catalog if catalog in {'current', 'cached', 'unavailable'} else None,

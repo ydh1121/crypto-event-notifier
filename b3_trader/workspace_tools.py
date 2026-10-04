@@ -11,7 +11,6 @@ import tempfile
 from .runtime_process_contract import RECOVERY_ENV
 from .runtime_review import _processes
 from .workspace_packages import cleanup_old_packages, verified_manifest
-from .collection_source import MIN_COLLECTION_SOURCE
 
 DEFAULT_REPO = Path(r'C:\Users\Administrator\Desktop\crypto-event-notifier-live')
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,7 +33,7 @@ def start_collection(repo: Path, *, confirmed_exchange: str | None = None, minim
         try:
             git('merge-base', '--is-ancestor', minimum_source, 'HEAD')
         except subprocess.CalledProcessError:
-            raise ValueError('Collector source needs the subscription fix. Run UPDATE_COLLECTION.cmd once; the viewer update alone does not update the collector.') from None
+            raise ValueError('Collector source is older than this package. Run UPDATE_COLLECTION.cmd once; the viewer update alone does not update the collector.') from None
     state = _processes(repo)
     if state.get('status') != 'read':
         raise ValueError('Process state could not be verified; collector was not started.')
@@ -73,7 +72,7 @@ def main():
             if args.action == 'update-collection':
                 from .collection_update import update_collection
                 update_collection(args.repo, manifest['source_commit'])
-            return start_collection(args.repo, confirmed_exchange=manifest.get('confirmed_holdings_exchange'), minimum_source=MIN_COLLECTION_SOURCE)
+            return start_collection(args.repo, confirmed_exchange=manifest.get('confirmed_holdings_exchange'), minimum_source=manifest['source_commit'])
         if args.action == 'clean-storage':
             from .storage_cleanup import clean_storage
             clean_storage(args.repo, ROOT/'CRYPTO_STORAGE_RESULT.json')

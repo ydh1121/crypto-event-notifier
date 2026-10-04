@@ -78,6 +78,9 @@ class IntelligenceEventResponseCollector:
         if not self.include_observed_markets:
             return self.benchmarks
         rows = []
+        from .event_trade_samples import TABLE as SAMPLE_TABLE
+        if self._table_exists(SAMPLE_TABLE):
+            rows.extend(self.conn.execute(f'SELECT DISTINCT exchange,market FROM {SAMPLE_TABLE}').fetchall())
         for table in ("research_market_flow_cursor_mx", "research_market_flow_stream_session_mx"):
             if self._table_exists(table):
                 rows.extend(self.conn.execute(f"SELECT exchange,market FROM {table}").fetchall())
@@ -114,6 +117,7 @@ class IntelligenceEventResponseCollector:
             attrs = {}
         return {"trade_ts": stamp, "trade_price": price,
                 "sequential_id": attrs.get("baseline_sequential_id", "") if isinstance(attrs, dict) else "",
+                "observation_kind": attrs.get('baseline_observation_kind', 'trade') if isinstance(attrs, dict) else 'trade',
                 "from_saved_response": True}
 
     def _ensure_schema(self) -> None:
@@ -342,6 +346,11 @@ class IntelligenceEventResponseCollector:
                         "baseline_from_event_archive": isinstance(baseline, dict) and bool(baseline.get("from_event_archive")),
                         "target_from_event_archive": isinstance(target, dict) and bool(target.get("from_event_archive")),
                     }
+                    for name, tick in (('baseline', baseline), ('target', target)):
+                        kind = tick.get('observation_kind', 'trade') if isinstance(tick, dict) else 'trade'
+                        attrs[name+'_observation_kind'] = kind
+                        if kind == 'minute_endpoints':
+                            attrs[name+'_semantics'] = 'nearest_stored_real_minute_endpoint_within_tolerance'
                     cursor = self.conn.execute(
                         """INSERT OR IGNORE INTO research_intelligence_event_responses(
                                event_id,event_type,source_id,exchange,market,horizon_label,

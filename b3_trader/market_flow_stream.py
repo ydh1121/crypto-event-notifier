@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import signal
+import sqlite3
 import threading
 import time
 import uuid
@@ -21,6 +23,7 @@ from .market_flow_subscription import (
 from .market_orderbook_ladder import MarketOrderbookLadderStore
 from .research_control import atomic_json
 from .research_work_lock import ResearchWorkLock
+from .event_trade_samples import EventTradeSampler, prepare_database
 
 STATUS_PATH = Path("b3_trader/data/research-platform/market-flow-stream.json")
 PROCESS_LOCK_PATH = Path("b3_trader/data/research-platform/market-flow-stream-process.lock")
@@ -67,7 +70,8 @@ def normalize_stream_trade(exchange: str, row: dict[str, Any], received_at: floa
     except (TypeError, ValueError):
         return None
     sequential_id = str(row.get("sequential_id") or "")
-    if not market or not sequential_id or price <= 0 or volume <= 0 or trade_ts <= 0:
+    if (not market or not sequential_id or price <= 0 or volume <= 0 or trade_ts <= 0
+            or not all(math.isfinite(v) for v in (price, volume, trade_ts))):
         return None
     return {
         "exchange": str(exchange),
@@ -144,8 +148,8 @@ def normalize_stream_orderbook(exchange: str, row: dict[str, Any], received_at: 
     }
 
 
-def _subscription(exchange: str, markets: tuple[str, ...]) -> str:
-    trade: dict[str, Any] = {"type": "trade", "codes": list(markets)}
+def _subscription(exchange: str, markets: tuple[str, ...], event_markets=None) -> str:
+    trade: dict[str, Any] = {"type": "trade", "codes": list(event_markets or markets)}
     orderbook: dict[str, Any] = {"type": "orderbook", "codes": list(markets)}
     if exchange == "upbit":
         trade["is_only_realtime"] = True
@@ -177,11 +181,15 @@ class StreamWorker:
         state: dict[str, Any],
         state_lock: threading.RLock,
         process_started_at: float,
+        event_markets: tuple[str, ...] | None = None,
     ) -> None:
         self.exchange = exchange
         self.endpoint = ENDPOINTS[exchange]
         self.markets = markets
         self.pending_markets = markets
+        self.event_markets = self.pending_event_markets = event_markets
+        self.event_sampler = None
+        self.event_retry_after = 0
         self.stop_event = stop_event
         self.state = state
         self.state_lock = state_lock
@@ -212,15 +220,15 @@ class StreamWorker:
         if not force and len(self.buffer) < FLUSH_BATCH_SIZE and now - self.last_flush_at < FLUSH_INTERVAL_SECONDS:
             return
         rows = self.buffer
-        self.buffer = []
         result = self.store.insert_trades(rows, received_at=now)
+        self.buffer = []
         self.last_flush_at = now
         self._increment("rows_observed", int(result.get("observed") or 0))
         self._increment("rows_inserted", int(result.get("inserted") or 0))
 
     def _on_open(self, ws: websocket.WebSocketApp) -> None:
         with self.state_lock:
-            if self.pending_markets != self.markets:
+            if self.pending_markets != self.markets or self.pending_event_markets != self.event_markets:
                 ws.close()
                 return
         now = time.time()
@@ -236,7 +244,7 @@ class StreamWorker:
                 connected_since=now,
                 reconnects=int(self.state.get("reconnects") or 0),
             )
-        ws.send(_subscription(self.exchange, self.markets))
+        ws.send(_subscription(self.exchange, self.markets, self.event_markets))
         self._update(
             connected=True,
             connected_since=now,
@@ -257,6 +265,11 @@ class StreamWorker:
         if not isinstance(payload, dict):
             self._increment("parse_errors")
             return
+        if isinstance(payload.get('error'), dict):
+            self._update(event_capture_error='SubscriptionRejected', last_error='Public subscription rejected')
+            if _ws is not None:
+                _ws.close()
+            return
         payload_type = str(payload.get("type") or "").lower()
         if payload_type == "orderbook":
             row = normalize_stream_orderbook(self.exchange, payload, received_at)
@@ -275,6 +288,16 @@ class StreamWorker:
         row = normalize_stream_trade(self.exchange, payload, received_at)
         if row is None:
             return
+        if self.event_sampler and received_at >= self.event_retry_after:
+            try:
+                self.event_sampler.observe(row, received_at)
+                if received_at >= self.event_sampler.next_flush:
+                    self.event_sampler.flush(received_at)
+                    self._update(event_capture=self.event_sampler.evidence(received_at), event_capture_error='')
+            except sqlite3.Error as exc:
+                # Research-price trouble must not change existing flow decisions.
+                self.event_retry_after = received_at+30
+                self._update(event_capture_error=type(exc).__name__)
         if row["market"] not in self.markets:
             return
         self.buffer.append(row)
@@ -315,7 +338,13 @@ class StreamWorker:
             while not self.stop_event.is_set():
                 with self.state_lock:
                     self.markets = self.pending_markets
+                    self.event_markets = self.pending_event_markets
                     self.state['markets'] = list(self.markets)
+                    self.state['event_markets'] = list(self.event_markets or ())
+                if self.event_markets is not None:
+                    if self.event_sampler is None:
+                        self.event_sampler = EventTradeSampler(self.store.conn, self.exchange, self.event_markets)
+                    self.event_sampler.markets = set(self.event_markets)
                 self.opened_in_run = False
                 self._update(status="connecting", endpoint=self.endpoint)
                 self.app = websocket.WebSocketApp(
@@ -335,11 +364,17 @@ class StreamWorker:
                     self._on_error(self.app, exc)
                 finally:
                     self._flush(force=True)
+                    if self.event_sampler:
+                        try:
+                            self.event_sampler.flush(time.time(), force=True)
+                            self._update(event_capture=self.event_sampler.evidence(time.time()))
+                        except sqlite3.Error as exc:
+                            self._update(event_capture_error=type(exc).__name__)
                     self.store.mark_disconnected(self.exchange, self.markets, disconnected_at=time.time())
                     self._update(connected=False)
                 if self.stop_event.is_set():
                     break
-                if self.pending_markets != self.markets:
+                if self.pending_markets != self.markets or self.pending_event_markets != self.event_markets:
                     backoff = 1.0
                     continue
                 if self.opened_in_run:
@@ -370,11 +405,12 @@ class StreamWorker:
             except Exception:
                 pass
 
-    def request_markets(self, markets: tuple[str, ...]) -> None:
+    def request_markets(self, markets: tuple[str, ...], *, event_markets=None) -> None:
         with self.state_lock:
-            if self.pending_markets == markets:
+            if self.pending_markets == markets and self.pending_event_markets == event_markets:
                 return
             self.pending_markets = markets
+            self.pending_event_markets = event_markets
         # Close just this venue's socket. Its worker flushes the old subscription
         # before applying the new list, and records a real continuity boundary.
         self.stop()
@@ -386,6 +422,7 @@ class MarketFlowStreamService:
     def __init__(self, markets: tuple[str, ...] | None = None) -> None:
         self.markets = markets or DEFAULT_MARKETS
         self.markets_by_exchange = {exchange: self.markets for exchange in ENDPOINTS}
+        self.event_markets_by_exchange = {}
         self.selector = None if markets is not None else SubscriptionSelector(Path.cwd())
         self.stop_event = threading.Event()
         self.started_at = time.time()
@@ -436,7 +473,8 @@ class MarketFlowStreamService:
         with self.state_lock:
             exchanges = {name: dict(state) for name, state in self.states.items()}
         return {
-            "ok": not bool(self.last_feature_error or self.last_orderbook_feature_error or self.last_price_archive_error),
+            "ok": not bool(self.last_feature_error or self.last_orderbook_feature_error or self.last_price_archive_error
+                           or any(s.get('event_capture_error') for s in exchanges.values())),
             "status": "running" if running and not self.stop_event.is_set() else "stopped",
             "pid": os.getpid(),
             "running": bool(running) and not self.stop_event.is_set(),
@@ -445,6 +483,7 @@ class MarketFlowStreamService:
             "process_lock_acquired": self.process_lock_acquired,
             "markets": list(self.markets),
             "markets_by_exchange": {e: list(m) for e, m in self.markets_by_exchange.items()},
+            "event_markets_by_exchange": {e: list(m) for e, m in self.event_markets_by_exchange.items()},
             "subscription_selection": self.selector.evidence if self.selector else {},
             "exchanges": exchanges,
             "window_features_written": self.window_features_written,
@@ -490,9 +529,12 @@ class MarketFlowStreamService:
         if self.selector is None:
             return
         self.markets_by_exchange = self.selector.refresh(now)
+        if hasattr(self.selector, 'event_markets'):
+            self.event_markets_by_exchange = {e:self.selector.event_markets(e) for e in ENDPOINTS}
         self.markets = tuple(dict.fromkeys(m for group in self.markets_by_exchange.values() for m in group))
         for exchange, worker in self.workers.items():
-            worker.request_markets(self.markets_by_exchange[exchange])
+            worker.request_markets(self.markets_by_exchange[exchange],
+                                   event_markets=self.event_markets_by_exchange.get(exchange))
 
     def _preserve_prices(self, store: MarketFlowStore) -> None:
         try:
@@ -515,6 +557,8 @@ class MarketFlowStreamService:
         price_store = MarketFlowStore()
         try:
             self._refresh_subscriptions(time.time())
+            if self.event_markets_by_exchange:
+                prepare_database(price_store.conn.execute('PRAGMA database_list').fetchone()[2])
             for exchange in ENDPOINTS:
                 worker = StreamWorker(
                     exchange,
@@ -523,6 +567,7 @@ class MarketFlowStreamService:
                     self.states[exchange],
                     self.state_lock,
                     self.started_at,
+                    event_markets=self.event_markets_by_exchange.get(exchange),
                 )
                 thread = threading.Thread(
                     target=worker.run,

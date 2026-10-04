@@ -46,6 +46,8 @@ def eligible_events(conn, now, *, lookback=EVENT_LOOKBACK_SECONDS, limit=MAX_EVE
 def capture_market(conn, exchange, market, now, *, events=None) -> int:
     if events is None:
         events = eligible_events(conn, now)
+    from .event_trade_samples import exists, candidate, SAMPLED_PROVIDER
+    sampled = exists(conn)
     changed = 0
     for event in events:
         stamp = float(event['source_ts'])
@@ -65,30 +67,48 @@ def capture_market(conn, exchange, market, now, *, events=None) -> int:
                 AND trade_ts>=? AND trade_ts<=? AND trade_price>0
                 ORDER BY trade_ts {order},sequential_id {order} LIMIT 1''',
                 (exchange, market, start, end)).fetchone()
+            if sampled:
+                sample = candidate(conn, exchange, market, target, baseline, now, MAX_TOLERANCE)
+                if sample:
+                    changed += save_price(conn, event, exchange, market, point, sample, now, provider=SAMPLED_PROVIDER)
             if row is None or not math.isfinite(row['trade_price']):
                 continue
-            better = '>' if baseline else '<'
-            cursor = conn.execute(f'''INSERT INTO {TABLE} (
-                event_id,event_ts,source_id,event_type,exchange,market,point,provider_id,
-                sequential_id,trade_ts,trade_price,archived_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
-                ON CONFLICT(event_id,event_ts,source_id,event_type,exchange,market,point,provider_id)
-                DO UPDATE SET sequential_id=excluded.sequential_id,trade_ts=excluded.trade_ts,
-                    trade_price=excluded.trade_price,archived_at=excluded.archived_at
-                WHERE excluded.trade_ts {better} {TABLE}.trade_ts
-                   OR (excluded.trade_ts={TABLE}.trade_ts
-                       AND excluded.sequential_id {better} {TABLE}.sequential_id)''',
-                (event['event_id'],stamp,event['source_id'],event['event_type'],exchange,market,
-                 point,PROVIDER_ID,row['sequential_id'],row['trade_ts'],row['trade_price'],now))
-            changed += max(0, cursor.rowcount)
+            changed += save_price(conn, event, exchange, market, point, row, now)
     return changed
 
 
+def save_price(conn, event, exchange, market, point, row, now, *, provider=PROVIDER_ID):
+    better = '>' if point == 'baseline' else '<'
+    cursor = conn.execute(f'''INSERT INTO {TABLE} (
+        event_id,event_ts,source_id,event_type,exchange,market,point,provider_id,
+        sequential_id,trade_ts,trade_price,archived_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(event_id,event_ts,source_id,event_type,exchange,market,point,provider_id)
+        DO UPDATE SET sequential_id=excluded.sequential_id,trade_ts=excluded.trade_ts,
+            trade_price=excluded.trade_price,archived_at=excluded.archived_at
+        WHERE excluded.trade_ts {better} {TABLE}.trade_ts
+           OR (excluded.trade_ts={TABLE}.trade_ts
+               AND excluded.sequential_id {better} {TABLE}.sequential_id)''',
+        (event['event_id'],event['source_ts'],event['source_id'],event['event_type'],exchange,market,
+         point,provider,row['sequential_id'],row['trade_ts'],row['trade_price'],now))
+    return max(0, cursor.rowcount)
+
+
 def read_price(conn, event, exchange, market, point, now, tolerance):
-    row = conn.execute(f'''SELECT sequential_id,trade_ts,trade_price,archived_at FROM {TABLE}
+    from .event_trade_samples import SAMPLED_PROVIDER
+    rows = conn.execute(f'''SELECT sequential_id,trade_ts,trade_price,archived_at,provider_id FROM {TABLE}
         WHERE event_id=? AND event_ts=? AND source_id=? AND event_type=?
-          AND exchange=? AND market=? AND point=? AND provider_id=?''',
+          AND exchange=? AND market=? AND point=? AND provider_id IN (?,?)
+        ORDER BY CASE WHEN provider_id=? THEN 0 ELSE 1 END''',
         (event['event_id'],event['source_ts'],event['source_id'],event['event_type'],
-         exchange,market,point,PROVIDER_ID)).fetchone()
+         exchange,market,point,PROVIDER_ID,SAMPLED_PROVIDER,PROVIDER_ID)).fetchall()
+    for row in rows:
+        found = _valid_price(row, event, point, now, tolerance)
+        if found:
+            return {**found, 'observation_kind': 'minute_endpoints' if row['provider_id'] == SAMPLED_PROVIDER else 'trade'}
+    return None
+
+
+def _valid_price(row, event, point, now, tolerance):
     if row is None:
         return None
     values = (row['trade_ts'], row['trade_price'], row['archived_at'])

@@ -15,7 +15,7 @@ PYTHON_FILES = (
     '__init__.py', 'paper_constants.py', 'strategy_journal_review.py',
     'strategy_lab_market.py', 'strategy_lab_context.py', 'strategy_lab_journal.py',
     'strategy_lab_plan.py', 'strategy_lab_rules.py',
-    'event_reaction_view.py', 'event_reaction_catalog.py', 'event_response_contract.py', 'event_price_archive.py',
+    'event_reaction_view.py', 'event_reaction_catalog.py', 'event_response_contract.py', 'event_price_archive.py', 'event_trade_samples.py',
     'runtime_review.py', 'runtime_process_contract.py', 'event_capture_review.py', 'holdings_review.py', 'holding_quotes.py', 'user_tools.py',
     'manual_planning_store.py', 'manual_trading.py',
     'workspace_tools.py', 'workspace_packages.py', 'collection_update.py',
@@ -43,6 +43,12 @@ exit /b %CRYPTO_WORKSPACE_EXIT%
 WORKSPACE_README = '''CRYPTO — 앞으로 계속 사용하는 고정 폴더
 
 현재 도구 버전: @BUILD@
+
+이번 변경: 빗썸·업비트 전체 원화 종목의 이벤트 반응용 가격 수집.
+적용: 조회 창 종료 → 수집 창 Ctrl+C 후 종료 대기 → 이 CRYPTO 폴더에 덮어쓰기
+→ UPDATE_COLLECTION.cmd 실행·창 유지 → RUN_REVIEW.cmd → 2분 후 RUN_CHECK.cmd.
+이벤트 가격은 보존하고 임시 분별 체결 표본만 6시간 후 자동 정리합니다.
+과거 미확보 가격은 새로 만들어 채우지 않습니다. CLEAN_STORAGE 재실행은 필요 없습니다.
 
 START_COLLECTION.cmd  수집기 켜기 — 수집할 동안 창을 열어 둡니다.
 UPDATE_COLLECTION.cmd 수집 코드 갱신 후 켜기 — 기존 수집·조회 창을 먼저 종료합니다.
@@ -100,11 +106,11 @@ DB·사용자 파일·수정 파일·연결된 폴더가 있거나 실행 상태
 
 기능 설명과 데이터 보존 기준: HELP.txt
 
-이번 변경: 체결 금액·수수료·총 지출/실수령을 입력 화면과 변경 내역에서 확인합니다.
+기존 기능: 체결 금액·수수료·총 지출/실수령을 입력 화면과 변경 내역에서 확인합니다.
 보유정보에 반영하면 모든 전략 계산기의 시작 수량·평단도 갱신됩니다. 분할 계획은 유지합니다.
 계산 결과에 시작 보유금액·총 매수원금·매도 금액·수령액·회차별 금액을 표시합니다.
-RUN_CHECK 결과에는 다음 용량 관리 작업을 위한 DB 할당/재사용 공간, WAL, 백업 폴더 용량·시각이 포함됩니다.
-이번 진단은 파일이나 DB를 삭제하지 않습니다. 다음 작업은 필수 기록 보존·백업 최근 48시간 유지입니다.
+RUN_CHECK 결과에는 DB 할당/재사용 공간, 백업 상태, 거래소별 이벤트 가격 수집 종목 수와 최근 알트 수신 수가 포함됩니다.
+점검은 읽기 전용입니다. 백업은 기존 일일 생성·최근 48시간 보존 정책을 사용합니다.
 '''
 LAUNCHER = r'''@echo off
 setlocal
@@ -147,8 +153,9 @@ README = '''가상매매 · 실전 계획 검토 화면
 
 이번 수집 코드 적용: 수집 창 Ctrl+C → 종료 대기 → UPDATE_COLLECTION.cmd.
 갱신 후 수집이 자동 시작됩니다. 이 창은 켜 두고 RUN_CHECK.cmd로 확인합니다.
-빗썸·업비트별 상장 종목을 확인하여 보유 코인과 관심 코인을 체결 수집에 연결합니다.
-BTC·ETH 포함 거래소당 최대 8개를 지속 구독하며, 자산 추가는 약 1분마다 반영합니다.
+이벤트 반응용 체결 가격은 빗썸·업비트 전체 원화 종목을 구독합니다.
+체결량·호가는 기존 보유·관심 종목 최대 8개 범위를 유지합니다. 자산 추가는 약 1분마다 반영합니다.
+이벤트별 전후 가격은 보존합니다. 늦게 수신된 발표에 쓰는 임시 분별 실제 체결 표본은 6시간만 유지합니다.
 새로 상장된 종목은 목록 갱신까지 최대 5분이 걸릴 수 있습니다.
 이미 놓친 발표 기준가를 가짜 가격으로 채우지 않습니다.
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import json
 import sqlite3
 from typing import Any
 
@@ -39,5 +40,14 @@ def observation(row: sqlite3.Row | None) -> dict[str, Any] | None:
     expected = (r['target_price'] / r['baseline_price'] - 1) * 100
     if not math.isclose(r['return_pct'], expected, rel_tol=1e-9, abs_tol=1e-8):
         return None
-    return {key: r[key] for key in ('return_pct', 'event_ts', 'baseline_trade_ts', 'baseline_price',
+    result = {key: r[key] for key in ('return_pct', 'event_ts', 'baseline_trade_ts', 'baseline_price',
                                     'target_ts', 'target_trade_ts', 'target_price', 'captured_at')}
+    try:
+        attrs = json.loads(r.get('attributes_json') or '{}')
+    except (ValueError, TypeError):
+        attrs = {}
+    if isinstance(attrs, dict):
+        for key in ('baseline_observation_kind', 'target_observation_kind'):
+            if attrs.get(key) in {'trade', 'minute_endpoints'}:
+                result[key] = attrs[key]
+    return result
