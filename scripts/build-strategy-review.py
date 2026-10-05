@@ -14,7 +14,7 @@ PUBLIC = ROOT / 'cloudflare-pages/public'
 PYTHON_FILES = (
     '__init__.py', 'paper_constants.py', 'strategy_journal_review.py',
     'strategy_lab_market.py', 'strategy_lab_context.py', 'strategy_lab_journal.py',
-    'strategy_lab_plan.py', 'strategy_lab_rules.py', 'event_strategy_study.py',
+    'strategy_lab_plan.py', 'strategy_lab_rules.py', 'event_strategy_study.py', 'strategy_period_review.py',
     'event_reaction_view.py', 'event_reaction_catalog.py', 'event_response_contract.py', 'event_price_archive.py', 'event_trade_samples.py',
     'runtime_review.py', 'runtime_process_contract.py', 'event_capture_review.py', 'holdings_review.py', 'holding_quotes.py', 'user_tools.py',
     'manual_planning_store.py', 'manual_trading.py',
@@ -44,7 +44,7 @@ WORKSPACE_README = '''CRYPTO — 앞으로 계속 사용하는 고정 폴더
 
 현재 도구 버전: @BUILD@
 
-이번 변경: 전체 알트 수집 현황 검사의 시간 초과 수정. 최근 120초 실제 저장을 빠르게 확인합니다.
+이번 변경: 가상매매 → 코인 → 전략 → 기간별 비교. 같은 기간의 전략별 완료·보유 중 매매와 비용 포함 손익, 직전 기간 성과를 비교합니다. 전략을 누르면 매매 금액과 체결 원장을 확인합니다.
 적용: 조회 창만 종료 → 기존 CRYPTO 폴더에 덮어쓰기 → RUN_REVIEW.cmd.
 실행 중인 수집 창은 그대로 유지합니다. CLEAN_STORAGE 재실행은 필요 없습니다.
 가상매매 → 코인 선택 → 반응도 → 경제지표 또는 정책·뉴스 → 종류별 누적.

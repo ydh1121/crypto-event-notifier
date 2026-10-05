@@ -11,12 +11,14 @@ from .event_strategy_study import read_event_study
 from .paper_constants import DB_PATH, START_KRW
 from .strategy_lab_context import read_coin_context
 from .strategy_lab_journal import TRADE_COLUMNS, reconcile_account
+from .strategy_period_review import period_review
 from .strategy_lab_plan import project_plan
 from .strategy_lab_rules import STYLE_SPECS, StyleSpec, _num
 
 
 def read_strategy_lab_market(exchange: str, market: str, path: Path = DB_PATH, *,
-                             event_study_request: dict | None = None, now: float | None = None) -> dict[str, Any]:
+                             event_study_request: dict | None = None,
+                             period_request: dict | None = None, now: float | None = None) -> dict[str, Any]:
     """One consistent, read-only account + COMPLETE journal view, scoped to one coin.
 
     Publication may put large journals into immutable detail chunks. API pagination
@@ -87,7 +89,10 @@ def read_strategy_lab_market(exchange: str, market: str, path: Path = DB_PATH, *
             item["revision"] = hashlib.sha256(json.dumps(item, sort_keys=True, ensure_ascii=False,
                 separators=(",", ":"), allow_nan=False).encode()).hexdigest()[:24]
             base["experiments"].append(item)
-        if event_study_request is not None:
+        if period_request is not None:
+            base['period_review'] = period_review(exchange, market, base['experiments'], grouped,
+                period_request, now=time.time() if now is None else now)
+        elif event_study_request is not None:
             try:
                 base['event_study'] = read_event_study(conn, exchange, market, base['experiments'], grouped,
                     event_study_request, now=time.time() if now is None else now)

@@ -12,7 +12,13 @@ const acc=(style,ex='bithumb')=>({experiment_id:`${ex}|${style}|v1`,style,label:
 const state={snapshot:{public:{exchanges:{bithumb:{leaderboard:[{market:'KRW-B3',symbol:'B3',price:100,signal_ts:clock/1000},{market:'KRW-DEXE',symbol:'DEXE',price:200,signal_ts:clock/1000}]},upbit:{leaderboard:[{market:'KRW-B3',symbol:'B3',price:101,signal_ts:clock/1000}]}}}},ui:{paperExchange:'bithumb',paperMarket:'KRW-B3',paperLabStyle:'aggressive'}};
 const listeners=new Set();const store={get:()=>state,setUi(p){Object.assign(state.ui,p)},subscribe(fn){listeners.add(fn);return()=>listeners.delete(fn)}};
 const requests=[];
-let addNewEvent=false,archivedTarget=null,delayStudy=false,releaseStudy;
+let addNewEvent=false,archivedTarget=null,delayStudy=false,releaseStudy,delayPeriod=false,releasePeriod;
+const periodBody=(u,accounts)=>{
+ const market=u.searchParams.get('market'),exchange=u.searchParams.get('exchange'),period=u.searchParams.get('period');
+ const selected=accounts.find(a=>a.experiment_id===u.searchParams.get('experiment'))||accounts[0];
+ const current={closed:2,open:1,wins:1,realized_pnl_krw:market==='KRW-B3'?10:30,return_pct:5,worst_return_pct:-2,invested_krw:200,proceeds_krw:210,open_invested_krw:100,carried_positions:1};
+ return {review:{status:'ok',exchange,market,period,start:clock/1000-30*86400,end:clock/1000,previous_start:clock/1000-60*86400,previous_end:clock/1000-30*86400,selected_experiment:selected.experiment_id,strategies:accounts.map(a=>({...a,status:'ok',current,previous:{closed:1,open:2,return_pct:-5}})),witnesses_total:1,witnesses_limit:20,witnesses:[{entry_ts:eventAnchor,exit_ts:eventAnchor+3600,entry_price:100,exit_price:105,buy_count:2,invested_krw:200,proceeds_krw:210,realized_pnl_krw:10,return_pct:5}]}};
+};
 const studyBody=(u,accounts)=>{
  const category=u.searchParams.get('category'),market=u.searchParams.get('market'),exchange=u.searchParams.get('exchange');
  const groups=(category==='news'?['US_SEC_REGULATION','US_SEC_POLICY']:['US_CPI']).map((event_type,i)=>({source_id:category==='news'?'us_sec_press_releases':'us_bls_release_calendar',event_type,label:event_type==='US_CPI'?'소비자물가 · CPI':i?'SEC · 정책':'SEC · 규제',samples:2,mean_pct:market==='KRW-B3'?2:4,median_pct:2,positive_samples:1,missing_events:1,waiting_events:0,vs_btc:{mean_pct:1,samples:2},vs_eth:{mean_pct:null,samples:0}}));
@@ -25,8 +31,9 @@ const eventRows=market=>(addNewEvent?['new','recent','old']:['recent','old']).ma
 globalThis.fetch=async path=>{const u=new URL(path,'http://127.0.0.1:8766'),ex=u.searchParams.get('exchange'),market=u.searchParams.get('market');requests.push(u);
  const accounts=['aggressive','balanced'].map(s=>acc(s,ex));let body;
  if(u.pathname==='/api/event-study') {body=studyBody(u,accounts);if(delayStudy){delayStudy=false;await new Promise(resolve=>{releaseStudy=resolve;});}}
+ else if(u.pathname==='/api/strategy-period') {body=periodBody(u,accounts);if(delayPeriod){delayPeriod=false;await new Promise(resolve=>{releasePeriod=resolve;});}}
  else if(u.searchParams.has('experiment')) {const account=accounts.find(a=>a.experiment_id===u.searchParams.get('experiment'));body={exchange:ex,market,journal:{account,trades:[],revision:account.revision,total:0,offset:0,limit:30,next_offset:null}};}
- else body={detail:{exchange:ex,market,data:{strategy_lab:{version:2,event_study_available:true,exchange:ex,market,experiments:accounts,price_history:[{ts:clock/1000-7200,price:98},{ts:clock/1000-3600,price:100}],events:[...eventRows(market),{event_id:'cpi',event_ts:eventAnchor,category:'economic',short_label:'소비자물가 · CPI',title:'Consumer Price Index DEXE',market,responses:{},source_url:'https://example.com/cpi'}]}}}};
+ else body={detail:{exchange:ex,market,data:{strategy_lab:{version:2,event_study_available:true,period_review_available:true,exchange:ex,market,experiments:accounts,price_history:[{ts:clock/1000-7200,price:98},{ts:clock/1000-3600,price:100}],events:[...eventRows(market),{event_id:'cpi',event_ts:eventAnchor,category:'economic',short_label:'소비자물가 · CPI',title:'Consumer Price Index DEXE',market,responses:{},source_url:'https://example.com/cpi'}]}}}};
  return {ok:true,json:async()=>structuredClone(body)};
 };
 const page=createPaperWorkbench({store});const root=document.getElementById('root');page.mount(root);page.render();
@@ -152,6 +159,40 @@ test('a late study response cannot replace another coin or exchange',async()=>{
  click('[data-exchange="upbit"]');await flush();
  assert.ok([...shadow().querySelectorAll('[data-study-experiment]')].every(b=>b.dataset.studyExperiment.startsWith('upbit|')));
  click('[data-section="strategy"]');await flush();
+});
+test('period comparison is lazy, money and cohorts are visible, selection survives polling and opens ledger',async()=>{
+ assert.equal(requests.filter(u=>u.pathname==='/api/strategy-period').length,0);
+ page.openAccount('bithumb','KRW-B3','aggressive');await flush();
+ click('[data-strategy-mode="compare"]');await flush();
+ assert.equal(requests.at(-1).pathname,'/api/strategy-period');
+ const witness=shadow().querySelector('[data-continuity-key="period-witnesses"]');
+ for(const value of ['200원','210원','10원'])assert.ok(witness.textContent.includes(value));
+ assert.ok(shadow().querySelector('.period-summary').textContent.includes('2회 / 1회'));
+ assert.ok(shadow().querySelector('.period-summary').textContent.includes('미청산 2회'));
+ click('[data-period-range="7d"]');await flush();click('[data-period-experiment="bithumb|balanced|v1"]');await flush();
+ shadow().querySelector('[data-continuity-key="period-method"]').open=true;
+ shadow().querySelector('[data-period-experiment][aria-pressed="true"]').focus();
+ clock+=21000;for(const fn of listeners)fn(state,{type:'snapshot-live'});await flush();
+ assert.equal(shadow().querySelector('[data-period-range][aria-pressed="true"]').dataset.periodRange,'7d');
+ assert.equal(shadow().activeElement.dataset.periodExperiment,'bithumb|balanced|v1');
+ assert.ok(shadow().querySelector('[data-continuity-key="period-method"]').open);
+ click('[data-period-journal]');await flush();
+ assert.equal(shadow().querySelector('[data-strategy-mode][aria-pressed="true"]').dataset.strategyMode,'account');
+ assert.equal(shadow().querySelector('[role="tab"][aria-selected="true"]').dataset.experiment,'bithumb|balanced|v1');
+});
+test('late period response cannot contaminate another coin; period is scoped and reaction flow remains reachable',async()=>{
+ click('[data-strategy-mode="compare"]');await flush();delayPeriod=true;click('[data-period-range="90d"]');await flush();
+ assert.equal(shadow().querySelector('.period-summary'),null);
+ click('[data-coin="KRW-DEXE"]');await flush();
+ assert.ok(shadow().querySelector('.period-summary').textContent.includes('30원'));
+ assert.equal(shadow().querySelector('[data-period-range][aria-pressed="true"]').dataset.periodRange,'30d');
+ releasePeriod();await flush();assert.ok(shadow().querySelector('.period-summary').textContent.includes('30원'));
+ click('[data-coin="KRW-B3"]');await flush();
+ assert.equal(shadow().querySelector('[data-period-range][aria-pressed="true"]').dataset.periodRange,'90d');
+ click('[data-exchange="upbit"]');await flush();
+ assert.ok([...shadow().querySelectorAll('[data-period-experiment]')].every(b=>b.dataset.periodExperiment.startsWith('upbit|')));
+ click('[data-section="reaction"]');click('[data-reaction="relative"]');assert.equal(shadow().querySelector('.period-summary'),null);
+ click('[data-section="strategy"]');click('[data-strategy-mode="account"]');await flush();
 });
 test('theme changes reach the isolated coin view; standalone review has no unsupported aggregate routes',async()=>{
  const {applyTheme}=await import('../public/modules/shared/theme.js');
