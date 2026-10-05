@@ -1,19 +1,22 @@
 # Dashboard v1 handoff
 
-### Current — holdings period evidence implemented; package pending workspace recovery
+### Current — value updates preserve controls; holdings period planning delivered
 
-- STATE = PERIOD_COMPARISON_ACTUAL_VERIFIED / HOLDING_PERIOD_SOURCE_DONE / PACKAGE_PENDING_EXEC_RECOVERY. Active WO CRYPTO-WO-20260921-RECOVERY-001.
-- ACTUAL = CRYPTO_CHECK_RESULT(20261005-011303).json /282450bytes/SHA2568e36543bf6e712db37459f05132a5c417f3c87a68c672fd1bdc7bab82990d1a4. Viewer dffe8b4 integrity verified; collector a8634c95 recovery branch clean. Canonical PAPER 5780217856bytes. Windows 직접 접근은 없으며 첨부 검사 근거다.
-- PERIOD VERIFIED = B3 공격적13체결/6완료/2승 원장 일치. 최근30일4완료/139015.63105262315원/2.9660361536613977%; 직전30일2완료/-9950.53344908182원. 첨부 전체 공격적 원장 재계산이 기간 결과·witness·revision과 정확히 일치. 분할매수 최근30일2완료/130717.70261438575원/5.655836907856774%. 6전략 금액 산술·화면 대조; 다른5전략의 전체 원장 독립 재현은 미확인.
-- CHANGED = 실전 계획에 같은7/30/90일·전체 기간 비교를 연결. 주 전략 탭의 완료/손익/직전 기간은 같은 기간 근거를 표시하며 계좌 전체 수익률과 혼합하지 않는다. 누적수익 정렬 제거·전략 자동선정 없음. 비교→선택 전략→기존 분할 매수/익절 계산으로 연결. 실제 수량·평단·사용자 예산 및 전략별 편집값 보존. 선택만으로 저장·주문하지 않는다.
-- VERIFY = 관련 Python35, DOM44, typecheck, git diff check 통과. 실제 첨부6전략 값이 PAPER 비교표와 실전 계획 DOM에 일치; 표본0은 null 유지. 거래소·코인 분리/늦은 응답 무시/오류 재시도 제한/포커스·펼침·입력값 보존/기존 추가·매수·매도·계획 저장 검증. 브라우저 실측·새 Windows 화면 수용은 미확인.
-- COLLECTION / STORAGE = 최근120초 빗썸 알트139→144, 업비트176→172로 저장 시각 전진. 창 내 수신 종목 수이며 전체 누적량이 아니다. 공식 발표38건/B3 유효 반응1건 유지; 새 네 구간 완주 미확인. 본체5780217856bytes·재사용677715968bytes, 일일 검증 백업 재사용·추가삭제0. 실제48h 만료 정리·장기 안정성은 계속 관찰.
-- GIT = 구현2a4ba52d73b4f30906bafc3cd0c8785001edbbc4 on agent/crypto-product-data-recovery-20260921; remote ref 확인 완료. 마지막 확인 로컬 HEAD a1c844a036ebc394191b40f9cd78cb9f0b74b502, 8파일 staged tree9cafc4d12fefae999e5d14b18054483e7f81131a가 원격 구현 tree와 일치. fetch 단계부터 exec-server transport disconnected / recovery timed out.
-- DELIVERY = CRYPTO.zip은 아직 기존 version25 /176982bytes/SHA256b61533280def98677b41f73fde1307d157ca1cb1aca2c62d6134cfb26f89684d. 이번 실전 계획 연결은 ZIP에 미포함. 새 배포/저장 성공을 주장하지 않는다. 도구 연결 복구 전 기존 파일을 새 버전으로 안내 금지.
-- RESUME = 작업 환경 복구→actual Git/첨부/QA 확인→remote fetch→기존 staged tree를 구현 커밋과 대조해 안전하게 동기화→scripts/build-strategy-review.py --output /workspace/scratch/72d59a25108a/CRYPTO.zip --holdings-exchange bithumb --enable-planning→압축 실행/자산/manifest 확인→동일 Library 파일libfile_40146030bc508191ab76b2788b16b9b4 expected_current_version25로 교체. 사용자 Desktop/CRYPTO 한 폴더 유지.
-- DURABLE = 이 Git 체크포인트로 중단 위치 보존. Drive CURRENT/BATON/Ledger/WBS는 trusted read 파일 저장 단계가 동일 실행 환경 연결 오류로 막혀 이번 단위 미갱신. 복구 후 기존4문서만 갱신·readback. QA /workspace/scratch/72d59a25108a/holding-period-qa; helper library-aa1rj4fs.
-- APPLY AFTER DELIVERY = 조회 창만 종료→같은 CRYPTO 폴더 덮어쓰기→RUN_REVIEW.cmd→실전 계획/코인/기간별 비교/이 전략으로 계획→분할 매수가·익절가 불러오기 확인→RUN_CHECK.cmd. 실행 중 수집기는 유지. UPDATE_COLLECTION/CLEAN_STORAGE 재실행 불필요.
-- NEXT PRODUCT = 새 실전 계획 연결의 실제 적용을 확인하고 소액 매매 기록의 같은 기간·비용 기준 PAPER 비교를 점검한다. 새 발표의 알트/BTC/ETH15m/1h/4h/1d를 관찰하며 근거가 쌓인 뒤 상승 관찰 후보에 연결. 단일 이벤트로 추천 확률·전략 우위를 만들지 않는다. 자동 실주문·전략/PAPER 규칙·canonical DB 변경 없음.
+- STATE = HOLDING_PERIOD_DELIVERED / VALUE_PATCH_DELIVERED / WINDOWS_ACCEPTANCE_PENDING. Active WO CRYPTO-WO-20260921-RECOVERY-001.
+- PROGRESS = 전체 약40%: 실제 수집→코인별 검증→계획→실전 비교까지 사용·확인 가능한 범위를 기준으로 한 보수적 추정이며, 코드량·테스트 통과율이나 완료 항목의 단순 비율이 아니다.
+- REMAINING = ① 화면 안정화·기간 비교→계산기 적용 확인 ② 알트·뉴스·경제지표 반응 누적 및 용량·48시간 백업 확인 ③ 소액 매매와 가상매매의 같은 기간·비용 기준 비교 ④ 도미넌스·시장 전체·SNS·온체인 반응 확장 ⑤ 코인별 전략 개선·근거 있는 상승 후보 ⑥ 소액 검증 통과 후 별도 승인으로 실전 전환
+- ACTUAL = CRYPTO_CHECK_RESULT(20261005-011303).json /282450bytes/SHA2568e36543bf6e712db37459f05132a5c417f3c87a68c672fd1bdc7bab82990d1a4. Viewer dffe8b4 integrity verified; collector a8634c95 recovery branch clean. Canonical PAPER 5780217856bytes. Windows 직접 접근 없이 첨부 결과로 확인했다.
+- PERIOD VERIFIED = B3 공격적13체결/6완료/2승 원장 일치. 최근30일4완료/+139015.63105262315원/+2.9660361536613977%; 직전30일2완료/-9950.53344908182원. 첨부 전체 공격적 원장 재계산이 기간 결과·witness·revision과 일치. 분할매수 최근30일2완료/+130717.70261438575원/+5.655836907856774%. 6전략 금액 산술·화면 대조; 다른5전략 전체 원장의 독립 재현은 미확인.
+- CHANGED PLAN = 미배포 구현2a4ba52 포함. 실전 계획의7/30/90일·전체 비교→이 전략으로 계획→기존 분할 매수/익절 계산 연결. 같은 기간 손익과 직전 기간을 사용, 계좌 전체 성과 혼합·누적수익 자동 정렬·전략 자동선정 없음. 실제 보유 수량·평단·사용자 예산·전략별 편집값 보존.
+- CHANGED LIVE = 공통 DOM 갱신이 같은 키의 코인·전략·체결 행·입력·계산 결과를 유지하며 바뀐 텍스트/속성만 반영. PAPER·실전 계획·반응/기간 비교에 적용. 비동기 로딩 중 높이 보존, 빈 차트/원장을 먼저 렌더하는 과정 제거, 동일 계좌 원장은 재조회 중 유지. 지연 프레임의 과거 스크롤 재적용 제거; 실제 달라진 위치만 즉시 복원. 코인 목록 가격도 갱신. 구조나 행이 바뀌면 해당 항목은 추가/제거하며 진짜 짧아진 문서의 스크롤 한계까지 고정한다고 주장하지 않는다.
+- VERIFY = 이번 화면 DOM/모델53개와 typecheck·필수 기존 계약·git diff check 통과. 이전 실전 계획 연결 Python35개 통과 근거 유지(백엔드 미변경). 숫자 갱신 시 핵심 DOM 동일성·노드 제거0·입력/선택/펼침 유지, 지연 스크롤 복원 없음 검증. 최종 압축의82 payload 해시와 Python -B -S 실행에서6전략 비교→정확한 revision 원장·정적 모듈·검증용 DB 바이트 보존 확인. 실제 브라우저 배치/스크롤 및 Windows UI 수용은 아직 미확인.
+- COLLECTION = 최근120초 조회 T0/T1 모두read/version2. 빗썸 알트139→144, 업비트176→172; 양 거래소 저장 체결시각 전진. 창 내 수신 종목 수이며 전체 누적량·전 종목 연속 수집의 증명은 아니다. 공식 발표38건/B3 유효 반응1건 유지; 새 발표의15m/1h/4h/1d 완주는 미확인.
+- STORAGE = 본체5780217856bytes·재사용677715968bytes. 일일 검증 백업 재사용·추가삭제0. 실제48h 만료 정리와 장기 용량 안정성은 계속 관찰. CLEAN_STORAGE 반복 실행 불필요.
+- GIT = 소스8c08161a2022850af4d364310af09873fe379b5b / agent/crypto-product-data-recovery-20260921. 실행 환경 복구 및 remote/local 동기화 완료. 기본 브랜치·PR#1 유지; 운영 배포·실주문·전략/PAPER 규칙·canonical DB 변경 없음.
+- PACKAGE = 동일 CRYPTO.zip version26 /180365bytes/83files/SHA2564fe453dff0e59ed787319d9d16272b7817c14a8761e8a75ee241dd3e622fb406. manifest2b47af70e6d1c067fe112c8c2c0f4f6d037c8b0b8c4b0cf5b908b3b418705cd9. libfile_40146030bc508191ab76b2788b16b9b4에 저장 성공. Desktop/CRYPTO 한 폴더 유지.
+- APPLY = 조회 창만 종료→기존 CRYPTO 폴더에 덮어쓰기→RUN_REVIEW.cmd→실전 계획/코인/기간별 비교/이 전략으로 계획→분할 매수가·익절가 불러오기 확인→RUN_CHECK.cmd. 숫자 갱신·버튼 선택 때 스크롤/입력 유지 확인. 실행 중 수집기는 유지; UPDATE_COLLECTION/CLEAN_STORAGE 재실행 불필요.
+- NEXT = 새 발표의 알트/BTC/ETH15m/1h/4h/1d가 실제 누적되는지와 백업48h 정리/용량 추세를 먼저 확인. 그 뒤 소액 매매 기록의 같은 기간·비용 기준 PAPER 비교를 연결·검증. 도미넌스/OTHERS·SNS·온체인·신규 거시 확장→시간 순 검증·코인별 개선/상승 후보→소액 검증 순서를 유지. 단일 이벤트로 추천 확률이나 전략 우위를 만들지 않는다.
+- DURABLE = 같은 ZIP version26 저장 완료. 기존 Drive CURRENT/BATON·Ledger·WBS 갱신 및 전체 텍스트 readback 일치 확인 완료.
 
 ### Previous checkpoint — shared daily backups and safe 48-hour cleanup implemented
 
