@@ -46,7 +46,7 @@ export function createPaperWorkbench({store, allowOverview=true}) {
     root.innerHTML='<crypto-paper-workbench data-raw-text></crypto-paper-workbench>';
     view=root.firstElementChild.attachShadow({mode:'open'});
     syncTheme();
-    view.innerHTML=`<link rel="stylesheet" href="/modules/styles/strategy-workbench.css?v=6">
+    view.innerHTML=`<link rel="stylesheet" href="/modules/styles/strategy-workbench.css?v=7">
       <main><header class="workbench-header"><h1>가상매매</h1>${allowOverview?'<nav aria-label="전체 가상매매"><button data-overview="summary">전체 계좌</button><button data-overview="compare">거래소 비교</button></nav>':''}</header>
       <div class="workspace"><aside aria-label="코인 선택"><div class="exchange-picker" role="group" aria-label="거래소"><button data-exchange="bithumb" aria-pressed="${exchange()==='bithumb'}">빗썸</button><button data-exchange="upbit" aria-pressed="${exchange()==='upbit'}">업비트</button></div><label class="search-label">코인 검색<input id="coin-search" type="search" placeholder="이름 또는 티커" value="${esc(search)}"></label><div id="coin-list" class="coin-list" data-preserve-scroll></div><label class="mobile-picker">코인 선택<select id="mobile-coin"></select></label></aside>
       <div class="coin-detail"><header id="coin-heading" class="coin-heading"></header><nav class="section-tabs" aria-label="코인 분석"><button data-section="strategy" aria-current="page">전략</button><button data-section="reaction">반응도</button></nav><div id="coin-content"></div></div></div></main>`;

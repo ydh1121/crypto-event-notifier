@@ -8,13 +8,14 @@ import {savedPlanHtml,manualRecordsHtml} from '../shared/holding-records-view.js
 import {createHoldingRegistration,holdingRegistrationHtml} from '../shared/holding-registration.js';
 import {createHoldingManagement} from '../shared/holding-management-session.js';
 import {holdingManagementHtml,holdingAmountsHtml} from '../shared/holding-management-view.js';
+import {createStrategyPeriod} from '../shared/strategy-period-workbench.js';
 
 /** Composition only. Per-holding/strategy drafts persist only through the
  * explicitly enabled local planning service; actual holdings remain separate. */
 export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=null,onHoldingsChanged=null,manualClient,registrationClient,managementClient}) {
   let root,view,unsub,selected='',strategy='',detail=null,request=0,loading=false,error='';
   let priceBusy=false,priceError='';
-  const drafts=new Map(),selections=new Map();
+  const drafts=new Map(),selections=new Map(),comparing=new Set();
   const edited=new Set(),panels=new Map();
   const records=createHoldingRecordsSession({client:manualClient,restore:(k,d)=>{drafts.set(k,d);edited.delete(k);},changed:()=>render()});
   const registration=createHoldingRegistration({client:registrationClient,changed:()=>render(),onAdded:result=>{
@@ -30,7 +31,7 @@ export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=nu
   const data=()=>store.get().snapshot?.local_holdings;
   const selectable=()=>data()?.holdings?.filter(h=>!h.closed||(data().planning_enabled&&h.recording_available)||(data().holding_management_enabled&&h.management_available))||[];
   const holding=()=>selectable().find(h=>h.key===selected);
-  const accounts=()=>scopedStrategies(detail,holding()).slice().sort((a,b)=>(b.return_pct??-Infinity)-(a.return_pct??-Infinity));
+  const accounts=()=>scopedStrategies(detail,holding());
   const account=()=>accounts().find(a=>a.experiment_id===strategy);
   const key=()=>`${selected}|${strategy}`;
   const record=()=>records.get(key());
@@ -40,6 +41,17 @@ export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=nu
   const el=id=>view?.getElementById(id);
   const set=(id,html)=>{const node=el(id);if(node)node.innerHTML=html;};
   const syncTheme=()=>{if(view)view.host.dataset.theme=document.documentElement.dataset.theme||'light';};
+  const periodReview=createStrategyPeriod({changed:()=>render(),
+    openJournal(experiment,review){
+      const h=holding(),a=accounts().find(a=>a.experiment_id===experiment);
+      if(a&&review?.exchange===h.exchange&&review?.market===h.market)onPaper(h.exchange,h.market,a.style);
+    },
+    chooseStrategy(experiment,review){
+      const h=holding();if(review?.exchange!==h?.exchange||review?.market!==h?.market||!accounts().some(a=>a.experiment_id===experiment))return;
+      strategy=experiment;selections.set(selected,strategy);comparing.delete(selected);
+      panels.set(key(),h.closed?'records':'plan');render();
+    },
+  });
   function render() {
     if(!view)return;
     const list=selectable();
@@ -55,12 +67,18 @@ export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=nu
     if(selected)selections.set(selected,strategy);
     const saved=data()?.planning_enabled&&(h?.planning_available||h?.recording_available)&&account()?records.ensure(key(),{exchange:h.exchange,market:h.market,experiment:strategy},edited.has(key())):null;
     const recordPanel=saved&&panel()==='records';
+    const canCompare=h?.quote_currency==='KRW'&&rows.length>0&&detail?.data?.strategy_lab?.period_review_available===true;
+    const scope=canCompare?{exchange:h.exchange,market:h.market,style:account()?.style||'aggressive'}:null;
+    const comparison=canCompare?periodReview.state(scope):null,showComparison=canCompare&&comparing.has(selected);
+    const modes=canCompare?`<nav class="holding-work-tabs" aria-label="보유 전략 보기"><button data-holding-comparison="plan" data-continuity-key="holding-mode-plan" aria-pressed="${!showComparison}">${h.closed?'전략·기록':'전략·계획'}</button><button data-holding-comparison="compare" data-continuity-key="holding-mode-compare" aria-pressed="${showComparison}">기간별 비교</button></nav>`:'';
     patchPreservingUi(view,()=>{
       set('holdings-summary',holdingsSummaryHtml(data()));set('holdings-list',holdingsListHtml(data(),selected));
       set('holding-price-refresh',priceRefreshHtml(data(),{available:Boolean(onRefreshPrices),busy:priceBusy,error:priceError}));
       set('holding-registration',holdingRegistrationHtml(registration.state,Boolean(onHoldingsChanged&&data()?.status==='read'&&data()?.holding_registration_enabled),data()?.confirmed_exchange));
-      set('holding-detail',h?`${holdingHeaderHtml(h)}${holdingManagementHtml(h,management.get(h.key),Boolean(onHoldingsChanged&&data()?.holding_management_enabled))}<section id="holding-strategies">${holdingStrategiesHtml(rows,strategy,{loading,error,holding:h})}</section>${saved?`<nav class="holding-work-tabs" aria-label="실전 기록">${h.closed?'':'<button data-holding-panel="plan" aria-pressed="'+!recordPanel+'">매매 계획</button>'}<button data-holding-panel="records" aria-pressed="${recordPanel}">소액 매매${h.closed?' · 매도 완료':''}</button></nav><div id="holding-save-state">${savedPlanHtml(saved,panel())}</div>`:''}<section id="holding-calculator" ${recordPanel||h.closed?'hidden':''}>${holdingCalculatorHtml(h,draft(),account())}</section>${saved?`<section id="holding-records" ${recordPanel?'':'hidden'}>${manualRecordsHtml(saved,{closed:h.closed})}</section>`:''}`:'');
+      const work=showComparison?`<section id="holding-period">${periodReview.html(scope)}</section>`:`<section id="holding-strategies">${holdingStrategiesHtml(rows,strategy,{loading,error,holding:h,comparison})}</section>${saved?`<nav class="holding-work-tabs" aria-label="실전 기록">${h.closed?'':'<button data-holding-panel="plan" aria-pressed="'+!recordPanel+'">매매 계획</button>'}<button data-holding-panel="records" aria-pressed="${recordPanel}">소액 매매${h.closed?' · 매도 완료':''}</button></nav><div id="holding-save-state">${savedPlanHtml(saved,panel())}</div>`:''}<section id="holding-calculator" ${recordPanel||h?.closed?'hidden':''}>${h?holdingCalculatorHtml(h,draft(),account()):''}</section>${saved?`<section id="holding-records" ${recordPanel?'':'hidden'}>${manualRecordsHtml(saved,{closed:h.closed})}</section>`:''}`;
+      set('holding-detail',h?`${holdingHeaderHtml(h)}${holdingManagementHtml(h,management.get(h.key),Boolean(onHoldingsChanged&&data()?.holding_management_enabled))}${modes}${work}`:'');
     });
+    if(canCompare)periodReview.mount(showComparison?el('holding-period'):null,scope);
   }
   async function load() {
     const h=holding();if(!(h?.planning_available||h?.recording_available)||!view)return;
@@ -93,6 +111,13 @@ export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=nu
     if(b.dataset.action==='close-holding-add'){registration.close();return;}
     if(b.dataset.holding){selected=b.dataset.holding;strategy=selections.get(selected)||'';detail=null;error='';request++;render();void load();return;}
     if(b.dataset.strategy){strategy=b.dataset.strategy;selections.set(selected,strategy);render();return;}
+    if(b.dataset.holdingComparison){
+      if(b.dataset.holdingComparison==='compare'){
+        const h=holding();if(!h)return;
+        periodReview.select({exchange:h.exchange,market:h.market,style:account()?.style},{experiment:strategy});comparing.add(selected);
+      }else comparing.delete(selected);
+      render();return;
+    }
     if(b.dataset.holdingPanel){panels.set(key(),b.dataset.holdingPanel);render();return;}
     const action=b.dataset.action,h=holding();if(!h)return;
     if(b.dataset.manageOpen){management.open(h,b.dataset.manageOpen);return;}
@@ -134,5 +159,5 @@ export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=nu
     d.origin='manual';markEdited();calculate();
   }
   return {mount(node){root=node;root.innerHTML='<crypto-holdings-workbench data-raw-text></crypto-holdings-workbench>';view=root.firstElementChild.attachShadow({mode:'open'});view.innerHTML=holdingsShell();syncTheme();view.addEventListener('click',click);view.addEventListener('input',input);view.addEventListener('submit',e=>{if(e.target.id==='holding-add-form'){e.preventDefault();void registration.save();}if(e.target.id==='holding-manage-form'){e.preventDefault();if(holding())void management.preview(holding());}});document.addEventListener('viewer-theme-change',syncTheme);unsub=store.subscribe((_,meta)=>{if(['snapshot','snapshot-live'].includes(meta?.type)){render();void load();}});render();void load();},render,refresh(){render();void load();},
-    destroy(){request++;unsub?.();records.destroy();registration.destroy();management.destroy();document.removeEventListener('viewer-theme-change',syncTheme);view=null;root=null;}};
+    destroy(){request++;unsub?.();periodReview.destroy();records.destroy();registration.destroy();management.destroy();document.removeEventListener('viewer-theme-change',syncTheme);view=null;root=null;}};
 }
