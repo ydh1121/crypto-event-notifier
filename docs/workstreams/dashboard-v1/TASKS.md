@@ -1,20 +1,21 @@
 # Dashboard v1 workstream tasks
 
-### Current — report8 verified; bounded alt liveness query delivered
+### Current — alt DB query verified; coin strategy period comparison delivered
 
-- STATE = EVENT_STUDY_ACTUAL_VERIFIED / ALT_QUERY_FIX_PC_CHECK_PENDING. Active WO CRYPTO-WO-20260921-RECOVERY-001. 펼침 스크롤은 사용자 정상 확인 완료.
-- ACTUAL = CRYPTO_CHECK_RESULT(8).json /271705bytes/SHA256d430aedfb7e8bf1f33112dac2750ccf333eeadbef96ba2d0e52ab227965c90bd. Viewer12fcbb3·manifest 검증, 실제 수집기b3c72eb·clean. canonical auto_demo.sqlite3 5780217856bytes. 사용자 PC를 직접 조작한 증거가 아닌 첨부 검사 결과다.
-- STUDY = 실제 B3/빗썸에서 공식 발표38건 중15m 유효 반응1건. SEC규제 평균+0.187969925%, BTC대비+0.267934462%p, ETH대비+0.160669898%p가 개별 반응 기록과 일치. 선택 SEC규제/15m의 연결 매매는0건으로 보고되며 손익·수익률은null. 나머지 결측37건을0%로 대체하지 않음. 표본1건을 검증된 전략 우위나 추천 근거 충분성으로 승격하지 않는다.
-- LEDGER = B3/공격적13체결·6완료·2승. 첨부 원장을 다시 묶은 매도 수령액−매수 금액 합계129065.0976035411원이 계좌 실현손익129065.09760354133원과 일치. 누적 분석의 account_revision·ledger_trade_count도 계좌 원장과 동일. 전체6완료를 특정 이벤트 거래0건과 혼합하지 않음.
-- RUNTIME = 검사 약35초 동안 PAPER·시장메모리·원시체결·OHLCV 시각 증가. 실제 host/storage/forward/market_flow/research/paper 소유자 확인. 수집기 상태에서 빗썸/업비트 구독482/291종목 모두 프로세스 가동 이후 수신, 최근120초139/167종목·분별 저장 누계82760/117905. 이는 고유 DB 행수나 전 종목 연속 수집 증명은 아니다. 전체 DB 현황 조회는 두 차례 query_timeout으로 직접 최신시각 대조가 불가능했다.
-- DECISION = 시간 초과는 event_capture_review의6시간 전체 GROUP BY 집계에서 발생. 수집기 변경 대신 기존 bucket_ts 인덱스로 최근120초만 읽도록 수정. 전체 누적 행수와 혼동하지 않도록 version2/scope=last_120s/window_rows/window_markets/history_counts=not_scanned 명시. 인덱스가 없으면 미확인으로 남기며 생성/전체 스캔하지 않는다.
-- STORAGE = DB 본체는 report7과 동일5780217856bytes, 재사용 가능656588800bytes. 보고 시 WAL292153352bytes. 기존 검증 일일 복구본을 관리주기1791124007.2227361에서도created=false로 재사용·추가삭제0. 실제48h 만료 경계와 장기 용량 안정성은 여전히 미확인. CLEAN_STORAGE 반복 실행 불필요.
-- VERIFY = 관련 Python39검사·compile·diff 통과. 24만 행 fixture에서 제한된 SQLite 작업 예산으로 최근 종목 집계 통과. 기간 밖/미래값·오래된 기록·인덱스 부재 구분. 최종 압축 해제 Python -B -S에서 양 거래소 T0→T1 비교·DB 바이트 보존과76개 payload 해시 확인. 실제 Windows의 수정 조회 성공은 다음 결과로 확인해야 한다.
-- GIT = 소스a8634c95abac1b0b0e9dcff185191949936c9ad5 / agent/crypto-product-data-recovery-20260921. 기본 브랜치·PR#1 Draft/Open/Unmerged 유지.
-- PACKAGE = 동일 CRYPTO.zip version24 /170507bytes/77files/SHA2569777ad20d5c02003a86c55be2ee97ce96320a31c04242f2a2999b105c3c3bf59. manifest3bd47407733083adc183e305b6c423a62ff47f277f5544056c813a63be760a6c. Desktop/CRYPTO 한 폴더 사용.
-- APPLY = 조회 창만 종료→기존 CRYPTO 폴더에 덮어쓰기→RUN_REVIEW.cmd→RUN_CHECK.cmd 결과 첨부. 실행 중 수집기는 켜 둔다. 지금 UPDATE_COLLECTION/CLEAN_STORAGE 재실행 불필요. 이후 수집기가 종료되고 START_COLLECTION이 버전 갱신을 요청하면 UPDATE_COLLECTION을 사용한다.
-- NEXT = 수정된 최근120초 DB 조회가 실제 PC에서도 성공하고 양 거래소 시각·알트 수신을 보여주는지 확인. 새 실제 발표의 알트/BTC/ETH 기준가·15m/1h/4h/1d를 계속 확인한다. 충분한 표본과 시간 순 검증을 거쳐 전략 비교·상승 관찰 후보로 연결하며 현재1건으로 우위/확률을 만들지 않는다. 도미넌스/OTHERS·SNS·온체인·지정학 등 P2 확장 미완료. 운영 배포·실주문 없음.
-- DURABLE = 동일 CRYPTO.zip version24 저장. Drive CURRENT SNAPSHOT/BATON·Ledger·WBS F01/F04/F11/F30/F32 갱신 후 전체 텍스트 readback 일치 확인.
+- STATE = ALT_QUERY_ACTUAL_VERIFIED / PERIOD_COMPARISON_PC_CHECK_PENDING. Active WO CRYPTO-WO-20260921-RECOVERY-001. 펼침 스크롤 사용자 정상 확인 완료.
+- ACTUAL = CRYPTO_CHECK_RESULT(10).json /273809bytes/SHA2563b061e5403358d0b9747aac0e73465fb2cf7829717d974d889ea59523756dbab. Viewer·실제 collector 모두a8634c95, manifest 검증·recovery branch clean. canonical auto_demo.sqlite3 5780217856bytes. 첨부 검사 근거이며 Windows 직접 접근은 없다.
+- COLLECTION = 최근120초 조회가 T0/T1 모두read/version2로 성공. 빗썸 알트86→99종목, 업비트93→110종목. 양 거래소 저장 체결시각 전진. 시점마다 바뀌는120초 창의 종목 수이며 전체 누적량·전 종목 연속 수집 증명은 아니다. PAPER·원시체결 시각도 전진. host/storage/research/paper/market_flow/forward 소유자 존재.
+- DATA = 공식 발표38건 중 B3/15m 유효 반응1건 유지. 새 네 구간 완주는 아직 미확인. B3 공격적13체결·6완료·2승, 실현손익129065.09760354133원 계좌·원장 일치. 선택 이벤트 거래0건과 전체6완료를 혼합하지 않는다.
+- CHANGED = 가상매매→코인→전략→기간별 비교. 7/30/90일·전체, 각 전략 완료/보유 중·비용 포함 손익·매매 수익률·승리/완료·최저 완료 거래 수익률·직전 기간 결과→선택 전략 매수/매도 금액과 최근20개 포지션→계좌·전체 원장 연결.
+- METHOD = 기간 안 첫 매수 포지션만 포함. 이전부터 보유한 포지션은 제외 건수 표시. 직전 기간은 그 종료시각에서 체결을 잘라 이후 물타기/청산을 섞지 않는다. 비용 반영 원장 금액 재사용, 완료 손익합계/매수금액합계. 계좌 전체 수익률·최대 낙폭·승률·추천 확률과 혼동 금지. 미체결/불일치 성과는null. 전략·PAPER 규칙·collector·canonical DB 변경 없음.
+- ACTUAL PERIOD = 첨부 B3 원장 재계산: 최근7일1완료/-24796.729870원/-2.612279%; 최근30일4완료/+139015.631053원/+2.966036%; 전체6완료/+129065.097604원/+1.926656%. 전체 수익률1.926656%는 누적 매수금액 기준이며 계좌 수익률1.290651%와 분모가 다르다. 실제 원장→네 기간 집계→화면 DOM 표시 값 대조 통과. 이 계산은 첨부 시각 기준이며 새 Windows 화면 적용 확인은 별도다.
+- VERIFY = 관련 Python43·DOM13·typecheck·compile·diff 통과. 기간 경계/미래값/물타기/미청산/원장 불일치/거래소 분리/선택·포커스·펼침 유지/늦은 응답 무시 검증. 최종 압축 실행 Python -B -S에서6전략 비교→동일 revision 원장·정적 자산·DB 바이트 보존과81 payload 해시 확인. 브라우저 실측·사용자 화면 수용은 아직 미확인.
+- STORAGE = 본체5780217856bytes로 직전 보고와 동일, 재사용 가능659046400bytes, WAL292153352bytes. 기존 검증 일일 백업 재사용·추가삭제0. 실제48h 만료 정리와 장기 용량 안정성은 계속 관찰. CLEAN_STORAGE 반복 실행 불필요.
+- GIT = 소스dffe8b4fa943cd66a8b7459f33cb6645ebbe927b / agent/crypto-product-data-recovery-20260921. 기본 브랜치·PR#1 유지. 운영 배포·실주문 없음.
+- PACKAGE = 동일 CRYPTO.zip version25 /176982bytes/82files/SHA256b61533280def98677b41f73fde1307d157ca1cb1aca2c62d6134cfb26f89684d. manifest04e4ec61647dfa150ba7cb3737d5d5f5c5a4db890cf6f8153e75d5326c053e87. Desktop/CRYPTO 한 폴더 사용.
+- APPLY = 조회 창만 종료→기존 CRYPTO 폴더에 덮어쓰기→RUN_REVIEW.cmd→가상매매/코인/전략/기간별 비교→RUN_CHECK.cmd 결과 첨부. 실행 중 수집기는 유지. 지금 UPDATE_COLLECTION/CLEAN_STORAGE 재실행 불필요. 이후 START_COLLECTION이 갱신을 요청할 때 UPDATE_COLLECTION 사용.
+- NEXT = 새 실행본의 strategy_period_review를 실제 DB/원장과 대조한 뒤 실전 계획의 전략 선택에도 같은 기간 비교 근거를 연결한다. 별도로 새 발표의 알트/BTC/ETH15m/1h/4h/1d를 관찰하고 충분한 시간 순 검증 후 상승 관찰 후보에 반영한다. 도미넌스/OTHERS·SNS·온체인·지정학 등 P2 확장 미완료.
+- DURABLE = CRYPTO.zip version25 저장. Drive CURRENT/BATON·Ledger·WBS 갱신 및 전체 텍스트 readback 일치 확인 완료.
 
 ### Previous checkpoint — shared daily backups and safe 48-hour cleanup implemented
 
