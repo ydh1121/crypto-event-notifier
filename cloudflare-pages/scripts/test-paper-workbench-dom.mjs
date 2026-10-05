@@ -194,6 +194,18 @@ test('late period response cannot contaminate another coin; period is scoped and
  click('[data-section="reaction"]');click('[data-reaction="relative"]');assert.equal(shadow().querySelector('.period-summary'),null);
  click('[data-section="strategy"]');click('[data-strategy-mode="account"]');await flush();
 });
+test('same-coin ticks retain the account, chart, calculator and price nodes without child replacement',async()=>{
+ clock+=21000;page.openAccount('bithumb','KRW-B3','aggressive');await flush();click('[data-action="import-plan"]');
+ const selectors=['#coin-heading .coin-price b','#coin-list [data-coin="KRW-B3"]','#account-summary','#price-chart svg','#price-chart polyline','[data-buy-amount="0"]','#calculation-result dd','[data-action="import-plan"]'];
+ const before=selectors.map(s=>shadow().querySelector(s));assert.ok(before.every(Boolean));
+ const observer=new window.MutationObserver(()=>{});observer.observe(shadow(),{subtree:true,childList:true});
+ state.snapshot.public.exchanges.bithumb.leaderboard[0].price=123;revision++;clock+=21000;
+ for(const fn of listeners)fn(state,{type:'snapshot-live'});await flush();
+ assert.deepEqual(selectors.map(s=>shadow().querySelector(s)),before);
+ assert.match(shadow().querySelector('#coin-heading .coin-price b').textContent,/123원/);
+ assert.match(shadow().querySelector('#coin-list [data-coin="KRW-B3"]').textContent,/123원/);
+ assert.equal(observer.takeRecords().reduce((n,r)=>n+r.removedNodes.length,0),0);observer.disconnect();
+});
 test('theme changes reach the isolated coin view; standalone review has no unsupported aggregate routes',async()=>{
  const {applyTheme}=await import('../public/modules/shared/theme.js');
  applyTheme('dark');assert.equal(shadow().host.dataset.theme,'dark');

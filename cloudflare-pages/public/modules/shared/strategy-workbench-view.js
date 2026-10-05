@@ -25,11 +25,11 @@ export function journalHtml(page, {loading=false,error=''}={}) {
   if(error)return `<p class="notice" role="status">${esc(error)}</p><button data-action="retry-journal">다시 불러오기</button>`;
   if(!page)return `<p class="placeholder">${loading?'체결 내역 불러오는 중…':'체결 내역을 선택하세요.'}</p>`;
   const start=page.total?page.offset+1:0,end=page.offset+page.trades.length;
-  return `<div class="section-heading"><h3>체결 원장 <span>${number(page.total,0)}건</span></h3><span>${start}–${end} / ${number(page.total,0)}</span></div>
-    ${page.total?`<div class="table-scroll" data-preserve-scroll><table><thead><tr><th>체결 · 한국시간</th><th>가격 / 수량</th><th>입출금액</th><th>실현손익</th></tr></thead><tbody>${page.trades.map(t=>`<tr><td><b class="${t.side==='buy'?'buy':'sell'}">${t.side==='buy'?'매수':'매도'}</b> <time>${time(t.ts)}</time><small>${esc(reasonLabel(t.reason))}</small></td><td>${won(t.price)}<small>${number(t.volume,8)}개</small></td><td>${t.side==='buy'?'−':'+'}${won(t.krw)}<small>${t.side==='buy'?'수수료 포함 지출':'수수료 차감 수령'}</small></td><td class="${color(t.realized_pnl)}">${t.side==='sell'?won(t.realized_pnl):'—'}<small>${t.side==='sell'?percent(t.return_pct):''}</small></td></tr>`).join('')}</tbody></table></div>`:'<p class="placeholder">이 코인·전략의 체결 기록이 없습니다.</p>'}
+  return `<div class="section-heading"><h3>체결 원장 <span>${number(page.total,0)}건</span></h3><span>${start}–${end} / ${number(page.total,0)}${loading?' · 갱신 중':''}</span></div>
+    ${page.total?`<div class="table-scroll" data-preserve-scroll><table><thead><tr><th>체결 · 한국시간</th><th>가격 / 수량</th><th>입출금액</th><th>실현손익</th></tr></thead><tbody>${page.trades.map(t=>`<tr data-render-key="fill-${esc(t.id)}"><td><b class="${t.side==='buy'?'buy':'sell'}">${t.side==='buy'?'매수':'매도'}</b> <time>${time(t.ts)}</time><small>${esc(reasonLabel(t.reason))}</small></td><td>${won(t.price)}<small>${number(t.volume,8)}개</small></td><td>${t.side==='buy'?'−':'+'}${won(t.krw)}<small>${t.side==='buy'?'수수료 포함 지출':'수수료 차감 수령'}</small></td><td class="${color(t.realized_pnl)}">${t.side==='sell'?won(t.realized_pnl):'—'}<small>${t.side==='sell'?percent(t.return_pct):''}</small></td></tr>`).join('')}</tbody></table></div>`:'<p class="placeholder">이 코인·전략의 체결 기록이 없습니다.</p>'}
     <div class="pagination"><button data-action="previous" ${page.offset===0||loading?'disabled':''}>이전</button><button data-action="next" ${page.next_offset===null||loading?'disabled':''}>다음</button></div>`;
 }
-export function calculatorHtml(draft,{origin='선택한 가상계좌 기준 · 계산값만 변경됩니다.',closable=true,result=true}={}) {
+export function calculatorHtml(draft,{origin='선택한 가상계좌 기준 · 계산값만 변경됩니다.',closable=true,result=true,identity}={}) {
   const input=(name,value,label)=>`<label>${label}<input data-draft="${name}" data-continuity-key="calc-${name}" type="number" min="0" step="any" value="${esc(value)}"></label>`;
   return `<div class="section-heading"><h3>물타기 · 익절 계산</h3>${closable?'<button class="text-button" data-action="close-calculator" aria-label="계산기 닫기">닫기</button>':''}</div>
     <p class="calculator-origin">${esc(origin)}</p>
@@ -39,7 +39,7 @@ export function calculatorHtml(draft,{origin='선택한 가상계좌 기준 · �
     <button class="text-button" data-action="add-buy" ${draft.buys.length>=20?'disabled':''}>+ 매수 회차</button>
     <h4>분할 익절 <small>매수 후 총수량 기준</small></h4><div class="stage-list">${draft.sells.map((r,i)=>`<div class="stage-row"><span>${i+1}</span><label>익절가<input data-sell-price="${i}" data-continuity-key="sell-price-${i}" type="number" step="any" min="0" value="${esc(r.price)}"></label><label>수량 비중 %<input data-sell-weight="${i}" data-continuity-key="sell-weight-${i}" type="number" step="any" min="0" max="100" value="${esc(r.weight)}"></label><button data-remove-sell="${i}" aria-label="익절 ${i+1}차 삭제">×</button></div>`).join('')}</div>
     <button class="text-button" data-action="add-sell" ${draft.sells.length>=20?'disabled':''}>+ 익절 회차</button>
-    ${draft.buys.some(r=>r.basis==='conditional_recalculation')?'<p class="subtle">2차 이후는 체결 뒤 평단을 다시 계산한 가정입니다. 시장 조건은 다시 확인해야 합니다.</p>':''}${result?'<div id="calculation-result" aria-live="polite"></div>':''}`;
+    ${draft.buys.some(r=>r.basis==='conditional_recalculation')?'<p class="subtle">2차 이후는 체결 뒤 평단을 다시 계산한 가정입니다. 시장 조건은 다시 확인해야 합니다.</p>':''}${result?`<div id="calculation-result" aria-live="polite">${calculationHtml(draft,identity)}</div>`:''}`;
 }
 export function calculationHtml(draft,identity,{emptySellAsMissing=false}={}) {
   const r=calculatePlan(draft,identity);

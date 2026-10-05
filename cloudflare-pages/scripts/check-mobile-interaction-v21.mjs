@@ -59,7 +59,8 @@ check('mobile return handoff keeps minimum touch geometry',
 check('continuity restores focus selection and scroll without browser jumps',
   continuity.includes('focus({preventScroll:true})')&&
   continuity.includes('setSelectionRange')&&
-  continuity.includes('window.scrollTo(snapshot.window.x,snapshot.window.y)')&&
+  continuity.includes("window.scrollTo({left:snapshot.window.x,top:snapshot.window.y,behavior:'instant'})")&&
+  continuity.includes('repeatOnFrame=false')&&
   continuity.includes('captureScrollableAncestors'));
 
 check('main render path preserves bounded UI continuity',

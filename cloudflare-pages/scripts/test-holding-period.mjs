@@ -98,6 +98,17 @@ test('background period refresh keeps calculator focus, edits and expanded calcu
   assert.equal(ctx.root().querySelector('[data-continuity-key=calculation-stages]').open,true);
   assert.equal(ctx.requests.filter(r=>r.u.pathname==='/api/strategy-period').length,2);
 });
+test('holding price refresh retains summary, input, output and button nodes while numbers change',async()=>{
+  ctx=setup();await tick();ctx.input('[data-draft=budget]','900');ctx.click('[data-action=import-holding-buy]');
+  const root=ctx.root(),selectors=['.coin-price b','#holdings-list [data-holding]','#holding-strategies [data-strategy]','[data-draft=budget]','[data-buy-amount="0"]','#calculation-result dd','[data-action=import-holding-buy]'];
+  const before=selectors.map(s=>root.querySelector(s));
+  const observer=new window.MutationObserver(()=>{});observer.observe(root,{subtree:true,childList:true});
+  ctx.data.holdings[0].current_price=121;ctx.data.holdings[0].value_quote=1210;ctx.poll();await tick();
+  assert.match(root.querySelector('.coin-price b').textContent,/121원/);
+  assert.deepEqual(selectors.map(s=>root.querySelector(s)),before);
+  assert.equal(observer.takeRecords().reduce((n,r)=>n+r.removedNodes.length,0),0);
+  observer.disconnect();
+});
 test('late same-ticker response cannot cross exchanges or change selected strategy',async()=>{
   ctx=setup({delay:true});await tick();ctx.click('[data-holding="upbit|KRW-B3|KRW"]');await tick();
   ctx.click('[data-strategy="upbit|balanced|v1"]');ctx.release();await tick();

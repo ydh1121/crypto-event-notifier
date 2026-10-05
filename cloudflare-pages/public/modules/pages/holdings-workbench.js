@@ -1,5 +1,6 @@
 import {getMarketDetail} from '../services/market-detail.js';
 import {patchPreservingUi} from '../shared/ui-continuity.js';
+import {updateHtml} from '../shared/dom-patch.js';
 import {holdingDraft,scopedStrategies,refreshHoldingDraft} from '../shared/holdings-workbench-model.js';
 import {importHoldingPlan} from '../shared/holdings-workbench-model.js';
 import {holdingsShell,holdingsSummaryHtml,holdingsListHtml,holdingHeaderHtml,holdingStrategiesHtml,holdingCalculatorHtml,holdingCalculationHtml,allocationHtml,priceRefreshHtml} from '../shared/holdings-workbench-view.js';
@@ -39,7 +40,7 @@ export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=nu
   const markEdited=()=>{edited.add(key());records.edit(key());};
   const draft=()=>{if(!drafts.has(key()))drafts.set(key(),holdingDraft(holding()));return drafts.get(key());};
   const el=id=>view?.getElementById(id);
-  const set=(id,html)=>{const node=el(id);if(node)node.innerHTML=html;};
+  const set=(id,html,options)=>updateHtml(el(id),html,options);
   const syncTheme=()=>{if(view)view.host.dataset.theme=document.documentElement.dataset.theme||'light';};
   const periodReview=createStrategyPeriod({changed:()=>render(),
     openJournal(experiment,review){
@@ -76,7 +77,7 @@ export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=nu
       set('holding-price-refresh',priceRefreshHtml(data(),{available:Boolean(onRefreshPrices),busy:priceBusy,error:priceError}));
       set('holding-registration',holdingRegistrationHtml(registration.state,Boolean(onHoldingsChanged&&data()?.status==='read'&&data()?.holding_registration_enabled),data()?.confirmed_exchange));
       const work=showComparison?`<section id="holding-period">${periodReview.html(scope)}</section>`:`<section id="holding-strategies">${holdingStrategiesHtml(rows,strategy,{loading,error,holding:h,comparison})}</section>${saved?`<nav class="holding-work-tabs" aria-label="실전 기록">${h.closed?'':'<button data-holding-panel="plan" aria-pressed="'+!recordPanel+'">매매 계획</button>'}<button data-holding-panel="records" aria-pressed="${recordPanel}">소액 매매${h.closed?' · 매도 완료':''}</button></nav><div id="holding-save-state">${savedPlanHtml(saved,panel())}</div>`:''}<section id="holding-calculator" ${recordPanel||h?.closed?'hidden':''}>${h?holdingCalculatorHtml(h,draft(),account()):''}</section>${saved?`<section id="holding-records" ${recordPanel?'':'hidden'}>${manualRecordsHtml(saved,{closed:h.closed})}</section>`:''}`;
-      set('holding-detail',h?`${holdingHeaderHtml(h)}${holdingManagementHtml(h,management.get(h.key),Boolean(onHoldingsChanged&&data()?.holding_management_enabled))}${modes}${work}`:'');
+      set('holding-detail',h?`${holdingHeaderHtml(h)}${holdingManagementHtml(h,management.get(h.key),Boolean(onHoldingsChanged&&data()?.holding_management_enabled))}${modes}${work}`:'',{busy:loading&&Boolean(h)&&!rows.length});
     });
     if(canCompare)periodReview.mount(showComparison?el('holding-period'):null,scope);
   }
@@ -109,7 +110,7 @@ export function createHoldingsWorkbench({store,onPaper=()=>{},onRefreshPrices=nu
     if(b.dataset.action==='refresh-prices'){void refreshPrices();return;}
     if(b.dataset.action==='open-holding-add'){registration.open(data()?.confirmed_exchange);el('holding-add-form')?.querySelector('[data-add-holding="symbol"]')?.focus();return;}
     if(b.dataset.action==='close-holding-add'){registration.close();return;}
-    if(b.dataset.holding){selected=b.dataset.holding;strategy=selections.get(selected)||'';detail=null;error='';request++;render();void load();return;}
+    if(b.dataset.holding){loading=true;selected=b.dataset.holding;strategy=selections.get(selected)||'';detail=null;error='';request++;render();void load();return;}
     if(b.dataset.strategy){strategy=b.dataset.strategy;selections.set(selected,strategy);render();return;}
     if(b.dataset.holdingComparison){
       if(b.dataset.holdingComparison==='compare'){

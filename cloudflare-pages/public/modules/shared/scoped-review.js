@@ -1,4 +1,5 @@
 import {patchPreservingUi} from './ui-continuity.js';
+import {updateHtml} from './dom-patch.js';
 
 /** Shared lazy read lifecycle: scoped selections, polling continuity and stale-response rejection. */
 export function createScopedReview({scopeKey, defaults, fetchReview, renderHtml, receive, action, placeholder, changed=()=>{}}) {
@@ -6,7 +7,7 @@ export function createScopedReview({scopeKey, defaults, fetchReview, renderHtml,
   let node,scope,key='',sequence=0,data=null,loading=false,error='',loadedAt=0;
   const selection=()=>selections.get(key);
   const html=()=>renderHtml(data,selection(),{loading,error});
-  const render=()=>{if(node?.isConnected)patchPreservingUi(node.getRootNode(),()=>{node.innerHTML=html();});};
+  const render=()=>{if(node?.isConnected)patchPreservingUi(node.getRootNode(),()=>updateHtml(node,html(),{busy:loading&&!data||Boolean(error)}));};
   async function load() {
     const id=++sequence,current=key,query={...selection()};loading=true;error='';render();
     try {

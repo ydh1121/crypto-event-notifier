@@ -63,7 +63,7 @@ export function captureUiContinuity(root,{scrollSelectors=[DEFAULT_SCROLL_SELECT
     window:preserveWindow?{x:window.scrollX,y:window.scrollY}:null,
     scroll,
     disclosures:[...(root?.querySelectorAll?.("details[data-continuity-key]")||[])].filter(n=>n.open).map(n=>n.getAttribute("data-continuity-key")),
-    focus:active?{selector:focusIdentity(active),selection:captureSelection(active)}:null,
+    focus:active?{element:active,selector:focusIdentity(active),selection:captureSelection(active)}:null,
   };
 }
 
@@ -73,23 +73,24 @@ function restoreSelection(element,selection){
   try{element.setSelectionRange(selection.start,selection.end,selection.direction)}catch{}
 }
 
-export function restoreUiContinuity(root,snapshot,{repeatOnFrame=true}={}){
+export function restoreUiContinuity(root,snapshot,{repeatOnFrame=false}={}){
   if(!snapshot)return;
   const apply=()=>{
     for(const key of snapshot.disclosures||[]){const node=root?.querySelector?.(`[data-continuity-key="${CSS.escape(key)}"]`);if(node)node.open=true;}
     for(const item of snapshot.scroll||[]){
       const elements=root?.querySelectorAll?.(item.selector)||[];
       const element=elements[item.index];
-      if(element){element.scrollTop=item.top;element.scrollLeft=item.left}
+      if(element){if(element.scrollTop!==item.top)element.scrollTop=item.top;if(element.scrollLeft!==item.left)element.scrollLeft=item.left}
     }
-    if(snapshot.focus?.selector){
-      const element=root?.querySelector?.(snapshot.focus.selector);
+    if(snapshot.focus){
+      const retained=snapshot.focus.element;
+      const element=retained?.isConnected&&root?.contains?.(retained)?retained:snapshot.focus.selector?root?.querySelector?.(snapshot.focus.selector):null;
       if(element instanceof HTMLElement){
-        try{element.focus({preventScroll:true})}catch{element.focus()}
+        if((root?.activeElement||document.activeElement)!==element)element.focus({preventScroll:true});
         restoreSelection(element,snapshot.focus.selection);
       }
     }
-    if(snapshot.window)window.scrollTo(snapshot.window.x,snapshot.window.y);
+    if(snapshot.window&&(window.scrollX!==snapshot.window.x||window.scrollY!==snapshot.window.y))window.scrollTo({left:snapshot.window.x,top:snapshot.window.y,behavior:'instant'});
   };
   apply();
   if(repeatOnFrame)requestAnimationFrame(apply);
@@ -112,7 +113,7 @@ export function installSamePageInteractionContinuity(root,{skipSelector='a[href]
       scroll:captureScrollableAncestors(root,target),
       focus:null,
     };
-    queueMicrotask(()=>restoreUiContinuity(root,snapshot,{repeatOnFrame:true}));
+    queueMicrotask(()=>restoreUiContinuity(root,snapshot,{repeatOnFrame:false}));
   };
   root.addEventListener('click',onClickCapture,true);
   return()=>root.removeEventListener('click',onClickCapture,true);

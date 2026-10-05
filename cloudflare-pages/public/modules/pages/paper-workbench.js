@@ -4,6 +4,7 @@ import {getStrategyJournal} from '../services/strategy-journal.js';
 import {accountModel, importPlan} from '../shared/strategy-workbench-model.js';
 import {esc} from '../shared/format.js';
 import {patchPreservingUi} from '../shared/ui-continuity.js';
+import {updateHtml} from '../shared/dom-patch.js';
 import {accountHtml,planHtml,journalHtml,calculatorHtml,calculationHtml,priceChart,relativeHtml,freshnessHtml,won,percent} from '../shared/strategy-workbench-view.js';
 import {eventsHtml,eventKey} from '../shared/event-workbench-view.js';
 import {createEventStudy} from '../shared/event-study-workbench.js';
@@ -37,12 +38,13 @@ export function createPaperWorkbench({store, allowOverview=true}) {
     if(!rows.some(r=>r.market===market()))store.setUi({paperMarket:rows.find(r=>r.market==='KRW-B3')?.market||rows[0]?.market||''},{scope:'paper-workbench'});
   }
   const el=id=>view?.getElementById(id);
-  const set=(id,html)=>{const node=el(id);if(node)node.innerHTML=html;};
+  const set=(id,html,options)=>{const node=el(id);if(node)patchPreservingUi(view,()=>updateHtml(node,html,options));};
   const syncTheme=()=>{if(view)view.host.dataset.theme=document.documentElement.dataset.theme||'light';};
   function render() {
     if(!root)return;
     legacy?.destroy();legacy=null;requestId++;journalId++;
     pickMarket();
+    if(!view||!root.contains(view.host)) {
     root.innerHTML='<crypto-paper-workbench data-raw-text></crypto-paper-workbench>';
     view=root.firstElementChild.attachShadow({mode:'open'});
     syncTheme();
@@ -51,6 +53,8 @@ export function createPaperWorkbench({store, allowOverview=true}) {
       <div class="workspace"><aside aria-label="코인 선택"><div class="exchange-picker" role="group" aria-label="거래소"><button data-exchange="bithumb" aria-pressed="${exchange()==='bithumb'}">빗썸</button><button data-exchange="upbit" aria-pressed="${exchange()==='upbit'}">업비트</button></div><label class="search-label">코인 검색<input id="coin-search" type="search" placeholder="이름 또는 티커" value="${esc(search)}"></label><div id="coin-list" class="coin-list" data-preserve-scroll></div><label class="mobile-picker">코인 선택<select id="mobile-coin"></select></label></aside>
       <div class="coin-detail"><header id="coin-heading" class="coin-heading"></header><nav class="section-tabs" aria-label="코인 분석"><button data-section="strategy" aria-current="page">전략</button><button data-section="reaction">반응도</button></nav><div id="coin-content"></div></div></div></main>`;
     view.addEventListener('click',click);view.addEventListener('input',input);view.addEventListener('change',change);
+    }
+    view.querySelectorAll('[data-exchange]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.exchange===exchange())));
     renderCoins();renderHeading();void loadDetail();
   }
   function renderCoins() {
@@ -66,7 +70,7 @@ export function createPaperWorkbench({store, allowOverview=true}) {
     if(!view||legacy||!market())return;
     const key=identity(),id=++requestId;
     if(!detail||detail.exchange!==exchange()||detail.market!==market()) {
-      detail=null;journal=null;currentRevision='';set('coin-content','<p class="placeholder">코인별 가상계좌를 불러오는 중…</p>');
+      detail=null;journal=null;currentRevision='';set('coin-content','<p class="placeholder">코인별 가상계좌를 불러오는 중…</p>',{busy:true});
     }
     try {
       const result=await getMarketDetail(exchange(),market(),{force});
@@ -77,14 +81,16 @@ export function createPaperWorkbench({store, allowOverview=true}) {
       const a=account();
       if(!a){renderContent();return;}
       renderHeading();
-      if(a?.revision!==currentRevision||!el('strategy-content')) {
-        journal=null;currentRevision=a?.revision||'';
-        renderContent();if(section==='strategy'&&strategyMode==='account'&&a)void loadJournal(0);
-      }
+      const reload=a.revision!==currentRevision||!journal;
+      if(journal?.account?.experiment_id!==selected)journal=null;
+      const offset=journal?.offset||0;currentRevision=a.revision||'';
+      if(reload&&section==='strategy'&&strategyMode==='account')loading=true;
+      renderContent();
+      if(reload&&section==='strategy'&&strategyMode==='account')void loadJournal(offset);
     } catch(err) {
       if(id!==requestId)return;
       detailError=err.message;
-      set('coin-content',`<p class="notice">${esc(detailError)}</p><button data-action="retry-detail">다시 불러오기</button>`);
+      set('coin-content',`<p class="notice">${esc(detailError)}</p><button data-action="retry-detail">다시 불러오기</button>`,{busy:true});
     }
   }
   function renderContent() {
@@ -106,21 +112,21 @@ export function createPaperWorkbench({store, allowOverview=true}) {
     }
     patchPreservingUi(view,()=>set('coin-content',`${modes}<nav class="strategy-tabs" role="tablist" aria-label="전략 선택" data-preserve-scroll>${accounts.map(e=>`<button role="tab" aria-selected="${e.experiment_id===selected}" data-experiment="${esc(e.experiment_id)}"><b>${esc(e.label)}</b><span>${percent(e.return_pct)} · 완료 ${e.closed_trades}회</span></button>`).join('')}</nav>
       <section id="strategy-content"><div id="account-summary">${accountHtml(a)}</div><div class="account-asof">${freshnessHtml(a)}${allowOverview?'<button class="text-button" data-overview="coins">기본 전략 기록</button>':''}</div>
-      <div class="analysis-layout"><div><section class="chart-section"><div class="section-heading"><h3>가격 · 체결</h3><div class="range-picker">${[['24h','24시간'],['7d','7일'],['all','전체']].map(([value,label])=>`<button data-range="${value}" aria-pressed="${range===value}">${label}</button>`).join('')}</div></div><div id="price-chart"></div></section><section id="journal" class="journal"></section></div><aside class="plan-column"><section id="current-plan">${planHtml(a)}</section><section id="calculator" ${calculatorOpen?'':'hidden'}>${calculatorOpen&&drafts.has(draftKey())?calculatorHtml(drafts.get(draftKey())):''}</section></aside></div></section>`));
-    renderChart();set('journal',journalHtml(journal,{loading,error:journalError}));
+      <div class="analysis-layout"><div><section class="chart-section"><div class="section-heading"><h3>가격 · 체결</h3><div class="range-picker">${[['24h','24시간'],['7d','7일'],['all','전체']].map(([value,label])=>`<button data-range="${value}" aria-pressed="${range===value}">${label}</button>`).join('')}</div></div><div id="price-chart">${chartHtml()}</div></section><section id="journal" class="journal">${journalHtml(journal,{loading,error:journalError})}</section></div><aside class="plan-column"><section id="current-plan">${planHtml(a)}</section><section id="calculator" ${calculatorOpen?'':'hidden'}>${calculatorOpen&&drafts.has(draftKey())?calculatorHtml(drafts.get(draftKey()),{identity:{exchange:exchange(),market:market()}}):''}</section></aside></div></section>`,{busy:loading&&!journal||Boolean(journalError)}));
     if(calculatorOpen)calculate();
   }
-  function renderChart() {
+  function chartHtml() {
     const source=detail?.data||{},history=source.strategy_lab?.price_history||source.market_memory?.map(r=>({ts:r.signal_ts||r.ts,price:r.price}))||[];
-    set('price-chart',priceChart(history,journal?.trades||[],range));
+    return priceChart(history,journal?.trades||[],range);
   }
+  function renderChart() {set('price-chart',chartHtml());}
   async function loadJournal(offset=0) {
     const a=account();if(!a?.revision)return;
     const key=draftKey(),id=++journalId;loading=true;journalError='';set('journal',journalHtml(journal,{loading:true}));
     try {
       const result=await getStrategyJournal(exchange(),market(),selected,{revision:a.revision,offset});
       if(id!==journalId||key!==draftKey()||legacy)return;
-      journal=result;loading=false;set('journal',journalHtml(journal));renderChart();
+      journal=result;loading=false;renderContent();
     } catch(err) {
       if(id!==journalId)return;loading=false;
       journalError=err.code==='JOURNAL_CHANGED'?'계좌가 갱신되었습니다. 새 원장을 불러오세요.':err.message;
@@ -130,7 +136,7 @@ export function createPaperWorkbench({store, allowOverview=true}) {
   function renderCalculator() {
     const draft=drafts.get(draftKey());if(!draft)return;
     const box=el('calculator');if(!box)return;box.hidden=!calculatorOpen;
-    patchPreservingUi(view,()=>{box.innerHTML=calculatorHtml(draft);});calculate();
+    patchPreservingUi(view,()=>updateHtml(box,calculatorHtml(draft,{identity:{exchange:exchange(),market:market()}})));calculate();
   }
   function calculate() { const draft=drafts.get(draftKey());if(draft)set('calculation-result',calculationHtml(draft,{exchange:exchange(),market:market()})); }
   function renderReaction() {
@@ -203,7 +209,7 @@ export function createPaperWorkbench({store, allowOverview=true}) {
   function change(event) {
     if(event.target.id==='mobile-coin')chooseCoin(event.target.value);
   }
-  return {mount(node){root=node;document.addEventListener('viewer-theme-change',syncTheme);unsub=store.subscribe((_,meta)=>{if(['snapshot','snapshot-live'].includes(meta.type)&&!legacy) {pickMarket();renderHeading();void loadDetail();}});},render,
+  return {mount(node){root=node;document.addEventListener('viewer-theme-change',syncTheme);unsub=store.subscribe((_,meta)=>{if(['snapshot','snapshot-live'].includes(meta.type)&&!legacy) {pickMarket();renderCoins();renderHeading();void loadDetail();}});},render,
     openAccount(exchange,market,style){selected='';section='strategy';strategyMode='account';detail=null;journal=null;currentRevision='';calculatorOpen=false;store.setUi({paperExchange:exchange,paperMarket:market,paperLabStyle:style},{scope:'paper-workbench'});render();},
     destroy(){requestId++;journalId++;eventStudy.destroy();periodReview.destroy();document.removeEventListener('viewer-theme-change',syncTheme);unsub?.();legacy?.destroy();root=null;view=null;}};
 }
