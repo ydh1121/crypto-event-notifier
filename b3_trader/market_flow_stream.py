@@ -32,10 +32,25 @@ FEATURE_INTERVAL_SECONDS = 60.0
 FLUSH_INTERVAL_SECONDS = 0.25
 FLUSH_BATCH_SIZE = 200
 RECONNECT_MAX_SECONDS = 30.0
+MESSAGE_STALE_SECONDS = 120.0
 ENDPOINTS = {
     "upbit": "wss://api.upbit.com/websocket/v1",
     "bithumb": "wss://ws-api.bithumb.com/websocket/v1",
 }
+
+
+def stream_health(state, worker_alive, now):
+    """Process presence is not evidence that either venue is receiving prices."""
+    stamp = float(state.get('last_socket_message_at') or 0)
+    age = max(0, now-stamp) if stamp else None
+    anchor = stamp or float(state.get('connected_since') or 0)
+    silence = max(0, now-anchor) if anchor else 0
+    reason = ('worker_stopped' if not worker_alive else
+              'disconnected' if not state.get('connected') else
+              'stale' if silence > MESSAGE_STALE_SECONDS else
+              'waiting' if age is None else 'receiving')
+    return dict(worker_alive=worker_alive, data_age_seconds=age,
+                health=reason, healthy=reason == 'receiving')
 
 
 def _epoch_seconds(value: Any) -> float:
@@ -248,6 +263,7 @@ class StreamWorker:
         self._update(
             connected=True,
             connected_since=now,
+            last_socket_message_at=0.0,
             last_error="",
             last_error_at=0.0,
             status="connected",
@@ -275,6 +291,7 @@ class StreamWorker:
             row = normalize_stream_orderbook(self.exchange, payload, received_at)
             if row is None or row["market"] not in self.markets or not self.orderbook_store:
                 return
+            self._update(last_socket_message_at=received_at)
             self._increment("orderbook_messages")
             result = self.orderbook_store.insert_snapshot(row, received_at=received_at)
             if result.get("accepted"):
@@ -288,6 +305,7 @@ class StreamWorker:
         row = normalize_stream_trade(self.exchange, payload, received_at)
         if row is None:
             return
+        self._update(last_socket_message_at=received_at)
         if self.event_sampler and received_at >= self.event_retry_after:
             try:
                 self.event_sampler.observe(row, received_at)
@@ -313,14 +331,16 @@ class StreamWorker:
         self._update(
             last_error=f"{type(error).__name__}: {error}"[:500],
             last_error_at=now,
+            connected=False,
             status="reconnecting",
         )
+        # Callback failures are otherwise reported by websocket-client without
+        # leaving its receive loop (including a failed on_open subscription).
+        if isinstance(error, sqlite3.Error):
+            self.stop()
 
     def _on_close(self, _ws: websocket.WebSocketApp, status_code: Any, message: Any) -> None:
         now = time.time()
-        self._flush(force=True)
-        if self.store:
-            self.store.mark_disconnected(self.exchange, self.markets, disconnected_at=now)
         self._update(
             connected=False,
             last_disconnect_at=now,
@@ -328,13 +348,38 @@ class StreamWorker:
             close_message=str(message or "")[:300],
             status="stopped" if self.stop_event.is_set() else "reconnecting",
         )
+        self._flush(force=True)
+        if self.store:
+            self.store.mark_disconnected(self.exchange, self.markets, disconnected_at=now)
 
     def run(self) -> None:
-        self.store = MarketFlowStreamStore()
-        self.orderbook_store = MarketFlowOrderbookStreamStore()
-        self.ladder_store = MarketOrderbookLadderStore()
+        """DB setup/flush/close failures must never silently kill a venue worker."""
+        backoff = 1.0
+        while not self.stop_event.is_set():
+            try:
+                self._run_connections()
+            except Exception as exc:
+                self._increment('worker_failures')
+                self._update(connected=False, status='retrying',
+                             last_error=f'{type(exc).__name__}: {exc}'[:500],
+                             last_error_at=time.time(), last_failure_kind=type(exc).__name__)
+            if self.stop_event.is_set():
+                break
+            self.stop_event.wait(backoff)
+            backoff = min(RECONNECT_MAX_SECONDS, backoff*2)
+
+    def _run_connections(self) -> None:
         backoff = 1.0
         try:
+            self.store = MarketFlowStreamStore()
+            self.orderbook_store = MarketFlowOrderbookStreamStore()
+            self.ladder_store = MarketOrderbookLadderStore()
+            # A failed transaction retained these buffers. Persist old-session
+            # ticks before mark_connected resets the CVD continuity anchor.
+            self._flush(force=True)
+            if self.event_sampler:
+                self.event_sampler.conn = self.store.conn
+                self.event_sampler.flush(time.time(), force=True)
             while not self.stop_event.is_set():
                 with self.state_lock:
                     self.markets = self.pending_markets
@@ -382,20 +427,24 @@ class StreamWorker:
                 self.stop_event.wait(backoff)
                 backoff = min(RECONNECT_MAX_SECONDS, max(1.0, backoff * 2.0))
         finally:
+            self._update(connected=False, last_disconnect_at=time.time(),
+                         status='stopped' if self.stop_event.is_set() else 'retrying')
+            self.stop()
+            self.app = None
             if self.store:
                 try:
                     self.store.mark_disconnected(self.exchange, self.markets, disconnected_at=time.time())
                 except Exception:
                     pass
-                self.store.close()
-                self.store = None
-            if self.orderbook_store:
-                self.orderbook_store.close()
-                self.orderbook_store = None
-            if self.ladder_store:
-                self.ladder_store.close()
-                self.ladder_store = None
-            self._update(connected=False, status="stopped")
+            # Close every connection even when one close itself fails.
+            for name in ('store', 'orderbook_store', 'ladder_store'):
+                resource = getattr(self, name)
+                setattr(self, name, None)
+                if resource:
+                    try:
+                        resource.close()
+                    except Exception as exc:
+                        self._update(last_close_error=type(exc).__name__)
 
     def stop(self) -> None:
         app = self.app
@@ -455,6 +504,8 @@ class MarketFlowStreamService:
         }
         self.workers: dict[str, StreamWorker] = {}
         self.threads: dict[str, threading.Thread] = {}
+        self.next_worker_start: dict[str, float] = {}
+        self.next_stale_close: dict[str, float] = {}
         self.process_lock_acquired = False
         self.window_features_written = 0
         self.orderbook_window_features_written = 0
@@ -470,11 +521,19 @@ class MarketFlowStreamService:
             worker.stop()
 
     def _status_payload(self, *, running: bool) -> dict[str, Any]:
+        now = time.time()
         with self.state_lock:
             exchanges = {name: dict(state) for name, state in self.states.items()}
+        for name, state in exchanges.items():
+            thread = self.threads.get(name)
+            state.update(stream_health(state, bool(thread and thread.is_alive()), now))
+        healthy = bool(running) and not self.stop_event.is_set() and all(s['healthy'] for s in exchanges.values())
+        healthy = healthy and not bool(self.last_feature_error or self.last_orderbook_feature_error or self.last_price_archive_error
+                                       or any(s.get('event_capture_error') for s in exchanges.values()))
         return {
-            "ok": not bool(self.last_feature_error or self.last_orderbook_feature_error or self.last_price_archive_error
-                           or any(s.get('event_capture_error') for s in exchanges.values())),
+            "ok": healthy,
+            "health": 'healthy' if healthy else 'degraded' if running and not self.stop_event.is_set() else 'stopped',
+            "recovery_version": 1,
             "status": "running" if running and not self.stop_event.is_set() else "stopped",
             "pid": os.getpid(),
             "running": bool(running) and not self.stop_event.is_set(),
@@ -547,6 +606,40 @@ class MarketFlowStreamService:
         except Exception as exc:
             self.last_price_archive_error = type(exc).__name__
 
+    def _ensure_workers(self, now: float) -> None:
+        """Restart only a terminated venue; never duplicate a live worker."""
+        if self.stop_event.is_set():
+            return
+        for exchange in ENDPOINTS:
+            thread = self.threads.get(exchange)
+            if thread and thread.is_alive():
+                with self.state_lock:
+                    health = stream_health(self.states[exchange], True, now)
+                if health['health'] == 'stale' and now >= self.next_stale_close.get(exchange, 0):
+                    self.next_stale_close[exchange] = now+RECONNECT_MAX_SECONDS
+                    self.workers[exchange]._update(connected=False, status='reconnecting',
+                        last_error='No market messages within 120 seconds', last_error_at=now)
+                    self.workers[exchange].stop()
+                continue
+            if now < self.next_worker_start.get(exchange, 0):
+                continue
+            self.next_worker_start[exchange] = now+RECONNECT_MAX_SECONDS
+            worker = self.workers.get(exchange)
+            if worker is None:
+                worker = StreamWorker(exchange, self.markets_by_exchange[exchange], self.stop_event,
+                    self.states[exchange], self.state_lock, self.started_at,
+                    event_markets=self.event_markets_by_exchange.get(exchange))
+                self.workers[exchange] = worker
+            worker._increment('worker_starts')
+            worker._update(connected=False, status='starting')
+            thread = threading.Thread(target=worker.run, name=f'market-flow-stream-{exchange}', daemon=True)
+            try:
+                thread.start()
+            except RuntimeError as exc:
+                worker._update(last_error=str(exc)[:500], last_error_at=now, status='retrying')
+            else:
+                self.threads[exchange] = thread
+
     def run(self) -> None:
         process_lock = ResearchWorkLock(PROCESS_LOCK_PATH)
         if not process_lock.acquire():
@@ -559,24 +652,7 @@ class MarketFlowStreamService:
             self._refresh_subscriptions(time.time())
             if self.event_markets_by_exchange:
                 prepare_database(price_store.conn.execute('PRAGMA database_list').fetchone()[2])
-            for exchange in ENDPOINTS:
-                worker = StreamWorker(
-                    exchange,
-                    self.markets_by_exchange[exchange],
-                    self.stop_event,
-                    self.states[exchange],
-                    self.state_lock,
-                    self.started_at,
-                    event_markets=self.event_markets_by_exchange.get(exchange),
-                )
-                thread = threading.Thread(
-                    target=worker.run,
-                    name=f"market-flow-stream-{exchange}",
-                    daemon=True,
-                )
-                self.workers[exchange] = worker
-                self.threads[exchange] = thread
-                thread.start()
+            self._ensure_workers(time.time())
             next_feature = time.time() + 5.0
             next_subscription = time.time() + REFRESH_SECONDS
             while not self.stop_event.wait(STATUS_INTERVAL_SECONDS):
@@ -584,6 +660,7 @@ class MarketFlowStreamService:
                 if now >= next_subscription:
                     self._refresh_subscriptions(now)
                     next_subscription = now + REFRESH_SECONDS
+                self._ensure_workers(now)
                 if now >= next_feature:
                     self._aggregate_windows(aggregate_store, aggregate_orderbook_store)
                     self._preserve_prices(price_store)

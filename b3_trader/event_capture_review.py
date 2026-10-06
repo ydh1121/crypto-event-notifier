@@ -287,11 +287,16 @@ def stream_subscription_evidence(value):
         event_capture[exchange] = {
             'subscribed_markets':len(event_markets) if isinstance(event_markets, list) else None,
             'connected':venue.get('connected') if type(venue.get('connected')) is bool else None,
+            'worker_alive':venue.get('worker_alive') if type(venue.get('worker_alive')) is bool else None,
+            'health':venue.get('health') if venue.get('health') in {'receiving','stale','waiting','disconnected','worker_stopped'} else None,
+            **{key:_number(venue.get(key)) for key in ('worker_starts','worker_failures','data_age_seconds','last_error_at')},
             'error':bool(venue.get('event_capture_error')),
             **{key:_number(evidence.get(key)) for key in ('observed_markets','recent_markets','messages',
                 'last_trade_ts','last_flush_at','sample_writes','exact_prices_archived','retention_seconds')},
         }
     return {"scope": "saved_configuration", "event_price_collection":event_capture,
+            "recovery_version":_number(value.get('recovery_version')),
+            "health":value.get('health') if value.get('health') in {'healthy','degraded','stopped'} else None,
             "market_count": len(markets) if valid else None,
             "membership": {market: market in markets if valid else None for market in MARKETS},
             "selection": {**selected, "capacity": _number(selection.get('capacity')),
