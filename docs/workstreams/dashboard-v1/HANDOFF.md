@@ -1,22 +1,21 @@
 # Dashboard v1 handoff
 
-### Current — value updates preserve controls; holdings period planning delivered
+### Current — stalled venue recovery delivered; collector update required
 
-- STATE = HOLDING_PERIOD_DELIVERED / VALUE_PATCH_DELIVERED / WINDOWS_ACCEPTANCE_PENDING. Active WO CRYPTO-WO-20260921-RECOVERY-001.
-- PROGRESS = 전체 약40%: 실제 수집→코인별 검증→계획→실전 비교까지 사용·확인 가능한 범위를 기준으로 한 보수적 추정이며, 코드량·테스트 통과율이나 완료 항목의 단순 비율이 아니다.
-- REMAINING = ① 화면 안정화·기간 비교→계산기 적용 확인 ② 알트·뉴스·경제지표 반응 누적 및 용량·48시간 백업 확인 ③ 소액 매매와 가상매매의 같은 기간·비용 기준 비교 ④ 도미넌스·시장 전체·SNS·온체인 반응 확장 ⑤ 코인별 전략 개선·근거 있는 상승 후보 ⑥ 소액 검증 통과 후 별도 승인으로 실전 전환
-- ACTUAL = CRYPTO_CHECK_RESULT(20261005-011303).json /282450bytes/SHA2568e36543bf6e712db37459f05132a5c417f3c87a68c672fd1bdc7bab82990d1a4. Viewer dffe8b4 integrity verified; collector a8634c95 recovery branch clean. Canonical PAPER 5780217856bytes. Windows 직접 접근 없이 첨부 결과로 확인했다.
-- PERIOD VERIFIED = B3 공격적13체결/6완료/2승 원장 일치. 최근30일4완료/+139015.63105262315원/+2.9660361536613977%; 직전30일2완료/-9950.53344908182원. 첨부 전체 공격적 원장 재계산이 기간 결과·witness·revision과 일치. 분할매수 최근30일2완료/+130717.70261438575원/+5.655836907856774%. 6전략 금액 산술·화면 대조; 다른5전략 전체 원장의 독립 재현은 미확인.
-- CHANGED PLAN = 미배포 구현2a4ba52 포함. 실전 계획의7/30/90일·전체 비교→이 전략으로 계획→기존 분할 매수/익절 계산 연결. 같은 기간 손익과 직전 기간을 사용, 계좌 전체 성과 혼합·누적수익 자동 정렬·전략 자동선정 없음. 실제 보유 수량·평단·사용자 예산·전략별 편집값 보존.
-- CHANGED LIVE = 공통 DOM 갱신이 같은 키의 코인·전략·체결 행·입력·계산 결과를 유지하며 바뀐 텍스트/속성만 반영. PAPER·실전 계획·반응/기간 비교에 적용. 비동기 로딩 중 높이 보존, 빈 차트/원장을 먼저 렌더하는 과정 제거, 동일 계좌 원장은 재조회 중 유지. 지연 프레임의 과거 스크롤 재적용 제거; 실제 달라진 위치만 즉시 복원. 코인 목록 가격도 갱신. 구조나 행이 바뀌면 해당 항목은 추가/제거하며 진짜 짧아진 문서의 스크롤 한계까지 고정한다고 주장하지 않는다.
-- VERIFY = 이번 화면 DOM/모델53개와 typecheck·필수 기존 계약·git diff check 통과. 이전 실전 계획 연결 Python35개 통과 근거 유지(백엔드 미변경). 숫자 갱신 시 핵심 DOM 동일성·노드 제거0·입력/선택/펼침 유지, 지연 스크롤 복원 없음 검증. 최종 압축의82 payload 해시와 Python -B -S 실행에서6전략 비교→정확한 revision 원장·정적 모듈·검증용 DB 바이트 보존 확인. 실제 브라우저 배치/스크롤 및 Windows UI 수용은 아직 미확인.
-- COLLECTION = 최근120초 조회 T0/T1 모두read/version2. 빗썸 알트139→144, 업비트176→172; 양 거래소 저장 체결시각 전진. 창 내 수신 종목 수이며 전체 누적량·전 종목 연속 수집의 증명은 아니다. 공식 발표38건/B3 유효 반응1건 유지; 새 발표의15m/1h/4h/1d 완주는 미확인.
-- STORAGE = 본체5780217856bytes·재사용677715968bytes. 일일 검증 백업 재사용·추가삭제0. 실제48h 만료 정리와 장기 용량 안정성은 계속 관찰. CLEAN_STORAGE 반복 실행 불필요.
-- GIT = 소스8c08161a2022850af4d364310af09873fe379b5b / agent/crypto-product-data-recovery-20260921. 실행 환경 복구 및 remote/local 동기화 완료. 기본 브랜치·PR#1 유지; 운영 배포·실주문·전략/PAPER 규칙·canonical DB 변경 없음.
-- PACKAGE = 동일 CRYPTO.zip version26 /180365bytes/83files/SHA2564fe453dff0e59ed787319d9d16272b7817c14a8761e8a75ee241dd3e622fb406. manifest2b47af70e6d1c067fe112c8c2c0f4f6d037c8b0b8c4b0cf5b908b3b418705cd9. libfile_40146030bc508191ab76b2788b16b9b4에 저장 성공. Desktop/CRYPTO 한 폴더 유지.
-- APPLY = 조회 창만 종료→기존 CRYPTO 폴더에 덮어쓰기→RUN_REVIEW.cmd→실전 계획/코인/기간별 비교/이 전략으로 계획→분할 매수가·익절가 불러오기 확인→RUN_CHECK.cmd. 숫자 갱신·버튼 선택 때 스크롤/입력 유지 확인. 실행 중 수집기는 유지; UPDATE_COLLECTION/CLEAN_STORAGE 재실행 불필요.
-- NEXT = 새 발표의 알트/BTC/ETH15m/1h/4h/1d가 실제 누적되는지와 백업48h 정리/용량 추세를 먼저 확인. 그 뒤 소액 매매 기록의 같은 기간·비용 기준 PAPER 비교를 연결·검증. 도미넌스/OTHERS·SNS·온체인·신규 거시 확장→시간 순 검증·코인별 개선/상승 후보→소액 검증 순서를 유지. 단일 이벤트로 추천 확률이나 전략 우위를 만들지 않는다.
-- DURABLE = 같은 ZIP version26 저장 완료. 기존 Drive CURRENT/BATON·Ledger·WBS 갱신 및 전체 텍스트 readback 일치 확인 완료.
+- STATE = UPBIT_STALL_CONFIRMED / STREAM_RECOVERY_DELIVERED / COLLECTOR_UPDATE_PENDING. Active WO CRYPTO-WO-20260921-RECOVERY-001.
+- PROGRESS = 전체 약40% 유지. 실제 수집→코인별 검증→계획→실전 비교까지 사용·확인 가능한 범위의 추정이며 코드량·테스트 통과율이 아니다.
+- ACTUAL = CRYPTO_CHECK_RESULT(20261005-144245).json /274956bytes/SHA256ebcfbf8cfeb29b43e3ba83f4bc7c65e116be29d0cae49eabfe6d3d88382782bb. Viewer8c08161 및 manifest2b47af70 무결성 확인(직전 version26 적용). Collector a8634c95 recovery branch clean. Windows 직접 접근·새 실행본 화면 수용을 주장하지 않는다.
+- FOUND = 보고 시점 업비트 마지막 저장2026-10-05 10:37:32.981 KST, 약13.05시간 정지. 전체 수집 프로세스·빗썸 연결은 살아 있지만 업비트 connected=false/최근120초 표본0. 빗썸 최근120초 알트204종목 및 저장 시각 전진. 원본 스택·거래소 스레드 상태가 첨부되지 않아 해당 중단의 단일 원인은 확정하지 않는다. 기존 코드에서 종료 시 DB 잠금 오류가 작업을 끝내고 상위 ok가 true일 수 있는 결함을 실제 SQLite 잠금으로 재현했다.
+- REACTIONS = 10월5일21:47:36 KST SEC 발표의 B3/BTC/ETH15분·1시간 실제 가격6쌍→수익률·상대수익률·120초 허용창을 독립 재계산해 일치 확인. B3 15분-0.4424778761%/1시간-0.7079646018%. 4시간 목표10월6일01:47:36,1일 목표10월6일21:47:36 KST. 첨부 당시 아직 미도래였으며 현재 저장 여부는 새 결과 필요. 기간 내 공식 발표39건/B3 유효15분 반응2건; 전 코인 완주나 추천 유효성으로 일반화 금지.
+- LEDGER = B3 공격적13체결/6완료/2승/실현129065.09760354133원 원장 일치 유지. 기존 기간별 전략 비교·실전 계획·입력/스크롤 유지·보유 변경 기능 보존.
+- CHANGED = DB 연결 준비·종료·flush 오류를 거래소 작업 내부에서1→2→4→8→16→최대30초로 재시도. 실패한 거래/이벤트 버퍼 보존, 재연결 전 기존 세션 체결 저장 후 연속성 기준 재설정. 모든 DB 연결을 개별 정리. SQLite callback 실패는 해당 소켓을 종료해 재연결. 종료된 작업만 최대30초 간격으로 복구하고 살아 있는 거래소 작업 중복 생성 금지.120초 시세 미수신 소켓은 해당 연결만 갱신. 전체 프로세스 running과 거래소 worker_alive/수신 지연·health를 분리; 첫 수신 전은 waiting. 복구 버전·시작/실패 횟수를 RUN_CHECK에 추가.
+- VERIFY = 관련 Python57개(복구9 포함), compile·기존 Viewer typecheck/계약·diff 통과. 이전 코드의 실제 SQLite 잠금 종료 실패→수정본 동일 조건 복구·중복 없이 기존 체결 보존·새 세션 CVD 재설정 확인. 초기화/연결종료/자원정리 실패·재시도 상한·한 거래소만 재시작·정상 종료 중 재시작 금지·수신 없는 연결 정상 오인 방지 검증. 압축82 payload 해시와 Python -B -S에서 복구 상태 보고·6전략 비교/동일 revision 원장/자산·검증용 DB 바이트 보존 통과. 실제 PC 업비트 복구는 미확인.
+- STORAGE = PAPER 본체5780217856bytes로 동일, 재사용717869056bytes(이전677715968에서 증가). 관리백업11850247089bytes/8파일 전체 목록 확인,48시간 초과 파일0. 일일 검증 백업 재사용·이번 추가삭제0; 구형 큰 백업 폴더0bytes. 장기 용량 안정성과 다음 일일 교체/만료 동작은 계속 관찰. CLEAN_STORAGE 재실행 불필요.
+- GIT = 소스b1c92d852fbc08508497fa31316830f4f92e27c8 / agent/crypto-product-data-recovery-20260921. 기본 브랜치·PR#1 유지. 전략/PAPER 판단·주문·canonical DB 데이터·schema·저장기간 변경 없음. 실주문·Production 배포 없음.
+- PACKAGE = 같은 CRYPTO.zip version27 /180545bytes/83files/SHA256f5d747f968ba8142352e0b6cf0f1c121a7c5a7c392b5e09e45caffa8166f3639. manifest7c181647b56ecebc52812b617fcc4e778a4a0e15da570720a7bca09fa2a92df6. libfile_40146030bc508191ab76b2788b16b9b4 저장 성공. 조회 도구의 manifest가 collector 갱신 대상 source를 고정하며 UPDATE_COLLECTION이 기존 본체를 안전하게 fast-forward한다.
+- APPLY = 이번에는 수집기 갱신 필요: 조회 창 종료→수집 창 Ctrl+C 후 종료 대기→같은 Desktop/CRYPTO 폴더에 덮어쓰기→UPDATE_COLLECTION.cmd. 갱신 완료 후 자동 시작되는 수집 창 유지→RUN_REVIEW.cmd→1분 뒤 RUN_CHECK.cmd 결과 첨부. 새 폴더·새 DB 생성 없음. CLEAN_STORAGE 불필요. 여기서 사용자 PC 프로세스를 직접 재시작하지 않았다.
+- NEXT = P0 새 결과에서 collector source b1c92d8·recovery_version1·거래소별 작업 생존·수신·DB 시각 전진을 확인하고 새 발표4시간/1일 및 다른 알트 반응 확인→P1 소액 기록과 같은 기간/비용의 PAPER 비교→P2 도미넌스·시장 전체·SNS·온체인·추가 거시→P3 시간 순 검증/코인별 전략 개선·근거 있는 상승 후보→소액 검증 통과 후 별도 승인 실전 전환.
+- DURABLE = 같은 ZIP version27 저장. 기존 Drive CURRENT/BATON·Ledger·WBS 갱신 및 전체 텍스트 readback 일치 확인 완료.
 
 ### Previous checkpoint — shared daily backups and safe 48-hour cleanup implemented
 
