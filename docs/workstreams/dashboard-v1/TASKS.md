@@ -1,21 +1,20 @@
 # Dashboard v1 workstream tasks
 
-### Current — stalled venue recovery delivered; collector update required
+### Current — venue recovery verified; manual cash comparison delivered
 
-- STATE = UPBIT_STALL_CONFIRMED / STREAM_RECOVERY_DELIVERED / COLLECTOR_UPDATE_PENDING. Active WO CRYPTO-WO-20260921-RECOVERY-001.
+- STATE = UPBIT_RECEIVING_VERIFIED / MANUAL_CASH_COMPARISON_DELIVERED / ACTUAL_MANUAL_SAMPLE_PENDING. WO CRYPTO-WO-20260921-RECOVERY-001.
 - PROGRESS = 전체 약40% 유지. 실제 수집→코인별 검증→계획→실전 비교까지 사용·확인 가능한 범위의 추정이며 코드량·테스트 통과율이 아니다.
-- ACTUAL = CRYPTO_CHECK_RESULT(20261005-144245).json /274956bytes/SHA256ebcfbf8cfeb29b43e3ba83f4bc7c65e116be29d0cae49eabfe6d3d88382782bb. Viewer8c08161 및 manifest2b47af70 무결성 확인(직전 version26 적용). Collector a8634c95 recovery branch clean. Windows 직접 접근·새 실행본 화면 수용을 주장하지 않는다.
-- FOUND = 보고 시점 업비트 마지막 저장2026-10-05 10:37:32.981 KST, 약13.05시간 정지. 전체 수집 프로세스·빗썸 연결은 살아 있지만 업비트 connected=false/최근120초 표본0. 빗썸 최근120초 알트204종목 및 저장 시각 전진. 원본 스택·거래소 스레드 상태가 첨부되지 않아 해당 중단의 단일 원인은 확정하지 않는다. 기존 코드에서 종료 시 DB 잠금 오류가 작업을 끝내고 상위 ok가 true일 수 있는 결함을 실제 SQLite 잠금으로 재현했다.
-- REACTIONS = 10월5일21:47:36 KST SEC 발표의 B3/BTC/ETH15분·1시간 실제 가격6쌍→수익률·상대수익률·120초 허용창을 독립 재계산해 일치 확인. B3 15분-0.4424778761%/1시간-0.7079646018%. 4시간 목표10월6일01:47:36,1일 목표10월6일21:47:36 KST. 첨부 당시 아직 미도래였으며 현재 저장 여부는 새 결과 필요. 기간 내 공식 발표39건/B3 유효15분 반응2건; 전 코인 완주나 추천 유효성으로 일반화 금지.
-- LEDGER = B3 공격적13체결/6완료/2승/실현129065.09760354133원 원장 일치 유지. 기존 기간별 전략 비교·실전 계획·입력/스크롤 유지·보유 변경 기능 보존.
-- CHANGED = DB 연결 준비·종료·flush 오류를 거래소 작업 내부에서1→2→4→8→16→최대30초로 재시도. 실패한 거래/이벤트 버퍼 보존, 재연결 전 기존 세션 체결 저장 후 연속성 기준 재설정. 모든 DB 연결을 개별 정리. SQLite callback 실패는 해당 소켓을 종료해 재연결. 종료된 작업만 최대30초 간격으로 복구하고 살아 있는 거래소 작업 중복 생성 금지.120초 시세 미수신 소켓은 해당 연결만 갱신. 전체 프로세스 running과 거래소 worker_alive/수신 지연·health를 분리; 첫 수신 전은 waiting. 복구 버전·시작/실패 횟수를 RUN_CHECK에 추가.
-- VERIFY = 관련 Python57개(복구9 포함), compile·기존 Viewer typecheck/계약·diff 통과. 이전 코드의 실제 SQLite 잠금 종료 실패→수정본 동일 조건 복구·중복 없이 기존 체결 보존·새 세션 CVD 재설정 확인. 초기화/연결종료/자원정리 실패·재시도 상한·한 거래소만 재시작·정상 종료 중 재시작 금지·수신 없는 연결 정상 오인 방지 검증. 압축82 payload 해시와 Python -B -S에서 복구 상태 보고·6전략 비교/동일 revision 원장/자산·검증용 DB 바이트 보존 통과. 실제 PC 업비트 복구는 미확인.
-- STORAGE = PAPER 본체5780217856bytes로 동일, 재사용717869056bytes(이전677715968에서 증가). 관리백업11850247089bytes/8파일 전체 목록 확인,48시간 초과 파일0. 일일 검증 백업 재사용·이번 추가삭제0; 구형 큰 백업 폴더0bytes. 장기 용량 안정성과 다음 일일 교체/만료 동작은 계속 관찰. CLEAN_STORAGE 재실행 불필요.
-- GIT = 소스b1c92d852fbc08508497fa31316830f4f92e27c8 / agent/crypto-product-data-recovery-20260921. 기본 브랜치·PR#1 유지. 전략/PAPER 판단·주문·canonical DB 데이터·schema·저장기간 변경 없음. 실주문·Production 배포 없음.
-- PACKAGE = 같은 CRYPTO.zip version27 /180545bytes/83files/SHA256f5d747f968ba8142352e0b6cf0f1c121a7c5a7c392b5e09e45caffa8166f3639. manifest7c181647b56ecebc52812b617fcc4e778a4a0e15da570720a7bca09fa2a92df6. libfile_40146030bc508191ab76b2788b16b9b4 저장 성공. 조회 도구의 manifest가 collector 갱신 대상 source를 고정하며 UPDATE_COLLECTION이 기존 본체를 안전하게 fast-forward한다.
-- APPLY = 이번에는 수집기 갱신 필요: 조회 창 종료→수집 창 Ctrl+C 후 종료 대기→같은 Desktop/CRYPTO 폴더에 덮어쓰기→UPDATE_COLLECTION.cmd. 갱신 완료 후 자동 시작되는 수집 창 유지→RUN_REVIEW.cmd→1분 뒤 RUN_CHECK.cmd 결과 첨부. 새 폴더·새 DB 생성 없음. CLEAN_STORAGE 불필요. 여기서 사용자 PC 프로세스를 직접 재시작하지 않았다.
-- NEXT = P0 새 결과에서 collector source b1c92d8·recovery_version1·거래소별 작업 생존·수신·DB 시각 전진을 확인하고 새 발표4시간/1일 및 다른 알트 반응 확인→P1 소액 기록과 같은 기간/비용의 PAPER 비교→P2 도미넌스·시장 전체·SNS·온체인·추가 거시→P3 시간 순 검증/코인별 전략 개선·근거 있는 상승 후보→소액 검증 통과 후 별도 승인 실전 전환.
-- DURABLE = 같은 ZIP version27 저장. 기존 Drive CURRENT/BATON·Ledger·WBS 갱신 및 전체 텍스트 readback 일치 확인 완료.
+- ACTUAL = CRYPTO_CHECK_RESULT(20261006-005517).json /280981bytes/SHA256f0b7a5707605618b480d24a0375ecbc3e529ed77b9d8821223f6bbe82af762e2. 관측09:52:54–09:53:27 KST. Viewer와 collector b1c92d8 적용·무결성·recovery branch clean 확인. 사용자 Windows를 직접 조회한 것은 아니다.
+- RUNTIME = recovery_version1, 양 거래소 worker_alive/connected/receiving. 실제 DB trade clock T0→T1 전진; 마지막120초 빗썸 알트115종목/업비트152종목. worker_starts1이며 실제 오류 후 자동 복구 사례가 발생한 것으로 주장하지 않는다. 전체 종목 연속수집·장기 안정성은 미확정. PAPER/전략 계좌·지표 전진; 짧은 관측에서 memory/OHLCV 미변화는 정지 증거가 아니다.
+- EVENTS = 같은 SEC 발표에서 B3/BTC/ETH15분·1시간 및 BTC/ETH4시간의 실제 가격8쌍·수익률·상대값·120초 허용창 재계산 일치. B3 4시간은 target 없음; 1일 목표1791290856은 첨부 당시 미도래. B3 반응 누적2표본을 전 코인 검증으로 일반화 금지. CFTC source403 한 곳 실패, 다른4개 공식 source 정상 응답; 예측치 인증정보 없음은 별도 공백.
+- CHANGED = 기존 소액 기록 원장의 비용 포함 매수금액·매도수령액·실현손익·금액가중 수익률·승리/완료·최저 거래 수익률·보유 중 개수 연결. 비교는 내 첫 체결~마지막 체결, 같은 거래소/코인/전략에서 시작·전량매도 완료한 매매. 기간 이전 진입·보유 중은 완료 성과에서 제외. 최근20회 근거를 펼쳐 보고 전체 원장으로 이동. 미조회·완료0·실제0수익 분리. 실거래 수수료 합계와 개별 체결금액/지급·수령액 표시; PAPER 비용은 원장 금액에 이미 포함되며 별도 수수료를0원으로 추정하지 않는다. 같은 계산 소유자를 기존 기간별 비교와 공유; RUN_CHECK도 같은 읽기 전용 결과를 포함.
+- VERIFY = 관련 Python86개+DOM16개=102개 통과, compile·기존 Viewer typecheck/계약·diff 통과. 실제 B3 PAPER13체결/6완료/2승, 매수6698916.26975원/매도6827981.367353541원/실현129065.09760354122원/거래금액기준1.9266563785%가 기존 계좌·기간집계와 일치. 수동 비교 범위 검증에는 명시적 합성 체결을 사용; 실제 소액 성과 증거가 아님. 압축84payload 해시 및 Python -B -S 실제 HTTP 계획저장→분할 가능한 체결기록→비교→재시작→보고서 일치·기존 보유값/PAPER DB 바이트 보존 확인. 브라우저 실행환경 부재로 새 화면 육안·실제 PC 저장 검증은 남음.
+- STORAGE = PAPER5780217856bytes 동일, 재사용736145408bytes로 증가. 관리백업11850247089bytes/8파일·48시간 초과0. 일일 검증본 재사용/신규복사·삭제0. 장기 추세와 이후 일일 교체는 계속 관찰; CLEAN_STORAGE 반복 불필요.
+- GIT = 소스3e127173df45ad1ce333cb28ff0cd1e769e539d5 / agent/crypto-product-data-recovery-20260921. 기본 브랜치·PR#1 유지. 수집 코드·전략/PAPER 판단·DB schema·저장기간 변경 없음. canonical DB 변조·실주문·Production 배포 없음.
+- PACKAGE = 같은 CRYPTO.zip version28 /183748bytes/85files/SHA256c947a10e550f0e894dd282571d5db71022b078a3b26c9b3329d08e79b7cc52ac. manifestc7200deb689243972e8366dfafde27f52b5cb8412b921ff44d6953dfc710fa81. libfile_40146030bc508191ab76b2788b16b9b4 저장 및 버전 메타데이터 확인.
+- APPLY = 수집 KEEP OPEN 창은 유지. CRYPTO VIEWER 검은 창만 닫고 기존 Desktop/CRYPTO에 덮어쓰기→RUN_REVIEW.cmd. 실전 계획→코인→전략→소액 매매; 처음이면 계획 저장 후 실제 체결가·수량·수수료 기록. RUN_CHECK.cmd 결과 첨부. 이번에는 UPDATE_COLLECTION/CLEAN_STORAGE 재실행 불필요. 향후 종료할 때 Ctrl+C 후 Y/N 질문이 뜨면 그 기존 창에서 Y→Enter→닫기, 새 KEEP OPEN 창은 유지한다고 HELP에 명시.
+- NEXT = 소액 실제 기록의 금액·같은 기간 PAPER 대조 확인 및 B3 4시간/다른 알트 결측의 수집 공백·거래 부재 구분→도미넌스·시장 전체→SNS/온체인/지정학·추가 거시→시간 순 검증과 코인별 전략 개선·상승 후보→소액 검증 통과 후 별도 승인 실전 전환. 새 반응의1일은 도래 후 실제 결과로 확인한다.
+- DURABLE = 같은 ZIP version28 저장. 기존 Drive CURRENT/BATON·Ledger·WBS 갱신 및 readback 확인.
 
 ### Previous checkpoint — shared daily backups and safe 48-hour cleanup implemented
 
