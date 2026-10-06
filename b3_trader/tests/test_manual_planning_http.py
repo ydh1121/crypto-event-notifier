@@ -58,6 +58,11 @@ def test_real_http_plan_restart_fills_and_scoped_paper_comparison(tmp_path):
             assert status==200,result
         assert result['summary']['realized']==38
         assert result['comparison']['manual']['closed']==1
+        assert result['comparison']['manual']['invested_krw']==201
+        assert result['comparison']['manual']['proceeds_krw']==239
+        assert result['comparison']['manual']['realized_pnl_krw']==38
+        assert result['comparison']['manual']['fees_krw']==2
+        assert result['comparison']['manual_witnesses'][0]['exit_trade_id']==result['records'][-1]['id']
         assert result['comparison']['paper'] is not None
         assert result['comparison']['paper']['closed']==0
         # A real closeout never makes the saved plan/ledger inaccessible.

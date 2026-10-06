@@ -25,7 +25,7 @@ from .strategy_lab_market import read_strategy_lab_market
 from .runtime_review import compare_activity, read_runtime
 from .event_reaction_view import review_event_index
 from .holdings_review import read_holdings, resolve_holdings_path
-from .manual_planning_store import ManualPlanningStore
+from .manual_planning_store import ManualPlanningStore, comparison_report
 from .manual_trading import PlanningError, identity
 from .holding_quotes import HoldingQuotes
 from .holding_registration import HoldingRegistration
@@ -382,6 +382,8 @@ def run_review(args, build, server):
                 'event_review':{'exchange':'bithumb','market':event_market,**review_event_index(events)},
                 'event_study_review':review_event_study(args.db,'bithumb','KRW-B3',{'horizon':'15m','category':'all','style':'aggressive'}),
                 'strategy_period_review':review_period(args.db,'bithumb','KRW-B3',{'period':'30d','style':'aggressive'}),
+                'manual_trading_review':comparison_report(args.holdings_db,
+                    {'exchange':'bithumb','market':'KRW-B3','experiment':exp['experiment_id']},exp) if exp else {'status':'no_account'},
                 'storage_review':read_storage(args.db, args.holdings_db) if args.report_only else {'status':'run_check_required'},
                 'holdings_review':{'status':holdings['status'],'path_source':args.holdings_source,
                     'confirmed_exchange':args.holdings_exchange,

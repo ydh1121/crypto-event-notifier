@@ -16,6 +16,21 @@ from .manual_trading import PlanningError, identity, clean_draft, clean_fill, re
 from .journal_backup import backup_journal
 
 TABLES = {'manual_strategy_meta', 'manual_strategy_plans', 'manual_strategy_records'}
+
+
+def comparison_report(path, selection, account):
+    """Diagnostics reuse the same read-only projection as the manual-trading UI."""
+    try:
+        data = ManualPlanningStore(path).read(selection, account)
+    except (OSError, sqlite3.Error, PlanningError):
+        return {'status': 'unavailable'}
+    return {'status': 'read', 'selection': selection,
+            'plan_revision': data['plan_revision'], 'ledger_revision': data['ledger_revision'],
+            'active_records': sum(not r['voided'] for r in data['records']),
+            'voided_records': sum(r['voided'] for r in data['records']),
+            'comparison': data['comparison']}
+
+
 SCHEMA = (
     'CREATE TABLE manual_strategy_meta (version INTEGER PRIMARY KEY, backup_name TEXT NOT NULL, created_ts REAL NOT NULL)',
     '''CREATE TABLE manual_strategy_plans (scope TEXT NOT NULL, revision INTEGER NOT NULL,

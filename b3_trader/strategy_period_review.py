@@ -6,6 +6,7 @@ Previous periods are cut at their own end, so later sales/adds cannot leak in.
 from __future__ import annotations
 
 from .strategy_lab_journal import position_cycles
+from .trade_cycle_metrics import cycle_metrics
 
 PERIODS = {'7d': 7, '30d': 30, '90d': 90, 'all': None}
 
@@ -14,23 +15,9 @@ def _period(trades: list[dict], start: float | None, end: float, *, inclusive: b
     visible = [t for t in trades if t['ts'] <= end] if inclusive else [t for t in trades if t['ts'] < end]
     cycles = position_cycles(visible, now=end) or []
     selected = [c for c in cycles if start is None or c['entry_ts'] >= start]
-    closed = [c for c in selected if c['exit_ts'] is not None]
-    cost = sum(c['invested_krw'] for c in closed)
-    proceeds = sum(c['proceeds_krw'] for c in closed)
-    pnl = sum(c['realized_pnl_krw'] for c in closed)
     carried = [c for c in cycles if start is not None and c['entry_ts'] < start
                and (c['exit_ts'] is None or c['exit_ts'] >= start)]
-    return {
-        'closed': len(closed), 'open': len(selected)-len(closed),
-        'wins': sum(c['realized_pnl_krw'] > 0 for c in closed) if closed else None,
-        'invested_krw': cost if closed else None,
-        'proceeds_krw': proceeds if closed else None,
-        'realized_pnl_krw': pnl if closed else None,
-        'return_pct': pnl / cost * 100 if cost > 0 else None,
-        'worst_return_pct': min((c['return_pct'] for c in closed), default=None),
-        'open_invested_krw': sum(c['invested_krw'] for c in selected if c['exit_ts'] is None),
-        'carried_positions': len(carried),
-    }, selected
+    return {**cycle_metrics(selected), 'carried_positions': len(carried)}, selected
 
 
 def period_review(exchange: str, market: str, accounts: list[dict], grouped: dict,

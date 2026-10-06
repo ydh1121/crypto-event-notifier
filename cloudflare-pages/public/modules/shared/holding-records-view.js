@@ -1,5 +1,6 @@
 import {esc} from './format.js';
-import {won,number,percent,time,color} from './strategy-workbench-view.js';
+import {won,number,time,color} from './strategy-workbench-view.js';
+import {manualComparisonHtml} from './manual-comparison-view.js';
 
 export function savedPlanHtml(e,panel='plan') {
   if(!e)return '';
@@ -24,9 +25,7 @@ export function manualRecordsHtml(e,{closed=false}={}) {
     ${field('ts','체결 시각 · 한국시간','datetime-local')}${field('price','체결가 · 원')}${field('volume','체결 수량')}${field('fee','실제 수수료 · 원')}
     <label>비교할 저장 계획<select data-record-field="stage" data-continuity-key="manual-stage"><option value="">회차 지정 안 함</option>${stageRows.map((r,i)=>r.price?`<option value="${f.side}:${i}" ${f.stage===`${f.side}:${i}`?'selected':''}>${f.side==='buy'?'매수':'익절'} ${i+1}차 · ${won(r.price)}</option>`:'').join('')}</select></label>
     <button data-action="record-manual-fill">체결 기록</button></fieldset></details>
-    <div class="section-heading"><h3>같은 기간 전략 비교</h3><span>${time(c?.start)} — ${time(c?.end)}</span></div>
-    <div class="table-scroll"><table><thead><tr><th></th><th>완료 거래</th><th>수익 거래 / 전체</th><th>평균 거래 수익률</th></tr></thead><tbody>${[['수동 실거래',c?.manual],['이 코인 가상계좌',c?.paper]].map(([label,v])=>`<tr><th>${label}</th><td>${v?`${v.closed}회`:'—'}</td><td>${v?.closed?`${v.wins} / ${v.closed}`:'—'}</td><td>${percent(v?.mean_return_pct)}</td></tr>`).join('')}</tbody></table></div>
-    <p class="subtle">첫 입력 체결부터 마지막 입력 체결까지, 해당 기간에 매수 시작·전량 매도를 마친 거래 기준입니다.</p>
+    ${manualComparisonHtml(c,d.plan.paper?.label)}
     <div class="section-heading"><h3>실제 체결 내역</h3><span>${d.records.length}건 · 수수료 합계 ${won(s?.fees)}</span></div>
-    ${d.records.length?`<div class="table-scroll" data-preserve-scroll><table><thead><tr><th>체결 · 한국시간</th><th>가격 / 수량</th><th>수수료 / 입출금</th><th>실현손익</th><th></th></tr></thead><tbody>${d.records.slice().sort((a,b)=>b.ts-a.ts||b.sequence-a.sequence).map(record=>{const t=active.get(record.id)||record;return `<tr data-render-key="manual-${esc(t.id)}" class="${t.voided?'manual-voided':''}"><td>${t.side==='buy'?'매수':'매도'}${t.voided?' · 취소':''}<small>${time(t.ts)}</small></td><td>${won(t.price)}<small>${number(t.volume,8)}개</small>${t.reference_price?`<small>계획 ${won(t.reference_price)}</small>`:''}</td><td>${won(t.fee)}<small>${t.voided?'—':won(t.net)}</small></td><td class="${color(t.realized)}">${won(t.realized)}</td><td>${t.voided?'':`<button class="text-button" data-void-record="${esc(t.id)}" ${disabled}>기록 취소</button>`}</td></tr>`;}).join('')}</tbody></table></div>`:'<p class="subtle">입력한 체결이 없습니다.</p>'}`;
+    ${d.records.length?`<div class="table-scroll" data-preserve-scroll><table><thead><tr><th>체결 · 한국시간</th><th>가격 / 수량</th><th>체결 금액 / 수수료</th><th>지급·수령액</th><th>실현손익</th><th></th></tr></thead><tbody>${d.records.slice().sort((a,b)=>b.ts-a.ts||b.sequence-a.sequence).map(record=>{const t=active.get(record.id)||record;return `<tr data-render-key="manual-${esc(t.id)}" class="${t.voided?'manual-voided':''}"><td>${t.side==='buy'?'매수':'매도'}${t.voided?' · 취소':''}<small>${time(t.ts)}</small></td><td>${won(t.price)}<small>${number(t.volume,8)}개</small>${t.reference_price?`<small>계획 ${won(t.reference_price)}</small>`:''}</td><td>${won(t.gross_krw)}<small>수수료 ${won(t.fee)}</small></td><td>${t.voided?'—':won(t.net)}</td><td class="${color(t.realized)}">${won(t.realized)}</td><td>${t.voided?'':`<button class="text-button" data-void-record="${esc(t.id)}" ${disabled}>기록 취소</button>`}</td></tr>`;}).join('')}</tbody></table></div>`:'<p class="subtle">입력한 체결이 없습니다.</p>'}`;
 }

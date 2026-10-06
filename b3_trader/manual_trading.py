@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
+import math
 import re
 import time
 
 from .user_tools import normalize_holding_market, holding_quote_currency
+from .trade_cycle_metrics import cycle_metrics
 
 
 class PlanningError(ValueError):
@@ -123,6 +125,7 @@ def replay(trades, *, paper=False):
     qty = cost = realized = fees = invested = cycle_cost = cycle_pnl = Decimal(0)
     opened = None
     rows, cycles = [], []
+    positions, position = [], None
     for t in sorted(trades, key=lambda t: (t['ts'], t.get('sequence', t.get('id', 0)))):
         if t.get('voided'):
             continue
@@ -135,9 +138,13 @@ def replay(trades, *, paper=False):
         if side == 'buy':
             if qty == 0:
                 opened, cycle_cost, cycle_pnl = t['ts'], Decimal(0), Decimal(0)
+                position = {'entry_trade_id': t.get('id', t.get('sequence')), 'entry_ts': opened,
+                            'exit_ts': None, 'exit_trade_id': None, 'buy_count': 0, 'sell_count': 0}
+                cycle_proceeds = cycle_fees = Decimal(0)
             qty, cost, pnl = position_fill(qty, cost, side, volume, net)
             invested += net
             cycle_cost += net
+            position['buy_count'] += 1
         elif side == 'sell':
             # Native PAPER quantities can have tiny binary rounding differences.
             if paper and qty > 0 and abs(volume - qty) <= max(Decimal('1e-8'), qty * Decimal('1e-9')):
@@ -147,6 +154,8 @@ def replay(trades, *, paper=False):
             qty, cost, pnl = position_fill(qty, cost, side, volume, net)
             realized += pnl
             cycle_pnl += pnl
+            cycle_proceeds += net
+            position['sell_count'] += 1
             if qty == 0:
                 cycles.append({'opened_at': opened, 'closed_at': t['ts'], 'realized': float(cycle_pnl),
                     'return_pct': float(cycle_pnl / cycle_cost * 100) if cycle_cost else None})
@@ -154,34 +163,55 @@ def replay(trades, *, paper=False):
         else:
             raise PlanningError('체결 종류를 확인하세요.')
         fees += fee
-        rows.append({**t, 'net': float(net), 'realized': float(pnl) if pnl is not None else None,
+        cycle_fees += fee
+        position.update(invested_krw=float(cycle_cost), proceeds_krw=float(cycle_proceeds),
+                        fees_krw=None if paper else float(cycle_fees),
+                        realized_pnl_krw=float(cycle_pnl), remaining_volume=float(qty),
+                        remaining_cost_krw=float(cost), return_pct=None)
+        if qty == 0:
+            position.update(exit_ts=t['ts'], exit_trade_id=t.get('id', t.get('sequence')),
+                            return_pct=float(cycle_pnl / cycle_cost * 100) if cycle_cost else None)
+            positions.append(position)
+            position = None
+        rows.append({**t, 'gross_krw': float(price * volume), 'net': float(net), 'realized': float(pnl) if pnl is not None else None,
                      'remaining': float(qty)})
+    if position:
+        positions.append(position)
     return {'volume': float(qty), 'average': float(cost / qty) if qty else None,
             'realized': float(realized), 'fees': float(fees), 'buy_total': float(invested),
-            'trades': rows, 'cycles': cycles}
-
-
-def cycle_stats(cycles):
-    return {'closed': len(cycles), 'wins': sum(c['realized'] > 0 for c in cycles),
-            'mean_return_pct': sum(c['return_pct'] for c in cycles) / len(cycles) if cycles else None}
+            'trades': rows, 'cycles': cycles, 'positions': positions}
 
 
 def compare_journals(real, account):
     active = real['trades']
-    result = {'manual': cycle_stats(real['cycles']), 'paper': None, 'start': None, 'end': None}
+    result = {'version': 2, 'status': 'no_manual_trades', 'manual': cycle_metrics(real['positions']),
+              'paper': None, 'start': None, 'end': None, 'costs_included': True,
+              'paper_revision': (account or {}).get('revision'), 'witnesses_limit': 20,
+              'manual_witnesses': [], 'paper_witnesses': [], 'paper_carried_positions': None}
     if not active:
         return result
     start, end = min(t['ts'] for t in active), max(t['ts'] for t in active)
-    result.update(start=start, end=end)
+    result.update(start=start, end=end, status='paper_unavailable',
+                  manual_witnesses=list(reversed(real['positions']))[:20])
     if not account or not account.get('reconciliation', {}).get('matches'):
         return result
     journal = account.get('journal', {})
     if 'rows' not in journal or journal.get('total') != len(journal['rows']):
+        result['status'] = 'paper_incomplete'
         return result
     trades = [dict(zip(journal['columns'], row)) for row in journal['rows']]
+    previous = 0
+    for trade in trades:
+        ts = trade.get('ts')
+        if not isinstance(ts, (int, float)) or not math.isfinite(ts) or ts <= 0 or ts < previous:
+            return result
+        previous = ts
     try:
         paper = replay([t for t in trades if t['ts'] <= end], paper=True)
     except PlanningError:
         return result
-    result['paper'] = cycle_stats([c for c in paper['cycles'] if c['opened_at'] >= start and c['closed_at'] <= end])
+    selected = [c for c in paper['positions'] if c['entry_ts'] >= start]
+    result.update(status='ok', paper=cycle_metrics(selected), paper_witnesses=list(reversed(selected))[:20],
+                  paper_carried_positions=sum(c['entry_ts'] < start and (c['exit_ts'] is None or c['exit_ts'] >= start)
+                                              for c in paper['positions']))
     return result

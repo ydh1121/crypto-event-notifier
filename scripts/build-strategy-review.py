@@ -17,7 +17,7 @@ PYTHON_FILES = (
     'strategy_lab_plan.py', 'strategy_lab_rules.py', 'event_strategy_study.py', 'strategy_period_review.py',
     'event_reaction_view.py', 'event_reaction_catalog.py', 'event_response_contract.py', 'event_price_archive.py', 'event_trade_samples.py',
     'runtime_review.py', 'runtime_process_contract.py', 'event_capture_review.py', 'holdings_review.py', 'holding_quotes.py', 'user_tools.py',
-    'manual_planning_store.py', 'manual_trading.py',
+    'manual_planning_store.py', 'manual_trading.py', 'trade_cycle_metrics.py',
     'workspace_tools.py', 'workspace_packages.py', 'collection_update.py',
     'journal_backup.py', 'holding_registration.py', 'holding_identity.py', 'holding_management.py',
     'check_report_output.py', 'intelligence_review.py', 'collection_source.py', 'storage_review.py',
@@ -44,10 +44,10 @@ WORKSPACE_README = '''CRYPTO — 앞으로 계속 사용하는 고정 폴더
 
 현재 도구 버전: @BUILD@
 
-이번 변경: 거래소별 수집 중단을 감지하고 해당 연결을 다시 켭니다. DB 저장 오류로 수집이 조용히 멈추는 문제를 수정했습니다.
-이번에는 수집 코드 갱신이 필요합니다. 조회 창 종료 → 수집 창에서 Ctrl+C → 종료를 기다림 → 기존 CRYPTO 폴더에 덮어쓰기 → UPDATE_COLLECTION.cmd.
-갱신이 끝나면 수집이 자동 시작됩니다. 그 창을 켜 둔 채 RUN_REVIEW.cmd로 화면을 열고, 1분 뒤 RUN_CHECK.cmd를 실행합니다.
-CLEAN_STORAGE 재실행은 필요 없습니다. 기존 가격 부분 갱신·기간별 전략 비교·계산기는 유지됩니다.
+이번 변경: 소액 실거래와 같은 기간 가상매매의 매수 금액·매도 수령액·손익·수익률을 비교합니다.
+이번에는 켜져 있는 수집 창을 그대로 둡니다. CRYPTO VIEWER 검은 창만 닫고, 기존 CRYPTO 폴더에 덮어쓴 뒤 RUN_REVIEW.cmd를 실행하세요.
+실전 계획 → 코인 → 전략 → 소액 매매에서 확인합니다. 처음이면 매매 계획을 저장한 뒤 실제 체결가·수량·수수료를 기록하세요.
+UPDATE_COLLECTION 또는 CLEAN_STORAGE를 다시 실행할 필요가 없습니다. 확인 후 RUN_CHECK.cmd 결과를 첨부하세요.
 가상매매 → 코인 선택 → 반응도 → 경제지표 또는 정책·뉴스 → 종류별 누적.
 기간·발표 종류·전략을 고르면 반응 표본과 매매 금액·손익을 확인할 수 있습니다.
 체결 원장에서 검증된 종료 거래만 성과를 집계합니다. 발표와 거래의 인과관계를 뜻하지 않습니다.
@@ -98,7 +98,9 @@ UPDATE_COLLECTION은 GitHub 연결이 필요합니다. 진행 중인 수집·수
 기존 본체에 설치된 수집 소스를 그대로 실행하며 Git 업데이트나 DB 교체는 하지 않습니다.
 수집 코드 갱신은 UPDATE_COLLECTION에서만 실행합니다.
 이미 수집 중이거나 실행 상태를 확인할 수 없으면 중복 실행을 막습니다.
-수집 종료는 Ctrl+C 후 종료가 끝날 때까지 기다립니다.
+수집을 종료해야 할 때만: 수집 창 제목에 '선택'이 보이면 Esc → Ctrl+C 한 번 → 기다림.
+그 창에 Terminate batch job (Y/N)? 또는 일괄 작업을 끝내시겠습니까 (Y/N)?가 뜨면 Y 입력 후 Enter → 그 창 닫기.
+새로 실행한 KEEP OPEN 수집 창은 계속 켜 둡니다. 정상 수집 중에는 종료 절차를 반복하지 않습니다.
 
 이전 폴더 정리: 조회 창을 닫고 CLEAN_OLD_FOLDERS.cmd를 실행합니다.
 바탕화면·다운로드·이 CRYPTO의 옆 폴더에서 확인된 이전 실행본만 정리합니다.
@@ -155,9 +157,10 @@ README = '''가상매매 · 실전 계획 검토 화면
 보유 거래소 적용: @HOLDINGS_EXCHANGE@
 고정된 CRYPTO 폴더를 사용합니다. 조회 창을 닫은 뒤 기존 CRYPTO에 덮어씁니다.
 
-이번 수집 수정: 조회 창 종료 → 수집 창 Ctrl+C 후 종료 대기 → 같은 CRYPTO 폴더에 덮어쓰기 → UPDATE_COLLECTION.cmd.
-갱신 후 수집이 자동 시작됩니다. 그 창을 유지하고 RUN_REVIEW.cmd로 화면을 엽니다.
-1분 뒤 RUN_CHECK.cmd를 실행하면 거래소별 연결·가격 수신·복구 상태를 확인할 수 있습니다.
+이번 조회 수정: 수집 창은 유지 → CRYPTO VIEWER 검은 창만 닫기 → 같은 CRYPTO 폴더에 덮어쓰기 → RUN_REVIEW.cmd.
+실전 계획 → 코인 → 전략 → 소액 매매에서 실제 기록과 가상매매 금액·손익을 비교합니다.
+RUN_CHECK.cmd 결과에는 같은 계산에 사용한 소액 기록 개수와 비교 결과도 포함됩니다.
+이번에는 UPDATE_COLLECTION과 CLEAN_STORAGE를 다시 실행하지 않습니다.
 이벤트 반응용 체결 가격은 빗썸·업비트 전체 원화 종목을 구독합니다.
 체결량·호가는 기존 보유·관심 종목 최대 8개 범위를 유지합니다. 자산 추가는 약 1분마다 반영합니다.
 이벤트별 전후 가격은 보존합니다. 늦게 수신된 발표에 쓰는 임시 분별 실제 체결 표본은 6시간만 유지합니다.

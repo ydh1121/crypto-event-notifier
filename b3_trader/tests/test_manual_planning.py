@@ -151,6 +151,11 @@ def test_comparison_counts_only_full_cycles_within_same_window():
     a=dict(reconciliation={'matches':True},journal=dict(total=6,columns=columns,rows=rows))
     comparison=compare_journals(real,a)
     assert comparison['start']==100 and comparison['end']==200
-    assert comparison['paper']==dict(closed=1,wins=1,mean_return_pct=10)
+    assert comparison['paper']['closed']==1 and comparison['paper']['wins']==1
+    assert comparison['paper']['mean_return_pct']==10
+    assert comparison['paper']['invested_krw']==100
+    assert comparison['paper']['proceeds_krw']==110
+    assert comparison['paper']['open']==1 and comparison['paper_carried_positions']==1
+    assert [p['entry_trade_id'] for p in comparison['paper_witnesses']]==[5,3]
     a['reconciliation']['matches']=False
     assert compare_journals(real,a)['paper'] is None
