@@ -12,9 +12,10 @@
 - EVENTS = B3 SEC15분·1시간 기록,4시간·1일 missing_target. 미국 무역수지4구간 대상가 없음; BTC/ETH는 같은 발표4구간 기록. 최근120초 알트181/161개 수신 관측. 거래 부재/수집 공백 구분은 미완료; 결측0% 보정·허용창 확대 없음.
 - CHANGED = OHLCV·체결·상대강도·거래소차이·프리미엄 저장 실패 rollback; 반응도·지연 반응·가격/수급 비교·신뢰도 계산을 쓰기 전에 준비한 뒤 짧은 원자 저장. 반응 원본과 파생 통계는 별도 원자 저장해 통계 실패 시 이전 통계·확정 원본 보존, 다음 주기 재계산. 연구 단계 경계는 남은 쓰기를 rollback하고 오류 처리. 단일 덮어쓰기 진행 파일의 단계·pid·SQLITE 코드·경계 잠금 상태를 RUN_CHECK에 전달. 수식·전략·PAPER 결정·보존 기간·schema 변경 없음.
 - VERIFY = 수정 전 실제 SQLite 두 연결에서7개 실패 재현, 수정 후 해소. 기존 검증 포함 고유69개 테스트 PASS(신규10개). 부분 저장 실패·다른 writer 진입·이전 집계 보존·다음 주기 회복·단계 실패 rollback·오류 readback 검증. compile/diff PASS. 실제 PC의 장기 수집 회복은 다음 첨부로 확인한다.
+- DELIVERY = 동일 CRYPTO.zip version31 /소스e51067a0f4cb44d70f916d813cf50b5e24c95a06 /188278bytes/86files/SHA256a56ee1ebec57c05afebf669da2bd39ef6af297607d94dfcbc622c2db100a1292. 85payload 해시·stdlib-only import PASS. 기존 CRYPTO 덮어쓰기.
 - APPLY = 조회 검은 창 X→기존 수집 창 Esc(선택 상태일 때)·Ctrl+C 한 번 후 종료 대기→Y/N 질문이면 Y→Enter 후 기존 창 닫기→기존 CRYPTO에 덮어쓰기→UPDATE_COLLECTION.cmd→새 KEEP OPEN 유지→RUN_REVIEW.cmd→10분 이상 후 RUN_CHECK.cmd. CLEAN_STORAGE 재실행·새 폴더 불필요.
 - NEXT = 수정본 적용·양 거래소 DB 잠금/최신시각/연구 단계 대조→알트 이벤트 거래 부재·수집 공백 분리→도미넌스/시장 전체→SNS/온체인/추가 거시→시간 순 코인별 전략 검증·근거 있는 상승 후보→수동 소액 대조 후 별도 승인 실전.
-- DELIVERY = 검증된 source commit과 같은 CRYPTO.zip을 확정한 후 기록한다. 현재 이 체크포인트는 구현·검증 완료, PC 적용 대기다.
+- DURABLE = Drive CURRENT SNAPSHOT/BATON·Ledger·기존 WBS 4문서 갱신 후 전체 본문 readback 일치. 동일 CRYPTO.zip version31 저장·85payload 검증 완료. actual PC의 수정 적용·장기 수집은 다음 첨부로 확인한다.
 
 ### Previous checkpoint — shared daily backups and safe 48-hour cleanup implemented
 
