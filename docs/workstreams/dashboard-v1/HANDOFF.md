@@ -1,6 +1,6 @@
 # Dashboard v1 handoff
 
-### Current — Recovery applied; exclusive startup WAL reclamation implemented
+### Current — Recovery applied; exclusive startup WAL reclamation delivered
 
 - STATE = RECOVERY_APPLIED / WAL_STARTUP_IMPLEMENTED / PC_RECLAIM_PENDING. WO CRYPTO-WO-20260921-RECOVERY-001.
 - PROGRESS = 전체 약40% 유지. 실제 데이터로 사용·검증된 범위 기준 추정이며, 짧은 관측과 코드 구현만으로 장기 안정성을 완료 처리하지 않는다.
@@ -12,9 +12,10 @@
 - STORAGE = PAPER 본체5780217856bytes·재사용1468424192bytes·WAL12685364672bytes. WAL 물리크기는 직전16:31 첨부와 동일하고 mtime만 갱신; 활성 프레임/차단 원인은 미확인. 최근48시간·DB별24시간 한 번 백업 정책 유지.
 - CHANGED = storage_wal 단일 소유자를 START/UPDATE_COLLECTION의 수집 시작 전에 연결. 1GiB 이상·최근 검증 백업·host/backup OS 잠금·SQLite EXCLUSIVE 독점 확보 시 TRUNCATE. 성공 후24시간 제한, 바쁨/백업 실패는 보류. 수집 중 반복 정리·WAL 직접 unlink·VACUUM·DB 행 삭제 없음. schema/page/freelist·DB/WAL 전후 용량·SQLite 버전·결과 영수증을 읽기 전용 RUN_CHECK로 전달.
 - VERIFY = 관련52개 Python 테스트 PASS. 실제 WAL에만 남은 체결·이벤트 전체 데이터 보존, 다른 reader/idle/writer 연결 거부, checkpoint 전후 독점 유지, 복구본 재사용, 하루 제한, 링크/불완전 백업 차단, 시작 전 실행 순서, 읽기 전용 보고 검증. compile/diff PASS. Windows에서 실제 회수된 바이트는 아직 미확인.
-- DELIVERY = 동일 CRYPTO.zip 갱신 준비 중. 패키지 해시·추출 검증 후 같은 파일로 교체한다.
+- DELIVERY = 동일 CRYPTO.zip version30 /소스2ef36d256747dc4b45ecdce02d44c2ec83cf526a /187853bytes/86files/SHA25675b08ef257a2bdb9f8a3d4c3f6e5bd9f384f447ecfde8ef0e4eacf91eecec4ae. 추출85payload 해시·stdlib-only import 검증 PASS. 새 폴더 없이 기존 CRYPTO에 덮어쓰기. GitHub recovery branch만 갱신; primary·배포·실주문 변경 없음.
 - APPLY = 조회 검은 창 X→기존 수집 창 Esc(선택 상태일 때)·Ctrl+C 한 번 후 종료 대기→Y/N 질문이면 Y→Enter 후 기존 창 닫기→기존 CRYPTO에 덮어쓰기→UPDATE_COLLECTION.cmd→시작 전 용량 정리 대기·새 KEEP OPEN 유지→RUN_REVIEW.cmd→10분 이상 후 RUN_CHECK.cmd. CLEAN_STORAGE 재실행·새 폴더 불필요.
 - NEXT = 새 결과의 wal_startup 전후 용량·계좌 갱신 대조→알트 이벤트의 거래 부재/수집 공백 구분·실제 소액 기록 비교→도미넌스/시장 전체→SNS/온체인/추가 거시→시간 순 검증·코인별 개선·근거 있는 상승 후보→소액 검증 후 별도 승인 실전.
+- DURABLE = Drive CURRENT SNAPSHOT/BATON・Ledger・기존 WBS 4문서 수정 후 전체 본문 readback 일치. 동일 CRYPTO.zip version30 저장 완료. Actual Windows 공간 회수와 장기 갱신은 다음 첨부로 확인한다.
 
 ### Previous checkpoint — shared daily backups and safe 48-hour cleanup implemented
 
