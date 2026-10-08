@@ -88,41 +88,41 @@ class MarketOhlcvStore:
                 continue
         if not prepared:
             return 0
-        self.conn.executemany(
-            """INSERT INTO research_market_ohlcv_mx(
-                   exchange,market,timeframe,candle_ts,open,high,low,close,
-                   base_volume,quote_volume,is_closed,source,received_at,schema_version
-               ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-               ON CONFLICT(exchange,market,timeframe,candle_ts) DO UPDATE SET
-                   open=excluded.open,
-                   high=excluded.high,
-                   low=excluded.low,
-                   close=excluded.close,
-                   base_volume=excluded.base_volume,
-                   quote_volume=excluded.quote_volume,
-                   is_closed=excluded.is_closed,
-                   source=excluded.source,
-                   received_at=excluded.received_at,
-                   schema_version=excluded.schema_version""",
-            prepared,
-        )
-        self.conn.commit()
+        with self.conn:
+            self.conn.executemany(
+                """INSERT INTO research_market_ohlcv_mx(
+                       exchange,market,timeframe,candle_ts,open,high,low,close,
+                       base_volume,quote_volume,is_closed,source,received_at,schema_version
+                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                   ON CONFLICT(exchange,market,timeframe,candle_ts) DO UPDATE SET
+                       open=excluded.open,
+                       high=excluded.high,
+                       low=excluded.low,
+                       close=excluded.close,
+                       base_volume=excluded.base_volume,
+                       quote_volume=excluded.quote_volume,
+                       is_closed=excluded.is_closed,
+                       source=excluded.source,
+                       received_at=excluded.received_at,
+                       schema_version=excluded.schema_version""",
+                prepared,
+            )
         return len(prepared)
 
     def prune(self, exchange: str, market: str, timeframe: str, *, keep: int | None = None) -> int:
         limit = max(50, int(keep or self.retention_bars))
         before = self.conn.total_changes
-        self.conn.execute(
-            """DELETE FROM research_market_ohlcv_mx
-               WHERE rowid IN (
-                   SELECT rowid FROM research_market_ohlcv_mx
-                   WHERE exchange=? AND market=? AND timeframe=?
-                   ORDER BY candle_ts DESC
-                   LIMIT -1 OFFSET ?
-               )""",
-            (str(exchange), str(market), str(timeframe), limit),
-        )
-        self.conn.commit()
+        with self.conn:
+            self.conn.execute(
+                """DELETE FROM research_market_ohlcv_mx
+                   WHERE rowid IN (
+                       SELECT rowid FROM research_market_ohlcv_mx
+                       WHERE exchange=? AND market=? AND timeframe=?
+                       ORDER BY candle_ts DESC
+                       LIMIT -1 OFFSET ?
+                   )""",
+                (str(exchange), str(market), str(timeframe), limit),
+            )
         return max(0, self.conn.total_changes - before)
 
     def rows(

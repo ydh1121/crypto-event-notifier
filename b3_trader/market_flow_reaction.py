@@ -307,20 +307,12 @@ class MarketFlowReactionStore:
             )
             grouped[key].append(row)
 
-        self.conn.execute("DELETE FROM research_market_flow_reaction_stats_mx")
-        written = 0
+        prepared = []
         for key, group in grouped.items():
             future = [float(row["future_return_pct"]) for row in group if row["future_return_pct"] is not None]
             follow = [float(row["flow_followthrough_return_pct"]) for row in group if row["flow_followthrough_return_pct"] is not None]
             hypothesis = [float(row["hypothesis_directional_return_pct"]) for row in group if row["hypothesis_directional_return_pct"] is not None]
-            self.conn.execute(
-                """INSERT INTO research_market_flow_reaction_stats_mx(
-                       exchange,market,signal_window_label,signal_evidence_label,horizon_label,
-                       sample_count,mean_future_return_pct,mean_flow_followthrough_return_pct,
-                       flow_followthrough_hit_rate_pct,hypothesis_sample_count,
-                       mean_hypothesis_directional_return_pct,hypothesis_hit_rate_pct,
-                       updated_at,feature_version,schema_version
-                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            prepared.append(
                 (
                     *key,len(future),statistics.fmean(future) if future else None,
                     statistics.fmean(follow) if follow else None,
@@ -330,8 +322,21 @@ class MarketFlowReactionStore:
                     now,FEATURE_VERSION,SCHEMA_VERSION,
                 ),
             )
-            written += 1
-        return written
+        # Derived summary replacement is atomic; calculations never own the writer.
+        # Committed reaction evidence remains available if this refresh fails.
+        with self.conn:
+            self.conn.execute("DELETE FROM research_market_flow_reaction_stats_mx")
+            self.conn.executemany(
+                """INSERT INTO research_market_flow_reaction_stats_mx(
+                       exchange,market,signal_window_label,signal_evidence_label,horizon_label,
+                       sample_count,mean_future_return_pct,mean_flow_followthrough_return_pct,
+                       flow_followthrough_hit_rate_pct,hypothesis_sample_count,
+                       mean_hypothesis_directional_return_pct,hypothesis_hit_rate_pct,
+                       updated_at,feature_version,schema_version
+                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                prepared,
+            )
+        return len(prepared)
 
     def _prune(self) -> int:
         before = self.conn.total_changes
@@ -355,6 +360,7 @@ class MarketFlowReactionStore:
         terminal_expired = 0
         alignment_skipped = 0
         deferred_existing = 0
+        prepared = []
         for signal in signals:
             for horizon_label in HORIZONS:
                 if processed >= MAX_REACTIONS_PER_RUN:
@@ -374,7 +380,7 @@ class MarketFlowReactionStore:
                     signal,horizon_label,now=stamp,status=status,endpoint_candle_ts=endpoint_ts,
                     endpoint_price=endpoint_price,source_timeframe=source_tf,source_interval=source_interval,
                 )
-                self._upsert(row)
+                prepared.append(row)
                 processed += 1
                 if row["data_ready"]:
                     ready_written += 1
@@ -385,9 +391,12 @@ class MarketFlowReactionStore:
             if processed >= MAX_REACTIONS_PER_RUN:
                 break
 
-        pruned = self._prune()
+        # All source reads and horizon calculations finish before the first write.
+        with self.conn:
+            for row in prepared:
+                self._upsert(row)
+            pruned = self._prune()
         stats_written = self._refresh_stats(stamp)
-        self.conn.commit()
         return {
             "ok": True,
             "status": "computed",

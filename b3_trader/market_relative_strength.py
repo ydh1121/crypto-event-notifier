@@ -220,36 +220,36 @@ class MarketRelativeStrengthEngine:
                 )
 
         if prepared:
-            self.conn.executemany(
-                """INSERT INTO research_market_relative_strength_mx(
-                       exchange,market,horizon_days,as_of_ts,asset_return_pct,
-                       btc_return_pct,eth_return_pct,vs_btc_pp,vs_eth_pp,
-                       breadth_positive_pct,breadth_median_return_pct,vs_breadth_median_pp,
-                       breadth_sample_count,breadth_universe_count,breadth_coverage_pct,
-                       breadth_ready,source_timeframe,source_table,source_ts,received_at,feature_version
-                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                   ON CONFLICT(exchange,market,horizon_days) DO UPDATE SET
-                       as_of_ts=excluded.as_of_ts,
-                       asset_return_pct=excluded.asset_return_pct,
-                       btc_return_pct=excluded.btc_return_pct,
-                       eth_return_pct=excluded.eth_return_pct,
-                       vs_btc_pp=excluded.vs_btc_pp,
-                       vs_eth_pp=excluded.vs_eth_pp,
-                       breadth_positive_pct=excluded.breadth_positive_pct,
-                       breadth_median_return_pct=excluded.breadth_median_return_pct,
-                       vs_breadth_median_pp=excluded.vs_breadth_median_pp,
-                       breadth_sample_count=excluded.breadth_sample_count,
-                       breadth_universe_count=excluded.breadth_universe_count,
-                       breadth_coverage_pct=excluded.breadth_coverage_pct,
-                       breadth_ready=excluded.breadth_ready,
-                       source_timeframe=excluded.source_timeframe,
-                       source_table=excluded.source_table,
-                       source_ts=excluded.source_ts,
-                       received_at=excluded.received_at,
-                       feature_version=excluded.feature_version""",
-                prepared,
-            )
-            self.conn.commit()
+            with self.conn:
+                self.conn.executemany(
+                    """INSERT INTO research_market_relative_strength_mx(
+                           exchange,market,horizon_days,as_of_ts,asset_return_pct,
+                           btc_return_pct,eth_return_pct,vs_btc_pp,vs_eth_pp,
+                           breadth_positive_pct,breadth_median_return_pct,vs_breadth_median_pp,
+                           breadth_sample_count,breadth_universe_count,breadth_coverage_pct,
+                           breadth_ready,source_timeframe,source_table,source_ts,received_at,feature_version
+                       ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                       ON CONFLICT(exchange,market,horizon_days) DO UPDATE SET
+                           as_of_ts=excluded.as_of_ts,
+                           asset_return_pct=excluded.asset_return_pct,
+                           btc_return_pct=excluded.btc_return_pct,
+                           eth_return_pct=excluded.eth_return_pct,
+                           vs_btc_pp=excluded.vs_btc_pp,
+                           vs_eth_pp=excluded.vs_eth_pp,
+                           breadth_positive_pct=excluded.breadth_positive_pct,
+                           breadth_median_return_pct=excluded.breadth_median_return_pct,
+                           vs_breadth_median_pp=excluded.vs_breadth_median_pp,
+                           breadth_sample_count=excluded.breadth_sample_count,
+                           breadth_universe_count=excluded.breadth_universe_count,
+                           breadth_coverage_pct=excluded.breadth_coverage_pct,
+                           breadth_ready=excluded.breadth_ready,
+                           source_timeframe=excluded.source_timeframe,
+                           source_table=excluded.source_table,
+                           source_ts=excluded.source_ts,
+                           received_at=excluded.received_at,
+                           feature_version=excluded.feature_version""",
+                    prepared,
+                )
 
         return {
             "ok": True,

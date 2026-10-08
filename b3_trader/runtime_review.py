@@ -296,10 +296,42 @@ def read_runtime(db: Path):
     result.update(status="observed", processes=processes,
                   collection_source=read_collection_source(root),
                   paper_scans=read_paper_scans(root, result["observed_at"]),
+                  research_stage=read_research_stage(root),
                   saved_statuses={role: _status(root, role, processes) for role in STATUS_FILES})
     result["research_log"] = _log_kinds(root / "b3_trader/data/research-platform/supervisor.log")
     result["process_logs"] = {role: _log_kinds(root / HOST_LOGS / f"{role}.log")
                               for role in [*(row[0] for row in SIDECARS), "app"]}
+    return result
+
+
+def read_research_stage(root: Path):
+    """Return only bounded phase/transaction evidence, never SQL or credentials."""
+    meta, value = _json_file(root / "b3_trader/data/research-platform/market-ohlcv-progress.json")
+    result = dict(meta)
+    for key in ("version", "pid", "started_at", "finished_at", "updated_at", "elapsed_seconds"):
+        number = value.get(key)
+        if type(number) in (int, float) and math.isfinite(number) and number >= 0:
+            result[key] = number
+    for key in ("stage", "status"):
+        word = value.get(key)
+        if isinstance(word, str) and re.fullmatch(r"[A-Za-z0-9_:.-]{1,120}", word):
+            result["stage_status" if key == "status" else key] = word
+    owners = {"ohlcv", "flow", "divergence", "reaction", "reliability"}
+    def open_owners(row, key):
+        names = row.get(key)
+        return [name for name in names if isinstance(name, str) and name in owners][:5] if isinstance(names, list) else []
+    result["open_transactions"] = open_owners(value, "open_transactions")
+    failure = value.get("last_failure")
+    if isinstance(failure, dict):
+        safe = {key: failure[key] for key in ("failed_at", "sqlite_errorcode")
+                if type(failure.get(key)) in (int, float) and math.isfinite(failure[key])}
+        for key in ("stage", "error_type", "sqlite_errorname", "result_status"):
+            word = failure.get(key)
+            if isinstance(word, str) and re.fullmatch(r"[A-Za-z0-9_:.-]{1,120}", word):
+                safe[key] = word
+        for key in ("open_transactions", "transactions_before_rollback"):
+            safe[key] = open_owners(failure, key)
+        result["last_failure"] = safe
     return result
 
 

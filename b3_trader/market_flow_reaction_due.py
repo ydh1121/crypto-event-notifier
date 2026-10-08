@@ -98,6 +98,7 @@ class MarketFlowReactionDueStore:
         terminal_expired = 0
         exact_alignment_skipped = 0
         selected_recoverable = 0
+        prepared = []
 
         for due in due_rows:
             horizon_label = str(due["horizon_label"])
@@ -132,7 +133,7 @@ class MarketFlowReactionDueStore:
                 source_timeframe=source_tf,
                 source_interval=source_interval,
             )
-            self.reactions._upsert(row)
+            prepared.append(row)
             processed += 1
             if int(row["data_ready"]) == 1:
                 ready_written += 1
@@ -141,8 +142,10 @@ class MarketFlowReactionDueStore:
                 if status == "expired_missing_exact_reaction_path":
                     terminal_expired += 1
 
+        with self.reactions.conn:
+            for row in prepared:
+                self.reactions._upsert(row)
         stats_written = self.reactions._refresh_stats(stamp) if processed else 0
-        self.reactions.conn.commit()
         return {
             "ok": True,
             "status": "computed" if due_rows else "no_due_reactions",

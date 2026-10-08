@@ -178,51 +178,51 @@ class MarketDomesticPremiumEngine:
         bithumb_price = _finite(domestic.get("bithumb_price"))
         upbit_price = _finite(domestic.get("upbit_price"))
         reference_krw = _finite(ref.get("price_krw"))
-        self.conn.execute(
-            """INSERT INTO research_market_domestic_premium_mx(
-                   market,symbol,provider,provider_id,identity_verified,status,
-                   bithumb_price_krw,upbit_price_krw,reference_exchange,reference_market,
-                   reference_quote_asset,reference_price_quote,quote_to_krw,reference_price_krw,
-                   reference_source_ts,bithumb_premium_pct,upbit_premium_pct,
-                   foreign_verified_sources,foreign_price_gap_pct,source_evidence_json,received_at,feature_version
-               ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-               ON CONFLICT(market) DO UPDATE SET
-                   symbol=excluded.symbol,provider=excluded.provider,provider_id=excluded.provider_id,
-                   identity_verified=excluded.identity_verified,status=excluded.status,
-                   bithumb_price_krw=excluded.bithumb_price_krw,upbit_price_krw=excluded.upbit_price_krw,
-                   reference_exchange=excluded.reference_exchange,reference_market=excluded.reference_market,
-                   reference_quote_asset=excluded.reference_quote_asset,reference_price_quote=excluded.reference_price_quote,
-                   quote_to_krw=excluded.quote_to_krw,reference_price_krw=excluded.reference_price_krw,
-                   reference_source_ts=excluded.reference_source_ts,bithumb_premium_pct=excluded.bithumb_premium_pct,
-                   upbit_premium_pct=excluded.upbit_premium_pct,foreign_verified_sources=excluded.foreign_verified_sources,
-                   foreign_price_gap_pct=excluded.foreign_price_gap_pct,source_evidence_json=excluded.source_evidence_json,
-                   received_at=excluded.received_at,feature_version=excluded.feature_version""",
-            (
-                str(market).upper(),
-                _symbol(market),
-                provider,
-                provider_id,
-                1 if identity_verified else 0,
-                status,
-                bithumb_price,
-                upbit_price,
-                str(ref.get("exchange") or ""),
-                str(ref.get("market") or ""),
-                str(ref.get("quote_asset") or ""),
-                _finite(ref.get("price_quote")),
-                _finite(ref.get("quote_to_krw")),
-                reference_krw,
-                _finite(ref.get("source_ts")),
-                ((bithumb_price / reference_krw - 1.0) * 100.0) if bithumb_price and reference_krw else None,
-                ((upbit_price / reference_krw - 1.0) * 100.0) if upbit_price and reference_krw else None,
-                len(sources),
-                foreign_gap,
-                json.dumps(sources[:6], ensure_ascii=False, separators=(",", ":")),
-                now,
-                FEATURE_VERSION,
-            ),
-        )
-        self.conn.commit()
+        with self.conn:
+            self.conn.execute(
+                """INSERT INTO research_market_domestic_premium_mx(
+                       market,symbol,provider,provider_id,identity_verified,status,
+                       bithumb_price_krw,upbit_price_krw,reference_exchange,reference_market,
+                       reference_quote_asset,reference_price_quote,quote_to_krw,reference_price_krw,
+                       reference_source_ts,bithumb_premium_pct,upbit_premium_pct,
+                       foreign_verified_sources,foreign_price_gap_pct,source_evidence_json,received_at,feature_version
+                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                   ON CONFLICT(market) DO UPDATE SET
+                       symbol=excluded.symbol,provider=excluded.provider,provider_id=excluded.provider_id,
+                       identity_verified=excluded.identity_verified,status=excluded.status,
+                       bithumb_price_krw=excluded.bithumb_price_krw,upbit_price_krw=excluded.upbit_price_krw,
+                       reference_exchange=excluded.reference_exchange,reference_market=excluded.reference_market,
+                       reference_quote_asset=excluded.reference_quote_asset,reference_price_quote=excluded.reference_price_quote,
+                       quote_to_krw=excluded.quote_to_krw,reference_price_krw=excluded.reference_price_krw,
+                       reference_source_ts=excluded.reference_source_ts,bithumb_premium_pct=excluded.bithumb_premium_pct,
+                       upbit_premium_pct=excluded.upbit_premium_pct,foreign_verified_sources=excluded.foreign_verified_sources,
+                       foreign_price_gap_pct=excluded.foreign_price_gap_pct,source_evidence_json=excluded.source_evidence_json,
+                       received_at=excluded.received_at,feature_version=excluded.feature_version""",
+                (
+                    str(market).upper(),
+                    _symbol(market),
+                    provider,
+                    provider_id,
+                    1 if identity_verified else 0,
+                    status,
+                    bithumb_price,
+                    upbit_price,
+                    str(ref.get("exchange") or ""),
+                    str(ref.get("market") or ""),
+                    str(ref.get("quote_asset") or ""),
+                    _finite(ref.get("price_quote")),
+                    _finite(ref.get("quote_to_krw")),
+                    reference_krw,
+                    _finite(ref.get("source_ts")),
+                    ((bithumb_price / reference_krw - 1.0) * 100.0) if bithumb_price and reference_krw else None,
+                    ((upbit_price / reference_krw - 1.0) * 100.0) if upbit_price and reference_krw else None,
+                    len(sources),
+                    foreign_gap,
+                    json.dumps(sources[:6], ensure_ascii=False, separators=(",", ":")),
+                    now,
+                    FEATURE_VERSION,
+                ),
+            )
 
     def collect_market(self, market: str, *, now: float | None = None) -> dict[str, Any]:
         started = time.time()

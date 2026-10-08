@@ -18,6 +18,7 @@ from .market_ohlcv_store import MarketOhlcvStore
 from .market_price_flow_divergence import MarketPriceFlowDivergenceStore
 from .market_relative_strength import BENCHMARK_MARKETS, MarketRelativeStrengthEngine
 from .research_control import atomic_json
+from .research_stage import ResearchStage
 
 STATE_PATH = Path("b3_trader/data/research-platform/market-ohlcv-cycle-state.json")
 EXCHANGES = ("bithumb", "upbit")
@@ -111,6 +112,12 @@ class MarketOhlcvResearchCycle:
         self.domestic_premium = MarketDomesticPremiumEngine(self.store.conn)
         self.state_path = Path(state_path)
         self._owns_store = store is None
+        self.stages = ResearchStage(
+            self.state_path.with_name("market-ohlcv-progress.json"),
+            {"ohlcv": self.store.conn, "flow": self.flow_store.conn,
+             "divergence": self.price_flow_divergence.conn, "reaction": self.flow_reaction.conn,
+             "reliability": self.flow_reliability.conn},
+        )
 
     def close(self) -> None:
         self.flow_reliability.close()
@@ -149,7 +156,8 @@ class MarketOhlcvResearchCycle:
                 next_cursors[exchange] = int(cursors.get(exchange) or 0)
                 continue
             try:
-                market_rows = [row for row in adapter.krw_markets() if str(row.market).startswith("KRW-")]
+                market_rows = [row for row in self.stages.run(f"markets:{exchange}", adapter.krw_markets)
+                               if str(row.market).startswith("KRW-")]
                 markets = sorted({row.market for row in market_rows})
                 market_names[exchange] = {str(row.market): str(row.name or "") for row in market_rows}
             except Exception as exc:
@@ -169,10 +177,12 @@ class MarketOhlcvResearchCycle:
             flow_picked = set(picked[:MAX_FLOW_MARKETS_PER_EXCHANGE_PER_RUN])
             market_results: list[dict[str, Any]] = []
             for market in picked:
-                outcome = self.collector.collect_market(adapter, market, now=now)
+                outcome = self.stages.run(f"ohlcv:{exchange}:{market}", self.collector.collect_market,
+                                          adapter, market, now=now)
                 if market in flow_picked:
                     try:
-                        flow = self.flow_collector.collect_market(adapter, market, now=time.time())
+                        flow = self.stages.run(f"flow:{exchange}:{market}", self.flow_collector.collect_market,
+                                               adapter, market, now=time.time())
                     except Exception as exc:
                         flow = {
                             "ok": False,
@@ -201,7 +211,9 @@ class MarketOhlcvResearchCycle:
                 total_processed += 1
 
             try:
-                relative = self.relative_strength.compute_exchange(exchange, universe_count=len(markets))
+                relative = self.stages.run(f"relative_strength:{exchange}",
+                                           self.relative_strength.compute_exchange, exchange,
+                                           universe_count=len(markets))
             except Exception as exc:
                 total_failures += 1
                 relative = {
@@ -225,7 +237,7 @@ class MarketOhlcvResearchCycle:
             }
 
         try:
-            gap_result = self.cross_exchange_gap.compute(
+            gap_result = self.stages.run("cross_exchange_gap", self.cross_exchange_gap.compute,
                 bithumb_names=market_names.get("bithumb", {}),
                 upbit_names=market_names.get("upbit", {}),
                 now=now,
@@ -260,7 +272,8 @@ class MarketOhlcvResearchCycle:
         )
         if premium_picked:
             try:
-                premium_result = self.domestic_premium.collect_market(premium_picked[0], now=now)
+                premium_result = self.stages.run("domestic_premium", self.domestic_premium.collect_market,
+                                                 premium_picked[0], now=now)
             except Exception as exc:
                 total_failures += 1
                 premium_result = {
@@ -285,7 +298,8 @@ class MarketOhlcvResearchCycle:
             next_premium_cursor = 0
 
         try:
-            price_flow_result = self.price_flow_divergence.compute_pending(now=time.time())
+            price_flow_result = self.stages.run("price_flow_divergence", self.price_flow_divergence.compute_pending,
+                                                now=time.time())
         except Exception as exc:
             total_failures += 1
             price_flow_result = {
@@ -301,7 +315,8 @@ class MarketOhlcvResearchCycle:
             }
 
         try:
-            flow_reaction_result = self.flow_reaction.compute_pending(now=time.time())
+            flow_reaction_result = self.stages.run("flow_reaction", self.flow_reaction.compute_pending,
+                                                  now=time.time())
         except Exception as exc:
             total_failures += 1
             flow_reaction_result = {
@@ -318,7 +333,8 @@ class MarketOhlcvResearchCycle:
             }
 
         try:
-            flow_reliability_result = self.flow_reliability.compute(now=time.time())
+            flow_reliability_result = self.stages.run("flow_reliability", self.flow_reliability.compute,
+                                                     now=time.time())
         except Exception as exc:
             total_failures += 1
             flow_reliability_result = {

@@ -407,18 +407,21 @@ class MarketPriceFlowDivergenceStore:
         buy_candidates = 0
         sell_candidates = 0
         touched: set[tuple[str, str, str]] = set()
+        prepared = []
+        for candidate in candidates:
+            price = self._price_candle(candidate)
+            derived = self._derive(candidate, price, current)
+            prepared.append(derived)
+            touched.add((derived["exchange"], derived["market"], derived["window_label"]))
+            if derived["data_ready"]:
+                ready += 1
+            else:
+                waiting += 1
+            buy_candidates += int(derived["passive_buy_absorption_candidate"])
+            sell_candidates += int(derived["passive_sell_absorption_candidate"])
         with self.conn:
-            for candidate in candidates:
-                price = self._price_candle(candidate)
-                derived = self._derive(candidate, price, current)
+            for derived in prepared:
                 self._upsert(derived)
-                touched.add((derived["exchange"], derived["market"], derived["window_label"]))
-                if derived["data_ready"]:
-                    ready += 1
-                else:
-                    waiting += 1
-                buy_candidates += int(derived["passive_buy_absorption_candidate"])
-                sell_candidates += int(derived["passive_sell_absorption_candidate"])
             for exchange, market, label in touched:
                 self._prune(exchange, market, label)
         return {

@@ -156,7 +156,7 @@ class MarketFlowReliabilityStore:
             )
             grouped[key][exchange].append(value)
 
-        self.conn.execute("DELETE FROM research_market_flow_reliability_mx")
+        prepared = []
         status_counts: Counter[str] = Counter()
         promotion_ready_rows = 0
         observation_ready_rows = 0
@@ -196,15 +196,7 @@ class MarketFlowReliabilityStore:
             else:
                 status = "collecting"
 
-            self.conn.execute(
-                """INSERT INTO research_market_flow_reliability_mx(
-                       market,signal_window_label,signal_evidence_label,horizon_label,
-                       bithumb_sample_count,upbit_sample_count,pooled_sample_count,
-                       bithumb_mean_hypothesis_return_pct,upbit_mean_hypothesis_return_pct,
-                       pooled_mean_hypothesis_return_pct,bithumb_hit_rate_pct,upbit_hit_rate_pct,
-                       pooled_hit_rate_pct,pooled_wilson_lower_pct,cross_exchange_direction_consistent,
-                       observation_ready,promotion_ready,status,source,received_at,feature_version,schema_version
-                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            prepared.append(
                 (
                     *key,
                     int(bithumb["count"]),int(upbit["count"]),int(pooled["count"]),
@@ -220,7 +212,19 @@ class MarketFlowReliabilityStore:
             observation_ready_rows += 1 if observation_ready else 0
             promotion_ready_rows += 1 if promotion_ready else 0
 
-        self.conn.commit()
+        with self.conn:
+            self.conn.execute("DELETE FROM research_market_flow_reliability_mx")
+            self.conn.executemany(
+                """INSERT INTO research_market_flow_reliability_mx(
+                       market,signal_window_label,signal_evidence_label,horizon_label,
+                       bithumb_sample_count,upbit_sample_count,pooled_sample_count,
+                       bithumb_mean_hypothesis_return_pct,upbit_mean_hypothesis_return_pct,
+                       pooled_mean_hypothesis_return_pct,bithumb_hit_rate_pct,upbit_hit_rate_pct,
+                       pooled_hit_rate_pct,pooled_wilson_lower_pct,cross_exchange_direction_consistent,
+                       observation_ready,promotion_ready,status,source,received_at,feature_version,schema_version
+                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                prepared,
+            )
 
         promotion_gate = MarketFlowPromotionGateStore(self.path)
         try:

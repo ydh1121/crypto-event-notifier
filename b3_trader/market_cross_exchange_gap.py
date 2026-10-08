@@ -165,37 +165,37 @@ class MarketCrossExchangeGapEngine:
             )
 
         if prepared:
-            self.conn.executemany(
-                """INSERT INTO research_market_cross_exchange_gap_mx(
-                       market,symbol,bithumb_market,upbit_market,bithumb_name,upbit_name,
-                       identity_verified,identity_basis,bithumb_price,upbit_price,
-                       bithumb_source_ts,upbit_source_ts,source_skew_seconds,
-                       upbit_vs_bithumb_pct,absolute_gap_pct,gap_ready,source_timeframe,
-                       source_table,received_at,feature_version
-                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                   ON CONFLICT(market) DO UPDATE SET
-                       symbol=excluded.symbol,
-                       bithumb_market=excluded.bithumb_market,
-                       upbit_market=excluded.upbit_market,
-                       bithumb_name=excluded.bithumb_name,
-                       upbit_name=excluded.upbit_name,
-                       identity_verified=excluded.identity_verified,
-                       identity_basis=excluded.identity_basis,
-                       bithumb_price=excluded.bithumb_price,
-                       upbit_price=excluded.upbit_price,
-                       bithumb_source_ts=excluded.bithumb_source_ts,
-                       upbit_source_ts=excluded.upbit_source_ts,
-                       source_skew_seconds=excluded.source_skew_seconds,
-                       upbit_vs_bithumb_pct=excluded.upbit_vs_bithumb_pct,
-                       absolute_gap_pct=excluded.absolute_gap_pct,
-                       gap_ready=excluded.gap_ready,
-                       source_timeframe=excluded.source_timeframe,
-                       source_table=excluded.source_table,
-                       received_at=excluded.received_at,
-                       feature_version=excluded.feature_version""",
-                prepared,
-            )
-            self.conn.commit()
+            with self.conn:
+                self.conn.executemany(
+                    """INSERT INTO research_market_cross_exchange_gap_mx(
+                           market,symbol,bithumb_market,upbit_market,bithumb_name,upbit_name,
+                           identity_verified,identity_basis,bithumb_price,upbit_price,
+                           bithumb_source_ts,upbit_source_ts,source_skew_seconds,
+                           upbit_vs_bithumb_pct,absolute_gap_pct,gap_ready,source_timeframe,
+                           source_table,received_at,feature_version
+                       ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                       ON CONFLICT(market) DO UPDATE SET
+                           symbol=excluded.symbol,
+                           bithumb_market=excluded.bithumb_market,
+                           upbit_market=excluded.upbit_market,
+                           bithumb_name=excluded.bithumb_name,
+                           upbit_name=excluded.upbit_name,
+                           identity_verified=excluded.identity_verified,
+                           identity_basis=excluded.identity_basis,
+                           bithumb_price=excluded.bithumb_price,
+                           upbit_price=excluded.upbit_price,
+                           bithumb_source_ts=excluded.bithumb_source_ts,
+                           upbit_source_ts=excluded.upbit_source_ts,
+                           source_skew_seconds=excluded.source_skew_seconds,
+                           upbit_vs_bithumb_pct=excluded.upbit_vs_bithumb_pct,
+                           absolute_gap_pct=excluded.absolute_gap_pct,
+                           gap_ready=excluded.gap_ready,
+                           source_timeframe=excluded.source_timeframe,
+                           source_table=excluded.source_table,
+                           received_at=excluded.received_at,
+                           feature_version=excluded.feature_version""",
+                    prepared,
+                )
 
         return {
             "ok": True,
