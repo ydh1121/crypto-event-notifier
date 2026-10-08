@@ -66,6 +66,7 @@ class MultiExchangePaperDemo(AutoPaperDemo):
         self.names: dict[str, str] = {}
         self.market_meta: dict[str, PublicMarket] = {}
         self.scan_number = 0
+        self.scan_failure: dict[str, Any] = {}
         self.last_scan_started = 0.0
         self.last_scan_completed = 0.0
         self.status_path = Path(f"dashboard/runtime-demo-{self.exchange}.json")
@@ -212,6 +213,8 @@ class MultiExchangePaperDemo(AutoPaperDemo):
             "running": not bool(error),
             "paper_only": True,
             "phase": 3,
+            "scan_failure": getattr(self, "scan_failure", {}),
+            "transaction_recovery_version": 1,
             "mode": "multi_exchange_per_coin_adaptive_research",
             "exchange": self.exchange,
             "strategy": self.strategy_name,
@@ -265,19 +268,41 @@ class MultiExchangePaperDemo(AutoPaperDemo):
         }
         _atomic_json(self.status_path, payload)
 
+    def _record_market(self, row, account, profile, signal, orderbook, btc_candles, now):
+        with self.store.market_transaction():
+            super()._record_market(row, account, profile, signal, orderbook, btc_candles, now)
+
     def scan_once(self) -> None:
-        super().scan_once()
-        now = time.time()
-        if now - self._last_retention_maintenance < RETENTION_MAINTENANCE_SECONDS:
-            return
-        self.last_retention_result = self.retention.prune_scope(
-            exchange=self.exchange,
-            strategy=self.strategy_name,
-            now=now,
-            memory_days=HOT_MEMORY_DAYS,
-            equity_days=HOT_EQUITY_DAYS,
-        )
-        self._last_retention_maintenance = now
+        self.scan_failure = {}
+        try:
+            super().scan_once()
+            now = time.time()
+            if now - self._last_retention_maintenance < RETENTION_MAINTENANCE_SECONDS:
+                return
+            self.last_retention_result = self.retention.prune_scope(
+                exchange=self.exchange,
+                strategy=self.strategy_name,
+                now=now,
+                memory_days=HOT_MEMORY_DAYS,
+                equity_days=HOT_EQUITY_DAYS,
+            )
+            self._last_retention_maintenance = now
+
+        except Exception as exc:
+            # Both the persistent Bithumb loop and Upbit supervisor reuse this
+            # connection. End every failed transaction before any status read.
+            self.store.conn.rollback()
+            self.scan_failure = {
+                "at": time.time(), "type": type(exc).__name__,
+                "sqlite_errorcode": getattr(exc, "sqlite_errorcode", None),
+                "sqlite_errorname": getattr(exc, "sqlite_errorname", None),
+                "transaction_open": self.store.conn.in_transaction,
+            }
+            try:
+                self._write_status(scanned=0, total=0, error=f"{type(exc).__name__}: {exc}")
+            except Exception:
+                pass  # Preserve the original scan error for the supervisor.
+            raise
 
     def run_once(self) -> None:
         try:

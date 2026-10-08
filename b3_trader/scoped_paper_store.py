@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 import time
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,30 @@ class ScopedPaperStore(MultiExchangeStore):
         if not self.exchange or not self.strategy:
             raise ValueError("exchange and strategy are required")
         super().__init__(path)
+
+    @contextmanager
+    def market_transaction(self):
+        """Keep one market's account, fills, learning and signal together.
+
+        Quotation/scoring requests happen before this short write transaction.
+        Standalone store calls retain their existing commit behavior.
+        """
+        if getattr(self, "_market_transaction_active", False) or self.conn.in_transaction:
+            raise RuntimeError("PAPER market transaction already active")
+        try:
+            self.conn.execute("BEGIN IMMEDIATE")
+            self._market_transaction_active = True
+            yield
+            self.conn.commit()
+        except BaseException:
+            self.conn.rollback()
+            raise
+        finally:
+            self._market_transaction_active = False
+
+    def _commit(self):
+        if not getattr(self, "_market_transaction_active", False):
+            self.conn.commit()
 
     @property
     def scope(self) -> tuple[str, str]:
@@ -55,7 +80,7 @@ class ScopedPaperStore(MultiExchangeStore):
                 time.time(), self.exchange, account["market"], self.strategy,
             ),
         )
-        self.conn.commit()
+        self._commit()
 
     def save_profile(self, market: str, profile: dict[str, Any]) -> None:
         self.conn.execute(
@@ -69,7 +94,7 @@ class ScopedPaperStore(MultiExchangeStore):
                 self.exchange, market, self.strategy,
             ),
         )
-        self.conn.commit()
+        self._commit()
 
     def add_fill(
         self, *, market: str, symbol: str, side: str, price: float, volume: float, krw: float,
@@ -87,7 +112,7 @@ class ScopedPaperStore(MultiExchangeStore):
                 json.dumps(signal or {}, ensure_ascii=False),
             ),
         )
-        self.conn.commit()
+        self._commit()
 
     def fills(self, market: str | None = None) -> list[dict[str, Any]]:
         if market:
@@ -157,7 +182,7 @@ class ScopedPaperStore(MultiExchangeStore):
             ),
         )
         self._append_market_memory(row, payload)
-        self.conn.commit()
+        self._commit()
 
     def _append_market_memory(self, row: dict[str, Any], signal: dict[str, Any]) -> None:
         market = str(row.get("market") or "")
@@ -223,7 +248,7 @@ class ScopedPaperStore(MultiExchangeStore):
                 json.dumps(profile_after, ensure_ascii=False), json.dumps(signal, ensure_ascii=False), note,
             ),
         )
-        self.conn.commit()
+        self._commit()
 
     def snapshot_equity(self, market: str, equity: float, cash: float, position_value: float) -> None:
         last = self.conn.execute(
@@ -244,7 +269,7 @@ class ScopedPaperStore(MultiExchangeStore):
             "DELETE FROM research_equity_mx WHERE exchange=? AND strategy=? AND ts < ?",
             (self.exchange, self.strategy, now - 90 * 86400.0),
         )
-        self.conn.commit()
+        self._commit()
 
     def leaderboard(self, limit: int = 5000) -> list[dict[str, Any]]:
         rows = self.conn.execute(

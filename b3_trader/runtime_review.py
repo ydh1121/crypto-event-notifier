@@ -255,6 +255,38 @@ def _positive_clock(value):
     return value if isinstance(value, (int, float)) and math.isfinite(value) and value > 0 else None
 
 
+def read_paper_scans(root: Path, now: float):
+    """Read bounded per-exchange scan progress, never account/secret payloads."""
+    result = {}
+    for exchange, path in (("bithumb", "dashboard/runtime-demo.json"),
+                           ("upbit", "dashboard/runtime-demo-upbit.json")):
+        meta, value = _json_file(root / path)
+        row = {**meta, "file": path}
+        for key in ("pid", "updated_at", "last_scan_started", "last_scan_completed",
+                    "scan_number", "scanned_count", "scan_total", "transaction_recovery_version"):
+            number = value.get(key)
+            if type(number) in (int, float) and math.isfinite(number) and number >= 0:
+                row[key] = number
+        completed = _positive_clock(row.get("last_scan_completed"))
+        row["last_completed_age_seconds"] = max(0, now - completed) if completed else None
+        row["error_kinds"] = _error_kinds(value.get("error", ""))
+        row["error_present"] = bool(value.get("error"))
+        failure = value.get("scan_failure")
+        if isinstance(failure, dict):
+            row["scan_failure"] = {}
+            for key in ("at", "sqlite_errorcode"):
+                number = failure.get(key)
+                if type(number) in (int, float) and math.isfinite(number) and number >= 0:
+                    row["scan_failure"][key] = number
+            name = failure.get("sqlite_errorname")
+            if isinstance(name, str) and re.fullmatch(r"SQLITE_[A-Z_]{1,60}", name):
+                row["scan_failure"]["sqlite_errorname"] = name
+            if type(failure.get("transaction_open")) is bool:
+                row["scan_failure"]["transaction_open"] = failure["transaction_open"]
+        result[exchange] = row
+    return result
+
+
 def read_runtime(db: Path):
     result = {"observed_at": time.time(), "activity": read_activity(db), "event_capture": read_event_capture(db)}
     if db.name != "auto_demo.sqlite3" or db.parent.name != "data" or db.parent.parent.name != "b3_trader":
@@ -263,6 +295,7 @@ def read_runtime(db: Path):
     processes = _processes(root)
     result.update(status="observed", processes=processes,
                   collection_source=read_collection_source(root),
+                  paper_scans=read_paper_scans(root, result["observed_at"]),
                   saved_statuses={role: _status(root, role, processes) for role in STATUS_FILES})
     result["research_log"] = _log_kinds(root / "b3_trader/data/research-platform/supervisor.log")
     result["process_logs"] = {role: _log_kinds(root / HOST_LOGS / f"{role}.log")

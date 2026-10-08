@@ -216,3 +216,24 @@ def test_strategy_aggregate_refresh_is_separate_from_account_activity(tmp_path):
     changes=review.compare_activity(before,after)
     assert changes['strategy_lab']['observation']=='unchanged'
     assert changes['strategy_lab_metrics']['observation']=='advanced'
+
+
+def test_paper_scan_evidence_is_scoped_and_excludes_payload_secrets(tmp_path):
+    directory = tmp_path / "dashboard"
+    directory.mkdir()
+    (directory / "runtime-demo-upbit.json").write_text(json.dumps({
+        "pid": 12, "last_scan_completed": 100, "updated_at": 500,
+        "error": "database is locked token=private-value", "leaderboard": [{"secret": "private-value"}],
+        "transaction_recovery_version": 1, "scan_failure": {
+            "at": 499, "type": "OperationalError", "sqlite_errorcode": 517,
+            "sqlite_errorname": "SQLITE_BUSY_SNAPSHOT", "transaction_open": False,
+            "unknown": "private-value"}}))
+    evidence = review.read_paper_scans(tmp_path, 501)
+    assert evidence["bithumb"]["status"] == "missing"
+    upbit = evidence["upbit"]
+    assert upbit["last_completed_age_seconds"] == 401
+    assert upbit["error_kinds"] == ["database_locked"]
+    assert upbit["scan_failure"]["sqlite_errorcode"] == 517
+    assert upbit["scan_failure"]["transaction_open"] is False
+    assert "private-value" not in json.dumps(evidence)
+    assert "leaderboard" not in json.dumps(evidence)

@@ -829,6 +829,36 @@ class AutoPaperDemo:
         }
         _atomic_json(STATUS_PATH, payload)
 
+    def _record_market(self, row, account, profile, signal, orderbook, btc_candles, now):
+        """Apply the existing decision and persistence sequence for one market."""
+        market = row["market"]
+        opportunity = self._opportunity(signal, row["liquidity_score"])
+        preliminary = self._build_trade_plan(account, profile, signal, opportunity, row["price"], "wait")
+        intent, reason = self._trade_intent(account, profile, signal, opportunity, row["price"], now, preliminary)
+        plan = self._build_trade_plan(account, profile, signal, opportunity, row["price"], intent)
+        execution_note = ""
+        if intent in {"buy", "explore", "idle_explore", "add"}:
+            execution_note = self._buy(account, profile, row, signal, opportunity, intent, orderbook, btc_candles, plan)
+        elif intent == "sell":
+            execution_note = self._sell(account, profile, row, signal, opportunity, reason, orderbook, plan)
+        equity, position_value = self._update_equity(account, row["price"])
+        final_plan = self._build_trade_plan(account, profile, signal, opportunity, row["price"], intent)
+        self.store.save_signal(
+            {
+                "market": market, "symbol": row["symbol"], "ts": now, "price": row["price"],
+                "turnover_24h": row["turnover_24h"], "change_24h_pct": row["change_24h_pct"],
+                "liquidity_score": row["liquidity_score"], "regime_score": signal.regime_score,
+                "entry_score": signal.entry_score, "opportunity_score": opportunity,
+                "strategy_action": signal.action, "trade_intent": intent,
+                "suggested_weight_pct": final_plan["suggested_weight_pct"],
+                "reason": f"{reason}; {execution_note}" if execution_note else reason,
+                "signal": {
+                    **asdict(signal), "equity_krw": equity, "position_value_krw": position_value,
+                    "trade_plan": final_plan, "execution_note": execution_note,
+                },
+            }
+        )
+
     def scan_once(self) -> None:
         self.last_scan_started = time.time()
         tickers, names = self._all_tickers()
@@ -852,33 +882,13 @@ class AutoPaperDemo:
             now = time.time()
             try:
                 signal, orderbook = self._score_market(row, btc_candles, eth_candles, breadth)
-                opportunity = self._opportunity(signal, row["liquidity_score"])
-                preliminary = self._build_trade_plan(account, profile, signal, opportunity, row["price"], "wait")
-                intent, reason = self._trade_intent(account, profile, signal, opportunity, row["price"], now, preliminary)
-                plan = self._build_trade_plan(account, profile, signal, opportunity, row["price"], intent)
-                execution_note = ""
-                if intent in {"buy", "explore", "idle_explore", "add"}:
-                    execution_note = self._buy(account, profile, row, signal, opportunity, intent, orderbook, btc_candles, plan)
-                elif intent == "sell":
-                    execution_note = self._sell(account, profile, row, signal, opportunity, reason, orderbook, plan)
-                equity, position_value = self._update_equity(account, row["price"])
-                final_plan = self._build_trade_plan(account, profile, signal, opportunity, row["price"], intent)
-                self.store.save_signal(
-                    {
-                        "market": market, "symbol": row["symbol"], "ts": now, "price": row["price"],
-                        "turnover_24h": row["turnover_24h"], "change_24h_pct": row["change_24h_pct"],
-                        "liquidity_score": row["liquidity_score"], "regime_score": signal.regime_score,
-                        "entry_score": signal.entry_score, "opportunity_score": opportunity,
-                        "strategy_action": signal.action, "trade_intent": intent,
-                        "suggested_weight_pct": final_plan["suggested_weight_pct"],
-                        "reason": f"{reason}; {execution_note}" if execution_note else reason,
-                        "signal": {
-                            **asdict(signal), "equity_krw": equity, "position_value_krw": position_value,
-                            "trade_plan": final_plan, "execution_note": execution_note,
-                        },
-                    }
-                )
+                self._record_market(row, account, profile, signal, orderbook, btc_candles, now)
                 self._write_market_detail(market)
+            except sqlite3.Error:
+                # A failed write may leave a read snapshot open. Never publish
+                # an analysis score or retry trading through that transaction.
+                self.store.conn.rollback()
+                raise
             except Exception as exc:
                 self.store.save_signal(
                     {
