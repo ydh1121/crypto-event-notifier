@@ -96,12 +96,14 @@ def read_storage(paper, holdings=None, *, seconds=5):
     # A large archive must not prevent observing all later folders.
     budget = seconds / (len(BACKUP_FOLDERS)+len(DATA_FOLDERS))
     return {'observed_at': now, 'mode': 'read_only', 'data_directory': str(directory),
+            'sqlite_version': sqlite3.sqlite_version,
             'paper': database_info(paper), 'holdings': database_info(holdings),
             'folders': [folder_info(directory/name, deadline=time.monotonic()+budget, now=now, backup=name in BACKUP_FOLDERS)
                         for name in (*BACKUP_FOLDERS, *DATA_FOLDERS)],
             'requested_backup_retention_hours': 48, 'cleanup_applied': False,
             'last_cleanup': read_status(directory/'storage-cleanup-result.json'),
             'maintenance': read_status(directory/'storage-maintenance.json'),
+            'wal_startup': read_status(directory/'storage-wal-result.json'),
             'limitations': ['Folder ages do not establish that a backup is safe to delete.',
                             'No full table scan or database integrity scan was run.',
                             'Active files may change during this observation.']}

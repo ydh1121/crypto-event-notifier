@@ -39,6 +39,8 @@ def start_collection(repo: Path, *, confirmed_exchange: str | None = None, minim
         raise ValueError('Process state could not be verified; collector was not started.')
     if state.get('items'):
         raise ValueError('A collector is already running or its ownership is unresolved. Keep its window open.')
+    from .storage_wal import prepare_collection_storage
+    prepare_collection_storage(repo)
     print('COLLECTION: '+str(repo), flush=True)
     print('SOURCE: '+git('rev-parse', 'HEAD'), flush=True)
     print('Keep this window open. Ctrl+C stops this collection session.', flush=True)

@@ -21,7 +21,7 @@ PYTHON_FILES = (
     'workspace_tools.py', 'workspace_packages.py', 'collection_update.py',
     'journal_backup.py', 'holding_registration.py', 'holding_identity.py', 'holding_management.py',
     'check_report_output.py', 'intelligence_review.py', 'collection_source.py', 'storage_review.py',
-    'managed_backup.py', 'storage_cleanup.py', 'research_work_lock.py',
+    'managed_backup.py', 'storage_cleanup.py', 'storage_wal.py', 'research_work_lock.py',
 )
 WORKSPACE_FOLDER = 'CRYPTO'
 TOOLS_LAUNCHER = r'''@echo off
@@ -44,14 +44,17 @@ WORKSPACE_README = '''CRYPTO — 앞으로 계속 사용하는 고정 폴더
 
 현재 도구 버전: @BUILD@
 
-이번 변경: DB 잠금 오류 뒤 가상매매 갱신이 계속 실패하는 문제를 복구합니다. 소액 실거래 금액 비교도 포함합니다.
+이번 변경: 수집 시작 전에 큰 DB 쓰기 임시파일의 공간을 안전하게 회수합니다. 기존 가상매매 복구와 소액 비교도 포함합니다.
 1. CRYPTO VIEWER 검은 창을 X로 닫습니다.
 2. 기존 KEEP OPEN 수집 창에서 Ctrl+C를 한 번 누르고 종료를 기다립니다. 제목에 '선택'이 있으면 Esc부터 누릅니다.
 3. Y/N 질문이 나오면 그 기존 창에서 Y 입력 후 Enter를 누르고 창을 닫습니다.
 4. 압축 안 CRYPTO의 내용을 기존 바탕화면 CRYPTO에 덮어씁니다. 새 폴더는 만들지 않습니다.
-5. UPDATE_COLLECTION.cmd를 실행합니다. 갱신 후 자동으로 시작된 새 KEEP OPEN 수집 창은 켜 둡니다.
+5. UPDATE_COLLECTION.cmd를 실행합니다. 시작 전 용량 정리가 끝날 때까지 기다리고, 새 KEEP OPEN 수집 창은 켜 둡니다.
 6. RUN_REVIEW.cmd를 실행하고, 10분 이상 수집한 뒤 RUN_CHECK.cmd의 결과를 첨부합니다.
 CLEAN_STORAGE는 다시 실행하지 않습니다. 기존 DB·보유정보·체결 내역은 그대로 사용합니다.
+임시파일이 1GiB 이상이고 DB를 독점 사용할 수 있을 때만 정리합니다. 다른 창에서 사용 중이면 정리를 건너뜁니다.
+당일 검증 백업을 재사용하고 DB별 하루 한 번만 공간을 회수합니다. 수집 중에는 임시파일을 반복 삭제하지 않습니다.
+이번 공간 회수 결과는 RUN_CHECK.cmd 결과에 함께 들어갑니다.
 실전 계획 → 코인 → 전략 → 소액 매매에서 비용 반영 매수/매도 금액과 손익을 비교합니다.
 가상매매 → 코인 선택 → 반응도 → 경제지표 또는 정책·뉴스 → 종류별 누적.
 기간·발표 종류·전략을 고르면 반응 표본과 매매 금액·손익을 확인할 수 있습니다.
@@ -162,15 +165,17 @@ README = '''가상매매 · 실전 계획 검토 화면
 보유 거래소 적용: @HOLDINGS_EXCHANGE@
 고정된 CRYPTO 폴더를 사용합니다. 조회 창을 닫은 뒤 기존 CRYPTO에 덮어씁니다.
 
-이번 가상매매 복구 적용:
+이번 DB 용량 관리 적용:
 CRYPTO VIEWER 검은 창을 X로 닫습니다.
 기존 수집 창에서 Ctrl+C를 한 번 누르고 기다립니다. 제목에 '선택'이 있으면 Esc부터 누릅니다.
 Y/N 질문이 뜨면 Y 입력 후 Enter → 기존 창 닫기 → 기존 CRYPTO 폴더에 덮어쓰기.
-UPDATE_COLLECTION.cmd → 갱신 후 자동 시작된 새 KEEP OPEN 창 유지 → RUN_REVIEW.cmd.
+UPDATE_COLLECTION.cmd → 시작 전 용량 정리 대기 → 새 KEEP OPEN 창 유지 → RUN_REVIEW.cmd.
 10분 이상 수집한 뒤 RUN_CHECK.cmd 결과를 첨부합니다. CLEAN_STORAGE 반복 실행은 필요 없습니다.
 실전 계획 → 코인 → 전략 → 소액 매매에서 실제 기록과 가상매매 금액·손익을 비교합니다.
 RUN_CHECK.cmd 결과에는 같은 계산에 사용한 소액 기록 개수와 비교 결과, 거래소별 가상매매 완료 시각과 DB 오류 코드가 포함됩니다.
-이번에는 UPDATE_COLLECTION과 CLEAN_STORAGE를 다시 실행하지 않습니다.
+큰 쓰기 임시파일은 수집 시작 전에만 검사합니다. 최근 검증 백업과 DB 독점 잠금을 확보한 경우만 공간을 회수합니다.
+DB별 하루 한 번·1GiB 이상 조건이며, 사용 중이거나 백업 검증이 안 되면 보류합니다. 체결·학습·이벤트 기록은 삭제하지 않습니다.
+RUN_CHECK는 읽기 전용이며 직전 공간 회수 결과와 전후 용량을 함께 표시합니다.
 이벤트 반응용 체결 가격은 빗썸·업비트 전체 원화 종목을 구독합니다.
 체결량·호가는 기존 보유·관심 종목 최대 8개 범위를 유지합니다. 자산 추가는 약 1분마다 반영합니다.
 이벤트별 전후 가격은 보존합니다. 늦게 수신된 발표에 쓰는 임시 분별 실제 체결 표본은 6시간만 유지합니다.

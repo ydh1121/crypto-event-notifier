@@ -38,6 +38,9 @@ def test_start_existing_canonical_host_and_wait_for_clean_ctrl_c_stop(collector,
         if len(waits) == 1: raise KeyboardInterrupt
         return 0
     def start(command, **kwargs):
+        receipt = json.loads((repo/'b3_trader/data/storage-wal-result.json').read_text())
+        assert receipt['phase'] == 'before_collection_start'
+        assert receipt['databases']['paper']['status'] == 'below_threshold'
         starts.append((command, kwargs))
         return SimpleNamespace(wait=wait)
     monkeypatch.setattr(tools.subprocess, 'Popen', start)
