@@ -1,8 +1,11 @@
 # Dashboard v1 handoff
 
-### Current — collection advancing; alt event retry loss repaired
+### Current — update ancestry recovery implemented; PC retry pending
 
-- STATE = RESEARCH_RECOVERY_OBSERVED / ALT_EVENT_RETRY_REPAIR_IMPLEMENTED / PC_APPLY_PENDING. WO CRYPTO-WO-20260921-RECOVERY-001.
+- STATE = UPDATE_CHECK_REPAIR_IMPLEMENTED / PC_APPLY_PENDING. WO CRYPTO-WO-20260921-RECOVERY-001.
+- LATEST USER RESULT = FETCHING COLLECTION UPDATE 이후 Git merge-base failed로 중단. 오류는 branch switch/merge/collector start 전에 발생한다. 제공 문구에 local/package/fetched SHA·shallow 여부가 없어 실제 PC의 실패 비교·근본 원인은 아직 확정할 수 없다.
+- UPDATE FIX = Git ancestry의 정상적인 false와 명령 오류를 구분. 검증된 원격 recovery 이력에 있는 후속 문서만 로컬에 앞서 있고 모든 비문서 파일이 package와 같으면 보존한다. shallow 이력으로 검증 실패 시 --deepen=256 한 번 후 재검증. 실제 코드/설정 차이·분기·미공개 커밋·로컬 수정은 거부하며 SHA3개와 이력 상태/원인을 출력. reset/clean/강제 checkout·DB/보유/전략 변경 없음.
+- UPDATE VERIFY = 수정 전4개 실패 재현, 신규5개 포함 업데이트·기존 실행·패키지 회귀28개 테스트 PASS. 실제 임시 Git repo의 문서 선행/primary 참조 보존/얕은 clone 이력 보충/새 코드·미공개 문서 거부/DB·환경 보존 확인. compile/diff PASS. 실제 PC 적용 성공은 다음 결과로 확인한다.
 - PROGRESS = 전체 약40% 유지. 실제 데이터로 수집·검증·계획·소액 비교가 이어지는 범위 기준 추정이다.
 - ACTUAL = CRYPTO_CHECK_RESULT(20261008-222605).json /305943bytes/SHA256fe35b4ca8b6c2303789f3ffebe5d80f81c77cbab961370716ff60cf779615634. ts1791497595.725–1791497629.865, 약34초 관측. Windows 첨부 근거이며 직접 PC 접속은 아니다.
 - VERSION = Viewer·collector e51067a0f4cb44d70f916d813cf50b5e24c95a06 적용·무결성 확인. 수집 host/sidecar 생존, 관측 구간 재시작 없음.
@@ -12,10 +15,10 @@
 - EVENTS = 최근120초 알트 빗썸155/업비트131개 실제 가격 확인. B3는 재접속 후 실제 체결1건 수신,34초 동안 추가 체결 없음만으로 장애로 판정하지 않는다. SEC15분/1시간 기록·4시간/1일 결측, 무역수지4구간 대상가 결측 유지. BTC/ETH 동일 발표4구간 기록. 과거 거래 부재/수집 공백 구분은 아직 미확인.
 - CHANGED = 저장 실패 후30초 재시도 중에도 알트 가격을 계속 보관. 이벤트 목록 조회 실패도 가격을 버리지 않고 기존 발표 시점·6시간 실제 분별 첫/마지막 체결을 유지. 이벤트 가격 조회 후16종목 단위 원자 저장, 반응 계산 후 발표별 원자 저장으로 긴 쓰기 점유·실패 후 열린 쓰기 제거. 가격·수익률 공식·120초 허용창·전략/PAPER·보존기간·schema 변경 없음.
 - VERIFY = 수정 전4개 실패 재현. 신규5개 포함 관련65개 테스트 PASS: 실제 SQLite 경합 중 알트 가격→보존→반응도→화면10% 대조, 실패 rollback·재시도 중복 없음, 조회 중 다른 writer 진입. compile/diff PASS. 이는 임시 검증 DB 결과이며 PC 과거 결측을 복구했다는 뜻이 아니다.
-- DELIVERY = 동일 CRYPTO.zip version32 /소스9381e4d980a680230d70b3015edd282d2b120a68 /188818bytes/86files/SHA256a078731d16802238d80639bf6e1839e170c754c9abc8ca7d4200bf7d0cd42987. 85payload 해시·stdlib-only import PASS. 기존 CRYPTO 덮어쓰기.
-- APPLY = 조회 검은 창 X→기존 수집 창 Esc(선택 상태일 때)·Ctrl+C 한 번 후 종료 대기→Y/N 질문이면 Y→Enter 후 기존 창 닫기→기존 CRYPTO에 덮어쓰기→UPDATE_COLLECTION.cmd→새 KEEP OPEN 유지→RUN_REVIEW.cmd→10분 이상 후 RUN_CHECK.cmd. CLEAN_STORAGE 재실행·새 폴더 불필요.
-- NEXT = 수정본 적용·지속 수신/저장 대조→새 발표의 알트·BTC·ETH 반응 누적과 수집 공백 구분→도미넌스/시장 전체→SNS/온체인/추가 거시→시간 순 코인별 전략 검증·근거 있는 상승 후보→수동 소액 대조 후 별도 승인 실전.
-- DURABLE = 동일 파일 version32 저장 완료. Drive CURRENT SNAPSHOT/BATON·Ledger·WBS 4문서 갱신 후 전체 본문 readback 일치. primary·Production·실주문·실제 DB 변경 없음.
+- DELIVERY = 동일 CRYPTO.zip version33 /소스5c7477eacf5625c66548189ca386d819015c28d6 /189978bytes/86files/SHA256938633d2bdd29b0caac80fae6ace35b3871a297e7caae4372e03edcdc219b84c. 85payload 해시·stdlib-only import PASS. 이전 알트 수집 수정 포함.
+- APPLY = 실패한 UPDATE 창은 아무 키로 닫기→조회·실행 중 수집이 있으면 종료(Esc는 선택 상태일 때, Ctrl+C 한 번, Y/N일 때만 Y→Enter)→기존 CRYPTO에 덮어쓰기→UPDATE_COLLECTION.cmd→새 KEEP OPEN 유지→RUN_REVIEW.cmd→10분 이상 후 RUN_CHECK.cmd. 재실패하면 LOCAL/PACKAGE/FETCHED SOURCE·HISTORY부터 오류까지 첨부. 새 폴더/CLEAN_STORAGE 불필요.
+- NEXT = UPDATE 성공·collector 시작과9381e4d 알트 수정 포함 확인→새 발표의 알트/BTC/ETH 반응 누적·공백 구분→도미넌스/시장 전체→SNS/온체인/추가 거시→시간 순 전략 검증·상승 후보→수동 소액 대조 후 별도 승인 실전. 전체 약40% 유지.
+- DURABLE = 동일 CRYPTO.zip version33 저장 완료. Drive CURRENT SNAPSHOT/BATON·Ledger·WBS 4문서 갱신 후 전체 본문 readback 일치. primary·Production·실주문·실제 DB 변경 없음.
 
 ### Previous checkpoint — shared daily backups and safe 48-hour cleanup implemented
 
