@@ -12,14 +12,84 @@ BRANCH = 'agent/crypto-product-data-recovery-20260921'
 PRIMARY_BRANCH = 'b3-auto-trader-phase1'
 
 
+class _GitFailure(ValueError):
+    def __init__(self, command, returncode):
+        self.returncode = returncode
+        # Git stderr may contain a credential-bearing remote URL.
+        super().__init__(f'Git {command} returned {returncode}. No reset or forced update was attempted.')
+
+
+class _HistoryMismatch(ValueError):
+    pass
+
+
 def _git(repo, *args):
     result = subprocess.run(['git', '-C', str(repo), *args], text=True,
                             capture_output=True, timeout=120,
                             env={**os.environ, 'GIT_TERMINAL_PROMPT': '0', 'GCM_INTERACTIVE': 'never'})
     if result.returncode:
-        # Git stderr may include a credential-bearing remote URL.
-        raise ValueError('Git '+args[0]+' failed. No reset or forced update was attempted.')
+        raise _GitFailure(args[0], result.returncode)
     return result.stdout.strip()
+
+
+def _ancestor(repo, older, newer):
+    try:
+        _git(repo, 'merge-base', '--is-ancestor', older, newer)
+    except _GitFailure as exc:
+        if exc.returncode == 1:
+            return False  # A negative ancestry answer is not a Git command error.
+        raise
+    return True
+
+
+def _documentation_only(repo, target, candidate):
+    paths = _git(repo, 'diff', '--name-only', '--no-renames', '--no-ext-diff',
+                 target, candidate, '--').splitlines()
+    # Do not use a collector-file allowlist: an unknown runtime/config change
+    # must also block accepting a newer checkout with an older tool package.
+    return all(path.endswith('.md') and ('/' not in path or path.startswith('docs/'))
+               for path in paths)
+
+
+def _compatible_target(repo, before, target, published, recovery):
+    if not _ancestor(repo, target, published):
+        raise _HistoryMismatch('Package revision is not verified on the fetched recovery branch. Existing source was kept.')
+    selected = target
+    for label, head in (('Local checkout', before), ('Local recovery branch', recovery)):
+        if not head or _ancestor(repo, head, selected):
+            continue
+        if not _ancestor(repo, selected, head):
+            raise _HistoryMismatch(label+' has diverged from the package revision. Existing commits were kept.')
+        if not _ancestor(repo, head, published):
+            raise _HistoryMismatch(label+' has unpublished commits. Existing commits were kept.')
+        if not _documentation_only(repo, target, head):
+            raise ValueError(label+' contains newer collector code or configuration. Use the matching newer CRYPTO.zip; no downgrade was attempted.')
+        selected = head
+    return selected
+
+
+def _resolve_target(repo, before, target, recovery):
+    published = _git(repo, 'rev-parse', 'FETCH_HEAD')
+    shallow = _git(repo, 'rev-parse', '--is-shallow-repository') == 'true'
+    print('LOCAL SOURCE: '+before+'\nPACKAGE SOURCE: '+target+'\nFETCHED SOURCE: '+published+
+          '\nHISTORY: '+('shallow' if shallow else 'complete'), flush=True)
+    try:
+        return _compatible_target(repo, before, target, published, recovery)
+    except (_GitFailure, _HistoryMismatch):
+        if not shallow:
+            raise
+    # Fetch ancestry only, once and with a bounded history size. No checkout,
+    # reset, database copy, or unbounded unshallow operation is performed.
+    print('FETCHING MISSING HISTORY (one bounded deepen: 256)...', flush=True)
+    _git(repo, 'fetch', '--no-tags', '--deepen=256', 'origin', 'refs/heads/'+BRANCH)
+    published = _git(repo, 'rev-parse', 'FETCH_HEAD')
+    print('FETCHED SOURCE: '+published, flush=True)
+    try:
+        return _compatible_target(repo, before, target, published, recovery)
+    except (_GitFailure, _HistoryMismatch) as exc:
+        if _git(repo, 'rev-parse', '--is-shallow-repository') == 'true':
+            raise ValueError('Git history is still incomplete after bounded history recovery. Existing source was kept; send the source versions printed above.') from exc
+        raise
 
 
 def _idle(repo):
@@ -59,12 +129,10 @@ def update_collection(repo: Path, target: str):
         raise ValueError('The existing origin is not the expected GitHub repository. Remote configuration was kept.')
     print('FETCHING COLLECTION UPDATE...', flush=True)
     _git(repo, 'fetch', '--no-tags', 'origin', 'refs/heads/'+BRANCH)
-    # Pin to the package revision, even if newer documents/source were pushed.
-    _git(repo, 'merge-base', '--is-ancestor', before, target)
-    _git(repo, 'merge-base', '--is-ancestor', target, 'FETCH_HEAD')
     recovery = _git(repo, 'for-each-ref', '--format=%(objectname)', 'refs/heads/'+BRANCH)
-    if recovery:
-        _git(repo, 'merge-base', '--is-ancestor', recovery, target)
+    # Keep package code pinned, but preserve already-applied published docs when
+    # every non-document file is identical. Never move an existing branch back.
+    selected = _resolve_target(repo, before, target, recovery)
     _idle(repo)
     if _clean(repo) != branch or _git(repo, 'rev-parse', 'HEAD') != before:
         raise ValueError('The checkout changed during update. Retry after other Git work finishes.')
@@ -75,8 +143,11 @@ def update_collection(repo: Path, target: str):
             raise ValueError('The recovery branch changed during update. Retry after other Git work finishes.')
         _git(repo, 'switch', BRANCH) if recovery else _git(repo, 'switch', '-c', BRANCH, before)
         _clean(repo)
-    _git(repo, 'merge', '--ff-only', target)
-    if _git(repo, 'rev-parse', 'HEAD') != target:
+    if _git(repo, 'rev-parse', 'HEAD') != selected:
+        _git(repo, 'merge', '--ff-only', selected)
+    if _git(repo, 'rev-parse', 'HEAD') != selected:
         raise ValueError('Source revision verification failed; collection was not started.')
     _clean(repo)
-    print('COLLECTION UPDATED: '+target, flush=True)
+    print('COLLECTION UPDATED: '+selected, flush=True)
+    if selected != target:
+        print('Package collector code matches; newer published documentation was preserved.', flush=True)

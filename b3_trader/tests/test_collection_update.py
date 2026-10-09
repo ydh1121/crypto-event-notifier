@@ -115,3 +115,79 @@ def test_generated_paper_recovery_branch_is_preserved_and_requires_ancestry(chec
         assert git(repo, 'rev-parse', 'HEAD') == target
     assert git(repo, 'rev-parse', branch) == before
     assert (repo/'b3_trader/data/auto_demo.sqlite3').read_text() == 'existing user data'
+
+
+@pytest.mark.parametrize('start_primary', [False, True])
+def test_published_docs_ahead_of_package_are_preserved(checkout, start_primary):
+    repo, base, target, calls = checkout
+    git(repo, 'switch', 'fixture-published')
+    (repo/'HANDOFF.md').write_text('newer handoff')
+    git(repo, 'add', '.'); git(repo, 'commit', '-m', 'docs')
+    docs = git(repo, 'rev-parse', 'HEAD')
+    git(repo, 'switch', update.BRANCH)
+    git(repo, 'merge', '--ff-only', docs)
+    if start_primary:
+        git(repo, 'switch', '-c', update.PRIMARY_BRANCH, base)
+    update.update_collection(repo, target)
+    assert git(repo, 'rev-parse', 'HEAD') == docs
+    assert git(repo, 'symbolic-ref', '--short', 'HEAD') == update.BRANCH
+    assert (repo/'HANDOFF.md').read_text() == 'newer handoff'
+    if start_primary:
+        assert git(repo, 'rev-parse', update.PRIMARY_BRANCH) == base
+    assert (repo/'b3_trader/data/auto_demo.sqlite3').read_text() == 'existing user data'
+    assert not any(c[0] in {'reset', 'clean', 'checkout'} for c in calls)
+
+
+def test_newer_collector_code_is_not_accepted_as_docs(checkout):
+    repo, base, target, calls = checkout
+    git(repo, 'switch', 'fixture-published')
+    (repo/'b3_trader/fix.py').write_text('different runtime')
+    git(repo, 'add', '.'); git(repo, 'commit', '-m', 'new runtime')
+    newer = git(repo, 'rev-parse', 'HEAD')
+    git(repo, 'switch', update.BRANCH); git(repo, 'merge', '--ff-only', newer)
+    with pytest.raises(ValueError, match='newer collector code'):
+        update.update_collection(repo, target)
+    assert git(repo, 'rev-parse', 'HEAD') == newer
+    assert not any(c[0] == 'merge' for c in calls)
+
+
+def test_shallow_history_is_deepened_without_reset(checkout, tmp_path, monkeypatch):
+    remote, base, target, calls = checkout
+    git(remote, 'switch', 'fixture-published')
+    (remote/'HANDOFF.md').write_text('published docs')
+    git(remote, 'add', '.'); git(remote, 'commit', '-m', 'docs')
+    docs = git(remote, 'rev-parse', 'HEAD')
+    local = tmp_path/'shallow'
+    subprocess.run(['git','clone','--depth=1','--branch','fixture-published',remote.as_uri(),str(local)],
+                   check=True, capture_output=True)
+    git(local, 'switch', '-c', update.BRANCH)
+    git(local, 'remote', 'set-url', 'origin', 'https://github.com/ydh1121/crypto-event-notifier.git')
+    for name in ('.venv/Scripts/python.exe', 'b3_trader/data/auto_demo.sqlite3'):
+        p=local/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text('existing user data')
+    original=update._git
+    def fetch_local(path, *args):
+        if args[0] == 'fetch':
+            calls.append(args)
+            return git(path, 'fetch', *[x for x in args[1:] if x.startswith('--')],
+                       remote.as_uri(), 'refs/heads/fixture-published')
+        return original(path, *args)
+    monkeypatch.setattr(update, '_git', fetch_local)
+    assert git(local, 'rev-parse', '--is-shallow-repository') == 'true'
+    update.update_collection(local, target)
+    assert git(local, 'rev-parse', 'HEAD') == docs
+    assert any('--deepen=256' in c for c in calls)
+    assert not any(c[0] in {'reset','clean','checkout'} for c in calls)
+    assert (local/'b3_trader/data/auto_demo.sqlite3').read_text() == 'existing user data'
+
+
+def test_unpublished_document_commits_are_not_silently_accepted(checkout):
+    repo, base, target, calls = checkout
+    git(repo, 'merge', '--ff-only', target)
+    (repo/'HANDOFF.md').write_text('unpublished user notes')
+    git(repo, 'add', '.');git(repo, 'commit', '-m', 'private docs')
+    before = git(repo, 'rev-parse', 'HEAD')
+    with pytest.raises(ValueError, match='unpublished commits'):
+        update.update_collection(repo, target)
+    assert git(repo, 'rev-parse', 'HEAD') == before
+    assert (repo/'HANDOFF.md').read_text() == 'unpublished user notes'
+    assert not any(c[0] == 'merge' for c in calls)
