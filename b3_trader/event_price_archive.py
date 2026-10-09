@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import math
 import sqlite3
+from itertools import islice
 
 from .event_response_contract import (
     EVENT_LOOKBACK_SECONDS, EXCLUDED_EVENT_TYPES, HORIZONS, MAX_EVENTS,
@@ -43,12 +44,13 @@ def eligible_events(conn, now, *, lookback=EVENT_LOOKBACK_SECONDS, limit=MAX_EVE
         (*OFFICIAL_EVENT_SOURCES, now - lookback, now, limit)).fetchall()
 
 
-def capture_market(conn, exchange, market, now, *, events=None) -> int:
+def prepare_market_prices(conn, exchange, market, now, *, events=None):
+    """Read bounded candidate prices without acquiring SQLite's single writer."""
     if events is None:
         events = eligible_events(conn, now)
     from .event_trade_samples import exists, candidate, SAMPLED_PROVIDER
     sampled = exists(conn)
-    changed = 0
+    prepared = []
     for event in events:
         stamp = float(event['source_ts'])
         if (not math.isfinite(stamp) or not 0 < stamp <= now
@@ -70,10 +72,35 @@ def capture_market(conn, exchange, market, now, *, events=None) -> int:
             if sampled:
                 sample = candidate(conn, exchange, market, target, baseline, now, MAX_TOLERANCE)
                 if sample:
-                    changed += save_price(conn, event, exchange, market, point, sample, now, provider=SAMPLED_PROVIDER)
+                    prepared.append((event, exchange, market, point, sample, SAMPLED_PROVIDER))
             if row is None or not math.isfinite(row['trade_price']):
                 continue
-            changed += save_price(conn, event, exchange, market, point, row, now)
+            prepared.append((event, exchange, market, point, row, PROVIDER_ID))
+    return prepared
+
+
+def _save_prepared(conn, prepared, now):
+    return sum(save_price(conn, event, exchange, market, point, row, now, provider=provider)
+               for event, exchange, market, point, row, provider in prepared)
+
+
+def capture_market(conn, exchange, market, now, *, events=None) -> int:
+    """Pruning callers own the transaction that preserves prices and deletes raw ticks."""
+    return _save_prepared(conn, prepare_market_prices(conn, exchange, market, now, events=events), now)
+
+
+def capture_markets(conn, markets, now, *, events):
+    """Collect outside writes, then commit bounded batches for the response owner."""
+    if conn.in_transaction:
+        raise RuntimeError('event capture requires an idle connection')
+    changed = 0
+    remaining = iter(markets)
+    while batch := tuple(islice(remaining, 16)):
+        prepared = [price for exchange, market in batch
+                    for price in prepare_market_prices(conn, exchange, market, now, events=events)]
+        if prepared:
+            with conn:
+                changed += _save_prepared(conn, prepared, now)
     return changed
 
 

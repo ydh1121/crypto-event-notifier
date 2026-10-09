@@ -10,7 +10,7 @@ from .event_response_contract import (
     HORIZONS, PROVIDER_ID, observation, OFFICIAL_EVENT_SOURCES,
     EXCLUDED_EVENT_TYPES, OBSERVATION_TOLERANCE_SECONDS, EVENT_LOOKBACK_SECONDS, MAX_EVENTS,
 )
-from .event_price_archive import capture_market, eligible_events, read_price, ensure_schema as ensure_price_schema
+from .event_price_archive import capture_markets, eligible_events, read_price, ensure_schema as ensure_price_schema
 
 DEFAULT_BENCHMARKS: tuple[tuple[str, str], ...] = (
     ("bithumb", "KRW-BTC"),
@@ -248,8 +248,7 @@ class IntelligenceEventResponseCollector:
 
         # Capture even before the first 15m horizon is due. Market-flow pruning
         # uses this same repository to preserve known event prices beforehand.
-        for exchange, market in markets:
-            result["prices_archived"] += capture_market(self.conn, exchange, market, current, events=events)
+        result["prices_archived"] = capture_markets(self.conn, markets, current, events=events)
 
         for event in events:
             event_type = str(event["event_type"] or "").strip().upper()
@@ -272,6 +271,7 @@ class IntelligenceEventResponseCollector:
                 saved.setdefault((row["exchange"], row["market"]), []).append(row)
             event_markets = sorted(set(markets).union(saved)) if self.include_observed_markets else markets
             baselines: dict[tuple[str, str], Any] = {}
+            prepared = []
 
             for horizon_label, horizon_seconds in HORIZONS:
                 target_ts = event_ts + float(horizon_seconds)
@@ -351,14 +351,7 @@ class IntelligenceEventResponseCollector:
                         attrs[name+'_observation_kind'] = kind
                         if kind == 'minute_endpoints':
                             attrs[name+'_semantics'] = 'nearest_stored_real_minute_endpoint_within_tolerance'
-                    cursor = self.conn.execute(
-                        """INSERT OR IGNORE INTO research_intelligence_event_responses(
-                               event_id,event_type,source_id,exchange,market,horizon_label,
-                               horizon_seconds,event_ts,baseline_trade_ts,baseline_price,target_ts,
-                               target_trade_ts,target_price,return_pct,provider_id,data_rights,
-                               observation_tolerance_seconds,captured_at,attributes_json,schema_version
-                           ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                        (
+                    prepared.append((attrs, (
                             event_id,
                             event_type,
                             source_id,
@@ -379,8 +372,20 @@ class IntelligenceEventResponseCollector:
                             current,
                             json.dumps(attrs, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
                             SCHEMA_VERSION,
-                        ),
-                    )
+                        )))
+
+            # One event's calculations finish before acquiring the writer.
+            # Failed inserts roll back this batch; preserved prices and already
+            # committed events remain available for an idempotent next cycle.
+            with self.conn:
+                for attrs, values in prepared:
+                    cursor = self.conn.execute(
+                        """INSERT OR IGNORE INTO research_intelligence_event_responses(
+                               event_id,event_type,source_id,exchange,market,horizon_label,
+                               horizon_seconds,event_ts,baseline_trade_ts,baseline_price,target_ts,
+                               target_trade_ts,target_price,return_pct,provider_id,data_rights,
+                               observation_tolerance_seconds,captured_at,attributes_json,schema_version
+                           ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", values)
                     if int(cursor.rowcount or 0) > 0:
                         result["samples_inserted"] += 1
                         if attrs["baseline_reused_from_response"]:
@@ -392,7 +397,6 @@ class IntelligenceEventResponseCollector:
                     else:
                         result["already_captured"] += 1
 
-        self.conn.commit()
         result["ok"] = not bool(result["anchor_conflicts"])
         result["status"] = "anchor_conflict" if result["anchor_conflicts"] else "ok"
         return result

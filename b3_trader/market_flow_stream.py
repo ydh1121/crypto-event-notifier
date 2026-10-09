@@ -306,12 +306,16 @@ class StreamWorker:
         if row is None:
             return
         self._update(last_socket_message_at=received_at)
-        if self.event_sampler and received_at >= self.event_retry_after:
+        if self.event_sampler:
             try:
                 self.event_sampler.observe(row, received_at)
-                if received_at >= self.event_sampler.next_flush:
+                if self.event_sampler.registry_error:
+                    self._update(event_capture_error=self.event_sampler.registry_error)
+                # Backoff delays writes, never observation of incoming alt ticks.
+                if received_at >= max(self.event_retry_after, self.event_sampler.next_flush):
                     self.event_sampler.flush(received_at)
-                    self._update(event_capture=self.event_sampler.evidence(received_at), event_capture_error='')
+                    self._update(event_capture=self.event_sampler.evidence(received_at),
+                                 event_capture_error=self.event_sampler.registry_error)
             except sqlite3.Error as exc:
                 # Research-price trouble must not change existing flow decisions.
                 self.event_retry_after = received_at+30

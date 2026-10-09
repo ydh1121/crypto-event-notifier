@@ -76,6 +76,7 @@ class EventTradeSampler:
         self.latest = {}
         self.messages = self.writes = self.archived = self.expired = 0
         self.last_flush = 0
+        self.registry_error = ''
 
     def refresh(self, now):
         if now < self.next_refresh:
@@ -91,6 +92,7 @@ class EventTradeSampler:
         # Dicts are not comparison keys: simultaneous releases are independent.
         self.clocks = [r[0] for r in self.boundaries]
         self.next_refresh = now + FLUSH_SECONDS
+        self.registry_error = ''
 
     def observe(self, row, now):
         stamp, price = row.get('trade_ts'), row.get('trade_price')
@@ -99,7 +101,6 @@ class EventTradeSampler:
                 or any(type(v) not in (int, float) or not math.isfinite(v) for v in (stamp, price, now))
                 or not now-120 <= stamp <= now or price <= 0 or not row.get('sequential_id')):
             return False
-        self.refresh(now)
         point = dict(trade_ts=stamp, trade_price=price, sequential_id=str(row['sequential_id']))
         key = (market, int(stamp//60)*60)
         first, last = self.pending.get(key, (point, point))
@@ -107,6 +108,14 @@ class EventTradeSampler:
         self.pending[key] = (min(first, point, key=rank), max(last, point, key=rank))
         self.latest[market] = max(stamp, self.latest.get(market, 0))
         self.messages += 1
+        # Receiving a price must not depend on the event registry being readable.
+        # Retain minute evidence and use known boundaries during a transient DB
+        # failure; newly discovered events can still use the stored endpoints.
+        try:
+            self.refresh(now)
+        except sqlite3.Error as exc:
+            self.registry_error = type(exc).__name__
+            self.next_refresh = now + FLUSH_SECONDS
         for target, label, event in self.boundaries[bisect_left(self.clocks, stamp-120):bisect_right(self.clocks, stamp+120)]:
             baseline = label == 'baseline'
             if (baseline and stamp > target) or (not baseline and stamp < target):
@@ -162,4 +171,4 @@ class EventTradeSampler:
                     last_trade_ts=max(self.latest.values(), default=None), last_flush_at=self.last_flush,
                     messages=self.messages, sample_writes=self.writes, exact_prices_archived=self.archived,
                     expired_samples=self.expired, retention_seconds=RETENTION_SECONDS,
-                    raw_volume_history=False)
+                    registry_error=self.registry_error, raw_volume_history=False)
