@@ -1,21 +1,21 @@
 # Dashboard v1 workstream tasks
 
-### Current — WAL recovered; research write locks repaired
+### Current — collection advancing; alt event retry loss repaired
 
-- STATE = WAL_RECLAIM_CONFIRMED / RESEARCH_WRITE_RECOVERY_IMPLEMENTED / PC_APPLY_PENDING. WO CRYPTO-WO-20260921-RECOVERY-001.
-- PROGRESS = 전체 약40% 유지. 실제 데이터로 사용·검증된 범위 기준 추정이며, 코드 수정만으로 장기 안정성을 완료 처리하지 않는다.
-- ACTUAL = CRYPTO_CHECK_RESULT(20261008-162105).json /306455bytes/SHA256ba4ab6433ecd82f5efd1bdfe62d204a253a33de5bb8f7f49b8ce2a8c26805dfa. ts1791476060.3761644–1791476093.4909341, 약33초 관측. Windows 첨부 근거이며 직접 PC 접속은 아니다.
-- VERSION = Viewer·collector 소스2ef36d256747dc4b45ecdce02d44c2ec83cf526a·무결성 확인. 현재 source recovery branch만 수정하며 primary·배포·실주문은 변경하지 않는다.
-- STORAGE = 실제 시작 전 WAL12685364672bytes→0, 순회수12.69GB 확인. 본체5780217856bytes·schema 유지, 기존 검증 백업 재사용. 점검 시 WAL12701992bytes. 최근48시간·DB별24시간 한 번 백업 유지. F32 공간 회수 미확인 상태는 해소됐다.
-- RUNTIME = 같은33초 동안 PAPER·전략·원시 가격·이벤트 가격 최신시각 불변. 양 거래소 SQLITE_BUSY5, PAPER transaction_open=false, websocket 연결도 지연/해제. 수집 host/sidecar process는 생존. PC의 정확한 잠금 소유자는 아직 미확인이며 WAL 공간 회수의 부작용으로 단정하지 않는다.
-- JOURNAL = B3/빗썸/공격적13체결·6완료·2승·실현손익129065.0976035411원 원장 일치. DD 원장 재현은 미확인. 실제 소액 기록0건.
-- EVENTS = B3 SEC15분·1시간 기록,4시간·1일 missing_target. 미국 무역수지4구간 대상가 없음; BTC/ETH는 같은 발표4구간 기록. 최근120초 알트181/161개 수신 관측. 거래 부재/수집 공백 구분은 미완료; 결측0% 보정·허용창 확대 없음.
-- CHANGED = OHLCV·체결·상대강도·거래소차이·프리미엄 저장 실패 rollback; 반응도·지연 반응·가격/수급 비교·신뢰도 계산을 쓰기 전에 준비한 뒤 짧은 원자 저장. 반응 원본과 파생 통계는 별도 원자 저장해 통계 실패 시 이전 통계·확정 원본 보존, 다음 주기 재계산. 연구 단계 경계는 남은 쓰기를 rollback하고 오류 처리. 단일 덮어쓰기 진행 파일의 단계·pid·SQLITE 코드·경계 잠금 상태를 RUN_CHECK에 전달. 수식·전략·PAPER 결정·보존 기간·schema 변경 없음.
-- VERIFY = 수정 전 실제 SQLite 두 연결에서7개 실패 재현, 수정 후 해소. 기존 검증 포함 고유69개 테스트 PASS(신규10개). 부분 저장 실패·다른 writer 진입·이전 집계 보존·다음 주기 회복·단계 실패 rollback·오류 readback 검증. compile/diff PASS. 실제 PC의 장기 수집 회복은 다음 첨부로 확인한다.
-- DELIVERY = 동일 CRYPTO.zip version31 /소스e51067a0f4cb44d70f916d813cf50b5e24c95a06 /188278bytes/86files/SHA256a56ee1ebec57c05afebf669da2bd39ef6af297607d94dfcbc622c2db100a1292. 85payload 해시·stdlib-only import PASS. 기존 CRYPTO 덮어쓰기.
+- STATE = RESEARCH_RECOVERY_OBSERVED / ALT_EVENT_RETRY_REPAIR_IMPLEMENTED / PC_APPLY_PENDING. WO CRYPTO-WO-20260921-RECOVERY-001.
+- PROGRESS = 전체 약40% 유지. 실제 데이터로 수집·검증·계획·소액 비교가 이어지는 범위 기준 추정이다.
+- ACTUAL = CRYPTO_CHECK_RESULT(20261008-222605).json /305943bytes/SHA256fe35b4ca8b6c2303789f3ffebe5d80f81c77cbab961370716ff60cf779615634. ts1791497595.725–1791497629.865, 약34초 관측. Windows 첨부 근거이며 직접 PC 접속은 아니다.
+- VERSION = Viewer·collector e51067a0f4cb44d70f916d813cf50b5e24c95a06 적용·무결성 확인. 수집 host/sidecar 생존, 관측 구간 재시작 없음.
+- RUNTIME = PAPER·시장 메모리·원시 가격 최신시각 전진, 빗썸486종목 스캔 완료 후 다음 순회, 업비트168→240/293 진행. 오류 없음. 연구 신뢰도 단계39.991초 완료·경계 열린 쓰기 없음. 전략/OHLCV/뉴스는 다음 실행 전의 관측이므로 최신시각 불변을 장애로 판정하지 않는다. 장기 안정성은 아직 미확인.
+- STORAGE = 기존 WAL12.69GB 회수 유지. 본체5780217856bytes·재사용1368616960bytes·WAL389958032bytes. 시작 정리 기준1GiB 미만이라 추가 회수 생략. DB별24시간 한 번·48시간 백업 정책 유지.
+- JOURNAL = B3/빗썸/공격적13체결·6완료·2승·실현손익129065.0976035411원 원장 일치. DD 원장 재현 미확인. 실제 소액 기록0건.
+- EVENTS = 최근120초 알트 빗썸155/업비트131개 실제 가격 확인. B3는 재접속 후 실제 체결1건 수신,34초 동안 추가 체결 없음만으로 장애로 판정하지 않는다. SEC15분/1시간 기록·4시간/1일 결측, 무역수지4구간 대상가 결측 유지. BTC/ETH 동일 발표4구간 기록. 과거 거래 부재/수집 공백 구분은 아직 미확인.
+- CHANGED = 저장 실패 후30초 재시도 중에도 알트 가격을 계속 보관. 이벤트 목록 조회 실패도 가격을 버리지 않고 기존 발표 시점·6시간 실제 분별 첫/마지막 체결을 유지. 이벤트 가격 조회 후16종목 단위 원자 저장, 반응 계산 후 발표별 원자 저장으로 긴 쓰기 점유·실패 후 열린 쓰기 제거. 가격·수익률 공식·120초 허용창·전략/PAPER·보존기간·schema 변경 없음.
+- VERIFY = 수정 전4개 실패 재현. 신규5개 포함 관련65개 테스트 PASS: 실제 SQLite 경합 중 알트 가격→보존→반응도→화면10% 대조, 실패 rollback·재시도 중복 없음, 조회 중 다른 writer 진입. compile/diff PASS. 이는 임시 검증 DB 결과이며 PC 과거 결측을 복구했다는 뜻이 아니다.
+- DELIVERY = 동일 CRYPTO.zip version32 /소스9381e4d980a680230d70b3015edd282d2b120a68 /188818bytes/86files/SHA256a078731d16802238d80639bf6e1839e170c754c9abc8ca7d4200bf7d0cd42987. 85payload 해시·stdlib-only import PASS. 기존 CRYPTO 덮어쓰기.
 - APPLY = 조회 검은 창 X→기존 수집 창 Esc(선택 상태일 때)·Ctrl+C 한 번 후 종료 대기→Y/N 질문이면 Y→Enter 후 기존 창 닫기→기존 CRYPTO에 덮어쓰기→UPDATE_COLLECTION.cmd→새 KEEP OPEN 유지→RUN_REVIEW.cmd→10분 이상 후 RUN_CHECK.cmd. CLEAN_STORAGE 재실행·새 폴더 불필요.
-- NEXT = 수정본 적용·양 거래소 DB 잠금/최신시각/연구 단계 대조→알트 이벤트 거래 부재·수집 공백 분리→도미넌스/시장 전체→SNS/온체인/추가 거시→시간 순 코인별 전략 검증·근거 있는 상승 후보→수동 소액 대조 후 별도 승인 실전.
-- DURABLE = Drive CURRENT SNAPSHOT/BATON·Ledger·기존 WBS 4문서 갱신 후 전체 본문 readback 일치. 동일 CRYPTO.zip version31 저장·85payload 검증 완료. actual PC의 수정 적용·장기 수집은 다음 첨부로 확인한다.
+- NEXT = 수정본 적용·지속 수신/저장 대조→새 발표의 알트·BTC·ETH 반응 누적과 수집 공백 구분→도미넌스/시장 전체→SNS/온체인/추가 거시→시간 순 코인별 전략 검증·근거 있는 상승 후보→수동 소액 대조 후 별도 승인 실전.
+- DURABLE = 동일 파일 version32 저장 완료. Drive CURRENT SNAPSHOT/BATON·Ledger·WBS 4문서 갱신 후 전체 본문 readback 일치. primary·Production·실주문·실제 DB 변경 없음.
 
 ### Previous checkpoint — shared daily backups and safe 48-hour cleanup implemented
 
